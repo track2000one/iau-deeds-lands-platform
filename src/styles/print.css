@@ -1,0 +1,150 @@
+/* Print Styles for Reports */
+
+@media print {
+  /* Hide unnecessary elements */
+  .no-print,
+  button,
+  .sidebar,
+  nav,
+  header,
+  footer,
+  .print-hidden {
+    display: none !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4 landscape;
+    margin: 15mm 10mm;
+  }
+
+  /* Body */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+
+  /* Container */
+  .container {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Cards */
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  /* Tables */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    font-size: 10pt !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+    background: #1e40af !important;
+    color: white !important;
+  }
+
+  th {
+    background: #1e40af !important;
+    color: white !important;
+    padding: 8px 6px !important;
+    font-weight: 600 !important;
+    border: 1px solid #2563eb !important;
+    text-align: center !important;
+  }
+
+  tbody tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #f9fafb !important;
+  }
+
+  td {
+    padding: 6px 6px !important;
+    border: 1px solid #d1d5db !important;
+    text-align: center !important;
+  }
+
+  /* Badges */
+  .badge {
+    border: 1px solid #3b82f6 !important;
+    background: #dbeafe !important;
+    color: #1e40af !important;
+    padding: 2px 8px !important;
+    border-radius: 8px !important;
+    font-size: 9pt !important;
+  }
+
+  /* Ensure colors print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Headers */
+  h1, h2, h3 {
+    page-break-after: avoid !important;
+    color: #1e40af !important;
+  }
+
+  h1 {
+    font-size: 20pt !important;
+  }
+
+  h2 {
+    font-size: 16pt !important;
+  }
+
+  h3 {
+    font-size: 14pt !important;
+  }
+
+  /* Links */
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  /* Card Headers */
+  .card-header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%) !important;
+    color: white !important;
+    padding: 12px !important;
+    margin-bottom: 10px !important;
+    border-bottom: 3px solid #fbbf24 !important;
+  }
+
+  .card-title {
+    color: white !important;
+    font-size: 16pt !important;
+  }
+
+  /* Statistics boxes */
+  .statistics-box {
+    background: #f8fafc !important;
+    border: 2px solid #e2e8f0 !important;
+    padding: 12px !important;
+    margin-bottom: 15px !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Remove shadows and effects */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
