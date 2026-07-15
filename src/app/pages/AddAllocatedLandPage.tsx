@@ -13,10 +13,33 @@ import { Textarea } from '../components/ui/textarea';
 import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
+import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { toast } from 'sonner';
 import type { AllocatedLand } from '../../types/models';
 
 type AllocatedLandFormData = Omit<AllocatedLand, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>;
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+const parseCoordinatesString = (value: string): Coordinates | undefined => {
+  if (!value) return undefined;
+
+  const parts = value
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((part) => !Number.isNaN(part));
+
+  if (parts.length < 2) return undefined;
+
+  return {
+    latitude: parts[0],
+    longitude: parts[1],
+  };
+};
+
 
 export const AddAllocatedLandPage: React.FC = () => {
   const navigate = useNavigate();
@@ -24,6 +47,11 @@ export const AddAllocatedLandPage: React.FC = () => {
   const { currentUser } = useAuth();
   const { t } = useTranslation();
   const [coordinates, setCoordinates] = useState('');
+  const selectedCoordinates = parseCoordinatesString(coordinates);
+
+  const handleCoordinatesChange = React.useCallback((selected: Coordinates) => {
+    setCoordinates(`${selected.latitude.toFixed(6)}, ${selected.longitude.toFixed(6)}`);
+  }, []);
 
   // File upload states
   const [contractFiles, setContractFiles] = useState<File[]>([]);
@@ -255,6 +283,12 @@ export const AddAllocatedLandPage: React.FC = () => {
                       </Button>
                     )}
                   </div>
+                    <div className="mt-3">
+                      <MapCoordinatePicker
+                        coordinates={selectedCoordinates}
+                        onChange={handleCoordinatesChange}
+                      />
+                    </div>
                   <p className="text-sm text-muted-foreground">
                     أدخل الإحداثيات بصيغة: latitude, longitude
                   </p>

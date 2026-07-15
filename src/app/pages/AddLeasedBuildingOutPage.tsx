@@ -12,10 +12,33 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
+import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { toast } from 'sonner';
 import type { LeasedBuildingOut } from '../../types/models';
 
 type FormData = Omit<LeasedBuildingOut, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>;
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+const parseCoordinatesString = (value: string): Coordinates | undefined => {
+  if (!value) return undefined;
+
+  const parts = value
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((part) => !Number.isNaN(part));
+
+  if (parts.length < 2) return undefined;
+
+  return {
+    latitude: parts[0],
+    longitude: parts[1],
+  };
+};
+
 
 export const AddLeasedBuildingOutPage: React.FC = () => {
   const navigate = useNavigate();
@@ -23,6 +46,11 @@ export const AddLeasedBuildingOutPage: React.FC = () => {
   const { currentUser } = useAuth();
   const { t } = useTranslation();
   const [coordinates, setCoordinates] = useState('');
+  const selectedCoordinates = parseCoordinatesString(coordinates);
+
+  const handleCoordinatesChange = React.useCallback((selected: Coordinates) => {
+    setCoordinates(`${selected.latitude.toFixed(6)}, ${selected.longitude.toFixed(6)}`);
+  }, []);
   const [contractFiles, setContractFiles] = useState<File[]>([]);
   const [planFiles, setPlanFiles] = useState<File[]>([]);
   const [siteFiles, setSiteFiles] = useState<File[]>([]);
@@ -194,6 +222,12 @@ export const AddLeasedBuildingOutPage: React.FC = () => {
                       )}
                     </div>
                   </div>
+                    <div className="mt-3">
+                      <MapCoordinatePicker
+                        coordinates={selectedCoordinates}
+                        onChange={handleCoordinatesChange}
+                      />
+                    </div>
                 </div>
               </CardContent>
             </Card>

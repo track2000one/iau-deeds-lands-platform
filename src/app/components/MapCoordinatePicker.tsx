@@ -157,26 +157,8 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
             <MapClickHandler onChange={onChange} />
             <RecenterMap position={position} zoom={zoom} />
 
-            {hasCoordinates && (
-              <Marker position={position} icon={markerIcon} />
-            )}
+            {hasCoordinates && <Marker position={position} icon={markerIcon} />}
           </MapContainer>
-        </div>
-
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="rounded-lg border bg-background px-3 py-2">
-            <p className="text-xs text-muted-foreground">خط العرض Latitude</p>
-            <p className="font-mono text-sm">
-              {hasCoordinates ? coordinates.latitude.toFixed(6) : '-'}
-            </p>
-          </div>
-
-          <div className="rounded-lg border bg-background px-3 py-2">
-            <p className="text-xs text-muted-foreground">خط الطول Longitude</p>
-            <p className="font-mono text-sm">
-              {hasCoordinates ? coordinates.longitude.toFixed(6) : '-'}
-            </p>
-          </div>
         </div>
       </div>
     </div>
