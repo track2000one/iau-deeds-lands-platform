@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useData } from '../../context/DataContext';
+import { useDeeds } from '../../context/DeedContext';
 import { Search, FileText, MapPin, Building, Home } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -21,8 +22,9 @@ import type { RecordType } from '../../types/models';
 
 export const UnifiedSearchPage: React.FC = () => {
   const { t } = useTranslation();
+  const { deeds } = useDeeds();
+
   const {
-    deeds,
     allocatedLands,
     deliveredLands,
     leasedLandsOut,

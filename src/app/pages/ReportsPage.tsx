@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useData } from '../../context/DataContext';
+import { useDeeds } from '../../context/DeedContext';
 import {
   FileSpreadsheet,
   FileText,
@@ -140,8 +141,9 @@ export const ReportsPage: React.FC = () => {
     { key: 'rentAmount', label: t('deed.rentAmount'), enabled: true },
   ];
 
+  const { deeds } = useDeeds();
+
   const {
-    deeds,
     allocatedLands,
     deliveredLands,
     leasedLandsOut,
