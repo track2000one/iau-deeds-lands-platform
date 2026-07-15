@@ -1,17 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../config/firebase';
-import { COLLECTIONS } from '../config/firestore-collections';
 import { useAuth } from './AuthContext';
 import type {
   UserPermissions,
   ModuleName,
   ModulePermissions,
+  UserProfile,
+} from '../types/permissions';
+import {
   ADMIN_PERMISSIONS,
   EMPLOYEE_DEFAULT_PERMISSIONS,
-  UserProfile
 } from '../types/permissions';
-import { ADMIN_PERMISSIONS as DEFAULT_ADMIN_PERMISSIONS, EMPLOYEE_DEFAULT_PERMISSIONS as DEFAULT_EMPLOYEE_PERMISSIONS } from '../types/permissions';
 
 interface PermissionsContextType {
   permissions: UserPermissions | null;
@@ -31,56 +29,27 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [loading, setLoading] = useState(true);
 
   const loadUserPermissions = async () => {
-    if (!currentUser) {
+    if (!currentUser || !authUserProfile) {
       setPermissions(null);
       setUserProfile(null);
       setLoading(false);
       return;
     }
 
-    try {
-      setLoading(true);
+    setLoading(true);
 
-      // Check if Firebase is configured
-      if (!isFirebaseConfigured() || !db) {
-        // وضع التشغيل بدون Firebase: الاعتماد على ملف المستخدم القادم من AuthContext
-        setUserProfile(authUserProfile);
+    const normalizedPermissions =
+      authUserProfile.role === 'admin'
+        ? ADMIN_PERMISSIONS
+        : authUserProfile.permissions || EMPLOYEE_DEFAULT_PERMISSIONS;
 
-        if (authUserProfile?.role === 'admin') {
-          setPermissions(DEFAULT_ADMIN_PERMISSIONS);
-        } else {
-          setPermissions(authUserProfile?.permissions || DEFAULT_EMPLOYEE_PERMISSIONS);
-        }
+    setUserProfile({
+      ...authUserProfile,
+      permissions: normalizedPermissions,
+    });
 
-        setLoading(false);
-        return;
-      }
-
-      // جلب بيانات المستخدم من Firestore
-      const userDocRef = doc(db, COLLECTIONS.USERS, currentUser.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserProfile;
-        setUserProfile(userData);
-
-        // إذا كان المستخدم مسؤول، امنحه جميع الصلاحيات
-        if (userData.role === 'admin') {
-          setPermissions(DEFAULT_ADMIN_PERMISSIONS);
-        } else {
-          // إذا كان موظف، استخدم صلاحياته المحفوظة
-          setPermissions(userData.permissions || DEFAULT_EMPLOYEE_PERMISSIONS);
-        }
-      } else {
-        // إذا لم يكن هناك بيانات للمستخدم، استخدم الصلاحيات الافتراضية
-        setPermissions(DEFAULT_EMPLOYEE_PERMISSIONS);
-      }
-    } catch (error) {
-      console.error('Error loading user permissions:', error);
-      setPermissions(DEFAULT_EMPLOYEE_PERMISSIONS);
-    } finally {
-      setLoading(false);
-    }
+    setPermissions(normalizedPermissions);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -90,10 +59,9 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const hasPermission = (module: ModuleName, action: keyof ModulePermissions): boolean => {
     if (!permissions) return false;
 
-    // المسؤول لديه جميع الصلاحيات
     if (userProfile?.role === 'admin') return true;
 
-    return permissions[module]?.[action] || false;
+    return Boolean(permissions[module]?.[action]);
   };
 
   const isAdmin = userProfile?.role === 'admin';
@@ -120,8 +88,10 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
 export const usePermissions = (): PermissionsContextType => {
   const context = useContext(PermissionsContext);
+
   if (context === undefined) {
     throw new Error('usePermissions must be used within a PermissionsProvider');
   }
+
   return context;
 };
