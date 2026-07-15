@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useDeeds } from '../../context/DeedContext';
+import { usePermissions } from '../../context/PermissionsContext';
 import {
   Search,
   Filter,
@@ -43,6 +44,7 @@ export const AllDeedsPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { deeds, deleteDeed } = useDeeds();
+  const { isAdmin } = usePermissions();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterPlanned, setFilterPlanned] = useState<'all' | 'planned' | 'unplanned'>('all');
@@ -83,12 +85,17 @@ export const AllDeedsPage: React.FC = () => {
   }, [deeds]);
 
   const handleDelete = (id: string) => {
+    if (!isAdmin) {
+      toast.error('ليس لديك صلاحية حذف الصكوك');
+      return;
+    }
+
     setDeedToDelete(id);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deedToDelete) {
+    if (deedToDelete && isAdmin) {
       deleteDeed(deedToDelete);
       toast.success(t('deed.deletedSuccessfully'));
       setDeleteDialogOpen(false);
@@ -106,10 +113,12 @@ export const AllDeedsPage: React.FC = () => {
             {t('search.foundResults', { count: filteredDeeds.length })}
           </p>
         </div>
-        <Button onClick={() => navigate('/deeds/new')} className="bg-primary w-full sm:w-auto text-sm md:text-base">
-          <FileText className="h-4 w-4 mr-2" />
-          {t('deed.addNew')}
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => navigate('/deeds/new')} className="bg-primary w-full sm:w-auto text-sm md:text-base">
+            <FileText className="h-4 w-4 mr-2" />
+            {t('deed.addNew')}
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -243,24 +252,28 @@ export const AllDeedsPage: React.FC = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => navigate(`/deeds/${deed.id}`)}
-                            title={t('app.edit')}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(deed.id)}
-                            title={t('app.delete')}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {isAdmin && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => navigate(`/deeds/${deed.id}`)}
+                                title={t('app.edit')}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleDelete(deed.id)}
+                                title={t('app.delete')}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -328,23 +341,27 @@ export const AllDeedsPage: React.FC = () => {
                     <Eye className="h-3 w-3 mr-1" />
                     {t('app.view')}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs h-8"
-                    onClick={() => navigate(`/deeds/${deed.id}`)}
-                  >
-                    <Edit className="h-3 w-3 mr-1" />
-                    {t('app.edit')}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs h-8 text-destructive hover:text-destructive"
-                    onClick={() => handleDelete(deed.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  {isAdmin && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-xs h-8"
+                        onClick={() => navigate(`/deeds/${deed.id}`)}
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        {t('app.edit')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-8 text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(deed.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

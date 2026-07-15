@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useDeeds } from '../../context/DeedContext';
+import { usePermissions } from '../../context/PermissionsContext';
 import { useForm } from 'react-hook-form';
 import { DeedFormData } from '../../types/deed';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
@@ -34,6 +35,7 @@ export const AddDeedPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { addDeed } = useDeeds();
+  const { isAdmin } = usePermissions();
 
   const [showMap, setShowMap] = useState(false);
   const [coordinates, setCoordinates] = useState<Coordinates | undefined>();
@@ -214,6 +216,27 @@ export const AddDeedPage: React.FC = () => {
       otherImages,
     ]
   );
+
+
+  if (!isAdmin) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>غير مصرح</CardTitle>
+            <CardDescription>
+              ليس لديك صلاحية إضافة أو تعديل الصكوك. يمكنك فقط استعراض البيانات والبحث حسب الصلاحيات الممنوحة لك.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button type="button" onClick={() => navigate('/deeds')}>
+              العودة إلى جميع الصكوك
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">

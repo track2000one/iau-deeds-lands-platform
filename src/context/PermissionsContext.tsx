@@ -25,7 +25,7 @@ interface PermissionsContextType {
 const PermissionsContext = createContext<PermissionsContextType | undefined>(undefined);
 
 export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, userProfile: authUserProfile } = useAuth();
   const [permissions, setPermissions] = useState<UserPermissions | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,8 +43,15 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       // Check if Firebase is configured
       if (!isFirebaseConfigured() || !db) {
-        // Demo mode - use default permissions
-        setPermissions(DEFAULT_EMPLOYEE_PERMISSIONS);
+        // وضع التشغيل بدون Firebase: الاعتماد على ملف المستخدم القادم من AuthContext
+        setUserProfile(authUserProfile);
+
+        if (authUserProfile?.role === 'admin') {
+          setPermissions(DEFAULT_ADMIN_PERMISSIONS);
+        } else {
+          setPermissions(authUserProfile?.permissions || DEFAULT_EMPLOYEE_PERMISSIONS);
+        }
+
         setLoading(false);
         return;
       }
@@ -78,7 +85,7 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   useEffect(() => {
     loadUserPermissions();
-  }, [currentUser]);
+  }, [currentUser, authUserProfile]);
 
   const hasPermission = (module: ModuleName, action: keyof ModulePermissions): boolean => {
     if (!permissions) return false;

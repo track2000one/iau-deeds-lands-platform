@@ -9,7 +9,6 @@ import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useData } from '../../context/DataContext';
-import { toast } from 'sonner';
 
 export const AdminDashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -34,15 +33,6 @@ export const AdminDashboardPage: React.FC = () => {
       </div>
     );
   }
-
-  const handleResetDemoData = () => {
-    if (confirm(t('admin.resetDemoDataConfirm'))) {
-      // Clear all localStorage data
-      localStorage.clear();
-      toast.success(t('admin.resetSuccess'));
-      window.location.reload();
-    }
-  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -195,22 +185,11 @@ export const AdminDashboardPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-medium">{t('admin.demoData')}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {t('admin.demoDataDescription')}
-                </p>
-                <Button variant="destructive" onClick={handleResetDemoData}>
-                  <Database className="ml-2 h-4 w-4" />
-                  {t('admin.resetDemoData')}
-                </Button>
-              </div>
-
               <Alert variant="default">
                 <Settings className="h-4 w-4" />
-                <AlertTitle>{t('admin.note')}</AlertTitle>
+                <AlertTitle>إعدادات النظام</AlertTitle>
                 <AlertDescription>
-                  {t('admin.demoModeNote')}
+                  هذه الصفحة مخصصة للمسؤولين فقط. يمكن استخدامها لاحقًا لإدارة المستخدمين، الصلاحيات، وإعدادات المنصة الرسمية.
                 </AlertDescription>
               </Alert>
             </CardContent>
