@@ -12,7 +12,7 @@ import {
   Upload,
   FileText,
   Image as ImageIcon,
-  Map as MapIcon
+  Map as MapIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -25,20 +25,31 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
 export const AddDeedPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { addDeed } = useDeeds();
-  const [showMap, setShowMap] = useState(false);
-  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | undefined>();
 
-  // File upload states
+  const [showMap, setShowMap] = useState(false);
+  const [coordinates, setCoordinates] = useState<Coordinates | undefined>();
+
   const [deedImages, setDeedImages] = useState<File[]>([]);
   const [siteImages, setSiteImages] = useState<File[]>([]);
   const [planImages, setPlanImages] = useState<File[]>([]);
   const [otherImages, setOtherImages] = useState<File[]>([]);
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<DeedFormData>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    watch,
+  } = useForm<DeedFormData>({
     defaultValues: {
       deedNumber: '',
       deedDate: new Date().toISOString().split('T')[0],
@@ -53,159 +64,206 @@ export const AddDeedPage: React.FC = () => {
       usageType: '',
       notes: '',
       isPlanned: false,
-      attachments: []
-    }
+      attachments: [],
+    },
   });
 
   const isPlanned = watch('isPlanned');
 
-  const handleIsPlannedChange = React.useCallback((checked: boolean) => {
-    setValue('isPlanned', checked);
-  }, [setValue]);
+  const cities = ['الدمام', 'الخبر', 'الظهران', 'القطيف', 'الجبيل', 'الأحساء', 'حفر الباطن'];
+  const usageTypes = ['سكني', 'تجاري', 'صناعي', 'استثماري', 'تعليمي', 'زراعي', 'حكومي'];
+
+  const handleIsPlannedChange = React.useCallback(
+    (checked: boolean) => {
+      setValue('isPlanned', checked);
+    },
+    [setValue]
+  );
 
   const handleToggleMap = React.useCallback(() => {
-    setShowMap(prev => !prev);
+    setShowMap((prev) => !prev);
   }, []);
 
-  const handleFileUpload = React.useCallback((
-    event: React.ChangeEvent<HTMLInputElement>,
-    type: 'deed' | 'site' | 'plan' | 'additional'
-  ) => {
-    const files = event.target.files;
-    if (!files) return;
+  const handleCoordinatesChange = React.useCallback((selectedCoordinates: Coordinates) => {
+    setCoordinates(selectedCoordinates);
+  }, []);
 
-    const newFiles = Array.from(files);
+  const handleFileUpload = React.useCallback(
+    (
+      event: React.ChangeEvent<HTMLInputElement>,
+      type: 'deed' | 'site' | 'plan' | 'additional'
+    ) => {
+      const files = event.target.files;
+      if (!files) return;
 
-    switch (type) {
-      case 'deed':
-        setDeedImages(prev => [...prev, ...newFiles]);
-        break;
-      case 'site':
-        setSiteImages(prev => [...prev, ...newFiles]);
-        break;
-      case 'plan':
-        setPlanImages(prev => [...prev, ...newFiles]);
-        break;
-      case 'additional':
-        setOtherImages(prev => [...prev, ...newFiles]);
-        break;
+      const newFiles = Array.from(files);
+
+      switch (type) {
+        case 'deed':
+          setDeedImages((prev) => [...prev, ...newFiles]);
+          break;
+        case 'site':
+          setSiteImages((prev) => [...prev, ...newFiles]);
+          break;
+        case 'plan':
+          setPlanImages((prev) => [...prev, ...newFiles]);
+          break;
+        case 'additional':
+          setOtherImages((prev) => [...prev, ...newFiles]);
+          break;
+      }
+
+      event.target.value = '';
+    },
+    []
+  );
+
+  const removeImage = React.useCallback(
+    (type: 'deed' | 'site' | 'plan' | 'additional', index: number) => {
+      switch (type) {
+        case 'deed':
+          setDeedImages((prev) => prev.filter((_, i) => i !== index));
+          break;
+        case 'site':
+          setSiteImages((prev) => prev.filter((_, i) => i !== index));
+          break;
+        case 'plan':
+          setPlanImages((prev) => prev.filter((_, i) => i !== index));
+          break;
+        case 'additional':
+          setOtherImages((prev) => prev.filter((_, i) => i !== index));
+          break;
+      }
+    },
+    []
+  );
+
+  const convertFileToAttachment = (file: File, attachmentType: string) => {
+    return new Promise<any>((resolve) => {
+      const reader = new FileReader();
+
+      reader.onload = (event) => {
+        resolve({
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+          attachmentType,
+          fileUrl: event.target?.result as string,
+        });
+      };
+
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const buildAttachments = async () => {
+    const attachments: any[] = [];
+
+    for (const file of deedImages) {
+      attachments.push(await convertFileToAttachment(file, 'deed'));
     }
 
-    // Reset input
-    event.target.value = '';
-  }, []);
-
-  const removeImage = React.useCallback((type: 'deed' | 'site' | 'plan' | 'additional', index: number) => {
-    switch (type) {
-      case 'deed':
-        setDeedImages(prev => prev.filter((_, i) => i !== index));
-        break;
-      case 'site':
-        setSiteImages(prev => prev.filter((_, i) => i !== index));
-        break;
-      case 'plan':
-        setPlanImages(prev => prev.filter((_, i) => i !== index));
-        break;
-      case 'additional':
-        setOtherImages(prev => prev.filter((_, i) => i !== index));
-        break;
+    for (const file of siteImages) {
+      attachments.push(await convertFileToAttachment(file, 'site'));
     }
-  }, []);
+
+    for (const file of planImages) {
+      attachments.push(await convertFileToAttachment(file, 'plan'));
+    }
+
+    for (const file of otherImages) {
+      attachments.push(await convertFileToAttachment(file, 'additional'));
+    }
+
+    return attachments;
+  };
 
   const handleCancel = React.useCallback(() => {
     navigate('/deeds');
   }, [navigate]);
 
-  const onSubmit = React.useCallback((data: DeedFormData) => {
-    try {
-      // Process images and create attachments
-      const processFiles = async () => {
-        const attachments: any[] = [];
+  const onSubmit = React.useCallback(
+    async (data: DeedFormData) => {
+      try {
+        const attachments = await buildAttachments();
 
-        const processFileGroup = async (files: File[], type: string) => {
-          for (const file of files) {
-            const reader = new FileReader();
-            await new Promise((resolve) => {
-              reader.onload = (e) => {
-                attachments.push({
-                  fileName: file.name,
-                  fileSize: file.size,
-                  fileType: file.type,
-                  attachmentType: type,
-                  fileUrl: e.target?.result as string
-                });
-                resolve(null);
-              };
-              reader.readAsDataURL(file);
-            });
-          }
-        };
-
-        await processFileGroup(deedImages, 'deed');
-        await processFileGroup(siteImages, 'site');
-        await processFileGroup(planImages, 'plan');
-        await processFileGroup(otherImages, 'additional');
-
-        addDeed({
-          ...data,
-          coordinates,
-          attachments
-        });
+        await Promise.resolve(
+          addDeed({
+            ...data,
+            area: Number(data.area || 0),
+            coordinates,
+            attachments,
+          })
+        );
 
         toast.success(t('deed.savedSuccessfully'));
         navigate('/deeds');
-      };
-
-      processFiles();
-    } catch (error) {
-      toast.error(t('errors.saveFailed'));
-    }
-  }, [addDeed, coordinates, navigate, t, deedImages, siteImages, planImages, otherImages]);
-
-  const handleFormSubmit = React.useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    handleSubmit(onSubmit)(e);
-  }, [handleSubmit, onSubmit]);
-
-  const cities = ['الدمام', 'الخبر', 'الظهران', 'القطيف', 'الجبيل', 'الأحساء', 'حفر الباطن'];
-  const usageTypes = ['سكني', 'تجاري', 'صناعي', 'استثماري', 'تعليمي', 'زراعي', 'حكومي'];
+      } catch (error) {
+        console.error(error);
+        toast.error(t('errors.saveFailed') || 'فشل في حفظ البيانات');
+      }
+    },
+    [
+      addDeed,
+      coordinates,
+      navigate,
+      t,
+      deedImages,
+      siteImages,
+      planImages,
+      otherImages,
+    ]
+  );
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold">{t('deed.addNew')}</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">قم بإدخال بيانات الصك الجديد</p>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            قم بإدخال بيانات الصك الجديد
+          </p>
         </div>
-        <Button type="button" variant="outline" onClick={handleCancel} className="w-full sm:w-auto text-sm md:text-base">
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleCancel}
+          className="w-full sm:w-auto text-sm md:text-base"
+        >
           <X className="h-4 w-4 mr-2" />
           {t('app.cancel')}
         </Button>
       </div>
 
-      <form onSubmit={handleFormSubmit} className="space-y-4 md:space-y-6">
-        {/* Basic Information */}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
         <Card>
           <CardHeader className="pb-3 md:pb-4">
             <CardTitle className="flex items-center gap-2 text-base md:text-lg">
               <FileText className="h-4 w-4 md:h-5 md:w-5" />
               المعلومات الأساسية
             </CardTitle>
-            <CardDescription className="text-xs md:text-sm">بيانات الصك الأساسية</CardDescription>
+            <CardDescription className="text-xs md:text-sm">
+              بيانات الصك الأساسية
+            </CardDescription>
           </CardHeader>
+
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="deedNumber">
                   {t('deed.deedNumber')} <span className="text-destructive">*</span>
                 </Label>
+
                 <Input
                   id="deedNumber"
-                  {...register('deedNumber', { required: t('validation.required') })}
+                  {...register('deedNumber', {
+                    required: t('validation.required'),
+                  })}
                   placeholder="610000000"
                   className={errors.deedNumber ? 'border-destructive' : ''}
                 />
+
                 {errors.deedNumber && (
                   <p className="text-sm text-destructive">{errors.deedNumber.message}</p>
                 )}
@@ -215,12 +273,16 @@ export const AddDeedPage: React.FC = () => {
                 <Label htmlFor="deedDate">
                   {t('deed.deedDate')} <span className="text-destructive">*</span>
                 </Label>
+
                 <Input
                   id="deedDate"
                   type="date"
-                  {...register('deedDate', { required: t('validation.required') })}
+                  {...register('deedDate', {
+                    required: t('validation.required'),
+                  })}
                   className={errors.deedDate ? 'border-destructive' : ''}
                 />
+
                 {errors.deedDate && (
                   <p className="text-sm text-destructive">{errors.deedDate.message}</p>
                 )}
@@ -228,18 +290,25 @@ export const AddDeedPage: React.FC = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="area">
-                  {t('deed.area')} ({t('deed.sqm')}) <span className="text-destructive">*</span>
+                  {t('deed.area')} ({t('deed.sqm')}){' '}
+                  <span className="text-destructive">*</span>
                 </Label>
+
                 <Input
                   id="area"
                   type="number"
                   {...register('area', {
                     required: t('validation.required'),
-                    min: { value: 1, message: t('validation.invalidNumber') }
+                    valueAsNumber: true,
+                    min: {
+                      value: 1,
+                      message: t('validation.invalidNumber'),
+                    },
                   })}
                   placeholder="1000"
                   className={errors.area ? 'border-destructive' : ''}
                 />
+
                 {errors.area && (
                   <p className="text-sm text-destructive">{errors.area.message}</p>
                 )}
@@ -247,24 +316,30 @@ export const AddDeedPage: React.FC = () => {
 
               <div className="space-y-2 md:col-span-2 lg:col-span-3">
                 <Label htmlFor="propertyDescription">
-                  {t('deed.propertyDescription')} <span className="text-destructive">*</span>
+                  {t('deed.propertyDescription')}{' '}
+                  <span className="text-destructive">*</span>
                 </Label>
+
                 <Textarea
                   id="propertyDescription"
-                  {...register('propertyDescription', { required: t('validation.required') })}
+                  {...register('propertyDescription', {
+                    required: t('validation.required'),
+                  })}
                   placeholder="قطعة أرض في..."
                   rows={3}
                   className={errors.propertyDescription ? 'border-destructive' : ''}
                 />
+
                 {errors.propertyDescription && (
-                  <p className="text-sm text-destructive">{errors.propertyDescription.message}</p>
+                  <p className="text-sm text-destructive">
+                    {errors.propertyDescription.message}
+                  </p>
                 )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Plot and Plan Information */}
         <Card>
           <CardHeader className="pb-3 md:pb-4">
             <CardTitle className="flex items-center gap-2 text-base md:text-lg">
@@ -272,28 +347,24 @@ export const AddDeedPage: React.FC = () => {
               معلومات القطعة والمخطط
             </CardTitle>
           </CardHeader>
+
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="plotNumber">{t('deed.plotNumber')}</Label>
-                <Input
-                  id="plotNumber"
-                  {...register('plotNumber')}
-                  placeholder="1234"
-                />
+                <Input id="plotNumber" {...register('plotNumber')} placeholder="1234" />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="planNumber">{t('deed.planNumber')}</Label>
-                <Input
-                  id="planNumber"
-                  {...register('planNumber')}
-                  placeholder="5678"
-                />
+                <Input id="planNumber" {...register('planNumber')} placeholder="5678" />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="isPlanned" className="flex items-center gap-2 cursor-pointer">
+                <Label
+                  htmlFor="isPlanned"
+                  className="flex items-center gap-2 cursor-pointer"
+                >
                   <Switch
                     id="isPlanned"
                     checked={isPlanned}
@@ -306,7 +377,6 @@ export const AddDeedPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Location Information */}
         <Card>
           <CardHeader className="pb-3 md:pb-4">
             <CardTitle className="flex items-center gap-2 text-base md:text-lg">
@@ -314,18 +384,23 @@ export const AddDeedPage: React.FC = () => {
               معلومات الموقع
             </CardTitle>
           </CardHeader>
+
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="region">
                   {t('deed.region')} <span className="text-destructive">*</span>
                 </Label>
+
                 <Input
                   id="region"
-                  {...register('region', { required: t('validation.required') })}
+                  {...register('region', {
+                    required: t('validation.required'),
+                  })}
                   placeholder="المنطقة الشرقية"
                   className={errors.region ? 'border-destructive' : ''}
                 />
+
                 {errors.region && (
                   <p className="text-sm text-destructive">{errors.region.message}</p>
                 )}
@@ -335,16 +410,22 @@ export const AddDeedPage: React.FC = () => {
                 <Label htmlFor="city">
                   {t('deed.city')} <span className="text-destructive">*</span>
                 </Label>
+
                 <NativeSelect
                   id="city"
-                  {...register('city', { required: t('validation.required') })}
+                  {...register('city', {
+                    required: t('validation.required'),
+                  })}
                   className={errors.city ? 'border-destructive' : ''}
                 >
                   <option value="">اختر المدينة</option>
-                  {cities.map(city => (
-                    <option key={city} value={city}>{city}</option>
+                  {cities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
                   ))}
                 </NativeSelect>
+
                 {errors.city && (
                   <p className="text-sm text-destructive">{errors.city.message}</p>
                 )}
@@ -354,12 +435,16 @@ export const AddDeedPage: React.FC = () => {
                 <Label htmlFor="district">
                   {t('deed.district')} <span className="text-destructive">*</span>
                 </Label>
+
                 <Input
                   id="district"
-                  {...register('district', { required: t('validation.required') })}
+                  {...register('district', {
+                    required: t('validation.required'),
+                  })}
                   placeholder="الحي"
                   className={errors.district ? 'border-destructive' : ''}
                 />
+
                 {errors.district && (
                   <p className="text-sm text-destructive">{errors.district.message}</p>
                 )}
@@ -378,90 +463,75 @@ export const AddDeedPage: React.FC = () => {
                 <Label htmlFor="usageType">
                   {t('deed.usageType')} <span className="text-destructive">*</span>
                 </Label>
+
                 <NativeSelect
                   id="usageType"
-                  {...register('usageType', { required: t('validation.required') })}
+                  {...register('usageType', {
+                    required: t('validation.required'),
+                  })}
                   className={errors.usageType ? 'border-destructive' : ''}
                 >
                   <option value="">اختر نوع الاستخدام</option>
-                  {usageTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                  {usageTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
                   ))}
                 </NativeSelect>
+
                 {errors.usageType && (
                   <p className="text-sm text-destructive">{errors.usageType.message}</p>
                 )}
               </div>
             </div>
 
-            {/* Coordinates */}
-            <div className="mt-4 p-4 bg-muted/30 rounded-lg">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                <div>
-                  <Label>{t('deed.coordinates')}</Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    يتم تعبئة الإحداثيات تلقائيًا عند تحديد الموقع من الخريطة.
-                  </p>
-                </div>
+            <div className="mt-4 rounded-xl bg-muted/30 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <Label>{t('deed.coordinates')}</Label>
 
-                <div className="flex flex-col sm:flex-row gap-2">
-                  {coordinates && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCoordinates(undefined)}
-                    >
-                      مسح الإحداثيات
-                    </Button>
-                  )}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleToggleMap}
-                  >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    {showMap ? 'إخفاء الخريطة' : t('deed.selectLocation')}
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleToggleMap}
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  {showMap ? 'إخفاء الخريطة' : 'تحديد الموقع من الخريطة'}
+                </Button>
               </div>
 
               {coordinates ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-3">
-                  <div className="rounded-md border bg-background px-3 py-2">
-                    <span className="text-muted-foreground">{t('deed.latitude')}:</span>
-                    <span className="font-mono ml-2">{coordinates.latitude.toFixed(6)}</span>
+                <div className="mb-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                  <div className="rounded-lg border bg-background px-3 py-2">
+                    <span className="text-muted-foreground">خط العرض:</span>
+                    <span className="font-mono mr-2">
+                      {coordinates.latitude.toFixed(6)}
+                    </span>
                   </div>
 
-                  <div className="rounded-md border bg-background px-3 py-2">
-                    <span className="text-muted-foreground">{t('deed.longitude')}:</span>
-                    <span className="font-mono ml-2">{coordinates.longitude.toFixed(6)}</span>
+                  <div className="rounded-lg border bg-background px-3 py-2">
+                    <span className="text-muted-foreground">خط الطول:</span>
+                    <span className="font-mono mr-2">
+                      {coordinates.longitude.toFixed(6)}
+                    </span>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground mb-3">
-                  لم يتم تحديد إحداثيات بعد.
+                <p className="mb-3 text-sm text-muted-foreground">
+                  لم يتم تحديد الإحداثيات بعد.
                 </p>
               )}
 
               {showMap && (
-                <div className="mt-3">
-                  <MapCoordinatePicker
-                    latitude={coordinates?.latitude ?? null}
-                    longitude={coordinates?.longitude ?? null}
-                    onChange={(selectedCoordinates) => {
-                      setCoordinates(selectedCoordinates);
-                    }}
-                  />
-                </div>
+                <MapCoordinatePicker
+                  coordinates={coordinates}
+                  onChange={handleCoordinatesChange}
+                />
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Attachments */}
         <Card>
           <CardHeader className="pb-3 md:pb-4">
             <CardTitle className="flex items-center gap-2 text-base md:text-lg">
@@ -472,6 +542,7 @@ export const AddDeedPage: React.FC = () => {
               قم برفع الصور المطلوبة للصك (PNG, JPG, PDF)
             </CardDescription>
           </CardHeader>
+
           <CardContent>
             <Tabs defaultValue="deed" className="w-full">
               <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
@@ -479,34 +550,49 @@ export const AddDeedPage: React.FC = () => {
                   <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
                   صورة الصك
                   {deedImages.length > 0 && (
-                    <Badge variant="secondary" className="mr-1 md:mr-2 text-xs h-5 w-5 rounded-full p-0 flex items-center justify-center">
+                    <Badge
+                      variant="secondary"
+                      className="mr-1 md:mr-2 text-xs h-5 w-5 rounded-full p-0 flex items-center justify-center"
+                    >
                       {deedImages.length}
                     </Badge>
                   )}
                 </TabsTrigger>
+
                 <TabsTrigger value="site" className="text-xs md:text-sm py-2 md:py-2.5">
                   <MapPin className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
                   صورة الموقع
                   {siteImages.length > 0 && (
-                    <Badge variant="secondary" className="mr-1 md:mr-2 text-xs h-5 w-5 rounded-full p-0 flex items-center justify-center">
+                    <Badge
+                      variant="secondary"
+                      className="mr-1 md:mr-2 text-xs h-5 w-5 rounded-full p-0 flex items-center justify-center"
+                    >
                       {siteImages.length}
                     </Badge>
                   )}
                 </TabsTrigger>
+
                 <TabsTrigger value="plan" className="text-xs md:text-sm py-2 md:py-2.5">
                   <MapIcon className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
                   صورة المخطط
                   {planImages.length > 0 && (
-                    <Badge variant="secondary" className="mr-1 md:mr-2 text-xs h-5 w-5 rounded-full p-0 flex items-center justify-center">
+                    <Badge
+                      variant="secondary"
+                      className="mr-1 md:mr-2 text-xs h-5 w-5 rounded-full p-0 flex items-center justify-center"
+                    >
                       {planImages.length}
                     </Badge>
                   )}
                 </TabsTrigger>
+
                 <TabsTrigger value="other" className="text-xs md:text-sm py-2 md:py-2.5">
                   <ImageIcon className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
                   صور أخرى
                   {otherImages.length > 0 && (
-                    <Badge variant="secondary" className="mr-1 md:mr-2 text-xs h-5 w-5 rounded-full p-0 flex items-center justify-center">
+                    <Badge
+                      variant="secondary"
+                      className="mr-1 md:mr-2 text-xs h-5 w-5 rounded-full p-0 flex items-center justify-center"
+                    >
                       {otherImages.length}
                     </Badge>
                   )}
@@ -514,249 +600,75 @@ export const AddDeedPage: React.FC = () => {
               </TabsList>
 
               <TabsContent value="deed" className="space-y-4 mt-4">
-                <div className="border-2 border-dashed rounded-lg p-4 md:p-6 text-center hover:border-primary transition-colors">
-                  <input
-                    type="file"
-                    id="deed-upload"
-                    multiple
-                    accept="image/*,.pdf"
-                    onChange={(e) => handleFileUpload(e, 'deed')}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="deed-upload"
-                    className="cursor-pointer flex flex-col items-center gap-2 md:gap-3"
-                  >
-                    <div className="p-3 md:p-4 rounded-full bg-primary/10">
-                      <Upload className="h-6 w-6 md:h-8 md:w-8 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm md:text-base font-medium">انقر لرفع صورة الصك</p>
-                      <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                        أو اسحب الملفات هنا
-                      </p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      PNG, JPG, PDF (حتى 10 ميجا)
-                    </p>
-                  </label>
-                </div>
+                <AttachmentUploadBox
+                  inputId="deed-upload"
+                  title="انقر لرفع صورة الصك"
+                  description="أو اسحب الملفات هنا"
+                  icon={<Upload className="h-6 w-6 md:h-8 md:w-8 text-primary" />}
+                  onChange={(event) => handleFileUpload(event, 'deed')}
+                />
 
-                {deedImages.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                    {deedImages.map((file, index) => (
-                      <div key={index} className="relative group">
-                        <div className="aspect-square rounded-lg border-2 border-border overflow-hidden bg-muted">
-                          {file.type.startsWith('image/') ? (
-                            <img
-                              src={URL.createObjectURL(file)}
-                              alt={file.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <FileText className="h-12 w-12 md:h-16 md:w-16 text-muted-foreground" />
-                            </div>
-                          )}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-1 md:top-2 right-1 md:right-2 h-6 w-6 md:h-7 md:w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => removeImage('deed', index)}
-                        >
-                          <X className="h-3 w-3 md:h-4 md:w-4" />
-                        </Button>
-                        <p className="text-xs truncate mt-1 px-1">{file.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <FilesPreview
+                  files={deedImages}
+                  onRemove={(index) => removeImage('deed', index)}
+                />
               </TabsContent>
 
               <TabsContent value="site" className="space-y-4 mt-4">
-                <div className="border-2 border-dashed rounded-lg p-4 md:p-6 text-center hover:border-primary transition-colors">
-                  <input
-                    type="file"
-                    id="site-upload"
-                    multiple
-                    accept="image/*,.pdf"
-                    onChange={(e) => handleFileUpload(e, 'site')}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="site-upload"
-                    className="cursor-pointer flex flex-col items-center gap-2 md:gap-3"
-                  >
-                    <div className="p-3 md:p-4 rounded-full bg-secondary/10">
-                      <MapPin className="h-6 w-6 md:h-8 md:w-8 text-secondary" />
-                    </div>
-                    <div>
-                      <p className="text-sm md:text-base font-medium">انقر لرفع صورة الموقع</p>
-                      <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                        صور جوية أو خرائط الموقع
-                      </p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      PNG, JPG, PDF (حتى 10 ميجا)
-                    </p>
-                  </label>
-                </div>
+                <AttachmentUploadBox
+                  inputId="site-upload"
+                  title="انقر لرفع صورة الموقع"
+                  description="صور جوية أو خرائط الموقع"
+                  icon={<MapPin className="h-6 w-6 md:h-8 md:w-8 text-secondary" />}
+                  onChange={(event) => handleFileUpload(event, 'site')}
+                />
 
-                {siteImages.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                    {siteImages.map((file, index) => (
-                      <div key={index} className="relative group">
-                        <div className="aspect-square rounded-lg border-2 border-border overflow-hidden bg-muted">
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={file.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-1 md:top-2 right-1 md:right-2 h-6 w-6 md:h-7 md:w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => removeImage('site', index)}
-                        >
-                          <X className="h-3 w-3 md:h-4 md:w-4" />
-                        </Button>
-                        <p className="text-xs truncate mt-1 px-1">{file.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <FilesPreview
+                  files={siteImages}
+                  onRemove={(index) => removeImage('site', index)}
+                />
               </TabsContent>
 
               <TabsContent value="plan" className="space-y-4 mt-4">
-                <div className="border-2 border-dashed rounded-lg p-4 md:p-6 text-center hover:border-primary transition-colors">
-                  <input
-                    type="file"
-                    id="plan-upload"
-                    multiple
-                    accept="image/*,.pdf"
-                    onChange={(e) => handleFileUpload(e, 'plan')}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="plan-upload"
-                    className="cursor-pointer flex flex-col items-center gap-2 md:gap-3"
-                  >
-                    <div className="p-3 md:p-4 rounded-full bg-accent/10">
-                      <MapIcon className="h-6 w-6 md:h-8 md:w-8 text-accent" />
-                    </div>
-                    <div>
-                      <p className="text-sm md:text-base font-medium">انقر لرفع صورة المخطط</p>
-                      <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                        المخططات الهندسية والتقسيمات
-                      </p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      PNG, JPG, PDF (حتى 10 ميجا)
-                    </p>
-                  </label>
-                </div>
+                <AttachmentUploadBox
+                  inputId="plan-upload"
+                  title="انقر لرفع صورة المخطط"
+                  description="المخططات الهندسية والتقسيمات"
+                  icon={<MapIcon className="h-6 w-6 md:h-8 md:w-8 text-accent" />}
+                  onChange={(event) => handleFileUpload(event, 'plan')}
+                />
 
-                {planImages.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                    {planImages.map((file, index) => (
-                      <div key={index} className="relative group">
-                        <div className="aspect-square rounded-lg border-2 border-border overflow-hidden bg-muted">
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={file.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-1 md:top-2 right-1 md:right-2 h-6 w-6 md:h-7 md:w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => removeImage('plan', index)}
-                        >
-                          <X className="h-3 w-3 md:h-4 md:w-4" />
-                        </Button>
-                        <p className="text-xs truncate mt-1 px-1">{file.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <FilesPreview
+                  files={planImages}
+                  onRemove={(index) => removeImage('plan', index)}
+                />
               </TabsContent>
 
               <TabsContent value="other" className="space-y-4 mt-4">
-                <div className="border-2 border-dashed rounded-lg p-4 md:p-6 text-center hover:border-primary transition-colors">
-                  <input
-                    type="file"
-                    id="other-upload"
-                    multiple
-                    accept="image/*,.pdf"
-                    onChange={(e) => handleFileUpload(e, 'additional')}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="other-upload"
-                    className="cursor-pointer flex flex-col items-center gap-2 md:gap-3"
-                  >
-                    <div className="p-3 md:p-4 rounded-full bg-muted">
-                      <ImageIcon className="h-6 w-6 md:h-8 md:w-8 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm md:text-base font-medium">انقر لرفع صور إضافية</p>
-                      <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                        أي مستندات أو صور أخرى متعلقة بالصك
-                      </p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      PNG, JPG, PDF (حتى 10 ميجا)
-                    </p>
-                  </label>
-                </div>
+                <AttachmentUploadBox
+                  inputId="other-upload"
+                  title="انقر لرفع صور إضافية"
+                  description="أي مستندات أو صور أخرى متعلقة بالصك"
+                  icon={
+                    <ImageIcon className="h-6 w-6 md:h-8 md:w-8 text-muted-foreground" />
+                  }
+                  onChange={(event) => handleFileUpload(event, 'additional')}
+                />
 
-                {otherImages.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                    {otherImages.map((file, index) => (
-                      <div key={index} className="relative group">
-                        <div className="aspect-square rounded-lg border-2 border-border overflow-hidden bg-muted">
-                          {file.type.startsWith('image/') ? (
-                            <img
-                              src={URL.createObjectURL(file)}
-                              alt={file.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <FileText className="h-12 w-12 md:h-16 md:w-16 text-muted-foreground" />
-                            </div>
-                          )}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-1 md:top-2 right-1 md:right-2 h-6 w-6 md:h-7 md:w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => removeImage('additional', index)}
-                        >
-                          <X className="h-3 w-3 md:h-4 md:w-4" />
-                        </Button>
-                        <p className="text-xs truncate mt-1 px-1">{file.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <FilesPreview
+                  files={otherImages}
+                  onRemove={(index) => removeImage('additional', index)}
+                />
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
-        {/* Notes */}
         <Card>
           <CardHeader className="pb-3 md:pb-4">
             <CardTitle className="text-base md:text-lg">ملاحظات إضافية</CardTitle>
           </CardHeader>
+
           <CardContent>
             <div className="space-y-2">
               <Label htmlFor="notes">{t('deed.notes')}</Label>
@@ -771,18 +683,98 @@ export const AddDeedPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Submit Buttons */}
         <div className="flex flex-col-reverse sm:flex-row gap-2 md:gap-3 sm:justify-end">
-          <Button type="button" variant="outline" onClick={handleCancel} className="w-full sm:w-auto text-sm md:text-base">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCancel}
+            className="w-full sm:w-auto text-sm md:text-base"
+          >
             <X className="h-4 w-4 mr-2" />
             {t('app.cancel')}
           </Button>
+
           <Button type="submit" className="bg-primary w-full sm:w-auto text-sm md:text-base">
             <Save className="h-4 w-4 mr-2" />
             {t('app.save')}
           </Button>
         </div>
       </form>
+    </div>
+  );
+};
+
+const AttachmentUploadBox: React.FC<{
+  inputId: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+}> = ({ inputId, title, description, icon, onChange }) => {
+  return (
+    <div className="border-2 border-dashed rounded-lg p-4 md:p-6 text-center hover:border-primary transition-colors">
+      <input
+        type="file"
+        id={inputId}
+        multiple
+        accept="image/*,.pdf"
+        onChange={onChange}
+        className="hidden"
+      />
+
+      <label htmlFor={inputId} className="cursor-pointer flex flex-col items-center gap-2 md:gap-3">
+        <div className="p-3 md:p-4 rounded-full bg-primary/10">{icon}</div>
+
+        <div>
+          <p className="text-sm md:text-base font-medium">{title}</p>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">
+            {description}
+          </p>
+        </div>
+
+        <p className="text-xs text-muted-foreground">PNG, JPG, PDF (حتى 10 ميجا)</p>
+      </label>
+    </div>
+  );
+};
+
+const FilesPreview: React.FC<{
+  files: File[];
+  onRemove: (index: number) => void;
+}> = ({ files, onRemove }) => {
+  if (files.length === 0) return null;
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+      {files.map((file, index) => (
+        <div key={`${file.name}-${index}`} className="relative group">
+          <div className="aspect-square rounded-lg border-2 border-border overflow-hidden bg-muted">
+            {file.type.startsWith('image/') ? (
+              <img
+                src={URL.createObjectURL(file)}
+                alt={file.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <FileText className="h-12 w-12 md:h-16 md:w-16 text-muted-foreground" />
+              </div>
+            )}
+          </div>
+
+          <Button
+            type="button"
+            variant="destructive"
+            size="icon"
+            className="absolute top-1 md:top-2 right-1 md:right-2 h-6 w-6 md:h-7 md:w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => onRemove(index)}
+          >
+            <X className="h-3 w-3 md:h-4 md:w-4" />
+          </Button>
+
+          <p className="text-xs truncate mt-1 px-1">{file.name}</p>
+        </div>
+      ))}
     </div>
   );
 };
