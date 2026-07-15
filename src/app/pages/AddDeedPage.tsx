@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useDeeds } from '../../context/DeedContext';
 import { useForm } from 'react-hook-form';
 import { DeedFormData } from '../../types/deed';
+import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import {
   Save,
   X,
@@ -11,8 +12,7 @@ import {
   Upload,
   FileText,
   Image as ImageIcon,
-  Map as MapIcon,
-  PlusCircle
+  Map as MapIcon
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -65,13 +65,6 @@ export const AddDeedPage: React.FC = () => {
 
   const handleToggleMap = React.useCallback(() => {
     setShowMap(prev => !prev);
-  }, []);
-
-  const handleSetRandomCoordinates = React.useCallback(() => {
-    setCoordinates({
-      latitude: 26.3927 + (Math.random() - 0.5) * 0.1,
-      longitude: 50.0438 + (Math.random() - 0.5) * 0.1
-    });
   }, []);
 
   const handleFileUpload = React.useCallback((
@@ -403,47 +396,65 @@ export const AddDeedPage: React.FC = () => {
 
             {/* Coordinates */}
             <div className="mt-4 p-4 bg-muted/30 rounded-lg">
-              <div className="flex items-center justify-between mb-3">
-                <Label>{t('deed.coordinates')}</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleToggleMap}
-                >
-                  <MapPin className="h-4 w-4 mr-2" />
-                  {showMap ? 'إخفاء الخريطة' : t('deed.selectLocation')}
-                </Button>
-              </div>
-
-              {coordinates && (
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">{t('deed.latitude')}:</span>
-                    <span className="font-mono ml-2">{coordinates.latitude.toFixed(6)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">{t('deed.longitude')}:</span>
-                    <span className="font-mono ml-2">{coordinates.longitude.toFixed(6)}</span>
-                  </div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                <div>
+                  <Label>{t('deed.coordinates')}</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    يتم تعبئة الإحداثيات تلقائيًا عند تحديد الموقع من الخريطة.
+                  </p>
                 </div>
-              )}
 
-              {showMap && (
-                <div className="mt-3 h-64 bg-muted rounded-md flex items-center justify-center border">
-                  <div className="text-center text-muted-foreground">
-                    <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>خريطة تفاعلية - اضغط لتحديد الموقع</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {coordinates && (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="mt-3"
-                      onClick={handleSetRandomCoordinates}
+                      onClick={() => setCoordinates(undefined)}
                     >
-                      تحديد موقع عشوائي (للتجربة)
+                      مسح الإحداثيات
                     </Button>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleToggleMap}
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    {showMap ? 'إخفاء الخريطة' : t('deed.selectLocation')}
+                  </Button>
+                </div>
+              </div>
+
+              {coordinates ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-3">
+                  <div className="rounded-md border bg-background px-3 py-2">
+                    <span className="text-muted-foreground">{t('deed.latitude')}:</span>
+                    <span className="font-mono ml-2">{coordinates.latitude.toFixed(6)}</span>
                   </div>
+
+                  <div className="rounded-md border bg-background px-3 py-2">
+                    <span className="text-muted-foreground">{t('deed.longitude')}:</span>
+                    <span className="font-mono ml-2">{coordinates.longitude.toFixed(6)}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground mb-3">
+                  لم يتم تحديد إحداثيات بعد.
+                </p>
+              )}
+
+              {showMap && (
+                <div className="mt-3">
+                  <MapCoordinatePicker
+                    latitude={coordinates?.latitude ?? null}
+                    longitude={coordinates?.longitude ?? null}
+                    onChange={(selectedCoordinates) => {
+                      setCoordinates(selectedCoordinates);
+                    }}
+                  />
                 </div>
               )}
             </div>
