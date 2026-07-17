@@ -138,6 +138,35 @@ const getAttachmentMimeType = (attachment: any) =>
 const getAttachmentName = (attachment: any) =>
   attachment?.title || attachment?.originalName || attachment?.fileName || 'مرفق';
 
+const extractGoogleDriveFileId = (attachment: any) => {
+  if (attachment?.driveFileId) return attachment.driveFileId;
+
+  const url = getAttachmentUrl(attachment);
+  const match = String(url).match(/\/file\/d\/([^/]+)/);
+
+  return match?.[1] || '';
+};
+
+const getGoogleDrivePreviewUrl = (attachment: any) => {
+  const fileId = extractGoogleDriveFileId(attachment);
+
+  if (!fileId) {
+    return getAttachmentUrl(attachment);
+  }
+
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+};
+
+const isImageAttachment = (attachment: any) => {
+  const mimeType = getAttachmentMimeType(attachment);
+  const name = getAttachmentName(attachment).toLowerCase();
+
+  return (
+    mimeType?.startsWith('image/') ||
+    /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(name)
+  );
+};
+
 
 const formatDateForInput = (value: any) => {
   if (!value) return new Date().toISOString().split('T')[0];
@@ -487,8 +516,8 @@ export const ViewDeedPage: React.FC = () => {
       return;
     }
 
-    if (mimeType?.startsWith('image/')) {
-      setPreviewImage(attachmentUrl);
+    if (isImageAttachment(attachment)) {
+      setPreviewImage(getGoogleDrivePreviewUrl(attachment));
       return;
     }
 
@@ -584,15 +613,18 @@ export const ViewDeedPage: React.FC = () => {
                 key={att.id || getAttachmentUrl(att) || `${getAttachmentName(att)}-${index}`}
                 className="border rounded-lg p-2 md:p-3 hover:border-primary transition-colors"
               >
-                {getAttachmentMimeType(att)?.startsWith('image/') ? (
+                {isImageAttachment(att) ? (
                   <div
                     className="aspect-square bg-muted rounded-md mb-2 overflow-hidden cursor-pointer"
                     onClick={() => openAttachment(att)}
                   >
                     <img
-                      src={getAttachmentUrl(att)}
+                      src={getGoogleDrivePreviewUrl(att)}
                       alt={getAttachmentName(att)}
                       className="w-full h-full object-cover"
+                      onError={(event) => {
+                        event.currentTarget.style.display = 'none';
+                      }}
                     />
                   </div>
                 ) : (
