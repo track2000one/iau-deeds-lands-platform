@@ -42,6 +42,17 @@ type UploadResponse = {
   attachment?: unknown;
 };
 
+type PendingAttachment = {
+  title: string;
+  driveUrl: string;
+  driveFileId?: string;
+  mimeType?: string;
+  attachmentType: 'deed_image' | 'location_image' | 'plan_image' | 'other';
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+};
+
 export const AddDeedPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -152,7 +163,24 @@ export const AddDeedPage: React.FC = () => {
     []
   );
 
-  const uploadFileToGoogleDrive = async (file: File, attachmentType: string) => {
+  const mapAttachmentType = (type: 'deed' | 'site' | 'plan' | 'additional') => {
+    switch (type) {
+      case 'deed':
+        return 'deed_image' as const;
+      case 'site':
+        return 'location_image' as const;
+      case 'plan':
+        return 'plan_image' as const;
+      case 'additional':
+      default:
+        return 'other' as const;
+    }
+  };
+
+  const uploadFileToGoogleDrive = async (
+    file: File,
+    type: 'deed' | 'site' | 'plan' | 'additional'
+  ): Promise<PendingAttachment> => {
     if (!API_BASE_URL) {
       throw new Error('VITE_API_URL غير موجود. تأكد من ربط الواجهة بالـ Backend في Railway.');
     }
@@ -189,18 +217,19 @@ export const AddDeedPage: React.FC = () => {
     }
 
     return {
+      title: file.name,
+      driveUrl: uploaded.driveUrl,
+      driveFileId: uploaded.driveFileId,
+      mimeType: uploaded.mimeType || file.type,
+      attachmentType: mapAttachmentType(type),
       fileName: uploaded.fileName || file.name,
       fileSize: file.size,
       fileType: uploaded.mimeType || file.type,
-      attachmentType,
-      fileUrl: uploaded.driveUrl,
-      driveUrl: uploaded.driveUrl,
-      driveFileId: uploaded.driveFileId,
     };
   };
 
-  const buildAttachments = async () => {
-    const attachments: any[] = [];
+  const buildAttachments = async (): Promise<PendingAttachment[]> => {
+    const attachments: PendingAttachment[] = [];
 
     for (const file of deedImages) {
       attachments.push(await uploadFileToGoogleDrive(file, 'deed'));
@@ -221,6 +250,40 @@ export const AddDeedPage: React.FC = () => {
     return attachments;
   };
 
+  const saveAttachmentsForDeed = async (deedId: string, attachments: PendingAttachment[]) => {
+    if (!API_BASE_URL || attachments.length === 0) return;
+
+    for (const attachment of attachments) {
+      const response = await fetch(`${API_BASE_URL}/api/attachments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          entityType: 'deed',
+          entityId: deedId,
+          attachmentType: attachment.attachmentType,
+          title: attachment.title || attachment.fileName,
+          driveUrl: attachment.driveUrl,
+          driveFileId: attachment.driveFileId || null,
+          mimeType: attachment.mimeType || attachment.fileType || null,
+        }),
+      });
+
+      let body: { message?: string } = {};
+
+      try {
+        body = await response.json();
+      } catch {
+        body = {};
+      }
+
+      if (!response.ok) {
+        throw new Error(body.message || 'تم حفظ الصك لكن تعذر حفظ بيانات أحد المرفقات');
+      }
+    }
+  };
+
   const handleCancel = React.useCallback(() => {
     navigate('/deeds');
   }, [navigate]);
@@ -232,14 +295,18 @@ export const AddDeedPage: React.FC = () => {
 
         const attachments = await buildAttachments();
 
-        await Promise.resolve(
+        const savedDeed = await Promise.resolve(
           addDeed({
             ...data,
             area: Number(data.area || 0),
             coordinates,
-            attachments,
+            attachments: [],
           })
         );
+
+        if (savedDeed?.id) {
+          await saveAttachmentsForDeed(savedDeed.id, attachments);
+        }
 
         toast.success(t('deed.savedSuccessfully'));
         navigate('/deeds');
