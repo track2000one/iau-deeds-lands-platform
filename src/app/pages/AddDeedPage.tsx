@@ -11,6 +11,7 @@ import {
   X,
   MapPin,
   Upload,
+  Loader2,
   FileText,
   Image as ImageIcon,
   Map as MapIcon,
@@ -31,6 +32,16 @@ type Coordinates = {
   longitude: number;
 };
 
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+
+type UploadResponse = {
+  fileName: string;
+  driveUrl: string;
+  driveFileId: string;
+  mimeType: string;
+  attachment?: unknown;
+};
+
 export const AddDeedPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -39,6 +50,7 @@ export const AddDeedPage: React.FC = () => {
 
   const [showMap, setShowMap] = useState(false);
   const [coordinates, setCoordinates] = useState<Coordinates | undefined>();
+  const [isSaving, setIsSaving] = useState(false);
 
   const [deedImages, setDeedImages] = useState<File[]>([]);
   const [siteImages, setSiteImages] = useState<File[]>([]);
@@ -140,41 +152,70 @@ export const AddDeedPage: React.FC = () => {
     []
   );
 
-  const convertFileToAttachment = (file: File, attachmentType: string) => {
-    return new Promise<any>((resolve) => {
-      const reader = new FileReader();
+  const uploadFileToGoogleDrive = async (file: File, attachmentType: string) => {
+    if (!API_BASE_URL) {
+      throw new Error('VITE_API_URL غير موجود. تأكد من ربط الواجهة بالـ Backend في Railway.');
+    }
 
-      reader.onload = (event) => {
-        resolve({
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-          attachmentType,
-          fileUrl: event.target?.result as string,
-        });
-      };
+    const maxSizeMB = 10;
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      throw new Error(`حجم الملف ${file.name} أكبر من الحد المسموح ${maxSizeMB} ميجا`);
+    }
 
-      reader.readAsDataURL(file);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE_URL}/api/uploads`, {
+      method: 'POST',
+      body: formData,
     });
+
+    let body: UploadResponse | { message?: string };
+
+    try {
+      body = await response.json();
+    } catch {
+      body = {};
+    }
+
+    if (!response.ok) {
+      throw new Error((body as { message?: string }).message || 'تعذر رفع الملف إلى Google Drive');
+    }
+
+    const uploaded = body as UploadResponse;
+
+    if (!uploaded.driveUrl) {
+      throw new Error('تم رفع الملف لكن لم يتم إرجاع رابط Google Drive');
+    }
+
+    return {
+      fileName: uploaded.fileName || file.name,
+      fileSize: file.size,
+      fileType: uploaded.mimeType || file.type,
+      attachmentType,
+      fileUrl: uploaded.driveUrl,
+      driveUrl: uploaded.driveUrl,
+      driveFileId: uploaded.driveFileId,
+    };
   };
 
   const buildAttachments = async () => {
     const attachments: any[] = [];
 
     for (const file of deedImages) {
-      attachments.push(await convertFileToAttachment(file, 'deed'));
+      attachments.push(await uploadFileToGoogleDrive(file, 'deed'));
     }
 
     for (const file of siteImages) {
-      attachments.push(await convertFileToAttachment(file, 'site'));
+      attachments.push(await uploadFileToGoogleDrive(file, 'site'));
     }
 
     for (const file of planImages) {
-      attachments.push(await convertFileToAttachment(file, 'plan'));
+      attachments.push(await uploadFileToGoogleDrive(file, 'plan'));
     }
 
     for (const file of otherImages) {
-      attachments.push(await convertFileToAttachment(file, 'additional'));
+      attachments.push(await uploadFileToGoogleDrive(file, 'additional'));
     }
 
     return attachments;
@@ -187,6 +228,8 @@ export const AddDeedPage: React.FC = () => {
   const onSubmit = React.useCallback(
     async (data: DeedFormData) => {
       try {
+        setIsSaving(true);
+
         const attachments = await buildAttachments();
 
         await Promise.resolve(
@@ -202,7 +245,9 @@ export const AddDeedPage: React.FC = () => {
         navigate('/deeds');
       } catch (error) {
         console.error(error);
-        toast.error(t('errors.saveFailed') || 'فشل في حفظ البيانات');
+        toast.error(error instanceof Error ? error.message : t('errors.saveFailed') || 'فشل في حفظ البيانات');
+      } finally {
+        setIsSaving(false);
       }
     },
     [
@@ -717,9 +762,17 @@ export const AddDeedPage: React.FC = () => {
             {t('app.cancel')}
           </Button>
 
-          <Button type="submit" className="bg-primary w-full sm:w-auto text-sm md:text-base">
-            <Save className="h-4 w-4 mr-2" />
-            {t('app.save')}
+          <Button
+            type="submit"
+            disabled={isSaving}
+            className="bg-primary w-full sm:w-auto text-sm md:text-base"
+          >
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            {isSaving ? 'جاري الحفظ...' : t('app.save')}
           </Button>
         </div>
       </form>
