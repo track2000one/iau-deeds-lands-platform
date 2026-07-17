@@ -16,6 +16,7 @@ import {
   X,
   Upload,
   Save,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -65,6 +66,79 @@ type EditFormState = {
 const usageTypes = ['سكني', 'تجاري', 'صناعي', 'استثماري', 'تعليمي', 'زراعي', 'حكومي'];
 const cities = ['الدمام', 'الخبر', 'الظهران', 'القطيف', 'الجبيل', 'الأحساء', 'حفر الباطن'];
 
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+
+type UiAttachmentType = 'deed' | 'site' | 'plan' | 'additional';
+type ApiAttachmentType = 'deed_image' | 'location_image' | 'plan_image' | 'other';
+
+type BackendAttachment = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  attachmentType: ApiAttachmentType | string;
+  title?: string | null;
+  driveUrl?: string | null;
+  driveFileId?: string | null;
+  mimeType?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  originalName?: string | null;
+  fileType?: string | null;
+  fileSize?: number | null;
+};
+
+type UploadResponse = {
+  fileName: string;
+  driveUrl: string;
+  driveFileId: string;
+  mimeType: string;
+  attachment?: unknown;
+};
+
+const toApiAttachmentType = (type: UiAttachmentType): ApiAttachmentType => {
+  switch (type) {
+    case 'deed':
+      return 'deed_image';
+    case 'site':
+      return 'location_image';
+    case 'plan':
+      return 'plan_image';
+    case 'additional':
+    default:
+      return 'other';
+  }
+};
+
+const fromApiAttachmentType = (type: string): UiAttachmentType => {
+  switch (type) {
+    case 'deed_image':
+    case 'deed':
+      return 'deed';
+    case 'location_image':
+    case 'site':
+      return 'site';
+    case 'plan_image':
+    case 'plan':
+      return 'plan';
+    case 'other':
+    case 'additional':
+    default:
+      return 'additional';
+  }
+};
+
+const getAttachmentUrl = (attachment: any) =>
+  attachment?.driveUrl || attachment?.fileUrl || '';
+
+const getAttachmentMimeType = (attachment: any) =>
+  attachment?.mimeType || attachment?.fileType || '';
+
+const getAttachmentName = (attachment: any) =>
+  attachment?.title || attachment?.originalName || attachment?.fileName || 'مرفق';
+
+
 const formatDateForInput = (value: any) => {
   if (!value) return new Date().toISOString().split('T')[0];
 
@@ -94,7 +168,10 @@ export const ViewDeedPage: React.FC = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [uploadTab, setUploadTab] = useState<'deed' | 'site' | 'plan' | 'additional'>('deed');
+  const [uploadTab, setUploadTab] = useState<UiAttachmentType>('deed');
+  const [backendAttachments, setBackendAttachments] = useState<BackendAttachment[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -117,6 +194,33 @@ export const ViewDeedPage: React.FC = () => {
   });
 
   const deed = deedId ? getDeedById(deedId) : null;
+
+  const loadBackendAttachments = React.useCallback(async () => {
+    if (!deedId || !API_BASE_URL) return;
+
+    try {
+      setAttachmentsLoading(true);
+
+      const response = await fetch(`${API_BASE_URL}/api/attachments/deed/${deedId}`);
+      const body = await response.json().catch(() => []);
+
+      if (!response.ok) {
+        throw new Error(body?.message || 'تعذر تحميل المرفقات');
+      }
+
+      setBackendAttachments(Array.isArray(body) ? body : []);
+    } catch (error) {
+      console.error('Error loading attachments:', error);
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل المرفقات');
+    } finally {
+      setAttachmentsLoading(false);
+    }
+  }, [deedId]);
+
+  React.useEffect(() => {
+    loadBackendAttachments();
+  }, [loadBackendAttachments]);
+
 
   const startEdit = () => {
     if (!deed) return;
@@ -258,42 +362,105 @@ export const ViewDeedPage: React.FC = () => {
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0 || !deedId) return;
+  const uploadFileToGoogleDrive = async (file: File): Promise<UploadResponse> => {
+    if (!API_BASE_URL) {
+      throw new Error('VITE_API_URL غير موجود. تأكد من ربط الواجهة بالـ Backend في Railway.');
+    }
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
+    const maxSizeMB = 10;
 
-      reader.onload = (e) => {
-        const fileUrl = e.target?.result as string;
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      throw new Error(`حجم الملف ${file.name} أكبر من الحد المسموح ${maxSizeMB} ميجا`);
+    }
 
-        addAttachment(deedId, {
-          fileName: file.name,
-          originalName: file.name,
-          fileSize: file.size,
-          fileType: file.type || 'application/octet-stream',
-          attachmentType: uploadTab,
-          fileUrl,
-        });
+    const formData = new FormData();
+    formData.append('file', file);
 
-        toast.success(`تم رفع ${file.name} بنجاح`);
-      };
-
-      reader.onerror = () => {
-        toast.error(`فشل في رفع ${file.name}`);
-      };
-
-      reader.readAsDataURL(file);
+    const response = await fetch(`${API_BASE_URL}/api/uploads`, {
+      method: 'POST',
+      body: formData,
     });
 
-    event.target.value = '';
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(body?.message || 'تعذر رفع الملف إلى Google Drive');
+    }
+
+    if (!body?.driveUrl) {
+      throw new Error('تم رفع الملف لكن لم يتم إرجاع رابط Google Drive');
+    }
+
+    return body as UploadResponse;
   };
 
-  const getAttachmentsByType = (type: string) => {
-    return Array.isArray(deed?.attachments)
-      ? deed.attachments.filter((att: any) => att.attachmentType === type)
+  const saveBackendAttachment = async (file: File, uploaded: UploadResponse) => {
+    if (!deedId || !API_BASE_URL) {
+      throw new Error('لا يمكن حفظ المرفق بدون رقم الصك أو رابط الـ Backend');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/attachments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        entityType: 'deed',
+        entityId: deedId,
+        attachmentType: toApiAttachmentType(uploadTab),
+        title: file.name,
+        driveUrl: uploaded.driveUrl,
+        driveFileId: uploaded.driveFileId || null,
+        mimeType: uploaded.mimeType || file.type || null,
+      }),
+    });
+
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(body?.message || 'تم رفع الملف لكن تعذر حفظ بيانات المرفق');
+    }
+
+    return body as BackendAttachment;
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+
+    if (!files || files.length === 0 || !deedId) return;
+
+    try {
+      setIsUploadingAttachment(true);
+
+      const savedAttachments: BackendAttachment[] = [];
+
+      for (const file of Array.from(files)) {
+        const uploaded = await uploadFileToGoogleDrive(file);
+        const savedAttachment = await saveBackendAttachment(file, uploaded);
+        savedAttachments.push(savedAttachment);
+      }
+
+      setBackendAttachments((prev) => [...savedAttachments, ...prev]);
+      toast.success(files.length === 1 ? 'تم رفع المرفق بنجاح' : `تم رفع ${files.length} مرفقات بنجاح`);
+    } catch (error) {
+      console.error('Attachment upload error:', error);
+      toast.error(error instanceof Error ? error.message : 'فشل في رفع المرفق');
+    } finally {
+      setIsUploadingAttachment(false);
+      event.target.value = '';
+    }
+  };
+
+  const getAttachmentsByType = (type: UiAttachmentType) => {
+    const remoteAttachments = backendAttachments.filter(
+      (att) => fromApiAttachmentType(String(att.attachmentType)) === type
+    );
+
+    const localAttachments = Array.isArray(deed?.attachments)
+      ? deed.attachments.filter((att: any) => fromApiAttachmentType(String(att.attachmentType)) === type)
       : [];
+
+    return [...remoteAttachments, ...localAttachments];
   };
 
   const formatFileSize = (bytes: number) => {
@@ -307,7 +474,10 @@ export const ViewDeedPage: React.FC = () => {
   };
 
   const openAttachment = (attachment: any) => {
-    if (!attachment?.fileUrl && !attachment?.localPath) {
+    const attachmentUrl = getAttachmentUrl(attachment);
+    const mimeType = getAttachmentMimeType(attachment);
+
+    if (!attachmentUrl && !attachment?.localPath) {
       toast.error('رابط أو مسار المرفق غير متوفر');
       return;
     }
@@ -317,29 +487,27 @@ export const ViewDeedPage: React.FC = () => {
       return;
     }
 
-    if (attachment.fileType?.startsWith('image/')) {
-      setPreviewImage(attachment.fileUrl);
+    if (mimeType?.startsWith('image/')) {
+      setPreviewImage(attachmentUrl);
       return;
     }
 
-    window.open(attachment.fileUrl, '_blank', 'noopener,noreferrer');
+    window.open(attachmentUrl, '_blank', 'noopener,noreferrer');
   };
 
   const downloadAttachment = async (attachment: any) => {
     try {
-      const fileName =
-        attachment.originalName ||
-        attachment.fileName ||
-        'attachment';
+      const fileName = getAttachmentName(attachment);
+      const attachmentUrl = getAttachmentUrl(attachment);
 
       if (attachment.localPath && window.localAPI?.openPath) {
         await window.localAPI.openPath(attachment.localPath);
         return;
       }
 
-      if (attachment.fileUrl) {
+      if (attachmentUrl) {
         const link = document.createElement('a');
-        link.href = attachment.fileUrl;
+        link.href = attachmentUrl;
         link.download = fileName;
         link.target = '_blank';
         document.body.appendChild(link);
@@ -360,7 +528,7 @@ export const ViewDeedPage: React.FC = () => {
     title,
     icon: Icon,
   }: {
-    type: string;
+    type: UiAttachmentType;
     title: string;
     icon: any;
   }) => {
@@ -384,17 +552,27 @@ export const ViewDeedPage: React.FC = () => {
             size="sm"
             variant="outline"
             className="w-full sm:w-auto text-xs md:text-sm"
+            disabled={isUploadingAttachment}
             onClick={() => {
-              setUploadTab(type as any);
+              setUploadTab(type as UiAttachmentType);
               document.getElementById('file-upload')?.click();
             }}
           >
-            <Upload className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-            رفع ملف
+            {isUploadingAttachment ? (
+              <Loader2 className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2 animate-spin" />
+            ) : (
+              <Upload className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+            )}
+            {isUploadingAttachment ? 'جاري الرفع...' : 'رفع ملف'}
           </Button>
         </div>
 
-        {attachments.length === 0 ? (
+        {attachmentsLoading ? (
+          <div className="text-center py-6 md:py-8 border-2 border-dashed rounded-lg">
+            <Loader2 className="h-8 w-8 md:h-10 md:w-10 mx-auto mb-2 animate-spin opacity-60" />
+            <p className="text-xs md:text-sm text-muted-foreground">جاري تحميل المرفقات...</p>
+          </div>
+        ) : attachments.length === 0 ? (
           <div className="text-center py-6 md:py-8 border-2 border-dashed rounded-lg">
             <Icon className="h-10 w-10 md:h-12 md:w-12 mx-auto mb-2 opacity-30" />
             <p className="text-xs md:text-sm text-muted-foreground">لا توجد مرفقات</p>
@@ -403,17 +581,17 @@ export const ViewDeedPage: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
             {attachments.map((att: any, index: number) => (
               <div
-                key={att.id || att.fileUrl || `${att.fileName}-${index}`}
+                key={att.id || getAttachmentUrl(att) || `${getAttachmentName(att)}-${index}`}
                 className="border rounded-lg p-2 md:p-3 hover:border-primary transition-colors"
               >
-                {att.fileType?.startsWith('image/') ? (
+                {getAttachmentMimeType(att)?.startsWith('image/') ? (
                   <div
                     className="aspect-square bg-muted rounded-md mb-2 overflow-hidden cursor-pointer"
                     onClick={() => openAttachment(att)}
                   >
                     <img
-                      src={att.fileUrl}
-                      alt={att.originalName || att.fileName}
+                      src={getAttachmentUrl(att)}
+                      alt={getAttachmentName(att)}
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -427,11 +605,11 @@ export const ViewDeedPage: React.FC = () => {
                 )}
 
                 <p className="text-xs font-medium truncate mb-1">
-                  {att.originalName || att.fileName}
+                  {getAttachmentName(att)}
                 </p>
 
                 <p className="text-xs text-muted-foreground mb-2">
-                  {formatFileSize(att.fileSize)}
+                  {att.fileSize ? formatFileSize(att.fileSize) : getAttachmentMimeType(att) || 'Google Drive'}
                 </p>
 
                 <div className="grid grid-cols-3 gap-1">
@@ -459,9 +637,28 @@ export const ViewDeedPage: React.FC = () => {
                     size="sm"
                     variant="outline"
                     className="h-7 text-xs text-destructive hover:text-destructive"
-                    onClick={() => {
-                      deleteAttachment(deedId, att.id);
-                      toast.success('تم حذف المرفق');
+                    onClick={async () => {
+                      try {
+                        if (API_BASE_URL && att.id) {
+                          const response = await fetch(`${API_BASE_URL}/api/attachments/${att.id}`, {
+                            method: 'DELETE',
+                          });
+
+                          if (!response.ok) {
+                            const body = await response.json().catch(() => ({}));
+                            throw new Error(body?.message || 'فشل في حذف المرفق');
+                          }
+
+                          setBackendAttachments((prev) => prev.filter((item) => item.id !== att.id));
+                        } else {
+                          await deleteAttachment(deedId, att.id);
+                        }
+
+                        toast.success('تم حذف المرفق');
+                      } catch (error) {
+                        console.error('Delete attachment error:', error);
+                        toast.error(error instanceof Error ? error.message : 'فشل في حذف المرفق');
+                      }
                     }}
                     title="حذف المرفق"
                   >
