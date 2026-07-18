@@ -17,7 +17,8 @@ import {
   User,
   MapPin,
   Building,
-  Shield
+  Shield,
+  Archive,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -86,8 +87,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'leased-buildings-in', path: '/buildings/leased-in', icon: Building, label: t('nav.leasedBuildingsIn') },
     { id: 'search', path: '/search', icon: Search, label: t('nav.search') },
     { id: 'reports', path: '/reports', icon: BarChart3, label: t('nav.reports') },
-    { id: 'maps', path: '/maps', icon: Map, label: t('nav.maps') },
     { id: 'admin', path: '/admin', icon: Shield, label: t('nav.admin') },
+    {id: 'archive', path: '/archive', icon: Archive, label: 'الأرشفة',},
   ];
 
   const getCurrentPage = () => {
@@ -103,7 +104,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/buildings/leased-in')) return 'leased-buildings-in';
     if (path.startsWith('/search')) return 'search';
     if (path.startsWith('/reports')) return 'reports';
-    if (path.startsWith('/maps')) return 'maps';
+    if (path.startsWith('/archive')) return 'archive';
     if (path.startsWith('/admin')) return 'admin';
     if (path.startsWith('/settings')) return 'settings';
     return 'home';

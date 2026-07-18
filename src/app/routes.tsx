@@ -5,7 +5,6 @@ import { AddDeedPage } from './pages/AddDeedPage';
 import { AllDeedsPage } from './pages/AllDeedsPage';
 import { ViewDeedPage } from './pages/ViewDeedPage';
 import { ReportsPage } from './pages/ReportsPage';
-import { MapsPage } from './pages/MapsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { AllocatedLandsPage } from './pages/AllocatedLandsPage';
@@ -61,12 +60,8 @@ export const router = createHashRouter([
         element: <ReportsPage />,
       },
       {
-        path: 'maps',
-        element: <MapsPage />,
-      },
-      {
-        path: 'maps/:deedId',
-        element: <MapsPage />,
+        path: '/archive',
+        element: <ArchivePage />,
       },
       {
         path: 'settings',
@@ -84,10 +79,6 @@ export const router = createHashRouter([
         path: 'admin',
         element: <AdminDashboardPage />,
       },
-      {
-        path: '/archive',
-        element: <ArchivePage />,
-        },
       {
         path: 'lands',
         children: [
