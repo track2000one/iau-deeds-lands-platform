@@ -16,8 +16,6 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { Label } from '../components/ui/label';
 import {
@@ -29,11 +27,8 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { NativeSelect } from '../components/ui/native-select';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { Badge } from '../components/ui/badge';
 import {
   BarChart,
@@ -58,39 +53,6 @@ type ReportSectionType =
   | 'leasedIn'
   | 'buildingsOut'
   | 'buildingsIn';
-
-type PrintTheme = 'official' | 'simple' | 'minimal';
-type PrintOrientation = 'landscape' | 'portrait';
-
-type PrintSettings = {
-  universityName: string;
-  subtitle: string;
-  customTitle: string;
-  introText: string;
-  closingText: string;
-  footerRight: string;
-  footerLeft: string;
-  fontFamily: string;
-  fontSize: string;
-  tableFontSize: string;
-  theme: PrintTheme;
-  orientation: PrintOrientation;
-  showStatistics: boolean;
-  showDateTime: boolean;
-  showFooter: boolean;
-  showSignatures: boolean;
-  firstSignature: string;
-  secondSignature: string;
-};
-
-const escapeHtml = (value: string) =>
-  String(value || '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-
 
 export const ReportsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -188,31 +150,6 @@ export const ReportsPage: React.FC = () => {
 
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [reportType, setReportType] = useState<'detailed' | 'summary' | 'statistical' | 'graphical'>('detailed');
-
-  const [printSettings, setPrintSettings] = useState<PrintSettings>({
-    universityName: 'جامعة الإمام عبدالرحمن بن فيصل',
-    subtitle: 'منصة إدارة الصكوك والأراضي',
-    customTitle: '',
-    introText: '',
-    closingText: '',
-    footerRight: 'جامعة الإمام عبدالرحمن بن فيصل\nالمملكة العربية السعودية',
-    footerLeft: 'منصة إدارة الصكوك والأراضي',
-    fontFamily: 'Arial',
-    fontSize: '13',
-    tableFontSize: '11',
-    theme: 'official',
-    orientation: 'landscape',
-    showStatistics: true,
-    showDateTime: true,
-    showFooter: true,
-    showSignatures: true,
-    firstSignature: 'التوقيع',
-    secondSignature: 'الختم',
-  });
-
-  const updatePrintSetting = <K extends keyof PrintSettings>(key: K, value: PrintSettings[K]) => {
-    setPrintSettings((prev) => ({ ...prev, [key]: value }));
-  };
 
   const [selectedColumns, setSelectedColumns] = useState<any>({
     deeds: deedsColumns,
@@ -442,144 +379,23 @@ export const ReportsPage: React.FC = () => {
     }
   };
 
-  const exportToPDF = (data: any[], columns: any[], title: string, filename: string) => {
-    try {
-      const doc = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4',
-      });
-
-      const enabledColumns = columns.filter((col) => col.enabled);
-
-      doc.setFontSize(18);
-      doc.text(title, doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
-
-      doc.setFontSize(12);
-      doc.text('Imam Abdulrahman Bin Faisal University', doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
-
-      doc.setFontSize(10);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.getWidth() / 2, 28, { align: 'center' });
-
-      const headers = ['#', ...enabledColumns.map((col) => col.label)];
-
-      const tableData = data.map((item, index) => [
-        index + 1,
-        ...enabledColumns.map((col) => formatCellValue(item, col.key)),
-      ]);
-
-      autoTable(doc, {
-        head: [headers],
-        body: tableData,
-        startY: 35,
-        styles: {
-          font: 'helvetica',
-          fontSize: 8,
-          cellPadding: 2,
-          halign: 'center',
-        },
-        headStyles: {
-          fillColor: [56, 75, 112],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          halign: 'center',
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245],
-        },
-      });
-
-      const pageCount = (doc as any).internal.getNumberOfPages();
-
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.text(
-          `Page ${i} of ${pageCount}`,
-          doc.internal.pageSize.getWidth() / 2,
-          doc.internal.pageSize.getHeight() - 10,
-          { align: 'center' }
-        );
-      }
-
-      doc.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`);
-      toast.success(t('reports.exportSuccess') || 'تم التصدير بنجاح');
-    } catch (error) {
-      console.error('PDF Export Error:', error);
-      toast.error(t('reports.exportError') || 'فشل في التصدير');
-    }
+  const escapeHtml = (value: any) => {
+    return String(value ?? '-')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
   };
 
-
-  const openHtmlForPrinting = (html: string) => {
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const printWindow = window.open(url, '_blank');
-
-    if (!printWindow) {
-      toast.error('تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة.');
-      URL.revokeObjectURL(url);
-      return;
-    }
-
-    const cleanup = () => {
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-    };
-
-    printWindow.onload = () => {
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-        cleanup();
-      }, 500);
-    };
-  };
-
-  const downloadPdfUsingBrowser = (html: string) => {
-    const htmlWithNotice = html.replace(
-      '</body>',
-      `<script>
-        window.addEventListener('load', function () {
-          setTimeout(function () {
-            window.focus();
-            window.print();
-          }, 600);
-        });
-      </script></body>`
-    );
-
-    const blob = new Blob([htmlWithNotice], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const pdfWindow = window.open(url, '_blank');
-
-    if (!pdfWindow) {
-      toast.error('تعذر فتح نافذة PDF. تأكد من السماح بالنوافذ المنبثقة.');
-      URL.revokeObjectURL(url);
-      return;
-    }
-
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-  };
-
-  const handlePrint = (
-    ref: React.RefObject<HTMLDivElement>,
+  const buildPrintableReportHtml = (
+    data: any[],
+    columns: any[],
     title: string,
     stats?: { total: number; totalArea?: string }
   ) => {
-    if (!ref.current) return;
-
-    const printWindow = window.open('', '_blank');
-
-    if (!printWindow) return;
-
+    const enabledColumns = columns.filter((col) => col.enabled);
     const currentDate = new Date();
-    const effectiveTitle = printSettings.customTitle.trim() || title;
-    const pageOrientation = printSettings.orientation;
-    const headerColors = {
-      official: { background: '#f8fafc', border: '#1e3a8a', text: '#0f172a', title: '#1e3a8a' },
-      simple: { background: '#ffffff', border: '#cbd5e1', text: '#111827', title: '#111827' },
-      minimal: { background: '#ffffff', border: '#e5e7eb', text: '#111827', title: '#111827' },
-    }[printSettings.theme];
 
     const dateString = currentDate.toLocaleDateString('ar-SA', {
       year: 'numeric',
@@ -592,284 +408,355 @@ export const ReportsPage: React.FC = () => {
       minute: '2-digit',
     });
 
-    const safeUniversityName = escapeHtml(printSettings.universityName);
-    const safeSubtitle = escapeHtml(printSettings.subtitle);
-    const safeTitle = escapeHtml(effectiveTitle);
-    const safeIntro = escapeHtml(printSettings.introText).replaceAll('\n', '<br />');
-    const safeFooterRight = escapeHtml(printSettings.footerRight).replaceAll('\\n', '<br />');
-    const safeFooterLeft = escapeHtml(printSettings.footerLeft).replaceAll('\\n', '<br />');
-    const safeFirstSignature = escapeHtml(printSettings.firstSignature || 'التوقيع');
-    const safeSecondSignature = escapeHtml(printSettings.secondSignature || 'الختم');
+    const rowsHtml =
+      data.length === 0
+        ? `<tr><td colspan="${enabledColumns.length + 1}" class="empty-cell">لا توجد بيانات</td></tr>`
+        : data
+            .map((item, index) => {
+              const cells = enabledColumns
+                .map((col) => `<td>${escapeHtml(formatCellValue(item, col.key))}</td>`)
+                .join('');
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html dir="rtl" lang="ar">
-        <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${safeTitle}</title>
-          <style>
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
+              return `<tr><td>${index + 1}</td>${cells}</tr>`;
+            })
+            .join('');
 
-            body {
-              font-family: ${printSettings.fontFamily}, 'Tahoma', 'Arial', 'Segoe UI', sans-serif, Arial, sans-serif;
-              direction: rtl;
-              padding: 0;
-              background: white;
-              color: #111827;
-              line-height: 1.7;
-              font-size: ${printSettings.fontSize}px;
-            }
+    const headersHtml = ['#', ...enabledColumns.map((col) => col.label)]
+      .map((header) => `<th>${escapeHtml(header)}</th>`)
+      .join('');
 
-            .report-header {
-              background: ${headerColors.background};
-              color: ${headerColors.text};
-              padding: 18px 22px;
-              margin: 0 0 20px 0;
-              border-bottom: 3px solid ${headerColors.border};
-            }
+    return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 10mm;
+    }
 
-            .university-name {
-              font-size: ${Number(printSettings.fontSize) + 7}px;
-              font-weight: 700;
-              margin-bottom: 4px;
-              text-align: center;
-            }
+    * {
+      box-sizing: border-box;
+    }
 
-            .university-subtitle {
-              font-size: ${Number(printSettings.fontSize) + 1}px;
-              text-align: center;
-              color: #475569;
-              margin-bottom: 10px;
-            }
+    body {
+      margin: 0;
+      padding: 18px;
+      direction: rtl;
+      unicode-bidi: plaintext;
+      background: #ffffff;
+      color: #111827;
+      font-family: Tahoma, Arial, "Segoe UI", sans-serif;
+      font-size: 13px;
+      line-height: 1.7;
+    }
 
-            .report-title {
-              font-size: ${Number(printSettings.fontSize) + 4}px;
-              font-weight: 700;
-              text-align: center;
-              color: ${headerColors.title};
-              padding: 8px;
-              border: 1px solid #e5e7eb;
-              border-radius: 8px;
-              background: #ffffff;
-              margin-top: 10px;
-            }
+    .report {
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+    }
 
-            .report-meta {
-              display: flex;
-              justify-content: space-between;
-              margin-top: 12px;
-              padding-top: 10px;
-              border-top: 1px solid #e5e7eb;
-              font-size: ${Math.max(Number(printSettings.fontSize) - 1, 10)}px;
-              color: #475569;
-            }
+    .header {
+      border: 1px solid #d8dee9;
+      border-top: 5px solid #1f4e79;
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+      text-align: center;
+      background: #f8fafc;
+    }
 
-            .free-text {
-              margin: 0 20px 18px 20px;
-              padding: 12px 14px;
-              border: 1px solid #e5e7eb;
-              background: #ffffff;
-              border-radius: 8px;
-              color: #111827;
-            }
+    .university {
+      font-size: 21px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
 
-            .statistics-box {
-              background: #ffffff;
-              border: 1px solid #e5e7eb;
-              border-radius: 10px;
-              padding: 14px;
-              margin: 0 20px 18px 20px;
-              display: flex;
-              justify-content: space-around;
-              gap: 20px;
-            }
+    .subtitle {
+      font-size: 13px;
+      color: #475569;
+      margin-bottom: 10px;
+    }
 
-            .stat-item {
-              text-align: center;
-              flex: 1;
-            }
+    .title {
+      display: inline-block;
+      min-width: 260px;
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: 1px solid #d8dee9;
+      background: #ffffff;
+      font-size: 18px;
+      font-weight: 700;
+      color: #1f4e79;
+    }
 
-            .stat-label {
-              font-size: ${Math.max(Number(printSettings.fontSize) - 2, 10)}px;
-              color: #64748b;
-              margin-bottom: 4px;
-            }
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 12px;
+      color: #475569;
+      font-size: 12px;
+    }
 
-            .stat-value {
-              font-size: ${Number(printSettings.fontSize) + 5}px;
-              font-weight: 700;
-              color: #0f172a;
-            }
+    .stats {
+      display: flex;
+      gap: 12px;
+      margin: 14px 0;
+    }
 
-            .print-content {
-              padding: 0 20px;
-            }
+    .stat {
+      flex: 1;
+      border: 1px solid #d8dee9;
+      border-radius: 8px;
+      padding: 10px;
+      background: #ffffff;
+      text-align: center;
+    }
 
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              background: white;
-              margin-top: 14px;
-              border: 1px solid #cbd5e1;
-            }
+    .stat-label {
+      color: #64748b;
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
 
-            thead,
-            tr.bg-blue-600,
-            .bg-blue-600 {
-              background: #e2e8f0 !important;
-              color: #0f172a !important;
-            }
+    .stat-value {
+      color: #1f4e79;
+      font-size: 18px;
+      font-weight: 700;
+    }
 
-            th {
-              padding: 9px 7px;
-              text-align: center;
-              font-weight: 700;
-              font-size: ${printSettings.tableFontSize}px;
-              border: 1px solid #cbd5e1;
-              color: #0f172a !important;
-              background: #e2e8f0 !important;
-            }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: auto;
+      background: #ffffff;
+      border: 1px solid #d8dee9;
+    }
 
-            tbody tr:nth-child(even) {
-              background-color: #f8fafc;
-            }
+    th {
+      background: #eaf1f8;
+      color: #0f172a;
+      font-weight: 700;
+      border: 1px solid #cbd5e1;
+      padding: 8px 6px;
+      text-align: center;
+      white-space: normal;
+    }
 
-            td {
-              padding: 8px 7px;
-              text-align: center;
-              font-size: ${printSettings.tableFontSize}px;
-              border: 1px solid #e5e7eb;
-              color: #111827;
-            }
+    td {
+      border: 1px solid #e2e8f0;
+      padding: 7px 6px;
+      text-align: center;
+      vertical-align: middle;
+      white-space: normal;
+      word-break: break-word;
+    }
 
-            .badge {
-              display: inline-block;
-              padding: 2px 8px;
-              border-radius: 8px;
-              font-size: ${Math.max(Number(printSettings.tableFontSize) - 1, 9)}px;
-              font-weight: 500;
-              background: #f8fafc;
-              color: #0f172a;
-              border: 1px solid #cbd5e1;
-            }
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
 
-            .report-footer {
-              margin: 35px 20px 0 20px;
-              padding-top: 15px;
-              border-top: 1px solid #cbd5e1;
-              display: flex;
-              justify-content: space-between;
-              font-size: ${Math.max(Number(printSettings.fontSize) - 2, 10)}px;
-              color: #475569;
-            }
+    .empty-cell {
+      padding: 20px;
+      color: #64748b;
+    }
 
-            .signature-line {
-              margin-top: 55px;
-              text-align: center;
-            }
+    .footer {
+      margin-top: 20px;
+      padding-top: 12px;
+      border-top: 1px solid #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      color: #475569;
+      font-size: 11px;
+    }
 
-            .signature-box {
-              display: inline-block;
-              border-top: 1.5px solid #374151;
-              padding-top: 8px;
-              min-width: 190px;
-              margin: 0 35px;
-            }
+    .signature {
+      display: flex;
+      justify-content: center;
+      gap: 90px;
+      margin-top: 42px;
+      color: #111827;
+    }
 
-            @media print {
-              @page { size: A4 landscape; margin: 10mm; 
-                size: A4 ${pageOrientation};
-                margin: 12mm 9mm;
-              }
+    .signature-item {
+      min-width: 160px;
+      text-align: center;
+      border-top: 1px solid #111827;
+      padding-top: 8px;
+    }
 
-              * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
+    .no-print {
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border: 1px solid #fde68a;
+      background: #fffbeb;
+      color: #92400e;
+      border-radius: 8px;
+      font-size: 13px;
+      text-align: center;
+    }
 
-              button,
-              input,
-              svg,
-              .no-print {
-                display: none !important;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="report-header">
-            <div class="university-name">${safeUniversityName}</div>
-            <div class="university-subtitle">${safeSubtitle}</div>
-            <div class="report-title">${safeTitle}</div>
+    @media print {
+      body {
+        padding: 0;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      .header {
+        break-inside: avoid;
+      }
+
+      table {
+        page-break-inside: auto;
+      }
+
+      tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
+
+      thead {
+        display: table-header-group;
+      }
+
+      tfoot {
+        display: table-footer-group;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="report">
+    <div class="no-print">
+      للحفظ PDF اختر من نافذة الطباعة: Destination / الوجهة = Save as PDF
+    </div>
+
+    <div class="header">
+      <div class="university">جامعة الإمام عبدالرحمن بن فيصل</div>
+      <div class="subtitle">منصة إدارة الصكوك والأراضي</div>
+      <div class="title">${escapeHtml(title)}</div>
+      <div class="meta">
+        <div>التاريخ: ${escapeHtml(dateString)}</div>
+        <div>الوقت: ${escapeHtml(timeString)}</div>
+      </div>
+    </div>
+
+    ${
+      stats
+        ? `<div class="stats">
+            <div class="stat">
+              <div class="stat-label">إجمالي السجلات</div>
+              <div class="stat-value">${escapeHtml(stats.total)}</div>
+            </div>
             ${
-              printSettings.showDateTime
-                ? `<div class="report-meta"><div>التاريخ: ${dateString}</div><div>الوقت: ${timeString}</div></div>`
+              stats.totalArea
+                ? `<div class="stat">
+                    <div class="stat-label">إجمالي المساحة</div>
+                    <div class="stat-value">${escapeHtml(stats.totalArea)} م²</div>
+                  </div>`
                 : ''
             }
-          </div>
+          </div>`
+        : ''
+    }
 
-          ${safeIntro ? `<div class="free-text">${safeIntro}</div>` : ''}
+    <table>
+      <thead>
+        <tr>${headersHtml}</tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
 
-          ${
-            printSettings.showStatistics && stats
-              ? `
-            <div class="statistics-box">
-              <div class="stat-item">
-                <div class="stat-label">إجمالي السجلات</div>
-                <div class="stat-value">${stats.total}</div>
-              </div>
-              ${
-                stats.totalArea
-                  ? `
-              <div class="stat-item">
-                <div class="stat-label">إجمالي المساحة</div>
-                <div class="stat-value">${stats.totalArea} م²</div>
-              </div>
-              `
-                  : ''
-              }
-            </div>
-            `
-              : ''
+    <div class="footer">
+      <div>
+        <strong>جامعة الإمام عبدالرحمن بن فيصل</strong><br />
+        المملكة العربية السعودية
+      </div>
+      <div>
+        تمت الطباعة بتاريخ: ${escapeHtml(dateString)}<br />
+        منصة إدارة الصكوك والأراضي
+      </div>
+    </div>
+
+    <div class="signature">
+      <div class="signature-item">التوقيع</div>
+      <div class="signature-item">الختم</div>
+    </div>
+  </div>
+</body>
+</html>`;
+  };
+
+  const openPrintableHtml = (html: string, autoPrint = true) => {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank', 'noopener,noreferrer');
+
+    if (!printWindow) {
+      URL.revokeObjectURL(url);
+      toast.error('تعذر فتح نافذة الطباعة. فعّل السماح بالنوافذ المنبثقة من المتصفح.');
+      return;
+    }
+
+    if (autoPrint) {
+      const timer = window.setInterval(() => {
+        try {
+          if (printWindow.document.readyState === 'complete') {
+            window.clearInterval(timer);
+            printWindow.focus();
+
+            setTimeout(() => {
+              printWindow.print();
+            }, 500);
           }
+        } catch {
+          window.clearInterval(timer);
+        }
+      }, 250);
+    }
 
-          <div class="print-content">
-            ${ref.current.innerHTML}
-          </div>
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  };
 
-          ${safeClosing ? `<div class="free-text">${safeClosing}</div>` : ''}
+  const exportToPDF = (data: any[], columns: any[], title: string, filename: string) => {
+    try {
+      const html = buildPrintableReportHtml(data, columns, title, {
+        total: Array.isArray(data) ? data.length : 0,
+      });
 
-          ${
-            printSettings.showFooter
-              ? `<div class="report-footer"><div>${safeFooterRight}</div><div style="text-align: left;">${safeFooterLeft}${printSettings.showDateTime ? `<br />تمت الطباعة بتاريخ: ${dateString}` : ''}</div></div>`
-              : ''
-          }
+      openPrintableHtml(html, true);
+      toast.success('تم فتح نافذة الطباعة. اختر Save as PDF للحفظ بصيغة PDF.');
+    } catch (error) {
+      console.error('PDF Export Error:', error);
+      toast.error(t('reports.exportError') || 'فشل في التصدير');
+    }
+  };
 
-          ${
-            printSettings.showSignatures
-              ? `<div class="signature-line"><div class="signature-box">${safeFirstSignature}</div><div class="signature-box">${safeSecondSignature}</div></div>`
-              : ''
-          }
-
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
+  const handlePrint = (
+    data: any[],
+    columns: any[],
+    title: string,
+    stats?: { total: number; totalArea?: string }
+  ) => {
+    try {
+      const html = buildPrintableReportHtml(data, columns, title, stats);
+      openPrintableHtml(html, true);
+    } catch (error) {
+      console.error('Print Error:', error);
+      toast.error('فشل في فتح نافذة الطباعة');
+    }
   };
 
   const getSectionStatistics = (type: ReportSectionType) => {
@@ -927,7 +814,7 @@ export const ReportsPage: React.FC = () => {
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-xl flex items-center gap-2">
-                <Layers className="h-5 w-5 text-slate-600" />
+                <Layers className="h-5 w-5 text-blue-600" />
                 {title}
               </CardTitle>
 
@@ -1041,7 +928,7 @@ export const ReportsPage: React.FC = () => {
 
                   <Button
                     onClick={() => {
-                      handlePrint(printRefs[refKey], title, {
+                      handlePrint(safeData, columns, title, {
                         total: safeData.length,
                         totalArea: Number(sectionStats.totalArea || 0).toLocaleString(),
                       });
@@ -1117,7 +1004,7 @@ export const ReportsPage: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                       <div className="text-center p-4 bg-white rounded-lg shadow">
-                        <div className="text-3xl font-bold text-slate-600">
+                        <div className="text-3xl font-bold text-blue-600">
                           {safeData.length}
                         </div>
                         <div className="text-sm text-gray-600 mt-1">
@@ -1272,7 +1159,7 @@ export const ReportsPage: React.FC = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-bold text-slate-900">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
           {t('reports.title') || 'التقارير'}
         </h1>
 
@@ -1281,17 +1168,17 @@ export const ReportsPage: React.FC = () => {
         </p>
       </div>
 
-      <Card className="bg-slate-50 border-slate-200">
+      <Card className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-blue-200">
         <CardContent className="pt-6">
           <div className="flex items-start gap-3">
-            <Download className="h-6 w-6 text-slate-600 mt-1 flex-shrink-0" />
+            <Download className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
 
             <div className="space-y-2">
-              <p className="font-semibold text-slate-900 text-lg">
+              <p className="font-semibold text-blue-900 text-lg">
                 ميزات التقارير الاحترافية:
               </p>
 
-              <ul className="text-sm text-slate-700 space-y-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+              <ul className="text-sm text-blue-800 space-y-1 grid grid-cols-1 md:grid-cols-2 gap-2">
                 <li className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
                   <strong>تقارير مفصلة</strong>: عرض كامل البيانات مع اختيار الأعمدة.
@@ -1323,195 +1210,6 @@ export const ReportsPage: React.FC = () => {
                 </li>
               </ul>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-
-      <Card className="border-slate-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <Settings className="h-5 w-5" />
-            إعدادات المعاينة والطباعة
-          </CardTitle>
-          <CardDescription>
-            تحكم في عنوان التقرير والعبارات والتوقيع والخط قبل الطباعة بدون تعقيد.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>اسم الجهة</Label>
-              <Input
-                value={printSettings.universityName}
-                onChange={(e) => updatePrintSetting('universityName', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>العنوان الفرعي</Label>
-              <Input
-                value={printSettings.subtitle}
-                onChange={(e) => updatePrintSetting('subtitle', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>عنوان مخصص للتقرير</Label>
-              <Input
-                value={printSettings.customTitle}
-                onChange={(e) => updatePrintSetting('customTitle', e.target.value)}
-                placeholder="اتركه فارغًا لاستخدام اسم القسم"
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-3">
-              <Label>عبارة قبل الجدول</Label>
-              <Textarea
-                value={printSettings.introText}
-                onChange={(e) => updatePrintSetting('introText', e.target.value)}
-                placeholder="مثال: نفيدكم ببيان السجلات الموضحة أدناه..."
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-3">
-              <Label>عبارة بعد الجدول</Label>
-              <Textarea
-                value={printSettings.closingText}
-                onChange={(e) => updatePrintSetting('closingText', e.target.value)}
-                placeholder="مثال: للاطلاع واتخاذ ما يلزم."
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>نوع الخط</Label>
-              <NativeSelect
-                value={printSettings.fontFamily}
-                onChange={(e) => updatePrintSetting('fontFamily', e.target.value)}
-              >
-                <option value="Arial">Arial</option>
-                <option value="Tahoma">Tahoma</option>
-                <option value="Segoe UI">Segoe UI</option>
-                <option value="Times New Roman">Times New Roman</option>
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label>حجم الخط العام</Label>
-              <NativeSelect
-                value={printSettings.fontSize}
-                onChange={(e) => updatePrintSetting('fontSize', e.target.value)}
-              >
-                <option value="11">صغير</option>
-                <option value="13">متوسط</option>
-                <option value="15">كبير</option>
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label>حجم خط الجدول</Label>
-              <NativeSelect
-                value={printSettings.tableFontSize}
-                onChange={(e) => updatePrintSetting('tableFontSize', e.target.value)}
-              >
-                <option value="9">صغير جدًا</option>
-                <option value="11">متوسط</option>
-                <option value="13">كبير</option>
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label>نمط الترويسة</Label>
-              <NativeSelect
-                value={printSettings.theme}
-                onChange={(e) => updatePrintSetting('theme', e.target.value as PrintTheme)}
-              >
-                <option value="official">رسمي هادئ</option>
-                <option value="simple">بسيط</option>
-                <option value="minimal">بدون ألوان تقريبًا</option>
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label>اتجاه الصفحة</Label>
-              <NativeSelect
-                value={printSettings.orientation}
-                onChange={(e) => updatePrintSetting('orientation', e.target.value as PrintOrientation)}
-              >
-                <option value="landscape">عرضي</option>
-                <option value="portrait">طولي</option>
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label>التوقيع الأول</Label>
-              <Input
-                value={printSettings.firstSignature}
-                onChange={(e) => updatePrintSetting('firstSignature', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>التوقيع الثاني</Label>
-              <Input
-                value={printSettings.secondSignature}
-                onChange={(e) => updatePrintSetting('secondSignature', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label>تذييل يمين</Label>
-              <Textarea
-                value={printSettings.footerRight}
-                onChange={(e) => updatePrintSetting('footerRight', e.target.value)}
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-1">
-              <Label>تذييل يسار</Label>
-              <Textarea
-                value={printSettings.footerLeft}
-                onChange={(e) => updatePrintSetting('footerLeft', e.target.value)}
-                rows={2}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 rounded-lg border bg-muted/20 p-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={printSettings.showStatistics}
-                onCheckedChange={(checked) => updatePrintSetting('showStatistics', Boolean(checked))}
-              />
-              <span className="text-sm">إظهار الإحصائيات</span>
-            </label>
-
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={printSettings.showDateTime}
-                onCheckedChange={(checked) => updatePrintSetting('showDateTime', Boolean(checked))}
-              />
-              <span className="text-sm">إظهار التاريخ والوقت</span>
-            </label>
-
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={printSettings.showFooter}
-                onCheckedChange={(checked) => updatePrintSetting('showFooter', Boolean(checked))}
-              />
-              <span className="text-sm">إظهار التذييل</span>
-            </label>
-
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={printSettings.showSignatures}
-                onCheckedChange={(checked) => updatePrintSetting('showSignatures', Boolean(checked))}
-              />
-              <span className="text-sm">إظهار التوقيع والختم</span>
-            </label>
           </div>
         </CardContent>
       </Card>
