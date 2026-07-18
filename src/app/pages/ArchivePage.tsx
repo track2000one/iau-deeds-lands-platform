@@ -262,7 +262,7 @@ export const ArchivePage: React.FC = () => {
       toast.error('تصنيف الملف مطلوب');
       return false;
     }
-    if (formMode === 'add' && form.files.length === 0) {
+    if (formMode === 'add' && form.files[0]s.length === 0) {
       toast.error('اختر ملفًا واحدًا على الأقل للأرشفة');
       return false;
     }
@@ -301,12 +301,12 @@ export const ArchivePage: React.FC = () => {
       if (formMode === 'add') {
         const newDocuments: ArchiveDocument[] = [];
 
-        for (const file of form.files) {
+        for (const file of form.files[0]s) {
           const uploaded = await uploadFileToGoogleDrive(file);
 
           const baseTitle = form.title.trim();
           const title =
-            form.files.length === 1
+            form.files[0]s.length === 1
               ? baseTitle
               : `${baseTitle} - ${file.name.replace(/\.[^/.]+$/, '')}`;
 
@@ -340,8 +340,8 @@ export const ArchivePage: React.FC = () => {
       } else if (selectedDocument) {
         let updatedFileData: Partial<ArchiveDocument> = {};
 
-        if (form.files.length > 0) {
-          const file = form.files[0];
+        if (form.files[0]s.length > 0) {
+          const file = form.files[0]s[0];
           const uploaded = await uploadFileToGoogleDrive(file);
           updatedFileData = {
             fileName: uploaded.fileName || file.name,
@@ -386,15 +386,39 @@ export const ArchivePage: React.FC = () => {
     }
   };
 
-  const selectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const selectFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files || []);
 
-    updateFormField('file', file);
-    if (!form.title.trim()) {
-      updateFormField('title', file.name.replace(/\.[^/.]+$/, ''));
-    }
+    if (selectedFiles.length === 0) return;
+
+    setForm((prev) => {
+      const existingKeys = new Set(
+        prev.files.map((file) => `${file.name}-${file.size}-${file.lastModified}`)
+      );
+
+      const uniqueNewFiles = selectedFiles.filter(
+        (file) => !existingKeys.has(`${file.name}-${file.size}-${file.lastModified}`)
+      );
+
+      return {
+        ...prev,
+        files: [...prev.files, ...uniqueNewFiles],
+        title: prev.title.trim()
+          ? prev.title
+          : selectedFiles.length > 1
+            ? 'مجموعة ملفات مؤرشفة'
+            : selectedFiles[0].name.replace(/\.[^/.]+$/, ''),
+      };
+    });
+
     event.target.value = '';
+  };
+
+  const removeSelectedFile = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      files: prev.files.filter((_, fileIndex) => fileIndex !== index),
+    }));
   };
 
   const openFile = (doc: ArchiveDocument) => {
@@ -567,9 +591,9 @@ export const ArchivePage: React.FC = () => {
               <CardContent className="space-y-4">
                 <div className="rounded-xl border border-dashed p-6 text-center bg-muted/20">
                   <Upload className="h-12 w-12 mx-auto mb-3 text-primary" />
-                  <p className="font-semibold mb-1">{form.files.length > 0 ? `تم اختيار ${form.files.length} ملف` : formMode === 'edit' ? 'اختيار ملفات جديد اختياري' : 'اختر ملفًا أو أكثر للأرشفة'}</p>
+                  <p className="font-semibold mb-1">{form.files[0]s.length > 0 ? `تم اختيار ${form.files[0]s.length} ملف` : formMode === 'edit' ? 'اختيار ملفات جديد اختياري' : 'اختر ملفًا أو أكثر للأرشفة'}</p>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {form.file ? `${formatFileSize(form.file.size)} — ${form.file.type || 'نوع غير معروف'}` : 'PDF، Word، Excel، PowerPoint، صور، ملفات مضغوطة، وجميع الصيغ تقريبًا'}
+                    {form.files[0] ? `${formatFileSize(form.files[0].size)} — ${form.files[0].type || 'نوع غير معروف'}` : 'PDF، Word، Excel، PowerPoint، صور، ملفات مضغوطة، وجميع الصيغ تقريبًا'}
                   </p>
 
                   <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
