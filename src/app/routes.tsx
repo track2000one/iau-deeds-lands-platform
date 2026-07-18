@@ -21,9 +21,10 @@ import { LeasedBuildingsInPage } from './pages/LeasedBuildingsInPage';
 import { AddLeasedBuildingInPage } from './pages/AddLeasedBuildingInPage';
 import { UnifiedSearchPage } from './pages/UnifiedSearchPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
-import { AppearanceSettingsPage } from './pages/AppearanceSettingsPage';
 import { ArchivePage } from './pages/ArchivePage';
 import { Archive } from 'lucide-react';
+import { AppearanceSettingsPage } from './pages/AppearanceSettingsPage';
+
 
 export const router = createHashRouter([
   {
