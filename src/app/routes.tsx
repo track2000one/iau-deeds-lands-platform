@@ -24,6 +24,7 @@ import { UnifiedSearchPage } from './pages/UnifiedSearchPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { AppearanceSettingsPage } from './pages/AppearanceSettingsPage';
 import { ArchivePage } from './pages/ArchivePage';
+import { Archive } from 'lucide-react';
 
 export const router = createHashRouter([
   {
@@ -86,7 +87,7 @@ export const router = createHashRouter([
       {
         path: '/archive',
         element: <ArchivePage />,
-        }
+        },
       {
         path: 'lands',
         children: [
