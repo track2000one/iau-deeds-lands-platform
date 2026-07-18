@@ -83,7 +83,7 @@ type ArchiveFormState = {
   confidentiality: 'public' | 'internal' | 'confidential';
   tags: string;
   description: string;
-  file?: File | null;
+  files: File[];
 };
 
 const STORAGE_KEY = 'iau_archive_documents_v1';
@@ -98,7 +98,7 @@ const emptyForm: ArchiveFormState = {
   confidentiality: 'internal',
   tags: '',
   description: '',
-  file: null,
+  files: [],
 };
 
 const categories = ['عام', 'صكوك', 'أراضي', 'مباني', 'عقود', 'محاضر', 'خطابات', 'صور', 'مخططات', 'مراسلات', 'أخرى'];
@@ -222,7 +222,7 @@ export const ArchivePage: React.FC = () => {
       confidentiality: doc.confidentiality,
       tags: doc.tags,
       description: doc.description,
-      file: null,
+      files: [],
     });
     setFormOpen(true);
     setTimeout(() => document.getElementById('archive-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
@@ -262,8 +262,8 @@ export const ArchivePage: React.FC = () => {
       toast.error('تصنيف الملف مطلوب');
       return false;
     }
-    if (formMode === 'add' && !form.file) {
-      toast.error('اختر ملفًا للأرشفة');
+    if (formMode === 'add' && form.files.length === 0) {
+      toast.error('اختر ملفًا واحدًا على الأقل للأرشفة');
       return false;
     }
     return true;
@@ -299,41 +299,55 @@ export const ArchivePage: React.FC = () => {
 
     try {
       if (formMode === 'add') {
-        const file = form.file as File;
-        const uploaded = await uploadFileToGoogleDrive(file);
+        const newDocuments: ArchiveDocument[] = [];
 
-        const newDocument: ArchiveDocument = {
-          id: `archive-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          title: form.title.trim(),
-          category: form.category.trim(),
-          documentNumber: form.documentNumber.trim(),
-          documentDate: form.documentDate,
-          issuingAuthority: form.issuingAuthority.trim(),
-          confidentiality: form.confidentiality,
-          tags: form.tags.trim(),
-          description: form.description.trim(),
-          fileName: uploaded.fileName || file.name,
-          originalName: file.name,
-          mimeType: uploaded.mimeType || file.type || 'application/octet-stream',
-          fileSize: file.size,
-          driveUrl: uploaded.driveUrl,
-          driveFileId: uploaded.driveFileId,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+        for (const file of form.files) {
+          const uploaded = await uploadFileToGoogleDrive(file);
 
-        persistDocuments([newDocument, ...documents]);
-        toast.success('تمت أرشفة الملف بنجاح');
+          const baseTitle = form.title.trim();
+          const title =
+            form.files.length === 1
+              ? baseTitle
+              : `${baseTitle} - ${file.name.replace(/\.[^/.]+$/, '')}`;
+
+          newDocuments.push({
+            id: `archive-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            title,
+            category: form.category.trim(),
+            documentNumber: form.documentNumber.trim(),
+            documentDate: form.documentDate,
+            issuingAuthority: form.issuingAuthority.trim(),
+            confidentiality: form.confidentiality,
+            tags: form.tags.trim(),
+            description: form.description.trim(),
+            fileName: uploaded.fileName || file.name,
+            originalName: file.name,
+            mimeType: uploaded.mimeType || file.type || 'application/octet-stream',
+            fileSize: file.size,
+            driveUrl: uploaded.driveUrl,
+            driveFileId: uploaded.driveFileId,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+
+        persistDocuments([...newDocuments, ...documents]);
+        toast.success(
+          newDocuments.length === 1
+            ? 'تمت أرشفة الملف بنجاح'
+            : `تمت أرشفة ${newDocuments.length} ملفات بنجاح`
+        );
       } else if (selectedDocument) {
         let updatedFileData: Partial<ArchiveDocument> = {};
 
-        if (form.file) {
-          const uploaded = await uploadFileToGoogleDrive(form.file);
+        if (form.files.length > 0) {
+          const file = form.files[0];
+          const uploaded = await uploadFileToGoogleDrive(file);
           updatedFileData = {
-            fileName: uploaded.fileName || form.file.name,
-            originalName: form.file.name,
-            mimeType: uploaded.mimeType || form.file.type || 'application/octet-stream',
-            fileSize: form.file.size,
+            fileName: uploaded.fileName || file.name,
+            originalName: file.name,
+            mimeType: uploaded.mimeType || file.type || 'application/octet-stream',
+            fileSize: file.size,
             driveUrl: uploaded.driveUrl,
             driveFileId: uploaded.driveFileId,
           };
@@ -487,7 +501,7 @@ export const ArchivePage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">بيانات الملف</CardTitle>
-                <CardDescription>كل ملف في الأرشفة له عنوان وتصنيف ورقم وتاريخ وجهة وملاحظات.</CardDescription>
+                <CardDescription>يمكن أرشفة ملف واحد أو عدة ملفات دفعة واحدة، مع عنوان وتصنيف ورقم وتاريخ وجهة وملاحظات.</CardDescription>
               </CardHeader>
 
               <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -547,23 +561,24 @@ export const ArchivePage: React.FC = () => {
                   <Upload className="h-4 w-4" />
                   رفع الملف
                 </CardTitle>
-                <CardDescription>يدعم الصور و PDF و Word و Excel و PowerPoint والملفات النصية والمضغوطة ومعظم الصيغ.</CardDescription>
+                <CardDescription>يدعم رفع أكثر من ملف دفعة واحدة: صور و PDF و Word و Excel و PowerPoint والملفات النصية والمضغوطة ومعظم الصيغ.</CardDescription>
               </CardHeader>
 
               <CardContent className="space-y-4">
                 <div className="rounded-xl border border-dashed p-6 text-center bg-muted/20">
                   <Upload className="h-12 w-12 mx-auto mb-3 text-primary" />
-                  <p className="font-semibold mb-1">{form.file ? form.file.name : formMode === 'edit' ? 'اختيار ملف جديد اختياري' : 'اختر ملفًا للأرشفة'}</p>
+                  <p className="font-semibold mb-1">{form.files.length > 0 ? `تم اختيار ${form.files.length} ملف` : formMode === 'edit' ? 'اختيار ملفات جديد اختياري' : 'اختر ملفًا أو أكثر للأرشفة'}</p>
                   <p className="text-sm text-muted-foreground mb-4">
                     {form.file ? `${formatFileSize(form.file.size)} — ${form.file.type || 'نوع غير معروف'}` : 'PDF، Word، Excel، PowerPoint، صور، ملفات مضغوطة، وجميع الصيغ تقريبًا'}
                   </p>
 
                   <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
                     <Paperclip className="ml-2 h-4 w-4" />
-                    اختيار ملف
+                    اختيار ملفات
                   </Button>
 
-                  <input ref={fileInputRef} type="file" className="hidden" onChange={selectFile} accept="*/*" />
+                  <input ref={fileInputRef} type="file" className="hidden" onChange={selectFiles} accept="*/*"
+                    multiple />
                 </div>
 
                 {formMode === 'edit' && selectedDocument && (
