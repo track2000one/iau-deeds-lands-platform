@@ -510,6 +510,57 @@ export const ReportsPage: React.FC = () => {
     }
   };
 
+
+  const openHtmlForPrinting = (html: string) => {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
+
+    if (!printWindow) {
+      toast.error('تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة.');
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const cleanup = () => {
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    };
+
+    printWindow.onload = () => {
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        cleanup();
+      }, 500);
+    };
+  };
+
+  const downloadPdfUsingBrowser = (html: string) => {
+    const htmlWithNotice = html.replace(
+      '</body>',
+      `<script>
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            window.focus();
+            window.print();
+          }, 600);
+        });
+      </script></body>`
+    );
+
+    const blob = new Blob([htmlWithNotice], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const pdfWindow = window.open(url, '_blank');
+
+    if (!pdfWindow) {
+      toast.error('تعذر فتح نافذة PDF. تأكد من السماح بالنوافذ المنبثقة.');
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  };
+
   const handlePrint = (
     ref: React.RefObject<HTMLDivElement>,
     title: string,
@@ -554,6 +605,8 @@ export const ReportsPage: React.FC = () => {
       <!DOCTYPE html>
       <html dir="rtl" lang="ar">
         <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>${safeTitle}</title>
@@ -565,7 +618,7 @@ export const ReportsPage: React.FC = () => {
             }
 
             body {
-              font-family: ${printSettings.fontFamily}, Arial, sans-serif;
+              font-family: ${printSettings.fontFamily}, 'Tahoma', 'Arial', 'Segoe UI', sans-serif, Arial, sans-serif;
               direction: rtl;
               padding: 0;
               background: white;
@@ -731,7 +784,7 @@ export const ReportsPage: React.FC = () => {
             }
 
             @media print {
-              @page {
+              @page { size: A4 landscape; margin: 10mm; 
                 size: A4 ${pageOrientation};
                 margin: 12mm 9mm;
               }
