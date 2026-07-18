@@ -20,6 +20,8 @@ import {
   AlertTriangle,
   FileText,
   BarChart3,
+  Paperclip,
+  Map as MapIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -28,6 +30,9 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { NativeSelect } from '../components/ui/native-select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { FileUploadZone } from '../components/FileUploadZone';
+import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { Separator } from '../components/ui/separator';
 import {
   Table,
@@ -77,6 +82,15 @@ type DeliveredLandFormState = {
   longitude: string;
   location: string;
   notes: string;
+  attachments: AttachmentItem[];
+};
+
+type AttachmentItem = {
+  id: string;
+  title: string;
+  driveUrl: string;
+  attachmentType: 'delivery_minutes' | 'deed_image' | 'plan_image' | 'location_image' | 'other';
+  createdAt: string;
 };
 
 const emptyForm: DeliveredLandFormState = {
@@ -100,6 +114,7 @@ const emptyForm: DeliveredLandFormState = {
   longitude: '',
   location: '',
   notes: '',
+  attachments: [],
 };
 
 const statusOptions = [
@@ -150,6 +165,27 @@ const normalizeDate = (value: any) => {
   }
 };
 
+const getLandAttachments = (land: any): AttachmentItem[] => {
+  return Array.isArray(land?.attachments) ? land.attachments : [];
+};
+
+const filterAttachments = (attachments: AttachmentItem[] = [], type: AttachmentItem['attachmentType']) => {
+  return attachments.filter((attachment) => attachment.attachmentType === type);
+};
+
+const makeAttachments = (
+  links: { title: string; url: string }[],
+  attachmentType: AttachmentItem['attachmentType']
+): AttachmentItem[] => {
+  return links.map((link) => ({
+    id: `${attachmentType}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    title: link.title,
+    driveUrl: link.url,
+    attachmentType,
+    createdAt: new Date().toISOString(),
+  }));
+};
+
 const getLandCoordinates = (land: any) => {
   if (!land?.coordinates) return null;
 
@@ -192,6 +228,13 @@ export const DeliveredLandsPage: React.FC = () => {
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<DeliveredLandFormState>(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+
+  const [deliveryMinutesLinks, setDeliveryMinutesLinks] = useState<{ title: string; url: string }[]>([]);
+  const [deedLinks, setDeedLinks] = useState<{ title: string; url: string }[]>([]);
+  const [planLinks, setPlanLinks] = useState<{ title: string; url: string }[]>([]);
+  const [siteLinks, setSiteLinks] = useState<{ title: string; url: string }[]>([]);
+  const [otherLinks, setOtherLinks] = useState<{ title: string; url: string }[]>([]);
 
   const deliveredLandsSafe = Array.isArray(deliveredLands) ? deliveredLands : [];
 
@@ -245,6 +288,14 @@ export const DeliveredLandsPage: React.FC = () => {
     ).sort();
   }, [deliveredLandsSafe]);
 
+  const resetAttachmentLinks = () => {
+    setDeliveryMinutesLinks([]);
+    setDeedLinks([]);
+    setPlanLinks([]);
+    setSiteLinks([]);
+    setOtherLinks([]);
+  };
+
   const updateFormField = (field: keyof DeliveredLandFormState, value: any) => {
     setForm((prev) => ({
       ...prev,
@@ -260,8 +311,14 @@ export const DeliveredLandsPage: React.FC = () => {
 
     setFormMode('add');
     setSelectedLand(null);
+    setDetailsOpen(false);
     setForm(emptyForm);
+    setShowMap(false);
+    resetAttachmentLinks();
     setFormOpen(true);
+    setTimeout(() => {
+      document.getElementById('delivered-land-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const openEditForm = (land: any) => {
@@ -297,14 +354,25 @@ export const DeliveredLandsPage: React.FC = () => {
           : '',
       location: land.location || '',
       notes: land.notes || '',
+      attachments: getLandAttachments(land),
     });
 
+    setDetailsOpen(false);
+    setShowMap(false);
+    resetAttachmentLinks();
     setFormOpen(true);
+    setTimeout(() => {
+      document.getElementById('delivered-land-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const openDetails = (land: DeliveredLand) => {
     setSelectedLand(land);
+    setFormOpen(false);
     setDetailsOpen(true);
+    setTimeout(() => {
+      document.getElementById('delivered-land-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const requestDelete = (land: DeliveredLand) => {
@@ -382,6 +450,16 @@ export const DeliveredLandsPage: React.FC = () => {
         ? { latitude, longitude }
         : undefined;
 
+    const existingAttachments = form.attachments || [];
+    const attachments = [
+      ...existingAttachments,
+      ...makeAttachments(deliveryMinutesLinks, 'delivery_minutes'),
+      ...makeAttachments(deedLinks, 'deed_image'),
+      ...makeAttachments(planLinks, 'plan_image'),
+      ...makeAttachments(siteLinks, 'location_image'),
+      ...makeAttachments(otherLinks, 'other'),
+    ];
+
     return {
       receiptNumber: form.receiptNumber.trim(),
       receiptDate: form.receiptDate,
@@ -403,6 +481,7 @@ export const DeliveredLandsPage: React.FC = () => {
       relatedDeedNumber: form.hasRelatedDeed ? form.relatedDeedNumber.trim() : '',
       location: form.location.trim(),
       notes: form.notes.trim(),
+      attachments,
       ...(coordinates ? { coordinates } : {}),
     };
   };
@@ -426,12 +505,34 @@ export const DeliveredLandsPage: React.FC = () => {
       setFormOpen(false);
       setSelectedLand(null);
       setForm(emptyForm);
+      setShowMap(false);
+      resetAttachmentLinks();
     } catch (error) {
       console.error('Error saving delivered land:', error);
       toast.error('فشل في حفظ بيانات الأرض المستلمة');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const removeExistingAttachment = (url: string) => {
+    setForm((prev: any) => ({
+      ...prev,
+      attachments: (prev.attachments || []).filter((attachment: AttachmentItem) => attachment.driveUrl !== url),
+    }));
+  };
+
+  const selectedCoordinates =
+    form.latitude && form.longitude
+      ? {
+          latitude: Number(form.latitude),
+          longitude: Number(form.longitude),
+        }
+      : undefined;
+
+  const setCoordinatesFromMap = (coordinates: { latitude: number; longitude: number }) => {
+    updateFormField('latitude', coordinates.latitude.toFixed(6));
+    updateFormField('longitude', coordinates.longitude.toFixed(6));
   };
 
   const openMap = (land: any) => {
@@ -688,13 +789,34 @@ export const DeliveredLandsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {formMode === 'add' ? 'إضافة أرض مستلمة' : 'تعديل أرض مستلمة'}
-            </DialogTitle>
-          </DialogHeader>
+      {formOpen && (
+        <div id="delivered-land-form" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
+          <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold">
+                {formMode === 'add' ? 'إضافة أرض مستلمة' : 'تعديل أرض مستلمة'}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                أدخل بيانات الأرض المستلمة ومحضر الاستلام والموقع والمرفقات.
+              </p>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => {
+                setFormOpen(false);
+                setSelectedLand(null);
+                setForm(emptyForm);
+                setShowMap(false);
+                resetAttachmentLinks();
+              }}
+              disabled={isSaving}
+              className="w-full md:w-auto"
+            >
+              <X className="ml-2 h-4 w-4" />
+              إغلاق النموذج
+            </Button>
+          </div>
 
           <div className="space-y-6">
             <Card>
@@ -862,6 +984,39 @@ export const DeliveredLandsPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2 md:col-span-3">
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium">الإحداثيات</p>
+                        <p className="text-sm text-muted-foreground">
+                          {form.latitude && form.longitude
+                            ? `${form.latitude}, ${form.longitude}`
+                            : 'لم يتم تحديد الإحداثيات بعد.'}
+                        </p>
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowMap((prev) => !prev)}
+                      >
+                        <MapPin className="ml-2 h-4 w-4" />
+                        {showMap ? 'إخفاء الخريطة' : 'تحديد الموقع من الخريطة'}
+                      </Button>
+                    </div>
+
+                    {showMap && (
+                      <div className="mt-4">
+                        <MapCoordinatePicker
+                          coordinates={selectedCoordinates}
+                          onChange={setCoordinatesFromMap}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 md:col-span-3">
                   <Label>الموقع التفصيلي</Label>
                   <Input
                     value={form.location}
@@ -921,6 +1076,102 @@ export const DeliveredLandsPage: React.FC = () => {
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">مرفقات الاستلام</CardTitle>
+                <CardDescription>
+                  يتم رفع الملفات إلى Google Drive وحفظ روابطها مع سجل الأرض المستلمة.
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent>
+                <Tabs defaultValue="minutes" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+                    <TabsTrigger value="minutes">محضر الاستلام</TabsTrigger>
+                    <TabsTrigger value="deed">الصك</TabsTrigger>
+                    <TabsTrigger value="plan">المخطط</TabsTrigger>
+                    <TabsTrigger value="site">صور الموقع</TabsTrigger>
+                    <TabsTrigger value="other">أخرى</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="minutes" className="mt-4">
+                    <FileUploadZone
+                      label="محضر الاستلام"
+                      existingFiles={filterAttachments((form as any).attachments || [], 'delivery_minutes').map((item) => ({
+                        name: item.title,
+                        url: item.driveUrl,
+                      }))}
+                      onDeleteExisting={removeExistingAttachment}
+                      onLinksChange={setDeliveryMinutesLinks}
+                      maxFiles={10}
+                      maxSizeMB={10}
+                      accept="image/*,.pdf"
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="deed" className="mt-4">
+                    <FileUploadZone
+                      label="صورة الصك"
+                      existingFiles={filterAttachments((form as any).attachments || [], 'deed_image').map((item) => ({
+                        name: item.title,
+                        url: item.driveUrl,
+                      }))}
+                      onDeleteExisting={removeExistingAttachment}
+                      onLinksChange={setDeedLinks}
+                      maxFiles={10}
+                      maxSizeMB={10}
+                      accept="image/*,.pdf"
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="plan" className="mt-4">
+                    <FileUploadZone
+                      label="صور المخطط"
+                      existingFiles={filterAttachments((form as any).attachments || [], 'plan_image').map((item) => ({
+                        name: item.title,
+                        url: item.driveUrl,
+                      }))}
+                      onDeleteExisting={removeExistingAttachment}
+                      onLinksChange={setPlanLinks}
+                      maxFiles={10}
+                      maxSizeMB={10}
+                      accept="image/*,.pdf"
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="site" className="mt-4">
+                    <FileUploadZone
+                      label="صور الموقع"
+                      existingFiles={filterAttachments((form as any).attachments || [], 'location_image').map((item) => ({
+                        name: item.title,
+                        url: item.driveUrl,
+                      }))}
+                      onDeleteExisting={removeExistingAttachment}
+                      onLinksChange={setSiteLinks}
+                      maxFiles={10}
+                      maxSizeMB={10}
+                      accept="image/*"
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="other" className="mt-4">
+                    <FileUploadZone
+                      label="مرفقات إضافية"
+                      existingFiles={filterAttachments((form as any).attachments || [], 'other').map((item) => ({
+                        name: item.title,
+                        url: item.driveUrl,
+                      }))}
+                      onDeleteExisting={removeExistingAttachment}
+                      onLinksChange={setOtherLinks}
+                      maxFiles={10}
+                      maxSizeMB={10}
+                      accept="image/*,.pdf,.doc,.docx"
+                    />
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+
             <div className="flex flex-col-reverse md:flex-row justify-end gap-2">
               <Button
                 variant="outline"
@@ -937,17 +1188,33 @@ export const DeliveredLandsPage: React.FC = () => {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>تفاصيل الأرض المستلمة</DialogTitle>
-          </DialogHeader>
+      {detailsOpen && selectedLand && (
+        <div id="delivered-land-details" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
+          <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold">تفاصيل الأرض المستلمة</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                عرض بيانات محضر الاستلام والموقع والمرفقات داخل نفس الصفحة.
+              </p>
+            </div>
 
-          {selectedLand && (
-            <div className="space-y-5">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDetailsOpen(false);
+                setSelectedLand(null);
+              }}
+              className="w-full md:w-auto"
+            >
+              <X className="ml-2 h-4 w-4" />
+              إغلاق التفاصيل
+            </Button>
+          </div>
+
+          <div className="space-y-5">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold">
@@ -988,6 +1255,19 @@ export const DeliveredLandsPage: React.FC = () => {
                 <InfoBlock label="الملاحظات" value={(selectedLand as any).notes} />
               )}
 
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Paperclip className="h-4 w-4" />
+                    مرفقات الأرض المستلمة
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent>
+                  <AttachmentGroups attachments={getLandAttachments(selectedLand)} />
+                </CardContent>
+              </Card>
+
               <div className="flex flex-col md:flex-row justify-end gap-2">
                 {getLandCoordinates(selectedLand) && (
                   <Button variant="outline" onClick={() => openMap(selectedLand)}>
@@ -1001,10 +1281,9 @@ export const DeliveredLandsPage: React.FC = () => {
                   تعديل البيانات
                 </Button>
               </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
@@ -1044,6 +1323,31 @@ const InfoBlock = ({ label, value }: { label: string; value: string }) => {
     <div className="rounded-lg border p-4">
       <p className="text-sm text-muted-foreground mb-2">{label}</p>
       <p className="whitespace-pre-wrap leading-7">{value}</p>
+    </div>
+  );
+};
+
+const AttachmentGroups = ({ attachments }: { attachments: AttachmentItem[] }) => {
+  if (!attachments.length) {
+    return <p className="text-sm text-muted-foreground">لا توجد مرفقات.</p>;
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {attachments.map((attachment) => (
+        <a
+          key={attachment.id}
+          href={attachment.driveUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg border p-3 hover:border-primary transition-colors"
+        >
+          <p className="font-medium truncate">{attachment.title}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {attachment.attachmentType}
+          </p>
+        </a>
+      ))}
     </div>
   );
 };
