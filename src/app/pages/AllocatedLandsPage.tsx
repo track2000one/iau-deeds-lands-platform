@@ -269,6 +269,9 @@ export const AllocatedLandsPage: React.FC = () => {
     setForm(emptyForm);
     resetAttachmentLinks();
     setFormOpen(true);
+    setTimeout(() => {
+      document.getElementById('allocated-land-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const openEditForm = (land: any) => {
@@ -298,6 +301,9 @@ export const AllocatedLandsPage: React.FC = () => {
     });
     resetAttachmentLinks();
     setFormOpen(true);
+    setTimeout(() => {
+      document.getElementById('allocated-land-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const openDetails = (land: AllocatedLand) => {
@@ -680,13 +686,33 @@ export const AllocatedLandsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {formMode === 'add' ? 'إضافة أرض مخصصة' : 'تعديل أرض مخصصة'}
-            </DialogTitle>
-          </DialogHeader>
+      {formOpen && (
+        <div id="allocated-land-form" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
+          <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold">
+                {formMode === 'add' ? 'إضافة أرض مخصصة' : 'تعديل أرض مخصصة'}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                أدخل بيانات الأرض المخصصة في نفس الصفحة ثم اضغط حفظ.
+              </p>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => {
+                setFormOpen(false);
+                setSelectedLand(null);
+                setForm(emptyForm);
+                resetAttachmentLinks();
+              }}
+              disabled={isSaving}
+              className="w-full md:w-auto"
+            >
+              <X className="ml-2 h-4 w-4" />
+              إغلاق النموذج
+            </Button>
+          </div>
 
           <div className="space-y-6">
             <Card>
@@ -930,8 +956,8 @@ export const AllocatedLandsPage: React.FC = () => {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
