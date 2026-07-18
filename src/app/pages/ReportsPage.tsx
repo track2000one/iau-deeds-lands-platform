@@ -1,7 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useData } from '../../context/DataContext';
-import { useDeeds } from '../../context/DeedContext';
 import {
   FileSpreadsheet,
   FileText,
@@ -17,6 +16,8 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { Label } from '../components/ui/label';
 import {
@@ -28,6 +29,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { NativeSelect } from '../components/ui/native-select';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -56,6 +58,39 @@ type ReportSectionType =
   | 'leasedIn'
   | 'buildingsOut'
   | 'buildingsIn';
+
+type PrintTheme = 'official' | 'simple' | 'minimal';
+type PrintOrientation = 'landscape' | 'portrait';
+
+type PrintSettings = {
+  universityName: string;
+  subtitle: string;
+  customTitle: string;
+  introText: string;
+  closingText: string;
+  footerRight: string;
+  footerLeft: string;
+  fontFamily: string;
+  fontSize: string;
+  tableFontSize: string;
+  theme: PrintTheme;
+  orientation: PrintOrientation;
+  showStatistics: boolean;
+  showDateTime: boolean;
+  showFooter: boolean;
+  showSignatures: boolean;
+  firstSignature: string;
+  secondSignature: string;
+};
+
+const escapeHtml = (value: string) =>
+  String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+
 
 export const ReportsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -141,9 +176,8 @@ export const ReportsPage: React.FC = () => {
     { key: 'rentAmount', label: t('deed.rentAmount'), enabled: true },
   ];
 
-  const { deeds } = useDeeds();
-
   const {
+    deeds,
     allocatedLands,
     deliveredLands,
     leasedLandsOut,
@@ -154,6 +188,31 @@ export const ReportsPage: React.FC = () => {
 
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [reportType, setReportType] = useState<'detailed' | 'summary' | 'statistical' | 'graphical'>('detailed');
+
+  const [printSettings, setPrintSettings] = useState<PrintSettings>({
+    universityName: 'جامعة الإمام عبدالرحمن بن فيصل',
+    subtitle: 'منصة إدارة الصكوك والأراضي',
+    customTitle: '',
+    introText: '',
+    closingText: '',
+    footerRight: 'جامعة الإمام عبدالرحمن بن فيصل\nالمملكة العربية السعودية',
+    footerLeft: 'منصة إدارة الصكوك والأراضي',
+    fontFamily: 'Arial',
+    fontSize: '13',
+    tableFontSize: '11',
+    theme: 'official',
+    orientation: 'landscape',
+    showStatistics: true,
+    showDateTime: true,
+    showFooter: true,
+    showSignatures: true,
+    firstSignature: 'التوقيع',
+    secondSignature: 'الختم',
+  });
+
+  const updatePrintSetting = <K extends keyof PrintSettings>(key: K, value: PrintSettings[K]) => {
+    setPrintSettings((prev) => ({ ...prev, [key]: value }));
+  };
 
   const [selectedColumns, setSelectedColumns] = useState<any>({
     deeds: deedsColumns,
@@ -463,6 +522,13 @@ export const ReportsPage: React.FC = () => {
     if (!printWindow) return;
 
     const currentDate = new Date();
+    const effectiveTitle = printSettings.customTitle.trim() || title;
+    const pageOrientation = printSettings.orientation;
+    const headerColors = {
+      official: { background: '#f8fafc', border: '#1e3a8a', text: '#0f172a', title: '#1e3a8a' },
+      simple: { background: '#ffffff', border: '#cbd5e1', text: '#111827', title: '#111827' },
+      minimal: { background: '#ffffff', border: '#e5e7eb', text: '#111827', title: '#111827' },
+    }[printSettings.theme];
 
     const dateString = currentDate.toLocaleDateString('ar-SA', {
       year: 'numeric',
@@ -475,13 +541,22 @@ export const ReportsPage: React.FC = () => {
       minute: '2-digit',
     });
 
+    const safeUniversityName = escapeHtml(printSettings.universityName);
+    const safeSubtitle = escapeHtml(printSettings.subtitle);
+    const safeTitle = escapeHtml(effectiveTitle);
+    const safeIntro = escapeHtml(printSettings.introText).replaceAll('\n', '<br />');
+    const safeFooterRight = escapeHtml(printSettings.footerRight).replaceAll('\\n', '<br />');
+    const safeFooterLeft = escapeHtml(printSettings.footerLeft).replaceAll('\\n', '<br />');
+    const safeFirstSignature = escapeHtml(printSettings.firstSignature || 'التوقيع');
+    const safeSecondSignature = escapeHtml(printSettings.secondSignature || 'الختم');
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html dir="rtl" lang="ar">
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${title}</title>
+          <title>${safeTitle}</title>
           <style>
             * {
               margin: 0;
@@ -490,62 +565,74 @@ export const ReportsPage: React.FC = () => {
             }
 
             body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              font-family: ${printSettings.fontFamily}, Arial, sans-serif;
               direction: rtl;
               padding: 0;
               background: white;
-              color: #1a1a1a;
-              line-height: 1.6;
+              color: #111827;
+              line-height: 1.7;
+              font-size: ${printSettings.fontSize}px;
             }
 
             .report-header {
-              background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-              color: white;
-              padding: 30px;
-              margin-bottom: 30px;
-              border-bottom: 6px solid #fbbf24;
+              background: ${headerColors.background};
+              color: ${headerColors.text};
+              padding: 18px 22px;
+              margin: 0 0 20px 0;
+              border-bottom: 3px solid ${headerColors.border};
             }
 
             .university-name {
-              font-size: 28px;
-              font-weight: bold;
-              margin-bottom: 8px;
+              font-size: ${Number(printSettings.fontSize) + 7}px;
+              font-weight: 700;
+              margin-bottom: 4px;
               text-align: center;
-              text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
             }
 
             .university-subtitle {
-              font-size: 16px;
+              font-size: ${Number(printSettings.fontSize) + 1}px;
               text-align: center;
-              opacity: 0.95;
-              margin-bottom: 20px;
+              color: #475569;
+              margin-bottom: 10px;
             }
 
             .report-title {
-              font-size: 22px;
-              font-weight: bold;
+              font-size: ${Number(printSettings.fontSize) + 4}px;
+              font-weight: 700;
               text-align: center;
-              background: rgba(255, 255, 255, 0.15);
-              padding: 12px;
+              color: ${headerColors.title};
+              padding: 8px;
+              border: 1px solid #e5e7eb;
               border-radius: 8px;
-              margin-top: 15px;
+              background: #ffffff;
+              margin-top: 10px;
             }
 
             .report-meta {
               display: flex;
               justify-content: space-between;
-              margin-top: 15px;
-              padding-top: 15px;
-              border-top: 1px solid rgba(255, 255, 255, 0.3);
-              font-size: 14px;
+              margin-top: 12px;
+              padding-top: 10px;
+              border-top: 1px solid #e5e7eb;
+              font-size: ${Math.max(Number(printSettings.fontSize) - 1, 10)}px;
+              color: #475569;
+            }
+
+            .free-text {
+              margin: 0 20px 18px 20px;
+              padding: 12px 14px;
+              border: 1px solid #e5e7eb;
+              background: #ffffff;
+              border-radius: 8px;
+              color: #111827;
             }
 
             .statistics-box {
-              background: #f8fafc;
-              border: 2px solid #e2e8f0;
+              background: #ffffff;
+              border: 1px solid #e5e7eb;
               border-radius: 10px;
-              padding: 20px;
-              margin: 0 20px 25px 20px;
+              padding: 14px;
+              margin: 0 20px 18px 20px;
               display: flex;
               justify-content: space-around;
               gap: 20px;
@@ -557,15 +644,15 @@ export const ReportsPage: React.FC = () => {
             }
 
             .stat-label {
-              font-size: 13px;
+              font-size: ${Math.max(Number(printSettings.fontSize) - 2, 10)}px;
               color: #64748b;
-              margin-bottom: 5px;
+              margin-bottom: 4px;
             }
 
             .stat-value {
-              font-size: 24px;
-              font-weight: bold;
-              color: #1e40af;
+              font-size: ${Number(printSettings.fontSize) + 5}px;
+              font-weight: 700;
+              color: #0f172a;
             }
 
             .print-content {
@@ -575,74 +662,78 @@ export const ReportsPage: React.FC = () => {
             table {
               width: 100%;
               border-collapse: collapse;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
               background: white;
-              margin-top: 20px;
+              margin-top: 14px;
+              border: 1px solid #cbd5e1;
             }
 
-            thead {
-              background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-              color: white;
+            thead,
+            tr.bg-blue-600,
+            .bg-blue-600 {
+              background: #e2e8f0 !important;
+              color: #0f172a !important;
             }
 
             th {
-              padding: 14px 10px;
+              padding: 9px 7px;
               text-align: center;
-              font-weight: 600;
-              font-size: 13px;
-              border: 1px solid #2563eb;
+              font-weight: 700;
+              font-size: ${printSettings.tableFontSize}px;
+              border: 1px solid #cbd5e1;
+              color: #0f172a !important;
+              background: #e2e8f0 !important;
             }
 
             tbody tr:nth-child(even) {
-              background-color: #f9fafb;
+              background-color: #f8fafc;
             }
 
             td {
-              padding: 12px 10px;
+              padding: 8px 7px;
               text-align: center;
-              font-size: 13px;
+              font-size: ${printSettings.tableFontSize}px;
               border: 1px solid #e5e7eb;
-              color: #1f2937;
+              color: #111827;
             }
 
             .badge {
               display: inline-block;
-              padding: 4px 12px;
-              border-radius: 12px;
-              font-size: 12px;
+              padding: 2px 8px;
+              border-radius: 8px;
+              font-size: ${Math.max(Number(printSettings.tableFontSize) - 1, 9)}px;
               font-weight: 500;
-              background: #dbeafe;
-              color: #1e40af;
-              border: 1px solid #93c5fd;
+              background: #f8fafc;
+              color: #0f172a;
+              border: 1px solid #cbd5e1;
             }
 
             .report-footer {
-              margin: 40px 20px 0 20px;
-              padding-top: 20px;
-              border-top: 3px solid #e5e7eb;
+              margin: 35px 20px 0 20px;
+              padding-top: 15px;
+              border-top: 1px solid #cbd5e1;
               display: flex;
               justify-content: space-between;
-              font-size: 12px;
-              color: #6b7280;
+              font-size: ${Math.max(Number(printSettings.fontSize) - 2, 10)}px;
+              color: #475569;
             }
 
             .signature-line {
-              margin-top: 60px;
+              margin-top: 55px;
               text-align: center;
             }
 
             .signature-box {
               display: inline-block;
-              border-top: 2px solid #374151;
-              padding-top: 10px;
-              min-width: 200px;
-              margin: 0 40px;
+              border-top: 1.5px solid #374151;
+              padding-top: 8px;
+              min-width: 190px;
+              margin: 0 35px;
             }
 
             @media print {
               @page {
-                size: A4 landscape;
-                margin: 15mm 10mm;
+                size: A4 ${pageOrientation};
+                margin: 12mm 9mm;
               }
 
               * {
@@ -650,7 +741,10 @@ export const ReportsPage: React.FC = () => {
                 print-color-adjust: exact !important;
               }
 
-              button {
+              button,
+              input,
+              svg,
+              .no-print {
                 display: none !important;
               }
             }
@@ -658,17 +752,20 @@ export const ReportsPage: React.FC = () => {
         </head>
         <body>
           <div class="report-header">
-            <div class="university-name">جامعة الإمام عبدالرحمن بن فيصل</div>
-            <div class="university-subtitle">منصة إدارة الصكوك والأراضي</div>
-            <div class="report-title">${title}</div>
-            <div class="report-meta">
-              <div>التاريخ: ${dateString}</div>
-              <div>الوقت: ${timeString}</div>
-            </div>
+            <div class="university-name">${safeUniversityName}</div>
+            <div class="university-subtitle">${safeSubtitle}</div>
+            <div class="report-title">${safeTitle}</div>
+            ${
+              printSettings.showDateTime
+                ? `<div class="report-meta"><div>التاريخ: ${dateString}</div><div>الوقت: ${timeString}</div></div>`
+                : ''
+            }
           </div>
 
+          ${safeIntro ? `<div class="free-text">${safeIntro}</div>` : ''}
+
           ${
-            stats
+            printSettings.showStatistics && stats
               ? `
             <div class="statistics-box">
               <div class="stat-item">
@@ -694,21 +791,19 @@ export const ReportsPage: React.FC = () => {
             ${ref.current.innerHTML}
           </div>
 
-          <div class="report-footer">
-            <div>
-              <div><strong>جامعة الإمام عبدالرحمن بن فيصل</strong></div>
-              <div>المملكة العربية السعودية</div>
-            </div>
-            <div style="text-align: left;">
-              <div>تمت الطباعة بتاريخ: ${dateString}</div>
-              <div>منصة إدارة الصكوك والأراضي</div>
-            </div>
-          </div>
+          ${safeClosing ? `<div class="free-text">${safeClosing}</div>` : ''}
 
-          <div class="signature-line">
-            <div class="signature-box">التوقيع</div>
-            <div class="signature-box">الختم</div>
-          </div>
+          ${
+            printSettings.showFooter
+              ? `<div class="report-footer"><div>${safeFooterRight}</div><div style="text-align: left;">${safeFooterLeft}${printSettings.showDateTime ? `<br />تمت الطباعة بتاريخ: ${dateString}` : ''}</div></div>`
+              : ''
+          }
+
+          ${
+            printSettings.showSignatures
+              ? `<div class="signature-line"><div class="signature-box">${safeFirstSignature}</div><div class="signature-box">${safeSecondSignature}</div></div>`
+              : ''
+          }
 
           <script>
             window.onload = function() {
@@ -779,7 +874,7 @@ export const ReportsPage: React.FC = () => {
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-xl flex items-center gap-2">
-                <Layers className="h-5 w-5 text-blue-600" />
+                <Layers className="h-5 w-5 text-slate-600" />
                 {title}
               </CardTitle>
 
@@ -969,7 +1064,7 @@ export const ReportsPage: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                       <div className="text-center p-4 bg-white rounded-lg shadow">
-                        <div className="text-3xl font-bold text-blue-600">
+                        <div className="text-3xl font-bold text-slate-600">
                           {safeData.length}
                         </div>
                         <div className="text-sm text-gray-600 mt-1">
@@ -1124,7 +1219,7 @@ export const ReportsPage: React.FC = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        <h1 className="text-4xl font-bold text-slate-900">
           {t('reports.title') || 'التقارير'}
         </h1>
 
@@ -1133,17 +1228,17 @@ export const ReportsPage: React.FC = () => {
         </p>
       </div>
 
-      <Card className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-blue-200">
+      <Card className="bg-slate-50 border-slate-200">
         <CardContent className="pt-6">
           <div className="flex items-start gap-3">
-            <Download className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
+            <Download className="h-6 w-6 text-slate-600 mt-1 flex-shrink-0" />
 
             <div className="space-y-2">
-              <p className="font-semibold text-blue-900 text-lg">
+              <p className="font-semibold text-slate-900 text-lg">
                 ميزات التقارير الاحترافية:
               </p>
 
-              <ul className="text-sm text-blue-800 space-y-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+              <ul className="text-sm text-slate-700 space-y-1 grid grid-cols-1 md:grid-cols-2 gap-2">
                 <li className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
                   <strong>تقارير مفصلة</strong>: عرض كامل البيانات مع اختيار الأعمدة.
@@ -1175,6 +1270,195 @@ export const ReportsPage: React.FC = () => {
                 </li>
               </ul>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+
+      <Card className="border-slate-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Settings className="h-5 w-5" />
+            إعدادات المعاينة والطباعة
+          </CardTitle>
+          <CardDescription>
+            تحكم في عنوان التقرير والعبارات والتوقيع والخط قبل الطباعة بدون تعقيد.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>اسم الجهة</Label>
+              <Input
+                value={printSettings.universityName}
+                onChange={(e) => updatePrintSetting('universityName', e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>العنوان الفرعي</Label>
+              <Input
+                value={printSettings.subtitle}
+                onChange={(e) => updatePrintSetting('subtitle', e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>عنوان مخصص للتقرير</Label>
+              <Input
+                value={printSettings.customTitle}
+                onChange={(e) => updatePrintSetting('customTitle', e.target.value)}
+                placeholder="اتركه فارغًا لاستخدام اسم القسم"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-3">
+              <Label>عبارة قبل الجدول</Label>
+              <Textarea
+                value={printSettings.introText}
+                onChange={(e) => updatePrintSetting('introText', e.target.value)}
+                placeholder="مثال: نفيدكم ببيان السجلات الموضحة أدناه..."
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-3">
+              <Label>عبارة بعد الجدول</Label>
+              <Textarea
+                value={printSettings.closingText}
+                onChange={(e) => updatePrintSetting('closingText', e.target.value)}
+                placeholder="مثال: للاطلاع واتخاذ ما يلزم."
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>نوع الخط</Label>
+              <NativeSelect
+                value={printSettings.fontFamily}
+                onChange={(e) => updatePrintSetting('fontFamily', e.target.value)}
+              >
+                <option value="Arial">Arial</option>
+                <option value="Tahoma">Tahoma</option>
+                <option value="Segoe UI">Segoe UI</option>
+                <option value="Times New Roman">Times New Roman</option>
+              </NativeSelect>
+            </div>
+
+            <div className="space-y-2">
+              <Label>حجم الخط العام</Label>
+              <NativeSelect
+                value={printSettings.fontSize}
+                onChange={(e) => updatePrintSetting('fontSize', e.target.value)}
+              >
+                <option value="11">صغير</option>
+                <option value="13">متوسط</option>
+                <option value="15">كبير</option>
+              </NativeSelect>
+            </div>
+
+            <div className="space-y-2">
+              <Label>حجم خط الجدول</Label>
+              <NativeSelect
+                value={printSettings.tableFontSize}
+                onChange={(e) => updatePrintSetting('tableFontSize', e.target.value)}
+              >
+                <option value="9">صغير جدًا</option>
+                <option value="11">متوسط</option>
+                <option value="13">كبير</option>
+              </NativeSelect>
+            </div>
+
+            <div className="space-y-2">
+              <Label>نمط الترويسة</Label>
+              <NativeSelect
+                value={printSettings.theme}
+                onChange={(e) => updatePrintSetting('theme', e.target.value as PrintTheme)}
+              >
+                <option value="official">رسمي هادئ</option>
+                <option value="simple">بسيط</option>
+                <option value="minimal">بدون ألوان تقريبًا</option>
+              </NativeSelect>
+            </div>
+
+            <div className="space-y-2">
+              <Label>اتجاه الصفحة</Label>
+              <NativeSelect
+                value={printSettings.orientation}
+                onChange={(e) => updatePrintSetting('orientation', e.target.value as PrintOrientation)}
+              >
+                <option value="landscape">عرضي</option>
+                <option value="portrait">طولي</option>
+              </NativeSelect>
+            </div>
+
+            <div className="space-y-2">
+              <Label>التوقيع الأول</Label>
+              <Input
+                value={printSettings.firstSignature}
+                onChange={(e) => updatePrintSetting('firstSignature', e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>التوقيع الثاني</Label>
+              <Input
+                value={printSettings.secondSignature}
+                onChange={(e) => updatePrintSetting('secondSignature', e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>تذييل يمين</Label>
+              <Textarea
+                value={printSettings.footerRight}
+                onChange={(e) => updatePrintSetting('footerRight', e.target.value)}
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-1">
+              <Label>تذييل يسار</Label>
+              <Textarea
+                value={printSettings.footerLeft}
+                onChange={(e) => updatePrintSetting('footerLeft', e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 rounded-lg border bg-muted/20 p-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={printSettings.showStatistics}
+                onCheckedChange={(checked) => updatePrintSetting('showStatistics', Boolean(checked))}
+              />
+              <span className="text-sm">إظهار الإحصائيات</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={printSettings.showDateTime}
+                onCheckedChange={(checked) => updatePrintSetting('showDateTime', Boolean(checked))}
+              />
+              <span className="text-sm">إظهار التاريخ والوقت</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={printSettings.showFooter}
+                onCheckedChange={(checked) => updatePrintSetting('showFooter', Boolean(checked))}
+              />
+              <span className="text-sm">إظهار التذييل</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={printSettings.showSignatures}
+                onCheckedChange={(checked) => updatePrintSetting('showSignatures', Boolean(checked))}
+              />
+              <span className="text-sm">إظهار التوقيع والختم</span>
+            </label>
           </div>
         </CardContent>
       </Card>
