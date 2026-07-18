@@ -23,6 +23,7 @@ import { AddLeasedBuildingInPage } from './pages/AddLeasedBuildingInPage';
 import { UnifiedSearchPage } from './pages/UnifiedSearchPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { AppearanceSettingsPage } from './pages/AppearanceSettingsPage';
+import { ArchivePage } from './pages/ArchivePage';
 
 export const router = createHashRouter([
   {
@@ -82,6 +83,10 @@ export const router = createHashRouter([
         path: 'admin',
         element: <AdminDashboardPage />,
       },
+      {
+        path: '/archive',
+        element: <ArchivePage />,
+        }
       {
         path: 'lands',
         children: [
