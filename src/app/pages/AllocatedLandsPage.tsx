@@ -197,6 +197,7 @@ export const AllocatedLandsPage: React.FC = () => {
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<AllocatedLandFormState>(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
+  const [showMap, setShowMap] = useState(false);
 
   const [contractLinks, setContractLinks] = useState<{ title: string; url: string }[]>([]);
   const [planLinks, setPlanLinks] = useState<{ title: string; url: string }[]>([]);
@@ -266,8 +267,10 @@ export const AllocatedLandsPage: React.FC = () => {
 
     setFormMode('add');
     setSelectedLand(null);
+    setDetailsOpen(false);
     setForm(emptyForm);
     resetAttachmentLinks();
+    setShowMap(false);
     setFormOpen(true);
     setTimeout(() => {
       document.getElementById('allocated-land-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -283,6 +286,7 @@ export const AllocatedLandsPage: React.FC = () => {
     const coordinates = parseCoordinates(land.coordinates);
 
     setFormMode('edit');
+    setDetailsOpen(false);
     setSelectedLand(land);
     setForm({
       propertyDescription: land.propertyDescription || '',
@@ -300,6 +304,7 @@ export const AllocatedLandsPage: React.FC = () => {
       attachments: getLandAttachments(land),
     });
     resetAttachmentLinks();
+    setShowMap(false);
     setFormOpen(true);
     setTimeout(() => {
       document.getElementById('allocated-land-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -309,6 +314,10 @@ export const AllocatedLandsPage: React.FC = () => {
   const openDetails = (land: AllocatedLand) => {
     setSelectedLand(land);
     setDetailsOpen(true);
+    setFormOpen(false);
+    setTimeout(() => {
+      document.getElementById('allocated-land-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const requestDelete = (land: AllocatedLand) => {
@@ -705,6 +714,7 @@ export const AllocatedLandsPage: React.FC = () => {
                 setSelectedLand(null);
                 setForm(emptyForm);
                 resetAttachmentLinks();
+                setShowMap(false);
               }}
               disabled={isSaving}
               className="w-full md:w-auto"
@@ -838,10 +848,36 @@ export const AllocatedLandsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <MapCoordinatePicker
-                  coordinates={mapCoordinates}
-                  onChange={setCoordinatesFromMap}
-                />
+                <div className="rounded-lg border bg-muted/20 p-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium">الإحداثيات</p>
+                      <p className="text-sm text-muted-foreground">
+                        {form.latitude && form.longitude
+                          ? `${form.latitude}, ${form.longitude}`
+                          : 'لم يتم تحديد الإحداثيات بعد.'}
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowMap((prev) => !prev)}
+                    >
+                      <MapPin className="ml-2 h-4 w-4" />
+                      {showMap ? 'إخفاء الخريطة' : 'تحديد الموقع من الخريطة'}
+                    </Button>
+                  </div>
+
+                  {showMap && (
+                    <div className="mt-4">
+                      <MapCoordinatePicker
+                        coordinates={mapCoordinates}
+                        onChange={setCoordinatesFromMap}
+                      />
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -959,14 +995,30 @@ export const AllocatedLandsPage: React.FC = () => {
         </div>
       )}
 
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>تفاصيل الأرض المخصصة</DialogTitle>
-          </DialogHeader>
+      {detailsOpen && selectedLand && (
+        <div id="allocated-land-details" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
+          <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold">تفاصيل الأرض المخصصة</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                عرض بيانات الأرض المخصصة والمرفقات بدون نافذة منبثقة.
+              </p>
+            </div>
 
-          {selectedLand && (
-            <div className="space-y-5">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDetailsOpen(false);
+                setSelectedLand(null);
+              }}
+              className="w-full md:w-auto"
+            >
+              <X className="ml-2 h-4 w-4" />
+              إغلاق التفاصيل
+            </Button>
+          </div>
+
+          <div className="space-y-5">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold">
@@ -1028,10 +1080,9 @@ export const AllocatedLandsPage: React.FC = () => {
                   </Button>
                 )}
               </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
