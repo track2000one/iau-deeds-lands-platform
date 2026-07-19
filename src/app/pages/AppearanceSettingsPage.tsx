@@ -1,505 +1,523 @@
-import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useCustomTheme, PREDEFINED_THEMES } from '../../context/CustomThemeContext';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Check, Moon, Palette, RotateCcw, Sparkles, Sun, Monitor, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import { NativeSelect } from '../components/ui/native-select';
-import { Check } from 'lucide-react';
-import { toast } from 'sonner';
 
-const FONT_FAMILIES = [
-  { value: 'Cairo, sans-serif', label: 'Cairo' },
-  { value: 'Tajawal, sans-serif', label: 'Tajawal' },
-  { value: 'Almarai, sans-serif', label: 'Almarai' },
-  { value: 'IBM Plex Sans Arabic, sans-serif', label: 'IBM Plex Sans Arabic' },
-  { value: 'Noto Sans Arabic, sans-serif', label: 'Noto Sans Arabic' },
-  { value: 'Amiri, serif', label: 'Amiri' },
-  { value: 'Changa, sans-serif', label: 'Changa' },
-  { value: 'El Messiri, sans-serif', label: 'El Messiri' },
+type AppearanceMode = 'light' | 'dark' | 'system';
+
+type ThemeOption = {
+  id: string;
+  name: string;
+  description: string;
+  badge?: string;
+  preview: string[];
+  variables: Record<string, string>;
+};
+
+const STORAGE_THEME_KEY = 'iau-appearance-theme';
+const STORAGE_MODE_KEY = 'iau-appearance-mode';
+
+const themes: ThemeOption[] = [
+  {
+    id: 'railway-neon',
+    name: 'Railway Neon',
+    description: 'مظهر داكن عصري بتوهج بنفسجي/أزرق وحواف مضيئة أثناء الاختيار.',
+    badge: 'جديد',
+    preview: ['#0b0814', '#7c3aed', '#22d3ee', '#f8fafc'],
+    variables: {
+      background: '258 32% 7%',
+      foreground: '210 40% 98%',
+      card: '257 30% 10%',
+      cardForeground: '210 40% 98%',
+      popover: '257 30% 10%',
+      popoverForeground: '210 40% 98%',
+      primary: '263 90% 64%',
+      primaryForeground: '210 40% 98%',
+      secondary: '222 32% 16%',
+      secondaryForeground: '210 40% 98%',
+      muted: '222 25% 14%',
+      mutedForeground: '226 18% 70%',
+      accent: '190 95% 45%',
+      accentForeground: '210 40% 98%',
+      border: '262 40% 25%',
+      input: '262 35% 20%',
+      ring: '263 90% 64%',
+      destructive: '0 84% 60%',
+      destructiveForeground: '210 40% 98%',
+      sidebar: '257 34% 9%',
+      sidebarForeground: '210 40% 98%',
+      sidebarPrimary: '263 90% 64%',
+      sidebarPrimaryForeground: '210 40% 98%',
+      sidebarAccent: '263 55% 18%',
+      sidebarAccentForeground: '210 40% 98%',
+      sidebarBorder: '263 35% 24%',
+      sidebarRing: '263 90% 64%',
+    },
+  },
+  {
+    id: 'professional-blue',
+    name: 'الأزرق المهني',
+    description: 'المظهر الرسمي الحالي للمنصة بألوان الجامعة واللون الأزرق.',
+    preview: ['#fcfaf1', '#6b9cc1', '#446b8f', '#2c4a6b'],
+    variables: {
+      background: '48 65% 97%',
+      foreground: '215 40% 18%',
+      card: '0 0% 100%',
+      cardForeground: '215 40% 18%',
+      popover: '0 0% 100%',
+      popoverForeground: '215 40% 18%',
+      primary: '208 42% 30%',
+      primaryForeground: '0 0% 100%',
+      secondary: '206 38% 58%',
+      secondaryForeground: '0 0% 100%',
+      muted: '210 25% 92%',
+      mutedForeground: '215 18% 45%',
+      accent: '206 52% 66%',
+      accentForeground: '215 40% 18%',
+      border: '38 38% 82%',
+      input: '38 38% 82%',
+      ring: '206 52% 66%',
+      destructive: '0 72% 51%',
+      destructiveForeground: '0 0% 100%',
+      sidebar: '208 42% 30%',
+      sidebarForeground: '0 0% 100%',
+      sidebarPrimary: '206 52% 66%',
+      sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '206 45% 46%',
+      sidebarAccentForeground: '0 0% 100%',
+      sidebarBorder: '208 38% 38%',
+      sidebarRing: '206 52% 66%',
+    },
+  },
+  {
+    id: 'graphite-glass',
+    name: 'Graphite Glass',
+    description: 'مظهر داكن هادئ ببطاقات زجاجية وتباين واضح.',
+    preview: ['#0f172a', '#334155', '#14b8a6', '#e2e8f0'],
+    variables: {
+      background: '222 47% 8%',
+      foreground: '210 40% 96%',
+      card: '222 40% 12%',
+      cardForeground: '210 40% 96%',
+      popover: '222 40% 12%',
+      popoverForeground: '210 40% 96%',
+      primary: '173 80% 40%',
+      primaryForeground: '222 47% 8%',
+      secondary: '215 28% 18%',
+      secondaryForeground: '210 40% 96%',
+      muted: '215 24% 16%',
+      mutedForeground: '215 16% 70%',
+      accent: '199 89% 48%',
+      accentForeground: '210 40% 96%',
+      border: '215 24% 22%',
+      input: '215 24% 20%',
+      ring: '173 80% 40%',
+      destructive: '0 72% 51%',
+      destructiveForeground: '210 40% 96%',
+      sidebar: '222 47% 9%',
+      sidebarForeground: '210 40% 96%',
+      sidebarPrimary: '173 80% 40%',
+      sidebarPrimaryForeground: '222 47% 8%',
+      sidebarAccent: '215 28% 18%',
+      sidebarAccentForeground: '210 40% 96%',
+      sidebarBorder: '215 24% 22%',
+      sidebarRing: '173 80% 40%',
+    },
+  },
+  {
+    id: 'sand-admin',
+    name: 'الرمل الإداري',
+    description: 'ألوان هادئة مناسبة للطباعة والعمل الرسمي اليومي.',
+    preview: ['#fdfaf5', '#6b5d50', '#a89586', '#4a7c9b'],
+    variables: {
+      background: '38 60% 97%',
+      foreground: '28 20% 20%',
+      card: '0 0% 100%',
+      cardForeground: '28 20% 20%',
+      popover: '0 0% 100%',
+      popoverForeground: '28 20% 20%',
+      primary: '204 36% 45%',
+      primaryForeground: '0 0% 100%',
+      secondary: '30 18% 64%',
+      secondaryForeground: '28 20% 20%',
+      muted: '36 35% 92%',
+      mutedForeground: '28 12% 45%',
+      accent: '31 66% 76%',
+      accentForeground: '28 20% 20%',
+      border: '35 28% 82%',
+      input: '35 28% 82%',
+      ring: '204 36% 45%',
+      destructive: '0 72% 51%',
+      destructiveForeground: '0 0% 100%',
+      sidebar: '204 36% 32%',
+      sidebarForeground: '0 0% 100%',
+      sidebarPrimary: '31 66% 76%',
+      sidebarPrimaryForeground: '28 20% 20%',
+      sidebarAccent: '204 30% 40%',
+      sidebarAccentForeground: '0 0% 100%',
+      sidebarBorder: '204 25% 38%',
+      sidebarRing: '31 66% 76%',
+    },
+  },
 ];
 
-const FONT_SIZES = [
-  { value: '14px', label: '14px' },
-  { value: '16px', label: '16px (Default)' },
-  { value: '18px', label: '18px' },
-  { value: '20px', label: '20px' },
-];
+const variableNameMap: Record<string, string> = {
+  background: '--background',
+  foreground: '--foreground',
+  card: '--card',
+  cardForeground: '--card-foreground',
+  popover: '--popover',
+  popoverForeground: '--popover-foreground',
+  primary: '--primary',
+  primaryForeground: '--primary-foreground',
+  secondary: '--secondary',
+  secondaryForeground: '--secondary-foreground',
+  muted: '--muted',
+  mutedForeground: '--muted-foreground',
+  accent: '--accent',
+  accentForeground: '--accent-foreground',
+  border: '--border',
+  input: '--input',
+  ring: '--ring',
+  destructive: '--destructive',
+  destructiveForeground: '--destructive-foreground',
+  sidebar: '--sidebar',
+  sidebarForeground: '--sidebar-foreground',
+  sidebarPrimary: '--sidebar-primary',
+  sidebarPrimaryForeground: '--sidebar-primary-foreground',
+  sidebarAccent: '--sidebar-accent',
+  sidebarAccentForeground: '--sidebar-accent-foreground',
+  sidebarBorder: '--sidebar-border',
+  sidebarRing: '--sidebar-ring',
+};
 
-export const AppearanceSettingsPage: React.FC = () => {
-  const { t, i18n } = useTranslation();
-  const { currentTheme, fontSettings, applyTheme, updateFontSettings, resetToDefault } = useCustomTheme();
+const applyThemeVariables = (theme: ThemeOption) => {
+  const root = document.documentElement;
 
-  const [selectedFontFamily, setSelectedFontFamily] = useState(fontSettings.family);
-  const [selectedFontSize, setSelectedFontSize] = useState(fontSettings.size);
-  const [selectedFontColor, setSelectedFontColor] = useState(fontSettings.color || '#2C4A6B');
-  const [customFontFile, setCustomFontFile] = useState<File | null>(null);
-  const [customFontName, setCustomFontName] = useState(fontSettings.customFontName || '');
-  const [customFontUrl, setCustomFontUrl] = useState(fontSettings.customFontUrl || '');
+  Object.entries(theme.variables).forEach(([key, value]) => {
+    const cssVariable = variableNameMap[key];
 
-  const [customColors, setCustomColors] = useState({
-    primary: currentTheme.colors.primary,
-    secondary: currentTheme.colors.secondary,
-    accent: currentTheme.colors.accent,
-    background: currentTheme.colors.background,
+    if (cssVariable) {
+      root.style.setProperty(cssVariable, value);
+    }
   });
 
+  root.dataset.appearanceTheme = theme.id;
+};
+
+const applyMode = (mode: AppearanceMode) => {
+  const root = document.documentElement;
+  const systemDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+  const shouldUseDark = mode === 'dark' || (mode === 'system' && systemDark);
+
+  root.classList.toggle('dark', shouldUseDark);
+  root.dataset.appearanceMode = mode;
+};
+
+const injectRailwayGlowStyles = () => {
+  const styleId = 'iau-railway-appearance-glow-style';
+
+  if (document.getElementById(styleId)) return;
+
+  const style = document.createElement('style');
+  style.id = styleId;
+  style.innerHTML = `
+    html[data-appearance-theme="railway-neon"] body {
+      background:
+        radial-gradient(circle at 15% 15%, rgba(124, 58, 237, 0.18), transparent 32%),
+        radial-gradient(circle at 80% 20%, rgba(34, 211, 238, 0.10), transparent 30%),
+        hsl(var(--background)) !important;
+    }
+
+    html[data-appearance-theme="railway-neon"] .railway-glow-card {
+      position: relative;
+      overflow: hidden;
+      border-color: rgba(124, 58, 237, 0.35) !important;
+      box-shadow:
+        0 0 0 1px rgba(124, 58, 237, 0.18),
+        0 18px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    html[data-appearance-theme="railway-neon"] .railway-glow-card::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.28), transparent 30%),
+        linear-gradient(120deg, transparent, rgba(34, 211, 238, 0.10), transparent);
+      pointer-events: none;
+      opacity: 0.8;
+    }
+
+    html[data-appearance-theme="railway-neon"] .railway-theme-selected {
+      box-shadow:
+        0 0 0 1px rgba(124, 58, 237, 0.75),
+        0 0 32px rgba(124, 58, 237, 0.55),
+        inset 0 0 30px rgba(34, 211, 238, 0.08) !important;
+    }
+
+    html[data-appearance-theme="railway-neon"] .railway-button-glow {
+      box-shadow: 0 0 22px rgba(124, 58, 237, 0.45);
+    }
+  `;
+
+  document.head.appendChild(style);
+};
+
+export const AppearanceSettingsPage: React.FC = () => {
+  const [selectedThemeId, setSelectedThemeId] = useState(
+    () => localStorage.getItem(STORAGE_THEME_KEY) || 'professional-blue'
+  );
+
+  const [appearanceMode, setAppearanceMode] = useState<AppearanceMode>(
+    () => (localStorage.getItem(STORAGE_MODE_KEY) as AppearanceMode) || 'system'
+  );
+
+  const selectedTheme = useMemo(() => {
+    return themes.find((theme) => theme.id === selectedThemeId) || themes[0];
+  }, [selectedThemeId]);
+
   useEffect(() => {
-    setCustomColors({
-      primary: currentTheme.colors.primary,
-      secondary: currentTheme.colors.secondary,
-      accent: currentTheme.colors.accent,
-      background: currentTheme.colors.background,
-    });
-  }, [currentTheme]);
+    injectRailwayGlowStyles();
+  }, []);
 
   useEffect(() => {
-    if (fontSettings.customFontUrl && fontSettings.customFontName) {
-      setCustomFontUrl(fontSettings.customFontUrl);
-      setCustomFontName(fontSettings.customFontName);
-    }
-    if (fontSettings.color) {
-      setSelectedFontColor(fontSettings.color);
-    }
-  }, [fontSettings]);
+    applyThemeVariables(selectedTheme);
+    localStorage.setItem(STORAGE_THEME_KEY, selectedTheme.id);
+  }, [selectedTheme]);
 
-  const handleThemeSelect = (themeKey: string) => {
-    const theme = PREDEFINED_THEMES[themeKey];
-    if (theme) {
-      applyTheme(theme);
-      setCustomColors(theme.colors);
-      toast.success(t('settings.themeApplied'));
-    }
-  };
+  useEffect(() => {
+    applyMode(appearanceMode);
+    localStorage.setItem(STORAGE_MODE_KEY, appearanceMode);
 
-  const handleFontFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const allowedTypes = ['.ttf', '.otf', '.woff', '.woff2'];
-      const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-
-      if (!allowedTypes.includes(fileExtension)) {
-        toast.error(t('settings.invalidFontFile'));
-        return;
-      }
-
-      setCustomFontFile(file);
-      const fontName = file.name.replace(/\.[^/.]+$/, '');
-      setCustomFontName(fontName);
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const url = e.target?.result as string;
-        setCustomFontUrl(url);
-        toast.success(t('settings.fontUploaded'));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleFontUpdate = () => {
-    updateFontSettings({
-      family: selectedFontFamily,
-      size: selectedFontSize,
-      color: selectedFontColor,
-      customFontUrl: customFontUrl || undefined,
-      customFontName: customFontName || undefined,
-    });
-    toast.success(t('settings.fontUpdated'));
-  };
-
-  const handleReset = () => {
-    resetToDefault();
-    setSelectedFontFamily('Cairo, sans-serif');
-    setSelectedFontSize('16px');
-    setSelectedFontColor('#2C4A6B');
-    setCustomFontFile(null);
-    setCustomFontName('');
-    setCustomFontUrl('');
-    const defaultTheme = PREDEFINED_THEMES.professionalBlue;
-    setCustomColors(defaultTheme.colors);
-    toast.success('تمت إعادة التعيين إلى الإعدادات الافتراضية');
-  };
-
-  const handleColorChange = (colorKey: keyof typeof customColors, value: string) => {
-    setCustomColors((prev) => ({
-      ...prev,
-      [colorKey]: value,
-    }));
-  };
-
-  const handleApplyCustomColors = () => {
-    const customTheme = {
-      name: 'Custom Theme',
-      colors: customColors,
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
+    const handler = () => {
+      if (appearanceMode === 'system') applyMode('system');
     };
-    applyTheme(customTheme);
-    toast.success(t('settings.customColorsApplied'));
-  };
 
-  const ThemeCard = ({ themeKey, theme }: { themeKey: string; theme: any }) => {
-    const isSelected = currentTheme.name === theme.name;
-    const isDefault = themeKey === 'professionalBlue';
+    media?.addEventListener?.('change', handler);
 
-    return (
-      <Card
-        className={`cursor-pointer transition-all hover:shadow-lg ${
-          isSelected ? 'ring-2 ring-blue-500' : ''
-        }`}
-        onClick={() => handleThemeSelect(themeKey)}
-      >
-        <CardHeader className="relative">
-          <CardTitle className="text-base flex items-center justify-between">
-            {t(`themes.${themeKey}`)}
-            {isSelected && (
-              <div className="absolute top-4 right-4 bg-blue-500 text-white rounded-full p-1">
-                <Check className="h-4 w-4" />
-              </div>
-            )}
-          </CardTitle>
-          {isDefault && (
-            <span className="text-xs text-blue-600 font-medium">افتراضي</span>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <div
-                className="h-16 rounded-md border"
-                style={{ backgroundColor: theme.colors.primary }}
-              />
-              <p className="text-xs text-center mt-1">P</p>
-              <p className="text-xs text-center text-muted-foreground">{theme.colors.primary}</p>
-            </div>
-            <div className="flex-1">
-              <div
-                className="h-16 rounded-md border"
-                style={{ backgroundColor: theme.colors.secondary }}
-              />
-              <p className="text-xs text-center mt-1">S</p>
-              <p className="text-xs text-center text-muted-foreground">{theme.colors.secondary}</p>
-            </div>
-            <div className="flex-1">
-              <div
-                className="h-16 rounded-md border"
-                style={{ backgroundColor: theme.colors.accent }}
-              />
-              <p className="text-xs text-center mt-1">A</p>
-              <p className="text-xs text-center text-muted-foreground">{theme.colors.accent}</p>
-            </div>
-            <div className="flex-1">
-              <div
-                className="h-16 rounded-md border"
-                style={{ backgroundColor: theme.colors.background }}
-              />
-              <p className="text-xs text-center mt-1">B</p>
-              <p className="text-xs text-center text-muted-foreground">{theme.colors.background}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return () => media?.removeEventListener?.('change', handler);
+  }, [appearanceMode]);
+
+  const resetAppearance = () => {
+    setSelectedThemeId('professional-blue');
+    setAppearanceMode('system');
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">{t('settings.appearance')}</h1>
-        <p className="text-muted-foreground">{t('settings.customization')}</p>
+    <div className="container mx-auto p-4 md:p-6 space-y-6">
+      <div className="relative overflow-hidden rounded-2xl border bg-card p-6 md:p-8 railway-glow-card">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div>
+            <Badge className="mb-3 gap-1" variant="secondary">
+              <Sparkles className="h-3.5 w-3.5" />
+              إعدادات المظهر
+            </Badge>
+
+            <h1 className="text-2xl md:text-3xl font-bold">تخصيص شكل المنصة</h1>
+
+            <p className="mt-2 text-muted-foreground max-w-2xl">
+              اختر مظهرًا عصريًا للمنصة. تمت إضافة مظهر Railway Neon مع توهج أثناء الاختيار، وحواف مضيئة، وخلفية داكنة احترافية.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={resetAppearance}>
+              <RotateCcw className="ml-2 h-4 w-4" />
+              استعادة الافتراضي
+            </Button>
+
+            <Button className="railway-button-glow" type="button">
+              <Zap className="ml-2 h-4 w-4" />
+              يتم الحفظ تلقائيًا
+            </Button>
+          </div>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{t('settings.colorTheme')}</CardTitle>
-          <CardDescription>اختر نظام الألوان المفضل لديك</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Monitor className="h-5 w-5" />
+            نمط العرض
+          </CardTitle>
+          <CardDescription>اختر الوضع الفاتح أو الداكن أو حسب إعدادات الجهاز.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Object.entries(PREDEFINED_THEMES).map(([key, theme]) => (
-              <ThemeCard key={key} themeKey={key} theme={theme} />
-            ))}
-          </div>
 
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <h4 className="font-medium mb-2">{t('settings.colorGuide')}</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-primary" />
-                <span>P: {t('themes.primaryColorDesc')}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-secondary" />
-                <span>S: {t('themes.secondaryColorDesc')}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-accent" />
-                <span>A: {t('themes.accentColorDesc')}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded border bg-background" />
-                <span>B: {t('themes.backgroundColorDesc')}</span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {[
+            { id: 'system', label: 'حسب الجهاز', icon: Monitor },
+            { id: 'light', label: 'فاتح', icon: Sun },
+            { id: 'dark', label: 'داكن', icon: Moon },
+          ].map((mode) => {
+            const Icon = mode.icon;
+            const active = appearanceMode === mode.id;
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('settings.customColorSettings')}</CardTitle>
-          <CardDescription>{t('settings.customColorDescription')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="primary-color">
-                {t('settings.primaryColorLabel')} (Primary Color)
-              </Label>
-              <div className="flex gap-2">
-                <input
-                  type="color"
-                  id="primary-color-picker"
-                  value={customColors.primary}
-                  onChange={(e) => handleColorChange('primary', e.target.value)}
-                  className="w-16 h-10 rounded border cursor-pointer"
-                />
-                <input
-                  type="text"
-                  id="primary-color"
-                  value={customColors.primary}
-                  onChange={(e) => handleColorChange('primary', e.target.value)}
-                  className="flex-1 h-10 rounded-md border border-input bg-input-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="#2C4A6B"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="secondary-color">
-                {t('settings.secondaryColorLabel')} (Secondary Color)
-              </Label>
-              <div className="flex gap-2">
-                <input
-                  type="color"
-                  id="secondary-color-picker"
-                  value={customColors.secondary}
-                  onChange={(e) => handleColorChange('secondary', e.target.value)}
-                  className="w-16 h-10 rounded border cursor-pointer"
-                />
-                <input
-                  type="text"
-                  id="secondary-color"
-                  value={customColors.secondary}
-                  onChange={(e) => handleColorChange('secondary', e.target.value)}
-                  className="flex-1 h-10 rounded-md border border-input bg-input-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="#4A6B8F"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="accent-color">
-                {t('settings.accentColorLabel')} (Accent Color)
-              </Label>
-              <div className="flex gap-2">
-                <input
-                  type="color"
-                  id="accent-color-picker"
-                  value={customColors.accent}
-                  onChange={(e) => handleColorChange('accent', e.target.value)}
-                  className="w-16 h-10 rounded border cursor-pointer"
-                />
-                <input
-                  type="text"
-                  id="accent-color"
-                  value={customColors.accent}
-                  onChange={(e) => handleColorChange('accent', e.target.value)}
-                  className="flex-1 h-10 rounded-md border border-input bg-input-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="#6B9EC1"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="background-color">
-                {t('settings.backgroundColorLabel')} (Background Color)
-              </Label>
-              <div className="flex gap-2">
-                <input
-                  type="color"
-                  id="background-color-picker"
-                  value={customColors.background}
-                  onChange={(e) => handleColorChange('background', e.target.value)}
-                  className="w-16 h-10 rounded border cursor-pointer"
-                />
-                <input
-                  type="text"
-                  id="background-color"
-                  value={customColors.background}
-                  onChange={(e) => handleColorChange('background', e.target.value)}
-                  className="flex-1 h-10 rounded-md border border-input bg-input-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="#FCFAEE"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Button onClick={handleApplyCustomColors}>
-              {t('settings.applyCustomColors')}
-            </Button>
-          </div>
-
-          <div className="p-4 border rounded-lg">
-            <p className="text-sm mb-3 font-medium">{t('settings.colorPreview')}:</p>
-            <div className="grid grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <div
-                  className="h-20 rounded-md border"
-                  style={{ backgroundColor: customColors.primary }}
-                />
-                <p className="text-xs text-center text-muted-foreground">Primary</p>
-              </div>
-              <div className="space-y-1">
-                <div
-                  className="h-20 rounded-md border"
-                  style={{ backgroundColor: customColors.secondary }}
-                />
-                <p className="text-xs text-center text-muted-foreground">Secondary</p>
-              </div>
-              <div className="space-y-1">
-                <div
-                  className="h-20 rounded-md border"
-                  style={{ backgroundColor: customColors.accent }}
-                />
-                <p className="text-xs text-center text-muted-foreground">Accent</p>
-              </div>
-              <div className="space-y-1">
-                <div
-                  className="h-20 rounded-md border"
-                  style={{ backgroundColor: customColors.background }}
-                />
-                <p className="text-xs text-center text-muted-foreground">Background</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('settings.fontSettings')}</CardTitle>
-          <CardDescription>قم بتخصيص نوع وحجم الخط</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>{t('settings.fontFamily')}</Label>
-              <NativeSelect
-                value={selectedFontFamily}
-                onChange={(e) => setSelectedFontFamily(e.target.value)}
+            return (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => setAppearanceMode(mode.id as AppearanceMode)}
+                className={[
+                  'relative rounded-xl border p-4 text-right transition-all duration-300',
+                  'hover:-translate-y-0.5 hover:border-primary hover:shadow-lg',
+                  active ? 'border-primary bg-primary/10 railway-theme-selected' : 'bg-card',
+                ].join(' ')}
               >
-                {FONT_FAMILIES.map((font) => (
-                  <option key={font.value} value={font.value}>
-                    {font.label}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t('settings.fontSize')}</Label>
-              <NativeSelect
-                value={selectedFontSize}
-                onChange={(e) => setSelectedFontSize(e.target.value)}
-              >
-                {FONT_SIZES.map((size) => (
-                  <option key={size.value} value={size.value}>
-                    {size.label}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="font-color">{t('settings.fontColor')}</Label>
-              <div className="flex gap-2">
-                <input
-                  type="color"
-                  id="font-color-picker"
-                  value={selectedFontColor}
-                  onChange={(e) => setSelectedFontColor(e.target.value)}
-                  className="w-16 h-10 rounded border cursor-pointer"
-                />
-                <input
-                  type="text"
-                  id="font-color"
-                  value={selectedFontColor}
-                  onChange={(e) => setSelectedFontColor(e.target.value)}
-                  className="flex-1 h-10 rounded-md border border-input bg-input-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="#2C4A6B"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="custom-font">{t('settings.customFont')}</Label>
-            <div className="flex flex-col gap-2">
-              <input
-                type="file"
-                id="custom-font"
-                accept=".ttf,.otf,.woff,.woff2"
-                onChange={handleFontFileUpload}
-                className="h-10 rounded-md border border-input bg-input-background px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium cursor-pointer"
-              />
-              {customFontFile && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>✓ {customFontFile.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setCustomFontFile(null);
-                      setCustomFontName('');
-                      setCustomFontUrl('');
-                    }}
-                  >
-                    {t('settings.removeFont')}
-                  </Button>
+                <div className="flex items-center justify-between">
+                  <Icon className="h-5 w-5 text-primary" />
+                  {active && <Check className="h-5 w-5 text-primary" />}
                 </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {t('settings.supportedFormats')}
-              </p>
+
+                <p className="mt-4 font-semibold">{mode.label}</p>
+              </button>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            مظاهر المنصة
+          </CardTitle>
+          <CardDescription>
+            اختر مجموعة ألوان متكاملة. مظهر Railway Neon يعطي إحساسًا قريبًا من لوحة Railway من ناحية الظلام والتوهج والحواف الحديثة.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {themes.map((theme) => {
+            const active = selectedThemeId === theme.id;
+
+            return (
+              <button
+                key={theme.id}
+                type="button"
+                onClick={() => setSelectedThemeId(theme.id)}
+                className={[
+                  'group relative overflow-hidden rounded-2xl border p-4 text-right transition-all duration-300',
+                  'hover:-translate-y-1 hover:shadow-2xl hover:border-primary',
+                  active ? 'border-primary bg-primary/10 railway-theme-selected' : 'bg-card',
+                ].join(' ')}
+              >
+                <div
+                  className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                  style={{
+                    background:
+                      theme.id === 'railway-neon'
+                        ? 'radial-gradient(circle at 20% 20%, rgba(124,58,237,0.22), transparent 36%), radial-gradient(circle at 80% 30%, rgba(34,211,238,0.16), transparent 32%)'
+                        : 'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.14), transparent 32%)',
+                  }}
+                />
+
+                <div className="relative z-10">
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-lg">{theme.name}</h3>
+                        {theme.badge && <Badge>{theme.badge}</Badge>}
+                      </div>
+
+                      <p className="mt-1 text-sm text-muted-foreground leading-6">{theme.description}</p>
+                    </div>
+
+                    <div
+                      className={[
+                        'flex h-8 w-8 items-center justify-center rounded-full border',
+                        active ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted',
+                      ].join(' ')}
+                    >
+                      {active && <Check className="h-4 w-4" />}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2">
+                    {theme.preview.map((color, index) => (
+                      <div
+                        key={`${theme.id}-${color}-${index}`}
+                        className="h-12 rounded-lg border shadow-sm transition-transform duration-300 group-hover:scale-[1.03]"
+                        style={{ background: color }}
+                      />
+                    ))}
+                  </div>
+
+                  {theme.id === 'railway-neon' && (
+                    <div className="mt-4 rounded-xl border border-purple-500/30 bg-black/30 p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Railway style preview</span>
+                        <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.9)]" />
+                      </div>
+
+                      <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full w-2/3 rounded-full bg-primary shadow-[0_0_20px_rgba(124,58,237,0.8)]" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>معاينة مباشرة</CardTitle>
+          <CardDescription>
+            مثال سريع يوضح شكل البطاقات والأزرار قبل اعتماد التصميم على كامل المنصة.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <div className="rounded-2xl border bg-card p-4 railway-glow-card">
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="rounded-xl border bg-background/60 p-4">
+                <p className="text-sm text-muted-foreground">إجمالي السجلات</p>
+                <p className="mt-2 text-3xl font-bold text-primary">128</p>
+              </div>
+
+              <div className="rounded-xl border bg-background/60 p-4">
+                <p className="text-sm text-muted-foreground">المرفقات</p>
+                <p className="mt-2 text-3xl font-bold text-primary">42</p>
+              </div>
+
+              <div className="rounded-xl border bg-background/60 p-4">
+                <p className="text-sm text-muted-foreground">حالة النظام</p>
+                <p className="mt-2 text-lg font-bold text-emerald-400">Online</p>
+              </div>
+            </div>
+
+            <div className="relative z-10 mt-4 flex flex-col sm:flex-row gap-2">
+              <Button>زر أساسي</Button>
+              <Button variant="outline">زر ثانوي</Button>
+              <Button variant="secondary">زر مساعد</Button>
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <Button onClick={handleFontUpdate}>
-              تطبيق إعدادات الخط
-            </Button>
-            <Button variant="outline" onClick={handleReset}>
-              {t('settings.resetToDefault')}
-            </Button>
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>اختيار سريع للمظهر</Label>
+              <NativeSelect value={selectedThemeId} onChange={(event) => setSelectedThemeId(event.target.value)}>
+                {themes.map((theme) => (
+                  <option key={theme.id} value={theme.id}>{theme.name}</option>
+                ))}
+              </NativeSelect>
+            </div>
 
-          <div
-            className="p-4 border rounded-lg"
-            style={{
-              fontFamily: customFontName ? `'${customFontName}', ${selectedFontFamily}` : selectedFontFamily,
-              fontSize: selectedFontSize,
-              color: selectedFontColor
-            }}
-          >
-            <p className="mb-2 font-bold">{t('settings.fontPreview')}:</p>
-            <p className="mb-2">هذا نموذج نص عربي لمعاينة الخط المحدد واللون</p>
-            <p className="text-sm">This is sample English text for font and color preview</p>
-            {customFontFile && (
-              <p className="text-xs mt-2 opacity-70">
-                {i18n.language === 'ar' ? `استخدام الخط المخصص: ${customFontName}` : `Using custom font: ${customFontName}`}
-              </p>
-            )}
+            <div className="space-y-2">
+              <Label>نمط العرض</Label>
+              <NativeSelect value={appearanceMode} onChange={(event) => setAppearanceMode(event.target.value as AppearanceMode)}>
+                <option value="system">حسب الجهاز</option>
+                <option value="light">فاتح</option>
+                <option value="dark">داكن</option>
+              </NativeSelect>
+            </div>
           </div>
         </CardContent>
       </Card>
