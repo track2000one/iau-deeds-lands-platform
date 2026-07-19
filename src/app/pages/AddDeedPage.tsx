@@ -6,6 +6,8 @@ import { usePermissions } from '../../context/PermissionsContext';
 import { useForm } from 'react-hook-form';
 import { DeedFormData } from '../../types/deed';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { AppDateField } from '../components/AppDateField';
+import type { DateType } from '../../utils/dateUtils';
 import {
   Save,
   X,
@@ -62,6 +64,7 @@ export const AddDeedPage: React.FC = () => {
   const [showMap, setShowMap] = useState(false);
   const [coordinates, setCoordinates] = useState<Coordinates | undefined>();
   const [isSaving, setIsSaving] = useState(false);
+  const [deedDateType, setDeedDateType] = useState<DateType>('gregorian');
 
   const [deedImages, setDeedImages] = useState<File[]>([]);
   const [siteImages, setSiteImages] = useState<File[]>([]);
@@ -77,7 +80,7 @@ export const AddDeedPage: React.FC = () => {
   } = useForm<DeedFormData>({
     defaultValues: {
       deedNumber: '',
-      deedDate: new Date().toISOString().split('T')[0],
+      deedDate: '',
       propertyDescription: '',
       plotNumber: '',
       planNumber: '',
@@ -298,10 +301,12 @@ export const AddDeedPage: React.FC = () => {
         const savedDeed = await Promise.resolve(
           addDeed({
             ...data,
+            deedDate: data.deedDate || '',
+            deedDateType,
             area: Number(data.area || 0),
             coordinates,
             attachments: [],
-          })
+          } as any)
         );
 
         if (savedDeed?.id) {
@@ -405,22 +410,14 @@ export const AddDeedPage: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="deedDate">
-                  {t('deed.deedDate')} <span className="text-destructive">*</span>
-                </Label>
-
-                <Input
+                <AppDateField
                   id="deedDate"
-                  type="date"
-                  {...register('deedDate', {
-                    required: t('validation.required'),
-                  })}
-                  className={errors.deedDate ? 'border-destructive' : ''}
+                  label={t('deed.deedDate')}
+                  value={watch('deedDate') || ''}
+                  dateType={deedDateType}
+                  onValueChange={(value) => setValue('deedDate', value)}
+                  onDateTypeChange={setDeedDateType}
                 />
-
-                {errors.deedDate && (
-                  <p className="text-sm text-destructive">{errors.deedDate.message}</p>
-                )}
               </div>
 
               <div className="space-y-2">

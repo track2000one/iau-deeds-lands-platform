@@ -1,63 +1,38 @@
 export type DateType = 'gregorian' | 'hijri';
 
-export type FlexibleDateValue = {
-  value: string;
-  type: DateType;
-};
-
-export const emptyFlexibleDate: FlexibleDateValue = {
-  value: '',
-  type: 'gregorian',
-};
-
 export const normalizeHijriInput = (value: string) => {
   return value
-    .replace(/[^0-9/\\-]/g, '')
+    .replace(/[^0-9/\-]/g, '')
     .replaceAll('-', '/')
     .slice(0, 10);
 };
 
 export const formatFlexibleDate = (
-  value?: string,
+  value?: string | Date | null,
   type: DateType = 'gregorian'
 ) => {
   if (!value) return '-';
 
+  const rawValue = value instanceof Date ? value.toISOString() : String(value);
+
+  if (!rawValue) return '-';
+
   if (type === 'hijri') {
-    return `${value}هـ`;
+    return `${rawValue}هـ`;
   }
 
   try {
-    return new Date(value).toLocaleDateString('ar-SA-u-ca-gregory');
+    const date = new Date(rawValue);
+    if (Number.isNaN(date.getTime())) return rawValue;
+    return date.toLocaleDateString('ar-SA-u-ca-gregory');
   } catch {
-    return value;
+    return rawValue;
   }
 };
 
-export const flexibleDateToStorage = (
-  value?: string,
-  type: DateType = 'gregorian'
-) => {
-  return {
-    value: value || '',
-    type,
-  };
-};
+export const getFlexibleDateType = (record: any, key: string): DateType => {
+  const typeKey = `${key}Type`;
+  const value = record?.[typeKey];
 
-export const getDateValue = (date: string | FlexibleDateValue | undefined | null) => {
-  if (!date) return '';
-
-  if (typeof date === 'string') {
-    return date;
-  }
-
-  return date.value || '';
-};
-
-export const getDateType = (date: string | FlexibleDateValue | undefined | null) => {
-  if (!date || typeof date === 'string') {
-    return 'gregorian' as DateType;
-  }
-
-  return date.type || 'gregorian';
+  return value === 'hijri' ? 'hijri' : 'gregorian';
 };

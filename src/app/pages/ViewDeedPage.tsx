@@ -27,6 +27,9 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { AppDateField } from '../components/AppDateField';
+import { formatFlexibleDate } from '../../utils/dateUtils';
+import type { DateType } from '../../utils/dateUtils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +51,7 @@ import { toast } from 'sonner';
 type EditFormState = {
   deedNumber: string;
   deedDate: string;
+  deedDateType: DateType;
   propertyDescription: string;
   plotNumber: string;
   planNumber: string;
@@ -169,16 +173,16 @@ const isImageAttachment = (attachment: any) => {
 
 
 const formatDateForInput = (value: any) => {
-  if (!value) return new Date().toISOString().split('T')[0];
+  if (!value) return '';
 
   try {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
-      return new Date().toISOString().split('T')[0];
+      return String(value || '');
     }
     return date.toISOString().split('T')[0];
   } catch {
-    return new Date().toISOString().split('T')[0];
+    return String(value || '');
   }
 };
 
@@ -206,7 +210,8 @@ export const ViewDeedPage: React.FC = () => {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editForm, setEditForm] = useState<EditFormState>({
     deedNumber: '',
-    deedDate: new Date().toISOString().split('T')[0],
+    deedDate: '',
+    deedDateType: 'gregorian',
     propertyDescription: '',
     plotNumber: '',
     planNumber: '',
@@ -256,7 +261,8 @@ export const ViewDeedPage: React.FC = () => {
 
     setEditForm({
       deedNumber: deed.deedNumber || '',
-      deedDate: formatDateForInput(deed.deedDate),
+      deedDate: deed.deedDateType === 'hijri' ? String(deed.deedDate || '') : formatDateForInput(deed.deedDate),
+      deedDateType: (deed as any).deedDateType || 'gregorian',
       propertyDescription: deed.propertyDescription || '',
       plotNumber: deed.plotNumber || '',
       planNumber: deed.planNumber || '',
@@ -295,11 +301,6 @@ export const ViewDeedPage: React.FC = () => {
   const validateEditForm = () => {
     if (!editForm.deedNumber.trim()) {
       toast.error('رقم الصك مطلوب');
-      return false;
-    }
-
-    if (!editForm.deedDate) {
-      toast.error('تاريخ الصك مطلوب');
       return false;
     }
 
@@ -346,7 +347,8 @@ export const ViewDeedPage: React.FC = () => {
 
       const payload: any = {
         deedNumber: editForm.deedNumber.trim(),
-        deedDate: editForm.deedDate,
+        deedDate: editForm.deedDate || '',
+        deedDateType: editForm.deedDateType,
         propertyDescription: editForm.propertyDescription.trim(),
         plotNumber: editForm.plotNumber.trim(),
         planNumber: editForm.planNumber.trim(),
@@ -807,12 +809,13 @@ export const ViewDeedPage: React.FC = () => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>تاريخ الصك *</Label>
-                <Input
-                  type="date"
+              <div className="md:col-span-2">
+                <AppDateField
+                  label="تاريخ الصك"
                   value={editForm.deedDate}
-                  onChange={(e) => updateEditField('deedDate', e.target.value)}
+                  dateType={editForm.deedDateType}
+                  onValueChange={(value) => updateEditField('deedDate', value)}
+                  onDateTypeChange={(type) => updateEditField('deedDateType', type)}
                 />
               </div>
 
@@ -887,7 +890,7 @@ export const ViewDeedPage: React.FC = () => {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">{t('deed.deedDate')}</p>
                   <p className="text-lg font-semibold">
-                    {new Date(deed.deedDate).toLocaleDateString('ar-SA')}
+                    {formatFlexibleDate(deed.deedDate, (deed as any).deedDateType || 'gregorian')}
                   </p>
                 </div>
 

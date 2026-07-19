@@ -2,11 +2,8 @@ import React from 'react';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
-import {
-  DateType,
-  formatFlexibleDate,
-  normalizeHijriInput,
-} from '../../utils/dateUtils';
+import type { DateType } from '../../utils/dateUtils';
+import { formatFlexibleDate, normalizeHijriInput } from '../../utils/dateUtils';
 
 type AppDateFieldProps = {
   label: string;
@@ -37,10 +34,7 @@ export const AppDateField: React.FC<AppDateFieldProps> = ({
     <div className="space-y-2">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label htmlFor={`${inputId}-type`}>
-            نوع التاريخ
-          </Label>
-
+          <Label htmlFor={`${inputId}-type`}>نوع التاريخ</Label>
           <NativeSelect
             id={`${inputId}-type`}
             value={dateType}
@@ -59,9 +53,7 @@ export const AppDateField: React.FC<AppDateFieldProps> = ({
           <Label htmlFor={inputId}>
             {label}
             {required ? <span className="text-destructive"> *</span> : null}
-            {!required ? (
-              <span className="text-muted-foreground"> (اختياري)</span>
-            ) : null}
+            {!required ? <span className="text-muted-foreground"> (اختياري)</span> : null}
           </Label>
 
           {dateType === 'gregorian' ? (

@@ -48,6 +48,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { AppDateField } from '../components/AppDateField';
+import { formatFlexibleDate } from '../../utils/dateUtils';
+import type { DateType } from '../../utils/dateUtils';
 import { toast } from 'sonner';
 import type { LeasedLandOut, LeasedLandIn } from '../../types/models';
 
@@ -141,14 +144,8 @@ const makeAttachments = (
   }));
 };
 
-const formatDate = (value: any) => {
-  if (!value) return '-';
-
-  try {
-    return new Date(value).toLocaleDateString('ar-SA');
-  } catch {
-    return '-';
-  }
+const formatDate = (value: any, type: DateType = 'gregorian') => {
+  return formatFlexibleDate(value, type);
 };
 
 const InfoItem = ({ label, value }: { label: string; value: React.ReactNode }) => {
@@ -196,6 +193,7 @@ type LeasedLandOutFormState = {
   tenant: PartyFormState;
   contractNumber: string;
   contractStartDate: string;
+  contractStartDateType: DateType;
   contractDuration: string;
   plotNumber: string;
   planNumber: string;
@@ -211,7 +209,8 @@ type LeasedLandOutFormState = {
 const emptyForm: LeasedLandOutFormState = {
   tenant: emptyParty,
   contractNumber: '',
-  contractStartDate: new Date().toISOString().split('T')[0],
+  contractStartDate: '',
+  contractStartDateType: 'gregorian',
   contractDuration: '',
   plotNumber: '',
   planNumber: '',
@@ -340,7 +339,8 @@ export const LeasedLandsOutPage: React.FC = () => {
         mobileNumber: record.tenant?.mobileNumber || '',
       },
       contractNumber: record.contractNumber || '',
-      contractStartDate: record.contractStartDate ? new Date(record.contractStartDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      contractStartDate: record.contractStartDate || '',
+      contractStartDateType: record.contractStartDateType || 'gregorian',
       contractDuration: record.contractDuration || '',
       plotNumber: record.plotNumber || '',
       planNumber: record.planNumber || '',
@@ -400,11 +400,6 @@ export const LeasedLandsOutPage: React.FC = () => {
       return false;
     }
 
-    if (!form.contractStartDate) {
-      toast.error('تاريخ بداية العقد مطلوب');
-      return false;
-    }
-
     if (!form.contractDuration.trim()) {
       toast.error('مدة العقد مطلوبة');
       return false;
@@ -434,7 +429,8 @@ export const LeasedLandsOutPage: React.FC = () => {
         name: form.tenant.name.trim(),
       },
       contractNumber: form.contractNumber.trim(),
-      contractStartDate: new Date(form.contractStartDate) as any,
+      contractStartDate: form.contractStartDate || '',
+      contractStartDateType: form.contractStartDateType,
       contractDuration: form.contractDuration.trim(),
       plotNumber: form.plotNumber.trim(),
       planNumber: form.planNumber.trim(),
@@ -623,7 +619,7 @@ export const LeasedLandsOutPage: React.FC = () => {
                     <TableRow key={record.id}>
                       <TableCell className="font-medium">{record.tenant?.name || '-'}</TableCell>
                       <TableCell>{record.contractNumber || '-'}</TableCell>
-                      <TableCell>{formatDate(record.contractStartDate)}</TableCell>
+                      <TableCell>{formatDate(record.contractStartDate, record.contractStartDateType || 'gregorian')}</TableCell>
                       <TableCell>
                         <div>
                           <p>قطعة: {record.plotNumber || '-'}</p>
@@ -741,7 +737,7 @@ export const LeasedLandsOutPage: React.FC = () => {
               <InfoItem label="السجل التجاري" value={(selectedRecord as any).tenant?.commercialRegistration || '-'} />
               <InfoItem label="ممثل الجهة" value={(selectedRecord as any).tenant?.entityRepresentative || '-'} />
               <InfoItem label="رقم العقد" value={(selectedRecord as any).contractNumber || '-'} />
-              <InfoItem label="بداية العقد" value={formatDate((selectedRecord as any).contractStartDate)} />
+              <InfoItem label="بداية العقد" value={formatDate((selectedRecord as any).contractStartDate, (selectedRecord as any).contractStartDateType || 'gregorian')} />
               <InfoItem label="مدة العقد" value={(selectedRecord as any).contractDuration || '-'} />
               <InfoItem label="رقم القطعة" value={(selectedRecord as any).plotNumber || '-'} />
               <InfoItem label="رقم المخطط" value={(selectedRecord as any).planNumber || '-'} />
@@ -911,9 +907,14 @@ const LeasedLandOutForm: React.FC<LeasedLandOutFormProps> = ({
               <Label>رقم العقد *</Label>
               <Input value={form.contractNumber} onChange={(e) => updateFormField('contractNumber', e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label>تاريخ بداية العقد *</Label>
-              <Input type="date" value={form.contractStartDate} onChange={(e) => updateFormField('contractStartDate', e.target.value)} />
+            <div className="md:col-span-2">
+              <AppDateField
+                label="تاريخ بداية العقد"
+                value={form.contractStartDate}
+                dateType={form.contractStartDateType}
+                onValueChange={(value) => updateFormField('contractStartDate', value)}
+                onDateTypeChange={(type) => updateFormField('contractStartDateType', type)}
+              />
             </div>
             <div className="space-y-2">
               <Label>مدة العقد *</Label>

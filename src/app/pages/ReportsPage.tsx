@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useData } from '../../context/DataContext';
+import { formatFlexibleDate, getFlexibleDateType } from '../../utils/dateUtils';
 import {
   FileSpreadsheet,
   FileText,
@@ -273,14 +274,8 @@ export const ReportsPage: React.FC = () => {
     leasedBuildingsIn,
   ]);
 
-  const formatDate = (value: any) => {
-    if (!value) return '-';
-
-    try {
-      return new Date(value).toLocaleDateString('ar-SA');
-    } catch {
-      return '-';
-    }
+  const formatDate = (value: any, type = 'gregorian') => {
+    return formatFlexibleDate(value, type as any);
   };
 
   const formatCoordinates = (coordinates: any) => {
@@ -315,7 +310,7 @@ export const ReportsPage: React.FC = () => {
       key === 'receiptDate' ||
       key === 'contractStartDate'
     ) {
-      return formatDate(item[key]);
+      return formatDate(item[key], getFlexibleDateType(item, key));
     }
 
     if (key === 'tenant' || key === 'owner') {

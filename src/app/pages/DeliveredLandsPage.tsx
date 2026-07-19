@@ -33,6 +33,9 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { AppDateField } from '../components/AppDateField';
+import { formatFlexibleDate } from '../../utils/dateUtils';
+import type { DateType } from '../../utils/dateUtils';
 import { Separator } from '../components/ui/separator';
 import {
   Table,
@@ -64,6 +67,7 @@ import type { DeliveredLand } from '../../types/models';
 type DeliveredLandFormState = {
   receiptNumber: string;
   receiptDate: string;
+  receiptDateType: DateType;
   deliveringEntity: string;
   recipientEntity: string;
   landName: string;
@@ -95,7 +99,8 @@ type AttachmentItem = {
 
 const emptyForm: DeliveredLandFormState = {
   receiptNumber: '',
-  receiptDate: new Date().toISOString().split('T')[0],
+  receiptDate: '',
+  receiptDateType: 'gregorian',
   deliveringEntity: '',
   recipientEntity: 'جامعة الإمام عبدالرحمن بن فيصل',
   landName: '',
@@ -155,14 +160,8 @@ const getStatusBadgeVariant = (status?: string) => {
   return 'secondary';
 };
 
-const normalizeDate = (value: any) => {
-  if (!value) return '-';
-
-  try {
-    return new Date(value).toLocaleDateString('ar-SA');
-  } catch {
-    return '-';
-  }
+const normalizeDate = (value: any, type: DateType = 'gregorian') => {
+  return formatFlexibleDate(value, type);
 };
 
 const getLandAttachments = (land: any): AttachmentItem[] => {
@@ -329,7 +328,8 @@ export const DeliveredLandsPage: React.FC = () => {
 
     setForm({
       receiptNumber: land.receiptNumber || '',
-      receiptDate: land.receiptDate || land.deliveryDate || new Date().toISOString().split('T')[0],
+      receiptDate: land.receiptDate || land.deliveryDate || '',
+      receiptDateType: land.receiptDateType || land.deliveryDateType || 'gregorian',
       deliveringEntity: land.deliveringEntity || '',
       recipientEntity: land.recipientEntity || '',
       landName: land.landName || '',
@@ -405,11 +405,6 @@ export const DeliveredLandsPage: React.FC = () => {
       return false;
     }
 
-    if (!form.receiptDate) {
-      toast.error('تاريخ الاستلام مطلوب');
-      return false;
-    }
-
     if (!form.deliveringEntity.trim()) {
       toast.error('الجهة المسلّمة مطلوبة');
       return false;
@@ -462,8 +457,10 @@ export const DeliveredLandsPage: React.FC = () => {
 
     return {
       receiptNumber: form.receiptNumber.trim(),
-      receiptDate: form.receiptDate,
-      deliveryDate: form.receiptDate,
+      receiptDate: form.receiptDate || '',
+      receiptDateType: form.receiptDateType,
+      deliveryDate: form.receiptDate || '',
+      deliveryDateType: form.receiptDateType,
       deliveringEntity: form.deliveringEntity.trim(),
       recipientEntity: form.recipientEntity.trim(),
       landName: form.landName.trim(),
@@ -700,7 +697,7 @@ export const DeliveredLandsPage: React.FC = () => {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                          {normalizeDate(land.receiptDate || land.deliveryDate)}
+                          {normalizeDate(land.receiptDate || land.deliveryDate, land.receiptDateType || land.deliveryDateType || 'gregorian')}
                         </div>
                       </TableCell>
 
@@ -834,12 +831,13 @@ export const DeliveredLandsPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>تاريخ الاستلام *</Label>
-                  <Input
-                    type="date"
+                <div className="md:col-span-2">
+                  <AppDateField
+                    label="تاريخ الاستلام"
                     value={form.receiptDate}
-                    onChange={(e) => updateFormField('receiptDate', e.target.value)}
+                    dateType={form.receiptDateType}
+                    onValueChange={(value) => updateFormField('receiptDate', value)}
+                    onDateTypeChange={(type) => updateFormField('receiptDateType', type)}
                   />
                 </div>
 
@@ -1233,7 +1231,7 @@ export const DeliveredLandsPage: React.FC = () => {
               <Separator />
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <InfoItem label="تاريخ الاستلام" value={normalizeDate((selectedLand as any).receiptDate || (selectedLand as any).deliveryDate)} />
+                <InfoItem label="تاريخ الاستلام" value={normalizeDate((selectedLand as any).receiptDate || (selectedLand as any).deliveryDate, (selectedLand as any).receiptDateType || (selectedLand as any).deliveryDateType || 'gregorian')} />
                 <InfoItem label="الجهة المسلّمة" value={(selectedLand as any).deliveringEntity || '-'} />
                 <InfoItem label="الجهة المستلمة" value={(selectedLand as any).recipientEntity || '-'} />
                 <InfoItem label="المنطقة" value={(selectedLand as any).region || '-'} />
