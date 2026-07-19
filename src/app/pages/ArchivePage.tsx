@@ -52,6 +52,7 @@ type ArchiveDocument = {
   category: string;
   documentNumber: string;
   documentDate: string;
+  documentDateType: 'gregorian' | 'hijri';
   issuingAuthority: string;
   confidentiality: 'public' | 'internal' | 'confidential';
   tags: string;
@@ -79,6 +80,7 @@ type ArchiveFormState = {
   category: string;
   documentNumber: string;
   documentDate: string;
+  documentDateType: 'gregorian' | 'hijri';
   issuingAuthority: string;
   confidentiality: 'public' | 'internal' | 'confidential';
   tags: string;
@@ -93,7 +95,8 @@ const emptyForm: ArchiveFormState = {
   title: '',
   category: 'عام',
   documentNumber: '',
-  documentDate: new Date().toISOString().split('T')[0],
+  documentDate: '',
+  documentDateType: 'gregorian',
   issuingAuthority: '',
   confidentiality: 'internal',
   tags: '',
@@ -217,7 +220,8 @@ export const ArchivePage: React.FC = () => {
       title: doc.title,
       category: doc.category,
       documentNumber: doc.documentNumber,
-      documentDate: doc.documentDate,
+      documentDate: doc.documentDate || '',
+      documentDateType: doc.documentDateType || 'gregorian',
       issuingAuthority: doc.issuingAuthority,
       confidentiality: doc.confidentiality,
       tags: doc.tags,
@@ -315,7 +319,8 @@ export const ArchivePage: React.FC = () => {
             title,
             category: form.category.trim(),
             documentNumber: form.documentNumber.trim(),
-            documentDate: form.documentDate,
+            documentDate: form.documentDate || '',
+          documentDateType: form.documentDateType,
             issuingAuthority: form.issuingAuthority.trim(),
             confidentiality: form.confidentiality,
             tags: form.tags.trim(),
@@ -360,7 +365,8 @@ export const ArchivePage: React.FC = () => {
                 title: form.title.trim(),
                 category: form.category.trim(),
                 documentNumber: form.documentNumber.trim(),
-                documentDate: form.documentDate,
+                documentDate: form.documentDate || '',
+                documentDateType: form.documentDateType,
                 issuingAuthority: form.issuingAuthority.trim(),
                 confidentiality: form.confidentiality,
                 tags: form.tags.trim(),
@@ -669,7 +675,8 @@ export const ArchivePage: React.FC = () => {
               <InfoItem label="العنوان" value={selectedDocument.title} />
               <InfoItem label="التصنيف" value={selectedDocument.category} />
               <InfoItem label="رقم المستند" value={selectedDocument.documentNumber || '-'} />
-              <InfoItem label="تاريخ المستند" value={formatDate(selectedDocument.documentDate)} />
+              <InfoItem label="تاريخ المستند" value={formatArchiveDocumentDate(selectedDocument.documentDate, selectedDocument.documentDateType)} />
+              <InfoItem label="نوع التاريخ" value={selectedDocument.documentDateType === 'hijri' ? 'هجري' : 'ميلادي'} />
               <InfoItem label="الجهة / المصدر" value={selectedDocument.issuingAuthority || '-'} />
               <InfoItem label="الكلمات المفتاحية" value={selectedDocument.tags || '-'} />
               <InfoItem label="اسم الملف" value={selectedDocument.originalName} />
@@ -808,7 +815,7 @@ export const ArchivePage: React.FC = () => {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <CalendarDays className="h-3 w-3 text-muted-foreground" />
-                          {formatDate(doc.documentDate)}
+                          {formatArchiveDocumentDate(doc.documentDate, doc.documentDateType)}
                         </div>
                       </TableCell>
                       <TableCell className="max-w-[180px] truncate">{doc.issuingAuthority || '-'}</TableCell>
