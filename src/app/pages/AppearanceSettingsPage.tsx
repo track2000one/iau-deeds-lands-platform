@@ -1,12 +1,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Moon, Palette, RotateCcw, Sparkles, Sun, Monitor, Zap } from 'lucide-react';
+import {
+  Check,
+  Moon,
+  Palette,
+  RotateCcw,
+  Sparkles,
+  Sun,
+  Monitor,
+  Zap,
+  Type,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
 import { NativeSelect } from '../components/ui/native-select';
 
 type AppearanceMode = 'light' | 'dark' | 'system';
+
+type FontControlSettings = {
+  fontFamily: string;
+  baseFontSize: string;
+  headingFontWeight: string;
+  foreground: string;
+  mutedForeground: string;
+  cardForeground: string;
+  sidebarForeground: string;
+  primary: string;
+};
 
 type ThemeOption = {
   id: string;
@@ -19,6 +42,26 @@ type ThemeOption = {
 
 const STORAGE_THEME_KEY = 'iau-appearance-theme';
 const STORAGE_MODE_KEY = 'iau-appearance-mode';
+const STORAGE_FONT_KEY = 'iau-appearance-font-controls';
+
+const defaultFontControls: FontControlSettings = {
+  fontFamily: 'Tajawal, Arial, sans-serif',
+  baseFontSize: '15px',
+  headingFontWeight: '700',
+  foreground: '#1f2937',
+  mutedForeground: '#64748b',
+  cardForeground: '#1f2937',
+  sidebarForeground: '#ffffff',
+  primary: '#2c4a6b',
+};
+
+const fontOptions = [
+  { label: 'Tajawal', value: 'Tajawal, Arial, sans-serif' },
+  { label: 'Arial', value: 'Arial, Tahoma, sans-serif' },
+  { label: 'Tahoma', value: 'Tahoma, Arial, sans-serif' },
+  { label: 'Segoe UI', value: '"Segoe UI", Tahoma, Arial, sans-serif' },
+  { label: 'System', value: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+];
 
 const themes: ThemeOption[] = [
   {
@@ -194,6 +237,52 @@ const variableNameMap: Record<string, string> = {
   sidebarRing: '--sidebar-ring',
 };
 
+const hexToHsl = (hex: string) => {
+  const normalized = hex.replace('#', '');
+
+  if (normalized.length !== 6) return null;
+
+  const r = parseInt(normalized.slice(0, 2), 16) / 255;
+  const g = parseInt(normalized.slice(2, 4), 16) / 255;
+  const b = parseInt(normalized.slice(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      default:
+        h = (r - g) / d + 4;
+        break;
+    }
+
+    h /= 6;
+  }
+
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+};
+
+const loadFontControls = (): FontControlSettings => {
+  try {
+    const stored = localStorage.getItem(STORAGE_FONT_KEY);
+    return stored ? { ...defaultFontControls, ...JSON.parse(stored) } : defaultFontControls;
+  } catch {
+    return defaultFontControls;
+  }
+};
+
 const applyThemeVariables = (theme: ThemeOption) => {
   const root = document.documentElement;
 
@@ -208,6 +297,30 @@ const applyThemeVariables = (theme: ThemeOption) => {
   root.dataset.appearanceTheme = theme.id;
 };
 
+const applyFontControls = (settings: FontControlSettings) => {
+  const root = document.documentElement;
+
+  root.style.setProperty('--app-font-family', settings.fontFamily);
+  root.style.setProperty('--app-base-font-size', settings.baseFontSize);
+  root.style.setProperty('--app-heading-font-weight', settings.headingFontWeight);
+
+  const foreground = hexToHsl(settings.foreground);
+  const mutedForeground = hexToHsl(settings.mutedForeground);
+  const cardForeground = hexToHsl(settings.cardForeground);
+  const sidebarForeground = hexToHsl(settings.sidebarForeground);
+  const primary = hexToHsl(settings.primary);
+
+  if (foreground) root.style.setProperty('--foreground', foreground);
+  if (mutedForeground) root.style.setProperty('--muted-foreground', mutedForeground);
+  if (cardForeground) root.style.setProperty('--card-foreground', cardForeground);
+  if (sidebarForeground) root.style.setProperty('--sidebar-foreground', sidebarForeground);
+  if (primary) {
+    root.style.setProperty('--primary', primary);
+    root.style.setProperty('--ring', primary);
+    root.style.setProperty('--sidebar-primary', primary);
+  }
+};
+
 const applyMode = (mode: AppearanceMode) => {
   const root = document.documentElement;
   const systemDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
@@ -217,14 +330,29 @@ const applyMode = (mode: AppearanceMode) => {
   root.dataset.appearanceMode = mode;
 };
 
-const injectRailwayGlowStyles = () => {
-  const styleId = 'iau-railway-appearance-glow-style';
+const injectAppearanceStyles = () => {
+  const styleId = 'iau-appearance-custom-style';
 
   if (document.getElementById(styleId)) return;
 
   const style = document.createElement('style');
   style.id = styleId;
   style.innerHTML = `
+    :root {
+      --app-font-family: Tajawal, Arial, sans-serif;
+      --app-base-font-size: 15px;
+      --app-heading-font-weight: 700;
+    }
+
+    body {
+      font-family: var(--app-font-family) !important;
+      font-size: var(--app-base-font-size) !important;
+    }
+
+    h1, h2, h3, h4, h5, h6, .font-bold {
+      font-weight: var(--app-heading-font-weight) !important;
+    }
+
     html[data-appearance-theme="railway-neon"] body {
       background:
         radial-gradient(circle at 15% 15%, rgba(124, 58, 237, 0.18), transparent 32%),
@@ -246,7 +374,7 @@ const injectRailwayGlowStyles = () => {
       position: absolute;
       inset: -1px;
       background:
-        radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.28), transparent 30%),
+        radial-gradient(circle at var(--x, 20%) var(--y, 20%), rgba(124, 58, 237, 0.28), transparent 30%),
         linear-gradient(120deg, transparent, rgba(34, 211, 238, 0.10), transparent);
       pointer-events: none;
       opacity: 0.8;
@@ -267,6 +395,36 @@ const injectRailwayGlowStyles = () => {
   document.head.appendChild(style);
 };
 
+const ColorInput = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) => {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="flex items-center gap-2 rounded-lg border bg-background p-2">
+        <Input
+          type="color"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-10 w-14 cursor-pointer border-0 p-1"
+        />
+        <Input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          dir="ltr"
+          className="font-mono"
+        />
+      </div>
+    </div>
+  );
+};
+
 export const AppearanceSettingsPage: React.FC = () => {
   const [selectedThemeId, setSelectedThemeId] = useState(
     () => localStorage.getItem(STORAGE_THEME_KEY) || 'professional-blue'
@@ -276,18 +434,21 @@ export const AppearanceSettingsPage: React.FC = () => {
     () => (localStorage.getItem(STORAGE_MODE_KEY) as AppearanceMode) || 'system'
   );
 
+  const [fontControls, setFontControls] = useState<FontControlSettings>(() => loadFontControls());
+
   const selectedTheme = useMemo(() => {
     return themes.find((theme) => theme.id === selectedThemeId) || themes[0];
   }, [selectedThemeId]);
 
   useEffect(() => {
-    injectRailwayGlowStyles();
+    injectAppearanceStyles();
   }, []);
 
   useEffect(() => {
     applyThemeVariables(selectedTheme);
+    applyFontControls(fontControls);
     localStorage.setItem(STORAGE_THEME_KEY, selectedTheme.id);
-  }, [selectedTheme]);
+  }, [selectedTheme, fontControls]);
 
   useEffect(() => {
     applyMode(appearanceMode);
@@ -303,9 +464,25 @@ export const AppearanceSettingsPage: React.FC = () => {
     return () => media?.removeEventListener?.('change', handler);
   }, [appearanceMode]);
 
+  useEffect(() => {
+    applyFontControls(fontControls);
+    localStorage.setItem(STORAGE_FONT_KEY, JSON.stringify(fontControls));
+  }, [fontControls]);
+
+  const updateFontControl = <K extends keyof FontControlSettings>(
+    key: K,
+    value: FontControlSettings[K]
+  ) => {
+    setFontControls((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
   const resetAppearance = () => {
     setSelectedThemeId('professional-blue');
     setAppearanceMode('system');
+    setFontControls(defaultFontControls);
   };
 
   return (
@@ -318,10 +495,12 @@ export const AppearanceSettingsPage: React.FC = () => {
               إعدادات المظهر
             </Badge>
 
-            <h1 className="text-2xl md:text-3xl font-bold">تخصيص شكل المنصة</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">
+              تخصيص شكل المنصة
+            </h1>
 
             <p className="mt-2 text-muted-foreground max-w-2xl">
-              اختر مظهرًا عصريًا للمنصة. تمت إضافة مظهر Railway Neon مع توهج أثناء الاختيار، وحواف مضيئة، وخلفية داكنة احترافية.
+              اختر مظهرًا عصريًا للمنصة، وتحكم بالخط وحجم الخط وألوان النصوص والعناوين والقائمة الجانبية.
             </p>
           </div>
 
@@ -331,9 +510,9 @@ export const AppearanceSettingsPage: React.FC = () => {
               استعادة الافتراضي
             </Button>
 
-            <Button className="railway-button-glow" type="button">
+            <Button className="railway-button-glow">
               <Zap className="ml-2 h-4 w-4" />
-              يتم الحفظ تلقائيًا
+              تم الحفظ تلقائيًا
             </Button>
           </div>
         </div>
@@ -345,7 +524,9 @@ export const AppearanceSettingsPage: React.FC = () => {
             <Monitor className="h-5 w-5" />
             نمط العرض
           </CardTitle>
-          <CardDescription>اختر الوضع الفاتح أو الداكن أو حسب إعدادات الجهاز.</CardDescription>
+          <CardDescription>
+            اختر الوضع الفاتح أو الداكن أو حسب إعدادات الجهاز.
+          </CardDescription>
         </CardHeader>
 
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -387,7 +568,7 @@ export const AppearanceSettingsPage: React.FC = () => {
             مظاهر المنصة
           </CardTitle>
           <CardDescription>
-            اختر مجموعة ألوان متكاملة. مظهر Railway Neon يعطي إحساسًا قريبًا من لوحة Railway من ناحية الظلام والتوهج والحواف الحديثة.
+            اختر مجموعة ألوان متكاملة. مظهر Railway Neon يعطي إحساسًا قريبًا من Railway من ناحية الظلام والتوهج والحواف الحديثة.
           </CardDescription>
         </CardHeader>
 
@@ -424,15 +605,15 @@ export const AppearanceSettingsPage: React.FC = () => {
                         {theme.badge && <Badge>{theme.badge}</Badge>}
                       </div>
 
-                      <p className="mt-1 text-sm text-muted-foreground leading-6">{theme.description}</p>
+                      <p className="mt-1 text-sm text-muted-foreground leading-6">
+                        {theme.description}
+                      </p>
                     </div>
 
-                    <div
-                      className={[
-                        'flex h-8 w-8 items-center justify-center rounded-full border',
-                        active ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted',
-                      ].join(' ')}
-                    >
+                    <div className={[
+                      'flex h-8 w-8 items-center justify-center rounded-full border',
+                      active ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted',
+                    ].join(' ')}>
                       {active && <Check className="h-4 w-4" />}
                     </div>
                   </div>
@@ -468,6 +649,116 @@ export const AppearanceSettingsPage: React.FC = () => {
 
       <Card>
         <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Type className="h-5 w-5" />
+            التحكم بالخط وألوان النصوص
+          </CardTitle>
+          <CardDescription>
+            تحكم بنوع الخط، حجم الخط، وزن العناوين، وألوان النصوص الأساسية والثانوية والقائمة الجانبية.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>نوع الخط</Label>
+              <NativeSelect
+                value={fontControls.fontFamily}
+                onChange={(event) => updateFontControl('fontFamily', event.target.value)}
+              >
+                {fontOptions.map((font) => (
+                  <option key={font.value} value={font.value}>
+                    {font.label}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+
+            <div className="space-y-2">
+              <Label>حجم الخط العام</Label>
+              <NativeSelect
+                value={fontControls.baseFontSize}
+                onChange={(event) => updateFontControl('baseFontSize', event.target.value)}
+              >
+                <option value="13px">صغير جدًا</option>
+                <option value="14px">صغير</option>
+                <option value="15px">متوسط</option>
+                <option value="16px">كبير</option>
+                <option value="17px">كبير جدًا</option>
+              </NativeSelect>
+            </div>
+
+            <div className="space-y-2">
+              <Label>سماكة العناوين</Label>
+              <NativeSelect
+                value={fontControls.headingFontWeight}
+                onChange={(event) => updateFontControl('headingFontWeight', event.target.value)}
+              >
+                <option value="500">خفيف</option>
+                <option value="600">متوسط</option>
+                <option value="700">واضح</option>
+                <option value="800">عريض</option>
+              </NativeSelect>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <ColorInput
+              label="لون النص الأساسي"
+              value={fontControls.foreground}
+              onChange={(value) => updateFontControl('foreground', value)}
+            />
+
+            <ColorInput
+              label="لون النص الثانوي"
+              value={fontControls.mutedForeground}
+              onChange={(value) => updateFontControl('mutedForeground', value)}
+            />
+
+            <ColorInput
+              label="لون نص البطاقات"
+              value={fontControls.cardForeground}
+              onChange={(value) => updateFontControl('cardForeground', value)}
+            />
+
+            <ColorInput
+              label="لون نص القائمة الجانبية"
+              value={fontControls.sidebarForeground}
+              onChange={(value) => updateFontControl('sidebarForeground', value)}
+            />
+
+            <ColorInput
+              label="لون العناوين والأزرار الرئيسية"
+              value={fontControls.primary}
+              onChange={(value) => updateFontControl('primary', value)}
+            />
+          </div>
+
+          <div className="rounded-2xl border bg-muted/30 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              <p className="font-semibold">معاينة الخط واللون</p>
+            </div>
+
+            <div className="rounded-xl border bg-card p-5">
+              <h3 className="text-xl font-bold mb-2">
+                عنوان تجريبي داخل المنصة
+              </h3>
+              <p className="text-muted-foreground leading-7">
+                هذا نص تجريبي يوضح شكل الخط ولون النص الأساسي والثانوي بعد التعديل. يتم حفظ الإعدادات تلقائيًا وتطبيقها مباشرة على المنصة.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button>زر رئيسي</Button>
+                <Button variant="outline">زر ثانوي</Button>
+                <Button variant="secondary">زر مساعد</Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>معاينة مباشرة</CardTitle>
           <CardDescription>
             مثال سريع يوضح شكل البطاقات والأزرار قبل اعتماد التصميم على كامل المنصة.
@@ -491,32 +782,6 @@ export const AppearanceSettingsPage: React.FC = () => {
                 <p className="text-sm text-muted-foreground">حالة النظام</p>
                 <p className="mt-2 text-lg font-bold text-emerald-400">Online</p>
               </div>
-            </div>
-
-            <div className="relative z-10 mt-4 flex flex-col sm:flex-row gap-2">
-              <Button>زر أساسي</Button>
-              <Button variant="outline">زر ثانوي</Button>
-              <Button variant="secondary">زر مساعد</Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>اختيار سريع للمظهر</Label>
-              <NativeSelect value={selectedThemeId} onChange={(event) => setSelectedThemeId(event.target.value)}>
-                {themes.map((theme) => (
-                  <option key={theme.id} value={theme.id}>{theme.name}</option>
-                ))}
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-2">
-              <Label>نمط العرض</Label>
-              <NativeSelect value={appearanceMode} onChange={(event) => setAppearanceMode(event.target.value as AppearanceMode)}>
-                <option value="system">حسب الجهاز</option>
-                <option value="light">فاتح</option>
-                <option value="dark">داكن</option>
-              </NativeSelect>
             </div>
           </div>
         </CardContent>
