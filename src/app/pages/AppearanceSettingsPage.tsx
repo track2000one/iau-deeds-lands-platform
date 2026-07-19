@@ -304,21 +304,43 @@ const applyFontControls = (settings: FontControlSettings) => {
   root.style.setProperty('--app-base-font-size', settings.baseFontSize);
   root.style.setProperty('--app-heading-font-weight', settings.headingFontWeight);
 
+  root.style.setProperty('--app-text-color', settings.foreground);
+  root.style.setProperty('--app-muted-text-color', settings.mutedForeground);
+  root.style.setProperty('--app-card-text-color', settings.cardForeground);
+  root.style.setProperty('--app-sidebar-text-color', settings.sidebarForeground);
+  root.style.setProperty('--app-primary-text-color', settings.primary);
+
   const foreground = hexToHsl(settings.foreground);
   const mutedForeground = hexToHsl(settings.mutedForeground);
   const cardForeground = hexToHsl(settings.cardForeground);
   const sidebarForeground = hexToHsl(settings.sidebarForeground);
   const primary = hexToHsl(settings.primary);
 
-  if (foreground) root.style.setProperty('--foreground', foreground);
-  if (mutedForeground) root.style.setProperty('--muted-foreground', mutedForeground);
-  if (cardForeground) root.style.setProperty('--card-foreground', cardForeground);
-  if (sidebarForeground) root.style.setProperty('--sidebar-foreground', sidebarForeground);
+  if (foreground) {
+    root.style.setProperty('--foreground', foreground);
+  }
+
+  if (mutedForeground) {
+    root.style.setProperty('--muted-foreground', mutedForeground);
+  }
+
+  if (cardForeground) {
+    root.style.setProperty('--card-foreground', cardForeground);
+    root.style.setProperty('--popover-foreground', cardForeground);
+  }
+
+  if (sidebarForeground) {
+    root.style.setProperty('--sidebar-foreground', sidebarForeground);
+    root.style.setProperty('--sidebar-accent-foreground', sidebarForeground);
+  }
+
   if (primary) {
     root.style.setProperty('--primary', primary);
     root.style.setProperty('--ring', primary);
     root.style.setProperty('--sidebar-primary', primary);
   }
+
+  root.dataset.customFontColors = 'enabled';
 };
 
 const applyMode = (mode: AppearanceMode) => {
@@ -347,10 +369,67 @@ const injectAppearanceStyles = () => {
     body {
       font-family: var(--app-font-family) !important;
       font-size: var(--app-base-font-size) !important;
+      color: var(--app-text-color) !important;
     }
 
     h1, h2, h3, h4, h5, h6, .font-bold {
       font-weight: var(--app-heading-font-weight) !important;
+    }
+
+    html[data-custom-font-colors="enabled"] body,
+    html[data-custom-font-colors="enabled"] main,
+    html[data-custom-font-colors="enabled"] label,
+    html[data-custom-font-colors="enabled"] p,
+    html[data-custom-font-colors="enabled"] span,
+    html[data-custom-font-colors="enabled"] div {
+      color: var(--app-text-color);
+    }
+
+    html[data-custom-font-colors="enabled"] h1,
+    html[data-custom-font-colors="enabled"] h2,
+    html[data-custom-font-colors="enabled"] h3,
+    html[data-custom-font-colors="enabled"] h4,
+    html[data-custom-font-colors="enabled"] h5,
+    html[data-custom-font-colors="enabled"] h6,
+    html[data-custom-font-colors="enabled"] .text-primary,
+    html[data-custom-font-colors="enabled"] .font-bold,
+    html[data-custom-font-colors="enabled"] .font-semibold {
+      color: var(--app-primary-text-color) !important;
+    }
+
+    html[data-custom-font-colors="enabled"] .text-muted-foreground,
+    html[data-custom-font-colors="enabled"] .text-secondary-foreground {
+      color: var(--app-muted-text-color) !important;
+    }
+
+    html[data-custom-font-colors="enabled"] .bg-card,
+    html[data-custom-font-colors="enabled"] [class*="bg-card"] {
+      color: var(--app-card-text-color) !important;
+    }
+
+    html[data-custom-font-colors="enabled"] .bg-card *,
+    html[data-custom-font-colors="enabled"] [class*="bg-card"] * {
+      color: inherit;
+    }
+
+    html[data-custom-font-colors="enabled"] aside,
+    html[data-custom-font-colors="enabled"] nav,
+    html[data-custom-font-colors="enabled"] [data-sidebar],
+    html[data-custom-font-colors="enabled"] aside *,
+    html[data-custom-font-colors="enabled"] nav *,
+    html[data-custom-font-colors="enabled"] [data-sidebar] * {
+      color: var(--app-sidebar-text-color) !important;
+    }
+
+    html[data-custom-font-colors="enabled"] button.bg-primary,
+    html[data-custom-font-colors="enabled"] .bg-primary {
+      color: hsl(var(--primary-foreground)) !important;
+    }
+
+    html[data-custom-font-colors="enabled"] input,
+    html[data-custom-font-colors="enabled"] select,
+    html[data-custom-font-colors="enabled"] textarea {
+      color: var(--app-text-color) !important;
     }
 
     html[data-appearance-theme="railway-neon"] body {
@@ -654,7 +733,7 @@ export const AppearanceSettingsPage: React.FC = () => {
             التحكم بالخط وألوان النصوص
           </CardTitle>
           <CardDescription>
-            تحكم بنوع الخط، حجم الخط، وزن العناوين، وألوان النصوص الأساسية والثانوية والقائمة الجانبية.
+            تحكم بنوع الخط، حجم الخط، وزن العناوين، وألوان النصوص الأساسية والثانوية والقائمة الجانبية. يتم تطبيق الألوان الآن بقوة على عناصر المنصة وليس على المعاينة فقط.
           </CardDescription>
         </CardHeader>
 
