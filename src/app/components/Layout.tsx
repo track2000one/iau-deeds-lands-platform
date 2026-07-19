@@ -2,13 +2,13 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
+import { ThemeInitializer } from './ThemeInitializer';
 import {
   Home,
   FileText,
   PlusCircle,
   Search,
   BarChart3,
-  Map,
   Settings,
   Languages,
   Menu,
@@ -19,6 +19,7 @@ import {
   Building,
   Shield,
   Archive,
+  Palette,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -43,11 +44,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const { t, i18n } = useTranslation();
   const { logout, username } = useAuth();
+
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = React.useState(false);
+
   const isRTL = i18n.language === 'ar';
 
-  // Prevent body scroll when sidebar is open on mobile
   React.useEffect(() => {
     if (sidebarOpen && window.innerWidth < 1024) {
       document.body.style.overflow = 'hidden';
@@ -65,6 +67,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'ar' ? 'en' : 'ar';
+
     i18n.changeLanguage(newLang);
     document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = newLang;
@@ -88,11 +91,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'search', path: '/search', icon: Search, label: t('nav.search') },
     { id: 'reports', path: '/reports', icon: BarChart3, label: t('nav.reports') },
     { id: 'admin', path: '/admin', icon: Shield, label: t('nav.admin') },
-    {id: 'archive', path: '/archive', icon: Archive, label: 'الأرشفة',},
+    { id: 'archive', path: '/archive', icon: Archive, label: 'الأرشفة' },
+    { id: 'appearance', path: '/appearance', icon: Palette, label: 'المظهر' },
   ];
 
   const getCurrentPage = () => {
     const path = location.pathname;
+
     if (path === '/') return 'home';
     if (path.startsWith('/deeds/new')) return 'add-deed';
     if (path.startsWith('/deeds')) return 'all-deeds';
@@ -104,9 +109,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/buildings/leased-in')) return 'leased-buildings-in';
     if (path.startsWith('/search')) return 'search';
     if (path.startsWith('/reports')) return 'reports';
-    if (path.startsWith('/archive')) return 'archive';
     if (path.startsWith('/admin')) return 'admin';
+    if (path.startsWith('/archive')) return 'archive';
+    if (path.startsWith('/appearance')) return 'appearance';
     if (path.startsWith('/settings')) return 'settings';
+
     return 'home';
   };
 
@@ -114,6 +121,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
+      <ThemeInitializer />
+
       {/* Top Header */}
       <header className="bg-primary text-primary-foreground shadow-md z-30 relative shrink-0">
         <div className="flex items-center justify-between px-3 md:px-4 py-3 md:py-4">
@@ -124,16 +133,24 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               className="lg:hidden text-primary-foreground hover:bg-primary-foreground/10 shrink-0 h-8 w-8 md:h-10 md:w-10"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
-              {sidebarOpen ? <X className="h-5 w-5 md:h-6 md:w-6" /> : <Menu className="h-5 w-5 md:h-6 md:w-6" />}
+              {sidebarOpen ? (
+                <X className="h-5 w-5 md:h-6 md:w-6" />
+              ) : (
+                <Menu className="h-5 w-5 md:h-6 md:w-6" />
+              )}
             </Button>
+
             <div className="flex flex-col min-w-0">
-              <h1 className="text-base md:text-lg lg:text-xl font-bold truncate">{t('app.title')}</h1>
-              <p className="text-xs lg:text-sm opacity-90 truncate hidden sm:block">{t('app.subtitle')}</p>
+              <h1 className="text-base md:text-lg lg:text-xl font-bold truncate">
+                {t('app.title')}
+              </h1>
+              <p className="text-xs lg:text-sm opacity-90 truncate hidden sm:block">
+                {t('app.subtitle')}
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-1 md:gap-2 shrink-0">
-            {/* User Info */}
             <div className="hidden md:flex items-center gap-2 px-2 md:px-3 py-1 bg-primary-foreground/10 rounded-md">
               <User className="h-3 w-3 md:h-4 md:w-4" />
               <span className="text-xs md:text-sm font-medium">{username}</span>
@@ -146,8 +163,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               className="text-primary-foreground hover:bg-primary-foreground/10 h-8 px-2 md:h-9 md:px-3"
             >
               <Languages className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-              <span className="text-xs md:text-sm">{i18n.language === 'ar' ? 'EN' : 'ع'}</span>
+              <span className="text-xs md:text-sm">
+                {i18n.language === 'ar' ? 'EN' : 'ع'}
+              </span>
             </Button>
+
             <Button
               variant="ghost"
               size="icon"
@@ -157,6 +177,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             >
               <Settings className="h-4 w-4 md:h-5 md:w-5" />
             </Button>
+
             <Button
               variant="ghost"
               size="icon"
@@ -171,7 +192,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Overlay for mobile */}
         {sidebarOpen && (
           <div
             className="lg:hidden fixed inset-0 top-0 bg-black/60 z-40 backdrop-blur-sm"
@@ -180,8 +200,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           />
         )}
 
-        {/* Sidebar */}
         <aside
+          data-sidebar
           className={`
             fixed lg:static
             top-0 lg:top-auto
@@ -194,22 +214,23 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             flex flex-col
             ${isRTL ? 'left-0 lg:border-l-2' : 'right-0 lg:border-r-2'}
             lg:border-border/60
-            ${sidebarOpen
-              ? 'translate-x-0'
-              : isRTL
-                ? '-translate-x-full'
-                : 'translate-x-full'
+            ${
+              sidebarOpen
+                ? 'translate-x-0'
+                : isRTL
+                  ? '-translate-x-full'
+                  : 'translate-x-full'
             }
             lg:translate-x-0
           `}
         >
-          {/* Mobile Header in Sidebar */}
           <div className="lg:hidden p-3 border-b border-sidebar-border shrink-0 bg-sidebar-accent/50">
             <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : 'flex-row'} justify-between`}>
               <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
                 <User className="h-4.5 w-4.5" />
                 <span className="text-sm font-medium">{username}</span>
               </div>
+
               <Button
                 variant="ghost"
                 size="icon"
@@ -226,6 +247,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPage === item.id;
+
                 return (
                   <Button
                     key={item.id}
@@ -240,7 +262,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     }}
                   >
                     <Icon className="h-4.5 w-4.5 shrink-0" />
-                    <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{item.label}</span>
+                    <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+                      {item.label}
+                    </span>
                   </Button>
                 );
               })}
@@ -248,7 +272,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             <Separator className="my-3 bg-sidebar-border" />
 
-            {/* Settings Button in Sidebar for Mobile */}
             <div className="lg:hidden">
               <Button
                 variant="ghost"
@@ -259,7 +282,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 }}
               >
                 <Settings className="h-4.5 w-4.5 shrink-0" />
-                <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{t('settings.title')}</span>
+                <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+                  {t('settings.title')}
+                </span>
               </Button>
             </div>
 
@@ -272,7 +297,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </ScrollArea>
         </aside>
 
-        {/* Main Content */}
         <main className="flex-1 overflow-auto bg-background w-full">
           <div className="container mx-auto p-3 md:p-4 lg:p-6 max-w-7xl">
             {children}
@@ -280,8 +304,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </main>
       </div>
 
-
-      {/* Logout Confirmation Dialog */}
       <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -292,10 +314,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               {t('nav.confirmLogoutMessage')}
             </AlertDialogDescription>
           </AlertDialogHeader>
+
           <AlertDialogFooter>
             <AlertDialogCancel>
               {t('app.cancel')}
             </AlertDialogCancel>
+
             <AlertDialogAction
               onClick={handleLogout}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
