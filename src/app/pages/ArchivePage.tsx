@@ -133,6 +133,27 @@ const formatDate = (value?: string) => {
   }
 };
 
+const formatArchiveDocumentDate = (value?: string, type: 'gregorian' | 'hijri' = 'gregorian') => {
+  if (!value) return '-';
+
+  if (type === 'hijri') {
+    return `${value}هـ`;
+  }
+
+  try {
+    return new Date(value).toLocaleDateString('ar-SA-u-ca-gregory');
+  } catch {
+    return value;
+  }
+};
+
+const normalizeHijriInput = (value: string) => {
+  return value
+    .replace(/[^0-9/\-]/g, '')
+    .replaceAll('-', '/')
+    .slice(0, 10);
+};
+
 const getConfidentialityLabel = (value: ArchiveDocument['confidentiality']) =>
   confidentialityOptions.find((item) => item.value === value)?.label || value;
 
@@ -266,7 +287,7 @@ export const ArchivePage: React.FC = () => {
       toast.error('تصنيف الملف مطلوب');
       return false;
     }
-    if (formMode === 'add' && form.files[0]s.length === 0) {
+    if (formMode === 'add' && form.files.length === 0) {
       toast.error('اختر ملفًا واحدًا على الأقل للأرشفة');
       return false;
     }
@@ -305,12 +326,12 @@ export const ArchivePage: React.FC = () => {
       if (formMode === 'add') {
         const newDocuments: ArchiveDocument[] = [];
 
-        for (const file of form.files[0]s) {
+        for (const file of form.files) {
           const uploaded = await uploadFileToGoogleDrive(file);
 
           const baseTitle = form.title.trim();
           const title =
-            form.files[0]s.length === 1
+            form.files.length === 1
               ? baseTitle
               : `${baseTitle} - ${file.name.replace(/\.[^/.]+$/, '')}`;
 
@@ -320,7 +341,7 @@ export const ArchivePage: React.FC = () => {
             category: form.category.trim(),
             documentNumber: form.documentNumber.trim(),
             documentDate: form.documentDate || '',
-          documentDateType: form.documentDateType,
+            documentDateType: form.documentDateType,
             issuingAuthority: form.issuingAuthority.trim(),
             confidentiality: form.confidentiality,
             tags: form.tags.trim(),
@@ -345,8 +366,8 @@ export const ArchivePage: React.FC = () => {
       } else if (selectedDocument) {
         let updatedFileData: Partial<ArchiveDocument> = {};
 
-        if (form.files[0]s.length > 0) {
-          const file = form.files[0]s[0];
+        if (form.files.length > 0) {
+          const file = form.files[0];
           const uploaded = await uploadFileToGoogleDrive(file);
           updatedFileData = {
             fileName: uploaded.fileName || file.name,
@@ -555,8 +576,42 @@ export const ArchivePage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>تاريخ المستند</Label>
-                  <Input type="date" value={form.documentDate} onChange={(e) => updateFormField('documentDate', e.target.value)} />
+                  <Label>نوع التاريخ</Label>
+                  <NativeSelect
+                    value={form.documentDateType}
+                    onChange={(e) => {
+                      updateFormField('documentDateType', e.target.value);
+                      updateFormField('documentDate', '');
+                    }}
+                  >
+                    <option value="gregorian">ميلادي</option>
+                    <option value="hijri">هجري</option>
+                  </NativeSelect>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>
+                    تاريخ المستند <span className="text-muted-foreground">(اختياري)</span>
+                  </Label>
+
+                  {form.documentDateType === 'gregorian' ? (
+                    <Input
+                      type="date"
+                      value={form.documentDate}
+                      onChange={(e) => updateFormField('documentDate', e.target.value)}
+                    />
+                  ) : (
+                    <Input
+                      value={form.documentDate}
+                      onChange={(e) => updateFormField('documentDate', normalizeHijriInput(e.target.value))}
+                      placeholder="مثال: 1447/07/18"
+                      dir="ltr"
+                    />
+                  )}
+
+                  <p className="text-xs text-muted-foreground">
+                    يمكن ترك التاريخ فارغًا، أو اختيار ميلادي/هجري حسب المستند.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -597,9 +652,11 @@ export const ArchivePage: React.FC = () => {
               <CardContent className="space-y-4">
                 <div className="rounded-xl border border-dashed p-6 text-center bg-muted/20">
                   <Upload className="h-12 w-12 mx-auto mb-3 text-primary" />
-                  <p className="font-semibold mb-1">{form.files[0]s.length > 0 ? `تم اختيار ${form.files[0]s.length} ملف` : formMode === 'edit' ? 'اختيار ملفات جديد اختياري' : 'اختر ملفًا أو أكثر للأرشفة'}</p>
+                  <p className="font-semibold mb-1">{form.files.length > 0 ? `تم اختيار ${form.files.length} ملف` : formMode === 'edit' ? 'اختيار ملفات جديدة اختياري' : 'اختر ملفًا أو أكثر للأرشفة'}</p>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {form.files[0] ? `${formatFileSize(form.files[0].size)} — ${form.files[0].type || 'نوع غير معروف'}` : 'PDF، Word، Excel، PowerPoint، صور، ملفات مضغوطة، وجميع الصيغ تقريبًا'}
+                    {form.files.length > 0
+                      ? `إجمالي الحجم: ${formatFileSize(form.files.reduce((sum, file) => sum + file.size, 0))}`
+                      : 'PDF، Word، Excel، PowerPoint، صور، ملفات مضغوطة، وجميع الصيغ تقريبًا'}
                   </p>
 
                   <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
@@ -607,9 +664,48 @@ export const ArchivePage: React.FC = () => {
                     اختيار ملفات
                   </Button>
 
-                  <input ref={fileInputRef} type="file" className="hidden" onChange={selectFiles} accept="*/*"
-                    multiple />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={selectFiles}
+                    accept="*/*"
+                    multiple
+                  />
                 </div>
+
+                {form.files.length > 0 && (
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <p className="text-sm font-semibold">الملفات المختارة ({form.files.length})</p>
+
+                    <div className="space-y-2">
+                      {form.files.map((file, index) => (
+                        <div
+                          key={`${file.name}-${file.size}-${file.lastModified}`}
+                          className="flex flex-col md:flex-row md:items-center justify-between gap-2 rounded-lg bg-muted/30 p-3"
+                        >
+                          <div>
+                            <p className="text-sm font-medium break-all">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(file.size)} — {file.type || 'نوع غير معروف'}
+                            </p>
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeSelectedFile(index)}
+                            disabled={isSaving}
+                          >
+                            <X className="ml-2 h-4 w-4" />
+                            إزالة
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {formMode === 'edit' && selectedDocument && (
                   <div className="rounded-lg border p-3 bg-muted/20">
