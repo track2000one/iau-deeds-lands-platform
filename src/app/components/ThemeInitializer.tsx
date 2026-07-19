@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 type AppearanceMode = 'light' | 'dark' | 'system';
 
@@ -13,9 +14,18 @@ type FontControlSettings = {
   primary: string;
 };
 
-const STORAGE_THEME_KEY = 'iau-appearance-theme';
-const STORAGE_MODE_KEY = 'iau-appearance-mode';
-const STORAGE_FONT_KEY = 'iau-appearance-font-controls';
+const DEFAULT_THEME_ID = 'classic-blue';
+const DEFAULT_MODE: AppearanceMode = 'light';
+
+const getUserKey = (username?: string | null) => {
+  const safeUser = username?.trim() || 'guest';
+
+  return {
+    theme: `iau-appearance-theme:${safeUser}`,
+    mode: `iau-appearance-mode:${safeUser}`,
+    font: `iau-appearance-font-controls:${safeUser}`,
+  };
+};
 
 const variableNameMap: Record<string, string> = {
   background: '--background',
@@ -48,6 +58,35 @@ const variableNameMap: Record<string, string> = {
 };
 
 const themeVariables: Record<string, Record<string, string>> = {
+  'classic-blue': {
+    background: '48 65% 97%',
+    foreground: '215 40% 18%',
+    card: '0 0% 100%',
+    cardForeground: '215 40% 18%',
+    popover: '0 0% 100%',
+    popoverForeground: '215 40% 18%',
+    primary: '208 42% 30%',
+    primaryForeground: '0 0% 100%',
+    secondary: '206 38% 58%',
+    secondaryForeground: '0 0% 100%',
+    muted: '210 25% 94%',
+    mutedForeground: '215 18% 45%',
+    accent: '206 52% 66%',
+    accentForeground: '215 40% 18%',
+    border: '38 38% 82%',
+    input: '38 38% 82%',
+    ring: '206 52% 66%',
+    destructive: '0 72% 51%',
+    destructiveForeground: '0 0% 100%',
+    sidebar: '208 42% 30%',
+    sidebarForeground: '0 0% 100%',
+    sidebarPrimary: '206 52% 66%',
+    sidebarPrimaryForeground: '0 0% 100%',
+    sidebarAccent: '206 45% 46%',
+    sidebarAccentForeground: '0 0% 100%',
+    sidebarBorder: '208 38% 38%',
+    sidebarRing: '206 52% 66%',
+  },
   'future-2060-dark': {
     background: '232 45% 6%',
     foreground: '210 100% 96%',
@@ -202,6 +241,7 @@ const hexToHsl = (hex: string) => {
   const r = parseInt(normalized.slice(0, 2), 16) / 255;
   const g = parseInt(normalized.slice(2, 4), 16) / 255;
   const b = parseInt(normalized.slice(4, 6), 16) / 255;
+
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   let h = 0;
@@ -239,6 +279,18 @@ const applyMode = (mode: AppearanceMode) => {
   root.dataset.appearanceMode = mode;
 };
 
+const applyThemeVariables = (themeId: string) => {
+  const root = document.documentElement;
+  const variables = themeVariables[themeId] || themeVariables[DEFAULT_THEME_ID];
+
+  Object.entries(variables).forEach(([key, value]) => {
+    const cssVariable = variableNameMap[key];
+    if (cssVariable) root.style.setProperty(cssVariable, value);
+  });
+
+  root.dataset.appearanceTheme = themeId;
+};
+
 const applyFontControls = (settings: FontControlSettings) => {
   const root = document.documentElement;
 
@@ -256,6 +308,7 @@ const applyFontControls = (settings: FontControlSettings) => {
   if (mutedForeground) root.style.setProperty('--muted-foreground', mutedForeground);
   if (cardForeground) root.style.setProperty('--card-foreground', cardForeground);
   if (sidebarForeground) root.style.setProperty('--sidebar-foreground', sidebarForeground);
+
   if (primary) {
     root.style.setProperty('--primary', primary);
     root.style.setProperty('--ring', primary);
@@ -290,49 +343,57 @@ const injectGlobalThemeStyles = () => {
     }
 
     html[data-appearance-theme] body {
+      background: hsl(var(--background)) !important;
+    }
+
+    html[data-appearance-theme]:not([data-appearance-theme="classic-blue"]) body {
       background:
-        radial-gradient(circle at 16% 12%, hsl(var(--primary) / 0.16), transparent 28%),
-        radial-gradient(circle at 86% 18%, hsl(var(--secondary) / 0.14), transparent 32%),
+        radial-gradient(circle at 16% 12%, hsl(var(--primary) / 0.14), transparent 28%),
+        radial-gradient(circle at 86% 18%, hsl(var(--secondary) / 0.12), transparent 32%),
         linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.45)) !important;
     }
 
     html[data-appearance-theme] .future-glow-card,
-    html[data-appearance-theme] .card,
-    html[data-appearance-theme] [class*="bg-card"] {
+    html[data-appearance-theme]:not([data-appearance-theme="classic-blue"]) .card,
+    html[data-appearance-theme]:not([data-appearance-theme="classic-blue"]) [class*="bg-card"] {
       border-color: hsl(var(--primary) / 0.20);
       box-shadow: 0 14px 45px hsl(var(--primary) / 0.10);
       backdrop-filter: blur(16px);
+    }
+
+    html[data-appearance-theme="future-2060-dark"] body {
+      background:
+        radial-gradient(circle at 15% 15%, rgba(124, 77, 255, 0.20), transparent 34%),
+        radial-gradient(circle at 80% 20%, rgba(0, 229, 255, 0.12), transparent 30%),
+        #080B1A !important;
     }
   `;
   document.head.appendChild(style);
 };
 
 export const ThemeInitializer: React.FC = () => {
+  const { username } = useAuth();
+
   useEffect(() => {
     injectGlobalThemeStyles();
 
-    const root = document.documentElement;
-    const themeId = localStorage.getItem(STORAGE_THEME_KEY) || 'future-2060-dark';
-    const mode = (localStorage.getItem(STORAGE_MODE_KEY) as AppearanceMode) || 'dark';
-    const variables = themeVariables[themeId] || themeVariables['future-2060-dark'];
+    const keys = getUserKey(username);
+    const themeId = localStorage.getItem(keys.theme) || DEFAULT_THEME_ID;
+    const mode = (localStorage.getItem(keys.mode) as AppearanceMode) || DEFAULT_MODE;
 
-    Object.entries(variables).forEach(([key, value]) => {
-      const cssVariable = variableNameMap[key];
-      if (cssVariable) root.style.setProperty(cssVariable, value);
-    });
-
-    root.dataset.appearanceTheme = themeId;
+    applyThemeVariables(themeId);
     applyMode(mode);
 
     try {
-      const stored = localStorage.getItem(STORAGE_FONT_KEY);
-      if (stored) {
-        applyFontControls(JSON.parse(stored));
+      const storedFont = localStorage.getItem(keys.font);
+
+      if (storedFont) {
+        applyFontControls(JSON.parse(storedFont));
       }
     } catch {
-      // ignore bad localStorage values
+      // تجاهل القيم التالفة في localStorage
     }
-  }, []);
+  }, [username]);
 
   return null;
 };

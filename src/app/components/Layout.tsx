@@ -109,9 +109,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/buildings/leased-in')) return 'leased-buildings-in';
     if (path.startsWith('/search')) return 'search';
     if (path.startsWith('/reports')) return 'reports';
-    if (path.startsWith('/admin')) return 'admin';
     if (path.startsWith('/archive')) return 'archive';
     if (path.startsWith('/appearance')) return 'appearance';
+    if (path.startsWith('/admin')) return 'admin';
     if (path.startsWith('/settings')) return 'settings';
 
     return 'home';
@@ -123,7 +123,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="h-screen flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
       <ThemeInitializer />
 
-      {/* Top Header */}
       <header className="bg-primary text-primary-foreground shadow-md z-30 relative shrink-0">
         <div className="flex items-center justify-between px-3 md:px-4 py-3 md:py-4">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
@@ -133,20 +132,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               className="lg:hidden text-primary-foreground hover:bg-primary-foreground/10 shrink-0 h-8 w-8 md:h-10 md:w-10"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
-              {sidebarOpen ? (
-                <X className="h-5 w-5 md:h-6 md:w-6" />
-              ) : (
-                <Menu className="h-5 w-5 md:h-6 md:w-6" />
-              )}
+              {sidebarOpen ? <X className="h-5 w-5 md:h-6 md:w-6" /> : <Menu className="h-5 w-5 md:h-6 md:w-6" />}
             </Button>
 
             <div className="flex flex-col min-w-0">
-              <h1 className="text-base md:text-lg lg:text-xl font-bold truncate">
-                {t('app.title')}
-              </h1>
-              <p className="text-xs lg:text-sm opacity-90 truncate hidden sm:block">
-                {t('app.subtitle')}
-              </p>
+              <h1 className="text-base md:text-lg lg:text-xl font-bold truncate">{t('app.title')}</h1>
+              <p className="text-xs lg:text-sm opacity-90 truncate hidden sm:block">{t('app.subtitle')}</p>
             </div>
           </div>
 
@@ -163,9 +154,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               className="text-primary-foreground hover:bg-primary-foreground/10 h-8 px-2 md:h-9 md:px-3"
             >
               <Languages className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-              <span className="text-xs md:text-sm">
-                {i18n.language === 'ar' ? 'EN' : 'ع'}
-              </span>
+              <span className="text-xs md:text-sm">{i18n.language === 'ar' ? 'EN' : 'ع'}</span>
             </Button>
 
             <Button
@@ -262,9 +251,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     }}
                   >
                     <Icon className="h-4.5 w-4.5 shrink-0" />
-                    <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-                      {item.label}
-                    </span>
+                    <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{item.label}</span>
                   </Button>
                 );
               })}
@@ -282,9 +269,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 }}
               >
                 <Settings className="h-4.5 w-4.5 shrink-0" />
-                <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-                  {t('settings.title')}
-                </span>
+                <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{t('settings.title')}</span>
               </Button>
             </div>
 
@@ -307,19 +292,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('nav.confirmLogout')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('nav.confirmLogoutMessage')}
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('nav.confirmLogout')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('nav.confirmLogoutMessage')}</AlertDialogDescription>
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t('app.cancel')}
-            </AlertDialogCancel>
-
+            <AlertDialogCancel>{t('app.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleLogout}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

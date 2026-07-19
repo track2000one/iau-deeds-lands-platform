@@ -7,19 +7,33 @@ import {
   Sparkles,
   Sun,
   Monitor,
-  Zap,
+  Save,
   Type,
   SlidersHorizontal,
   Wand2,
+  Eye,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { NativeSelect } from '../components/ui/native-select';
+import { toast } from 'sonner';
 
 type AppearanceMode = 'light' | 'dark' | 'system';
+
+type FontControlSettings = {
+  fontFamily: string;
+  baseFontSize: string;
+  headingFontWeight: string;
+  foreground: string;
+  mutedForeground: string;
+  cardForeground: string;
+  sidebarForeground: string;
+  primary: string;
+};
 
 type ThemeOption = {
   id: string;
@@ -34,30 +48,17 @@ type ThemeOption = {
   fontDefaults: FontControlSettings;
 };
 
-type FontControlSettings = {
-  fontFamily: string;
-  baseFontSize: string;
-  headingFontWeight: string;
-  foreground: string;
-  mutedForeground: string;
-  cardForeground: string;
-  sidebarForeground: string;
-  primary: string;
-};
+const DEFAULT_THEME_ID = 'classic-blue';
+const DEFAULT_MODE: AppearanceMode = 'light';
 
-const STORAGE_THEME_KEY = 'iau-appearance-theme';
-const STORAGE_MODE_KEY = 'iau-appearance-mode';
-const STORAGE_FONT_KEY = 'iau-appearance-font-controls';
+const getUserKey = (username?: string | null) => {
+  const safeUser = username?.trim() || 'guest';
 
-const defaultFontControls: FontControlSettings = {
-  fontFamily: 'Tajawal, Arial, sans-serif',
-  baseFontSize: '15px',
-  headingFontWeight: '700',
-  foreground: '#1f2937',
-  mutedForeground: '#64748b',
-  cardForeground: '#1f2937',
-  sidebarForeground: '#ffffff',
-  primary: '#2c4a6b',
+  return {
+    theme: `iau-appearance-theme:${safeUser}`,
+    mode: `iau-appearance-mode:${safeUser}`,
+    font: `iau-appearance-font-controls:${safeUser}`,
+  };
 };
 
 const fontOptions = [
@@ -70,6 +71,55 @@ const fontOptions = [
 ];
 
 const themes: ThemeOption[] = [
+  {
+    id: 'classic-blue',
+    name: 'Classic Blue',
+    arabicName: 'الكلاسيك الافتراضي',
+    description: 'الثيم الافتراضي الواضح للمنصة، مناسب للعمل اليومي الرسمي بدون تعتيم أو إضاءة زائدة.',
+    badge: 'افتراضي',
+    version: 'v1.0-CLASSIC',
+    mode: 'light',
+    preview: ['#FDFBF3', '#2C4A6B', '#6B9CC1', '#FFFFFF'],
+    variables: {
+      background: '48 65% 97%',
+      foreground: '215 40% 18%',
+      card: '0 0% 100%',
+      cardForeground: '215 40% 18%',
+      popover: '0 0% 100%',
+      popoverForeground: '215 40% 18%',
+      primary: '208 42% 30%',
+      primaryForeground: '0 0% 100%',
+      secondary: '206 38% 58%',
+      secondaryForeground: '0 0% 100%',
+      muted: '210 25% 94%',
+      mutedForeground: '215 18% 45%',
+      accent: '206 52% 66%',
+      accentForeground: '215 40% 18%',
+      border: '38 38% 82%',
+      input: '38 38% 82%',
+      ring: '206 52% 66%',
+      destructive: '0 72% 51%',
+      destructiveForeground: '0 0% 100%',
+      sidebar: '208 42% 30%',
+      sidebarForeground: '0 0% 100%',
+      sidebarPrimary: '206 52% 66%',
+      sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '206 45% 46%',
+      sidebarAccentForeground: '0 0% 100%',
+      sidebarBorder: '208 38% 38%',
+      sidebarRing: '206 52% 66%',
+    },
+    fontDefaults: {
+      fontFamily: 'Tajawal, Arial, sans-serif',
+      baseFontSize: '15px',
+      headingFontWeight: '700',
+      foreground: '#1F2F46',
+      mutedForeground: '#64748B',
+      cardForeground: '#1F2F46',
+      sidebarForeground: '#FFFFFF',
+      primary: '#2C4A6B',
+    },
+  },
   {
     id: 'future-2060-dark',
     name: 'Future 2060 Dark',
@@ -384,13 +434,43 @@ const hexToHsl = (hex: string) => {
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
 };
 
-const loadFontControls = (): FontControlSettings => {
+const getDefaultFontControls = () => themes.find((theme) => theme.id === DEFAULT_THEME_ID)?.fontDefaults || themes[0].fontDefaults;
+
+const loadSavedAppearance = (username?: string | null) => {
+  const keys = getUserKey(username);
+
+  const savedThemeId = localStorage.getItem(keys.theme) || DEFAULT_THEME_ID;
+  const theme = themes.find((item) => item.id === savedThemeId) || themes[0];
+
+  let savedFontControls = theme.fontDefaults;
+
   try {
-    const stored = localStorage.getItem(STORAGE_FONT_KEY);
-    return stored ? { ...defaultFontControls, ...JSON.parse(stored) } : defaultFontControls;
+    const storedFont = localStorage.getItem(keys.font);
+
+    if (storedFont) {
+      savedFontControls = {
+        ...theme.fontDefaults,
+        ...JSON.parse(storedFont),
+      };
+    }
   } catch {
-    return defaultFontControls;
+    savedFontControls = theme.fontDefaults;
   }
+
+  return {
+    themeId: theme.id,
+    mode: (localStorage.getItem(keys.mode) as AppearanceMode) || theme.mode || DEFAULT_MODE,
+    fontControls: savedFontControls,
+  };
+};
+
+const applyMode = (mode: AppearanceMode) => {
+  const root = document.documentElement;
+  const systemDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+  const shouldUseDark = mode === 'dark' || (mode === 'system' && systemDark);
+
+  root.classList.toggle('dark', shouldUseDark);
+  root.dataset.appearanceMode = mode;
 };
 
 const applyThemeVariables = (theme: ThemeOption) => {
@@ -414,12 +494,6 @@ const applyFontControls = (settings: FontControlSettings) => {
   root.style.setProperty('--app-base-font-size', settings.baseFontSize);
   root.style.setProperty('--app-heading-font-weight', settings.headingFontWeight);
 
-  root.style.setProperty('--app-text-color', settings.foreground);
-  root.style.setProperty('--app-muted-text-color', settings.mutedForeground);
-  root.style.setProperty('--app-card-text-color', settings.cardForeground);
-  root.style.setProperty('--app-sidebar-text-color', settings.sidebarForeground);
-  root.style.setProperty('--app-primary-text-color', settings.primary);
-
   const foreground = hexToHsl(settings.foreground);
   const mutedForeground = hexToHsl(settings.mutedForeground);
   const cardForeground = hexToHsl(settings.cardForeground);
@@ -428,14 +502,17 @@ const applyFontControls = (settings: FontControlSettings) => {
 
   if (foreground) root.style.setProperty('--foreground', foreground);
   if (mutedForeground) root.style.setProperty('--muted-foreground', mutedForeground);
+
   if (cardForeground) {
     root.style.setProperty('--card-foreground', cardForeground);
     root.style.setProperty('--popover-foreground', cardForeground);
   }
+
   if (sidebarForeground) {
     root.style.setProperty('--sidebar-foreground', sidebarForeground);
     root.style.setProperty('--sidebar-accent-foreground', sidebarForeground);
   }
+
   if (primary) {
     root.style.setProperty('--primary', primary);
     root.style.setProperty('--ring', primary);
@@ -445,13 +522,16 @@ const applyFontControls = (settings: FontControlSettings) => {
   root.dataset.customFontColors = 'enabled';
 };
 
-const applyMode = (mode: AppearanceMode) => {
-  const root = document.documentElement;
-  const systemDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-  const shouldUseDark = mode === 'dark' || (mode === 'system' && systemDark);
+const applyAppearancePreview = (
+  themeId: string,
+  mode: AppearanceMode,
+  fontControls: FontControlSettings
+) => {
+  const theme = themes.find((item) => item.id === themeId) || themes[0];
 
-  root.classList.toggle('dark', shouldUseDark);
-  root.dataset.appearanceMode = mode;
+  applyThemeVariables(theme);
+  applyMode(mode);
+  applyFontControls(fontControls);
 };
 
 const injectAppearanceStyles = () => {
@@ -466,17 +546,11 @@ const injectAppearanceStyles = () => {
       --app-font-family: Tajawal, Arial, sans-serif;
       --app-base-font-size: 15px;
       --app-heading-font-weight: 700;
-      --app-text-color: hsl(var(--foreground));
-      --app-muted-text-color: hsl(var(--muted-foreground));
-      --app-card-text-color: hsl(var(--card-foreground));
-      --app-sidebar-text-color: hsl(var(--sidebar-foreground));
-      --app-primary-text-color: hsl(var(--primary));
     }
 
     body {
       font-family: var(--app-font-family) !important;
       font-size: var(--app-base-font-size) !important;
-      color: var(--app-text-color) !important;
       transition: background 350ms ease, color 350ms ease;
     }
 
@@ -490,16 +564,11 @@ const injectAppearanceStyles = () => {
     html[data-custom-font-colors="enabled"] h3,
     html[data-custom-font-colors="enabled"] .font-bold,
     html[data-custom-font-colors="enabled"] .font-semibold {
-      color: var(--app-primary-text-color) !important;
+      color: hsl(var(--primary)) !important;
     }
 
     html[data-custom-font-colors="enabled"] .text-muted-foreground {
-      color: var(--app-muted-text-color) !important;
-    }
-
-    html[data-custom-font-colors="enabled"] .bg-card,
-    html[data-custom-font-colors="enabled"] [class*="bg-card"] {
-      color: var(--app-card-text-color) !important;
+      color: hsl(var(--muted-foreground)) !important;
     }
 
     html[data-custom-font-colors="enabled"] aside,
@@ -508,40 +577,32 @@ const injectAppearanceStyles = () => {
     html[data-custom-font-colors="enabled"] aside *,
     html[data-custom-font-colors="enabled"] nav *,
     html[data-custom-font-colors="enabled"] [data-sidebar] * {
-      color: var(--app-sidebar-text-color) !important;
+      color: hsl(var(--sidebar-foreground)) !important;
     }
 
     html[data-custom-font-colors="enabled"] input,
     html[data-custom-font-colors="enabled"] select,
     html[data-custom-font-colors="enabled"] textarea {
-      color: var(--app-text-color) !important;
+      color: hsl(var(--foreground)) !important;
     }
 
     html[data-appearance-theme] body {
+      background: hsl(var(--background)) !important;
+    }
+
+    html[data-appearance-theme]:not([data-appearance-theme="classic-blue"]) body {
       background:
-        radial-gradient(circle at 16% 12%, hsl(var(--primary) / 0.16), transparent 28%),
-        radial-gradient(circle at 86% 18%, hsl(var(--secondary) / 0.14), transparent 32%),
+        radial-gradient(circle at 16% 12%, hsl(var(--primary) / 0.14), transparent 28%),
+        radial-gradient(circle at 86% 18%, hsl(var(--secondary) / 0.12), transparent 32%),
         linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.45)) !important;
     }
 
     html[data-appearance-theme] .future-glow-card {
       position: relative;
       overflow: hidden;
-      border-color: hsl(var(--primary) / 0.35) !important;
-      box-shadow:
-        0 0 0 1px hsl(var(--primary) / 0.12),
-        0 18px 60px hsl(var(--primary) / 0.14);
-      backdrop-filter: blur(18px);
-    }
-
-    html[data-appearance-theme] .future-glow-card::before {
-      content: "";
-      position: absolute;
-      inset: -1px;
-      background:
-        radial-gradient(circle at 18% 18%, hsl(var(--primary) / 0.18), transparent 34%),
-        linear-gradient(120deg, transparent, hsl(var(--accent) / 0.10), transparent);
-      pointer-events: none;
+      border-color: hsl(var(--primary) / 0.25) !important;
+      box-shadow: 0 14px 45px hsl(var(--primary) / 0.12);
+      backdrop-filter: blur(16px);
     }
 
     html[data-appearance-theme] .future-theme-selected {
@@ -597,15 +658,14 @@ const ColorInput = ({
 };
 
 export const AppearanceSettingsPage: React.FC = () => {
-  const [selectedThemeId, setSelectedThemeId] = useState(
-    () => localStorage.getItem(STORAGE_THEME_KEY) || 'future-2060-dark'
-  );
+  const { username } = useAuth();
 
-  const [appearanceMode, setAppearanceMode] = useState<AppearanceMode>(
-    () => (localStorage.getItem(STORAGE_MODE_KEY) as AppearanceMode) || 'dark'
-  );
+  const savedAppearance = useMemo(() => loadSavedAppearance(username), [username]);
 
-  const [fontControls, setFontControls] = useState<FontControlSettings>(() => loadFontControls());
+  const [selectedThemeId, setSelectedThemeId] = useState(savedAppearance.themeId);
+  const [appearanceMode, setAppearanceMode] = useState<AppearanceMode>(savedAppearance.mode);
+  const [fontControls, setFontControls] = useState<FontControlSettings>(savedAppearance.fontControls);
+  const [savedThemeId, setSavedThemeId] = useState(savedAppearance.themeId);
 
   const selectedTheme = useMemo(() => {
     return themes.find((theme) => theme.id === selectedThemeId) || themes[0];
@@ -616,37 +676,15 @@ export const AppearanceSettingsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    applyThemeVariables(selectedTheme);
-    applyMode(selectedTheme.mode);
-    setAppearanceMode(selectedTheme.mode);
+    const loaded = loadSavedAppearance(username);
 
-    localStorage.setItem(STORAGE_THEME_KEY, selectedTheme.id);
-    localStorage.setItem(STORAGE_MODE_KEY, selectedTheme.mode);
+    setSelectedThemeId(loaded.themeId);
+    setAppearanceMode(loaded.mode);
+    setFontControls(loaded.fontControls);
+    setSavedThemeId(loaded.themeId);
 
-    const stored = localStorage.getItem(STORAGE_FONT_KEY);
-    if (!stored) {
-      setFontControls(selectedTheme.fontDefaults);
-    }
-  }, [selectedTheme]);
-
-  useEffect(() => {
-    applyMode(appearanceMode);
-    localStorage.setItem(STORAGE_MODE_KEY, appearanceMode);
-
-    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
-    const handler = () => {
-      if (appearanceMode === 'system') applyMode('system');
-    };
-
-    media?.addEventListener?.('change', handler);
-
-    return () => media?.removeEventListener?.('change', handler);
-  }, [appearanceMode]);
-
-  useEffect(() => {
-    applyFontControls(fontControls);
-    localStorage.setItem(STORAGE_FONT_KEY, JSON.stringify(fontControls));
-  }, [fontControls]);
+    applyAppearancePreview(loaded.themeId, loaded.mode, loaded.fontControls);
+  }, [username]);
 
   const updateFontControl = <K extends keyof FontControlSettings>(
     key: K,
@@ -658,17 +696,63 @@ export const AppearanceSettingsPage: React.FC = () => {
     }));
   };
 
-  const applyThemePreset = (theme: ThemeOption) => {
+  const previewTheme = (theme: ThemeOption) => {
     setSelectedThemeId(theme.id);
+    setAppearanceMode(theme.mode);
     setFontControls(theme.fontDefaults);
+    applyAppearancePreview(theme.id, theme.mode, theme.fontDefaults);
   };
 
-  const resetAppearance = () => {
-    const defaultTheme = themes[0];
-    setSelectedThemeId(defaultTheme.id);
-    setAppearanceMode(defaultTheme.mode);
-    setFontControls(defaultTheme.fontDefaults);
+  const saveAppearance = () => {
+    const keys = getUserKey(username);
+
+    localStorage.setItem(keys.theme, selectedThemeId);
+    localStorage.setItem(keys.mode, appearanceMode);
+    localStorage.setItem(keys.font, JSON.stringify(fontControls));
+
+    applyAppearancePreview(selectedThemeId, appearanceMode, fontControls);
+    setSavedThemeId(selectedThemeId);
+
+    toast.success('تم حفظ الثيم لهذا المستخدم فقط');
   };
+
+  const restoreSavedAppearance = () => {
+    const loaded = loadSavedAppearance(username);
+
+    setSelectedThemeId(loaded.themeId);
+    setAppearanceMode(loaded.mode);
+    setFontControls(loaded.fontControls);
+    setSavedThemeId(loaded.themeId);
+
+    applyAppearancePreview(loaded.themeId, loaded.mode, loaded.fontControls);
+
+    toast.info('تمت استعادة آخر ثيم محفوظ لهذا المستخدم');
+  };
+
+  const resetToClassic = () => {
+    const classicTheme = themes.find((theme) => theme.id === DEFAULT_THEME_ID) || themes[0];
+    const keys = getUserKey(username);
+
+    localStorage.setItem(keys.theme, classicTheme.id);
+    localStorage.setItem(keys.mode, DEFAULT_MODE);
+    localStorage.setItem(keys.font, JSON.stringify(classicTheme.fontDefaults));
+
+    setSelectedThemeId(classicTheme.id);
+    setAppearanceMode(DEFAULT_MODE);
+    setFontControls(classicTheme.fontDefaults);
+    setSavedThemeId(classicTheme.id);
+
+    applyAppearancePreview(classicTheme.id, DEFAULT_MODE, classicTheme.fontDefaults);
+
+    toast.success('تمت استعادة الثيم الكلاسيك الافتراضي');
+  };
+
+  const applyManualPreview = () => {
+    applyAppearancePreview(selectedThemeId, appearanceMode, fontControls);
+    toast.info('تمت المعاينة فقط، لم يتم الحفظ');
+  };
+
+  const hasUnsavedChanges = selectedThemeId !== savedThemeId;
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
@@ -677,7 +761,7 @@ export const AppearanceSettingsPage: React.FC = () => {
           <div>
             <Badge className="mb-3 gap-1" variant="secondary">
               <Sparkles className="h-3.5 w-3.5" />
-              ثيمات المستقبل 2060
+              تخصيص شكلي لكل مستخدم
             </Badge>
 
             <h1 className="text-2xl md:text-3xl font-bold">
@@ -685,22 +769,33 @@ export const AppearanceSettingsPage: React.FC = () => {
             </h1>
 
             <p className="mt-2 text-muted-foreground max-w-2xl">
-              اختر واحدًا من ثيمات 2060 الفاخرة، مع تحكم كامل بالخطوط وألوان النصوص والإضاءة.
+              اختر الثيم المناسب لك فقط. لن يتأثر باقي المستخدمين بتغييرك، ولا يتم الحفظ إلا عند الضغط على زر الحفظ.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={resetAppearance}>
+            <Button variant="outline" onClick={restoreSavedAppearance}>
               <RotateCcw className="ml-2 h-4 w-4" />
-              استعادة الافتراضي
+              استعادة المحفوظ
             </Button>
 
-            <Button className="future-button-glow">
-              <Zap className="ml-2 h-4 w-4" />
-              حفظ تلقائي
+            <Button variant="outline" onClick={resetToClassic}>
+              <Palette className="ml-2 h-4 w-4" />
+              الكلاسيك الافتراضي
+            </Button>
+
+            <Button onClick={saveAppearance} className="future-button-glow">
+              <Save className="ml-2 h-4 w-4" />
+              حفظ لهذا المستخدم
             </Button>
           </div>
         </div>
+
+        {hasUnsavedChanges && (
+          <div className="relative z-10 mt-4 rounded-xl border border-amber-400/40 bg-amber-50/70 px-4 py-3 text-sm text-amber-800">
+            لديك ثيم قيد المعاينة ولم يتم حفظه بعد. اضغط <strong>حفظ لهذا المستخدم</strong> لاعتماده.
+          </div>
+        )}
       </div>
 
       <Card className="future-glow-card">
@@ -710,19 +805,20 @@ export const AppearanceSettingsPage: React.FC = () => {
             اختر ثيم المنصة
           </CardTitle>
           <CardDescription>
-            تم تجهيز 5 ثيمات: ثيم داكن رئيسي وأربعة ثيمات فاتحة مستوحاة من التصميمات التي أعجبتك.
+            تم تجهيز 6 ثيمات، والثيم الافتراضي هو الكلاسيك الواضح بدون تعتيم.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="relative z-10 grid grid-cols-1 xl:grid-cols-2 gap-4">
           {themes.map((theme) => {
             const active = selectedThemeId === theme.id;
+            const saved = savedThemeId === theme.id;
 
             return (
               <button
                 key={theme.id}
                 type="button"
-                onClick={() => applyThemePreset(theme)}
+                onClick={() => previewTheme(theme)}
                 className={[
                   'group relative overflow-hidden rounded-2xl border p-4 text-right transition-all duration-300',
                   'hover:-translate-y-1 hover:shadow-2xl hover:border-primary',
@@ -740,22 +836,27 @@ export const AppearanceSettingsPage: React.FC = () => {
                 <div className="relative z-10">
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-bold text-lg">{theme.arabicName}</h3>
                         {theme.badge && <Badge>{theme.badge}</Badge>}
+                        {saved && <Badge variant="secondary">محفوظ لك</Badge>}
                       </div>
 
-                      <p className="text-xs text-muted-foreground mt-1">{theme.name} — {theme.version}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {theme.name} — {theme.version}
+                      </p>
 
                       <p className="mt-2 text-sm text-muted-foreground leading-6">
                         {theme.description}
                       </p>
                     </div>
 
-                    <div className={[
-                      'flex h-8 w-8 items-center justify-center rounded-full border',
-                      active ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted',
-                    ].join(' ')}>
+                    <div
+                      className={[
+                        'flex h-8 w-8 items-center justify-center rounded-full border',
+                        active ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted',
+                      ].join(' ')}
+                    >
                       {active && <Check className="h-4 w-4" />}
                     </div>
                   </div>
@@ -794,7 +895,7 @@ export const AppearanceSettingsPage: React.FC = () => {
             نمط العرض
           </CardTitle>
           <CardDescription>
-            يمكنك اختيار فاتح أو داكن يدويًا، لكن عند اختيار ثيم جاهز يتم تطبيق النمط المناسب تلقائيًا.
+            يمكنك اختيار فاتح أو داكن يدويًا، ثم الضغط على معاينة أو حفظ.
           </CardDescription>
         </CardHeader>
 
@@ -837,7 +938,7 @@ export const AppearanceSettingsPage: React.FC = () => {
             التحكم بالخط وألوان النصوص
           </CardTitle>
           <CardDescription>
-            تحكم بنوع الخط، حجم الخط، وزن العناوين، وألوان النصوص الأساسية والثانوية والقائمة الجانبية.
+            بعد التعديل اضغط معاينة لتجربة الألوان، أو حفظ لاعتمادها لهذا المستخدم فقط.
           </CardDescription>
         </CardHeader>
 
@@ -886,35 +987,23 @@ export const AppearanceSettingsPage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            <ColorInput
-              label="لون النص الأساسي"
-              value={fontControls.foreground}
-              onChange={(value) => updateFontControl('foreground', value)}
-            />
+            <ColorInput label="لون النص الأساسي" value={fontControls.foreground} onChange={(value) => updateFontControl('foreground', value)} />
+            <ColorInput label="لون النص الثانوي" value={fontControls.mutedForeground} onChange={(value) => updateFontControl('mutedForeground', value)} />
+            <ColorInput label="لون نص البطاقات" value={fontControls.cardForeground} onChange={(value) => updateFontControl('cardForeground', value)} />
+            <ColorInput label="لون نص القائمة الجانبية" value={fontControls.sidebarForeground} onChange={(value) => updateFontControl('sidebarForeground', value)} />
+            <ColorInput label="لون العناوين والأزرار الرئيسية" value={fontControls.primary} onChange={(value) => updateFontControl('primary', value)} />
+          </div>
 
-            <ColorInput
-              label="لون النص الثانوي"
-              value={fontControls.mutedForeground}
-              onChange={(value) => updateFontControl('mutedForeground', value)}
-            />
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
+            <Button variant="outline" onClick={applyManualPreview}>
+              <Eye className="ml-2 h-4 w-4" />
+              معاينة فقط
+            </Button>
 
-            <ColorInput
-              label="لون نص البطاقات"
-              value={fontControls.cardForeground}
-              onChange={(value) => updateFontControl('cardForeground', value)}
-            />
-
-            <ColorInput
-              label="لون نص القائمة الجانبية"
-              value={fontControls.sidebarForeground}
-              onChange={(value) => updateFontControl('sidebarForeground', value)}
-            />
-
-            <ColorInput
-              label="لون العناوين والأزرار الرئيسية"
-              value={fontControls.primary}
-              onChange={(value) => updateFontControl('primary', value)}
-            />
+            <Button onClick={saveAppearance}>
+              <Save className="ml-2 h-4 w-4" />
+              حفظ لهذا المستخدم
+            </Button>
           </div>
 
           <div className="rounded-2xl border bg-muted/30 p-4">
@@ -925,11 +1014,10 @@ export const AppearanceSettingsPage: React.FC = () => {
 
             <div className="rounded-xl border bg-card p-5 future-glow-card">
               <div className="relative z-10">
-                <h3 className="text-xl font-bold mb-2">
-                  عنوان تجريبي داخل المنصة
-                </h3>
+                <h3 className="text-xl font-bold mb-2">عنوان تجريبي داخل المنصة</h3>
                 <p className="text-muted-foreground leading-7">
-                  هذا نص تجريبي يوضح شكل الخط ولون النص الأساسي والثانوي بعد التعديل. يتم حفظ الإعدادات تلقائيًا وتطبيقها مباشرة على المنصة.
+                  هذا نص تجريبي يوضح شكل الخط ولون النص الأساسي والثانوي بعد التعديل.
+                  لا يتم الحفظ إلا بعد الضغط على زر حفظ لهذا المستخدم.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button>زر رئيسي</Button>
