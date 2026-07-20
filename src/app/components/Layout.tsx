@@ -20,6 +20,10 @@ import {
   Shield,
   Archive,
   Palette,
+  Bell,
+  Mail,
+  Globe2,
+  CalendarDays,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -118,64 +122,69 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const currentPage = getCurrentPage();
+  const now = new Date();
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className="future-app-shell h-screen flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
       <ThemeInitializer />
 
-      <header className="bg-primary text-primary-foreground shadow-md z-30 relative shrink-0">
-        <div className="flex items-center justify-between px-3 md:px-4 py-3 md:py-4">
+      <header className="future-topbar text-foreground z-30 relative shrink-0">
+        <div className="flex items-center justify-between px-3 md:px-5 py-3">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden text-primary-foreground hover:bg-primary-foreground/10 shrink-0 h-8 w-8 md:h-10 md:w-10"
+              className="lg:hidden shrink-0 h-9 w-9 future-glow-button"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
-              {sidebarOpen ? <X className="h-5 w-5 md:h-6 md:w-6" /> : <Menu className="h-5 w-5 md:h-6 md:w-6" />}
+              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
 
-            <div className="flex flex-col min-w-0">
-              <h1 className="text-base md:text-lg lg:text-xl font-bold truncate">{t('app.title')}</h1>
-              <p className="text-xs lg:text-sm opacity-90 truncate hidden sm:block">{t('app.subtitle')}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 md:gap-2 shrink-0">
-            <div className="hidden md:flex items-center gap-2 px-2 md:px-3 py-1 bg-primary-foreground/10 rounded-md">
-              <User className="h-3 w-3 md:h-4 md:w-4" />
-              <span className="text-xs md:text-sm font-medium">{username}</span>
+            <div className="hidden md:flex items-center gap-2">
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button">
+                <User className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl">
+                <Bell className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl">
+                <Mail className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl">
+                <Globe2 className="h-4 w-4" />
+              </Button>
             </div>
 
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleLanguage}
-              className="text-primary-foreground hover:bg-primary-foreground/10 h-8 px-2 md:h-9 md:px-3"
+              className="h-10 rounded-2xl px-3"
             >
-              <Languages className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-              <span className="text-xs md:text-sm">{i18n.language === 'ar' ? 'EN' : 'ع'}</span>
+              <Languages className="h-4 w-4 ml-2" />
+              {i18n.language === 'ar' ? 'EN' : 'ع'}
             </Button>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/settings')}
-              className="text-primary-foreground hover:bg-primary-foreground/10 h-8 w-8 md:h-9 md:w-9 hidden sm:flex"
-              title={t('settings.title')}
-            >
-              <Settings className="h-4 w-4 md:h-5 md:w-5" />
-            </Button>
+            <div className="hidden xl:flex items-center gap-2 rounded-2xl border bg-background/50 px-4 py-2">
+              <span className="font-mono text-sm">
+                {now.toLocaleDateString('ar-SA-u-nu-latn')}
+              </span>
+              <span className="font-mono text-sm">
+                {now.toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <CalendarDays className="h-4 w-4 text-primary" />
+            </div>
+          </div>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setLogoutDialogOpen(true)}
-              className="text-primary-foreground hover:bg-destructive/90 h-8 w-8 md:h-9 md:w-9"
-              title={t('nav.logout')}
-            >
-              <LogOut className="h-4 w-4 md:h-5 md:w-5" />
-            </Button>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="hidden sm:flex flex-col text-right min-w-0">
+              <h1 className="text-base md:text-xl font-bold truncate">{t('app.title')}</h1>
+              <p className="text-xs opacity-75 truncate">{t('app.subtitle')}</p>
+            </div>
+
+            <div className="h-12 w-12 rounded-2xl border bg-primary/10 grid place-items-center shadow-[0_0_25px_hsl(var(--primary)/0.25)]">
+              <Shield className="h-7 w-7 text-primary" />
+            </div>
           </div>
         </div>
       </header>
@@ -192,17 +201,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <aside
           data-sidebar
           className={`
+            future-sidebar
             fixed lg:static
             top-0 lg:top-auto
             h-screen lg:h-auto
             z-50 lg:z-0
-            w-[75vw] max-w-[280px] lg:w-56
+            w-[78vw] max-w-[300px] lg:w-64
             bg-sidebar text-sidebar-foreground
-            shadow-2xl lg:shadow-none
             transition-transform duration-300 ease-in-out
             flex flex-col
-            ${isRTL ? 'left-0 lg:border-l-2' : 'right-0 lg:border-r-2'}
-            lg:border-border/60
+            ${isRTL ? 'left-0 lg:border-l' : 'right-0 lg:border-r'}
             ${
               sidebarOpen
                 ? 'translate-x-0'
@@ -213,26 +221,35 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             lg:translate-x-0
           `}
         >
-          <div className="lg:hidden p-3 border-b border-sidebar-border shrink-0 bg-sidebar-accent/50">
-            <div className={`flex items-center ${isRTL ? 'flex-row-reverse' : 'flex-row'} justify-between`}>
-              <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
-                <User className="h-4.5 w-4.5" />
-                <span className="text-sm font-medium">{username}</span>
+          <div className="p-4 border-b border-sidebar-border">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold truncate">{username}</p>
+                <p className="text-xs opacity-70">مستخدم المنصة</p>
               </div>
 
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setSidebarOpen(false)}
-                className="text-sidebar-foreground hover:bg-sidebar-accent h-8 w-8"
+                onClick={() => setLogoutDialogOpen(true)}
+                className="h-9 w-9 rounded-2xl"
               >
-                <X className="h-4.5 w-4.5" />
+                <LogOut className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden h-9 w-9 rounded-2xl"
+              >
+                <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          <ScrollArea className="flex-1 px-2 py-3 overflow-y-auto">
-            <nav className="space-y-0.5">
+          <ScrollArea className="flex-1 px-3 py-4 overflow-y-auto">
+            <nav className="space-y-2">
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPage === item.id;
@@ -240,10 +257,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 return (
                   <Button
                     key={item.id}
-                    variant={isActive ? 'secondary' : 'ghost'}
+                    variant="ghost"
                     className={`
-                      w-full ${isRTL ? 'justify-end' : 'justify-start'} gap-2.5 text-sidebar-foreground text-sm h-11 px-3
-                      ${isActive ? 'bg-sidebar-accent font-semibold' : 'hover:bg-sidebar-accent/50'}
+                      future-nav-item w-full ${isRTL ? 'justify-end' : 'justify-start'} gap-3 text-sm h-12 px-4
+                      ${isActive ? 'is-active font-bold' : ''}
                     `}
                     onClick={() => {
                       navigate(item.path);
@@ -251,39 +268,25 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     }}
                   >
                     <Icon className="h-4.5 w-4.5 shrink-0" />
-                    <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{item.label}</span>
+                    <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+                      {item.label}
+                    </span>
                   </Button>
                 );
               })}
             </nav>
 
-            <Separator className="my-3 bg-sidebar-border" />
+            <Separator className="my-4 bg-sidebar-border" />
 
-            <div className="lg:hidden">
-              <Button
-                variant="ghost"
-                className={`w-full ${isRTL ? 'justify-end' : 'justify-start'} gap-2.5 text-sidebar-foreground text-sm h-11 px-3 hover:bg-sidebar-accent/50`}
-                onClick={() => {
-                  navigate('/settings');
-                  setSidebarOpen(false);
-                }}
-              >
-                <Settings className="h-4.5 w-4.5 shrink-0" />
-                <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{t('settings.title')}</span>
-              </Button>
-            </div>
-
-            <Separator className="my-3 bg-sidebar-border" />
-
-            <div className={`px-3 py-2 text-xs text-sidebar-foreground/60 shrink-0 ${isRTL ? 'text-right' : 'text-left'}`}>
-              <p className="font-medium">v1.0.0</p>
-              <p className="mt-0.5">© 2024 IAU</p>
+            <div className={`px-3 py-2 text-xs opacity-70 ${isRTL ? 'text-right' : 'text-left'}`}>
+              <p className="font-medium">v2060.1.0</p>
+              <p className="mt-1">© 2060 IAU</p>
             </div>
           </ScrollArea>
         </aside>
 
-        <main className="flex-1 overflow-auto bg-background w-full">
-          <div className="container mx-auto p-3 md:p-4 lg:p-6 max-w-7xl">
+        <main className="flex-1 overflow-auto bg-background/70 w-full">
+          <div className="container mx-auto p-3 md:p-5 lg:p-6 max-w-7xl">
             {children}
           </div>
         </main>
