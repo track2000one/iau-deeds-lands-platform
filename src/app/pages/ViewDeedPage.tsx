@@ -172,6 +172,84 @@ const isImageAttachment = (attachment: any) => {
 };
 
 
+
+type SafeCoordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+const parseCoordinates = (value: unknown): SafeCoordinates | null => {
+  if (!value) return null;
+
+  try {
+    let raw: any = value;
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+
+      if (!trimmed) return null;
+
+      // يدعم JSON string مثل: {"latitude":26.3,"longitude":50.2}
+      if (trimmed.startsWith('{')) {
+        raw = JSON.parse(trimmed);
+      } else {
+        // يدعم نص بسيط مثل: 26.3,50.2
+        const parts = trimmed.split(',').map((part) => Number(part.trim()));
+
+        if (parts.length >= 2 && !Number.isNaN(parts[0]) && !Number.isNaN(parts[1])) {
+          return {
+            latitude: parts[0],
+            longitude: parts[1],
+          };
+        }
+
+        return null;
+      }
+    }
+
+    if (typeof raw !== 'object' || raw === null) return null;
+
+    const latitude = Number(
+      raw.latitude ??
+        raw.lat ??
+        raw.y ??
+        raw[0]
+    );
+
+    const longitude = Number(
+      raw.longitude ??
+        raw.lng ??
+        raw.lon ??
+        raw.x ??
+        raw[1]
+    );
+
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null;
+
+    return {
+      latitude,
+      longitude,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const serializeCoordinates = (value: SafeCoordinates | null) => {
+  if (!value) return '';
+
+  return JSON.stringify({
+    latitude: Number(value.latitude),
+    longitude: Number(value.longitude),
+  });
+};
+
+const formatCoordinate = (value?: number) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '-';
+
+  return value.toFixed(6);
+};
+
 const formatDateForInput = (value: any) => {
   if (!value) return '';
 
@@ -228,6 +306,7 @@ export const ViewDeedPage: React.FC = () => {
   });
 
   const deed = deedId ? getDeedById(deedId) : null;
+  const safeCoordinates = parseCoordinates((deed as any)?.coordinates);
 
   const loadBackendAttachments = React.useCallback(async () => {
     if (!deedId || !API_BASE_URL) return;
@@ -273,14 +352,8 @@ export const ViewDeedPage: React.FC = () => {
       location: deed.location || '',
       usageType: deed.usageType || '',
       isPlanned: Boolean(deed.isPlanned),
-      latitude:
-        deed.coordinates && typeof deed.coordinates.latitude === 'number'
-          ? String(deed.coordinates.latitude)
-          : '',
-      longitude:
-        deed.coordinates && typeof deed.coordinates.longitude === 'number'
-          ? String(deed.coordinates.longitude)
-          : '',
+      latitude: safeCoordinates ? String(safeCoordinates.latitude) : '',
+      longitude: safeCoordinates ? String(safeCoordinates.longitude) : '',
       notes: deed.notes || '',
     });
 
@@ -343,7 +416,7 @@ export const ViewDeedPage: React.FC = () => {
         !Number.isNaN(latitude) &&
         !Number.isNaN(longitude)
           ? { latitude, longitude }
-          : undefined;
+          : null;
 
       const payload: any = {
         deedNumber: editForm.deedNumber.trim(),
@@ -362,11 +435,7 @@ export const ViewDeedPage: React.FC = () => {
         notes: editForm.notes.trim(),
       };
 
-      if (coordinates) {
-        payload.coordinates = coordinates;
-      } else {
-        payload.coordinates = undefined;
-      }
+      payload.coordinates = serializeCoordinates(coordinates);
 
       await updateDeed(deedId, payload);
 
@@ -1031,7 +1100,7 @@ export const ViewDeedPage: React.FC = () => {
                 </div>
               </div>
 
-              {deed.coordinates && (
+              {safeCoordinates && (
                 <>
                   <Separator className="my-6" />
 
@@ -1045,14 +1114,14 @@ export const ViewDeedPage: React.FC = () => {
                         <div>
                           <span className="text-xs text-muted-foreground">{t('deed.latitude')}: </span>
                           <span className="text-xs md:text-sm font-mono font-medium">
-                            {deed.coordinates.latitude.toFixed(6)}
+                            {formatCoordinate(safeCoordinates.latitude)}
                           </span>
                         </div>
 
                         <div>
                           <span className="text-xs text-muted-foreground">{t('deed.longitude')}: </span>
                           <span className="text-xs md:text-sm font-mono font-medium">
-                            {deed.coordinates.longitude.toFixed(6)}
+                            {formatCoordinate(safeCoordinates.longitude)}
                           </span>
                         </div>
                       </div>
