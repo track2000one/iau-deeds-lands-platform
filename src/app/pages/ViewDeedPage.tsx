@@ -47,6 +47,8 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { toast } from 'sonner';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
 type EditFormState = {
   deedNumber: string;
@@ -67,7 +69,7 @@ type EditFormState = {
   notes: string;
 };
 
-const usageTypes = ['سكني', 'تجاري', 'صناعي', 'استثماري', 'تعليمي', 'زراعي', 'حكومي' , 'إداري'];
+const usageTypes = ['سكني', 'تجاري', 'صناعي', 'استثماري', 'تعليمي', 'زراعي', 'حكومي'];
 const cities = ['الدمام', 'الخبر', 'الظهران', 'القطيف', 'الجبيل', 'الأحساء', 'حفر الباطن'];
 
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
@@ -172,10 +174,14 @@ const isImageAttachment = (attachment: any) => {
 };
 
 
-
 type SafeCoordinates = {
   latitude: number;
   longitude: number;
+};
+
+const DEFAULT_MAP_CENTER: SafeCoordinates = {
+  latitude: 26.3927,
+  longitude: 50.0438,
 };
 
 const parseCoordinates = (value: unknown): SafeCoordinates | null => {
@@ -189,14 +195,15 @@ const parseCoordinates = (value: unknown): SafeCoordinates | null => {
 
       if (!trimmed) return null;
 
-      // يدعم JSON string مثل: {"latitude":26.3,"longitude":50.2}
       if (trimmed.startsWith('{')) {
         raw = JSON.parse(trimmed);
       } else {
-        // يدعم نص بسيط مثل: 26.3,50.2
-        const parts = trimmed.split(',').map((part) => Number(part.trim()));
+        const parts = trimmed
+          .split(',')
+          .map((part) => Number(part.trim()))
+          .filter((number) => !Number.isNaN(number));
 
-        if (parts.length >= 2 && !Number.isNaN(parts[0]) && !Number.isNaN(parts[1])) {
+        if (parts.length >= 2) {
           return {
             latitude: parts[0],
             longitude: parts[1],
@@ -209,20 +216,8 @@ const parseCoordinates = (value: unknown): SafeCoordinates | null => {
 
     if (typeof raw !== 'object' || raw === null) return null;
 
-    const latitude = Number(
-      raw.latitude ??
-        raw.lat ??
-        raw.y ??
-        raw[0]
-    );
-
-    const longitude = Number(
-      raw.longitude ??
-        raw.lng ??
-        raw.lon ??
-        raw.x ??
-        raw[1]
-    );
+    const latitude = Number(raw.latitude ?? raw.lat ?? raw.y ?? raw[0]);
+    const longitude = Number(raw.longitude ?? raw.lng ?? raw.lon ?? raw.x ?? raw[1]);
 
     if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null;
 
@@ -249,6 +244,106 @@ const formatCoordinate = (value?: number) => {
 
   return value.toFixed(6);
 };
+
+const getMapCenter = (latitude?: string, longitude?: string): SafeCoordinates => {
+  const lat = latitude ? Number(latitude) : NaN;
+  const lng = longitude ? Number(longitude) : NaN;
+
+  if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+    return {
+      latitude: lat,
+      longitude: lng,
+    };
+  }
+
+  return DEFAULT_MAP_CENTER;
+};
+
+const MapRecenter = ({ center }: { center: SafeCoordinates }) => {
+  const map = useMap();
+
+  React.useEffect(() => {
+    map.setView([center.latitude, center.longitude], map.getZoom() || 14);
+  }, [center.latitude, center.longitude, map]);
+
+  return null;
+};
+
+const EditMapPicker = ({
+  latitude,
+  longitude,
+  onChange,
+}: {
+  latitude: string;
+  longitude: string;
+  onChange: (latitude: number, longitude: number) => void;
+}) => {
+  const center = getMapCenter(latitude, longitude);
+
+  const MapClickHandler = () => {
+    useMapEvents({
+      click(event) {
+        onChange(event.latlng.lat, event.latlng.lng);
+      },
+    });
+
+    return null;
+  };
+
+  return (
+    <div className="rounded-xl border overflow-hidden bg-muted">
+      <div className="p-3 border-b bg-background flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <p className="font-semibold text-sm">الخريطة — اختر النقطة</p>
+          <p className="text-xs text-muted-foreground">
+            اضغط على الخريطة لتحديث خط العرض وخط الطول مباشرة.
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (!navigator.geolocation) {
+              toast.error('المتصفح لا يدعم تحديد الموقع الحالي');
+              return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                onChange(position.coords.latitude, position.coords.longitude);
+                toast.success('تم تحديد موقعك الحالي');
+              },
+              () => toast.error('تعذر الحصول على الموقع الحالي')
+            );
+          }}
+        >
+          <MapPin className="h-4 w-4 mr-2" />
+          استخدام موقعي الحالي
+        </Button>
+      </div>
+
+      <MapContainer
+        key={`${center.latitude}-${center.longitude}`}
+        center={[center.latitude, center.longitude]}
+        zoom={14}
+        style={{ height: 360, width: '100%' }}
+        scrollWheelZoom
+      >
+        <TileLayer
+          attribution='&copy; OpenStreetMap'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <MapRecenter center={center} />
+        <MapClickHandler />
+        <Marker position={[center.latitude, center.longitude]} />
+      </MapContainer>
+    </div>
+  );
+};
+
+
 
 const formatDateForInput = (value: any) => {
   if (!value) return '';
@@ -286,6 +381,7 @@ export const ViewDeedPage: React.FC = () => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [showEditMap, setShowEditMap] = useState(false);
   const [editForm, setEditForm] = useState<EditFormState>({
     deedNumber: '',
     deedDate: '',
@@ -357,6 +453,7 @@ export const ViewDeedPage: React.FC = () => {
       notes: deed.notes || '',
     });
 
+    setShowEditMap(false);
     setIsEditing(true);
   };
 
@@ -419,7 +516,6 @@ export const ViewDeedPage: React.FC = () => {
           : null;
 
       const payload: any = {
-        deedNumber: editForm.deedNumber.trim(),
         deedDate: editForm.deedDate || '',
         deedDateType: editForm.deedDateType,
         propertyDescription: editForm.propertyDescription.trim(),
@@ -433,9 +529,16 @@ export const ViewDeedPage: React.FC = () => {
         usageType: editForm.usageType,
         isPlanned: editForm.isPlanned,
         notes: editForm.notes.trim(),
+        coordinates: serializeCoordinates(coordinates),
       };
 
-      payload.coordinates = serializeCoordinates(coordinates);
+      const originalDeedNumber = String(deed.deedNumber || '').trim();
+      const nextDeedNumber = editForm.deedNumber.trim();
+
+      // لا نرسل رقم الصك عند عدم تغييره حتى لا يحدث تعارض Unique Constraint في قاعدة البيانات.
+      if (nextDeedNumber && nextDeedNumber !== originalDeedNumber) {
+        payload.deedNumber = nextDeedNumber;
+      }
 
       await updateDeed(deedId, payload);
 
@@ -443,7 +546,17 @@ export const ViewDeedPage: React.FC = () => {
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating deed:', error);
-      toast.error('فشل في حفظ التعديلات');
+
+      const errorMessage = error instanceof Error ? error.message : '';
+
+      if (
+        errorMessage.includes('Unique constraint') ||
+        errorMessage.includes('deedNumber')
+      ) {
+        toast.error('رقم الصك مستخدم في سجل آخر. غيّر رقم الصك أو اتركه كما هو.');
+      } else {
+        toast.error('فشل في حفظ التعديلات');
+      }
     } finally {
       setIsSavingEdit(false);
     }
@@ -892,6 +1005,8 @@ export const ViewDeedPage: React.FC = () => {
                 <Label>المساحة م² *</Label>
                 <Input
                   type="number"
+                  step="any"
+                  inputMode="decimal"
                   value={editForm.area}
                   onChange={(e) => updateEditField('area', e.target.value)}
                 />
@@ -1061,6 +1176,9 @@ export const ViewDeedPage: React.FC = () => {
               <div className="space-y-2">
                 <Label>خط العرض</Label>
                 <Input
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
                   value={editForm.latitude}
                   onChange={(e) => updateEditField('latitude', e.target.value)}
                   placeholder="26.392700"
@@ -1070,10 +1188,55 @@ export const ViewDeedPage: React.FC = () => {
               <div className="space-y-2">
                 <Label>خط الطول</Label>
                 <Input
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
                   value={editForm.longitude}
                   onChange={(e) => updateEditField('longitude', e.target.value)}
                   placeholder="50.043800"
                 />
+              </div>
+
+              <div className="md:col-span-2 lg:col-span-4 space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowEditMap((prev) => !prev)}
+                  >
+                    <MapIcon className="h-4 w-4 mr-2" />
+                    {showEditMap ? 'إخفاء الخريطة' : 'تحديد الموقع من الخريطة'}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!editForm.latitude || !editForm.longitude}
+                    onClick={() => {
+                      if (!editForm.latitude || !editForm.longitude) return;
+
+                      window.open(
+                        `https://www.google.com/maps?q=${editForm.latitude},${editForm.longitude}`,
+                        '_blank',
+                        'noopener,noreferrer'
+                      );
+                    }}
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    فتح في Google Maps
+                  </Button>
+                </div>
+
+                {showEditMap && (
+                  <EditMapPicker
+                    latitude={editForm.latitude}
+                    longitude={editForm.longitude}
+                    onChange={(latitude, longitude) => {
+                      updateEditField('latitude', latitude.toFixed(6));
+                      updateEditField('longitude', longitude.toFixed(6));
+                    }}
+                  />
+                )}
               </div>
             </div>
           ) : (
@@ -1104,37 +1267,71 @@ export const ViewDeedPage: React.FC = () => {
                 <>
                   <Separator className="my-6" />
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs md:text-sm text-muted-foreground mb-2">
-                        {t('deed.coordinates')}
-                      </p>
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs md:text-sm text-muted-foreground mb-2">
+                          {t('deed.coordinates')}
+                        </p>
 
-                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-6">
-                        <div>
-                          <span className="text-xs text-muted-foreground">{t('deed.latitude')}: </span>
-                          <span className="text-xs md:text-sm font-mono font-medium">
-                            {formatCoordinate(safeCoordinates.latitude)}
-                          </span>
-                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-6">
+                          <div>
+                            <span className="text-xs text-muted-foreground">{t('deed.latitude')}: </span>
+                            <span className="text-xs md:text-sm font-mono font-medium">
+                              {formatCoordinate(safeCoordinates.latitude)}
+                            </span>
+                          </div>
 
-                        <div>
-                          <span className="text-xs text-muted-foreground">{t('deed.longitude')}: </span>
-                          <span className="text-xs md:text-sm font-mono font-medium">
-                            {formatCoordinate(safeCoordinates.longitude)}
-                          </span>
+                          <div>
+                            <span className="text-xs text-muted-foreground">{t('deed.longitude')}: </span>
+                            <span className="text-xs md:text-sm font-mono font-medium">
+                              {formatCoordinate(safeCoordinates.longitude)}
+                            </span>
+                          </div>
                         </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => navigate(`/maps/${deedId}`)}
+                          className="w-full sm:w-auto text-xs md:text-sm"
+                        >
+                          <MapIcon className="h-3 w-3 md:h-4 md:w-4 mr-2" />
+                          {t('maps.viewOnMap')}
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            window.open(
+                              `https://www.google.com/maps?q=${safeCoordinates.latitude},${safeCoordinates.longitude}`,
+                              '_blank',
+                              'noopener,noreferrer'
+                            );
+                          }}
+                          className="w-full sm:w-auto text-xs md:text-sm"
+                        >
+                          <MapPin className="h-3 w-3 md:h-4 md:w-4 mr-2" />
+                          Google Maps
+                        </Button>
                       </div>
                     </div>
 
-                    <Button
-                      variant="outline"
-                      onClick={() => navigate(`/maps/${deedId}`)}
-                      className="w-full sm:w-auto text-xs md:text-sm"
-                    >
-                      <MapIcon className="h-3 w-3 md:h-4 md:w-4 mr-2" />
-                      {t('maps.viewOnMap')}
-                    </Button>
+                    <div className="rounded-xl border overflow-hidden">
+                      <MapContainer
+                        center={[safeCoordinates.latitude, safeCoordinates.longitude]}
+                        zoom={14}
+                        style={{ height: 260, width: '100%' }}
+                        scrollWheelZoom={false}
+                      >
+                        <TileLayer
+                          attribution='&copy; OpenStreetMap'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        <Marker position={[safeCoordinates.latitude, safeCoordinates.longitude]} />
+                      </MapContainer>
+                    </div>
                   </div>
                 </>
               )}
