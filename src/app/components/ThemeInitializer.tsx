@@ -300,6 +300,70 @@ const injectOfficialClassicStyles = () => {
     html[data-appearance-theme="official-classic-navy"] .official-card-accent-blue {
       border-right: 4px solid #2c4f73 !important;
     }
+
+    /* ============================================================
+       إصلاح شفافية نافذة تسجيل الخروج / جميع النوافذ المنبثقة
+       ============================================================ */
+
+    html[data-appearance-theme="official-classic-navy"] [data-radix-dialog-overlay],
+    html[data-appearance-theme="official-classic-navy"] .fixed.inset-0.bg-black\/80,
+    html[data-appearance-theme="official-classic-navy"] .fixed.inset-0.z-50 {
+      background: rgba(15, 23, 42, 0.55) !important;
+      backdrop-filter: blur(3px) !important;
+    }
+
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"],
+    html[data-appearance-theme="official-classic-navy"] [data-radix-dialog-content],
+    html[data-appearance-theme="official-classic-navy"] .fixed.left-\[50\%\].top-\[50\%\] {
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+      color: #17395b !important;
+      opacity: 1 !important;
+      border: 1px solid #e5dcc9 !important;
+      box-shadow: 0 24px 70px rgba(24, 39, 55, 0.28) !important;
+      border-radius: 18px !important;
+      backdrop-filter: none !important;
+    }
+
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"] *,
+    html[data-appearance-theme="official-classic-navy"] [data-radix-dialog-content] * {
+      color: inherit;
+    }
+
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"] h2,
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"] h3,
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"] [data-radix-dialog-title] {
+      color: #17395b !important;
+      font-weight: 700 !important;
+    }
+
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"] p,
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"] [data-radix-dialog-description] {
+      color: #667085 !important;
+    }
+
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"] button.bg-destructive,
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"] .bg-destructive {
+      background: #c40028 !important;
+      background-color: #c40028 !important;
+      color: #ffffff !important;
+      border-color: #c40028 !important;
+      opacity: 1 !important;
+    }
+
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"] button:not(.bg-destructive) {
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+      color: #17395b !important;
+      border-color: #d9cdb6 !important;
+      opacity: 1 !important;
+    }
+
+    html[data-appearance-theme="official-classic-navy"] [role="dialog"] button:hover:not(.bg-destructive) {
+      background: #f8f4e7 !important;
+      color: #17395b !important;
+    }
+
   `;
 
   document.head.appendChild(style);
