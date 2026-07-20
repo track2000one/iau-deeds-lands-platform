@@ -348,7 +348,7 @@ export const AddDeedPage: React.FC = () => {
   if (!isAdmin) {
     return (
       <div className="container mx-auto p-6">
-        <Card>
+        <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
           <CardHeader>
             <CardTitle>غير مصرح</CardTitle>
             <CardDescription>
@@ -366,10 +366,10 @@ export const AddDeedPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-6 rounded-[2rem] border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-4 md:p-6 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold">{t('deed.addNew')}</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-800">{t('deed.addNew')}</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
             قم بإدخال بيانات الصك الجديد
           </p>
@@ -387,8 +387,8 @@ export const AddDeedPage: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
-        <Card>
-          <CardHeader className="pb-3 md:pb-4">
+        <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
             <CardTitle className="flex items-center gap-2 text-base md:text-lg">
               <FileText className="h-4 w-4 md:h-5 md:w-5" />
               المعلومات الأساسية
@@ -450,7 +450,6 @@ export const AddDeedPage: React.FC = () => {
                       message: t('validation.invalidNumber'),
                     },
                   })}
-                  placeholder="1000"
                   className={errors.area ? 'border-destructive' : ''}
                 />
 
@@ -485,8 +484,8 @@ export const AddDeedPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3 md:pb-4">
+        <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
             <CardTitle className="flex items-center gap-2 text-base md:text-lg">
               <MapIcon className="h-4 w-4 md:h-5 md:w-5" />
               معلومات القطعة والمخطط
@@ -522,8 +521,8 @@ export const AddDeedPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3 md:pb-4">
+        <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
             <CardTitle className="flex items-center gap-2 text-base md:text-lg">
               <MapPin className="h-4 w-4 md:h-5 md:w-5" />
               معلومات الموقع
@@ -677,8 +676,8 @@ export const AddDeedPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3 md:pb-4">
+        <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
             <CardTitle className="flex items-center gap-2 text-base md:text-lg">
               <Upload className="h-4 w-4 md:h-5 md:w-5" />
               المرفقات والصور
@@ -809,8 +808,8 @@ export const AddDeedPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3 md:pb-4">
+        <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
             <CardTitle className="text-base md:text-lg">ملاحظات إضافية</CardTitle>
           </CardHeader>
 
@@ -842,7 +841,7 @@ export const AddDeedPage: React.FC = () => {
           <Button
             type="submit"
             disabled={isSaving}
-            className="bg-primary w-full sm:w-auto text-sm md:text-base"
+            className="bg-gradient-to-l from-sky-600 to-blue-700 text-white shadow-[0_12px_35px_rgba(37,99,235,0.22)] hover:from-sky-500 hover:to-blue-600 w-full sm:w-auto text-sm md:text-base"
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />

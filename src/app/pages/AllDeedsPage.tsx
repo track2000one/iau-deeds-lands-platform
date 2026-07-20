@@ -104,17 +104,17 @@ export const AllDeedsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-6 rounded-[2rem] border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-4 md:p-6 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold truncate">{t('nav.allDeeds')}</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-800 truncate">{t('nav.allDeeds')}</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
             {t('search.foundResults', { count: filteredDeeds.length })}
           </p>
         </div>
         {isAdmin && (
-          <Button onClick={() => navigate('/deeds/new')} className="bg-primary w-full sm:w-auto text-sm md:text-base">
+          <Button onClick={() => navigate('/deeds/new')} className="bg-gradient-to-l from-sky-600 to-blue-700 text-white shadow-[0_12px_35px_rgba(37,99,235,0.22)] hover:from-sky-500 hover:to-blue-600 w-full sm:w-auto text-sm md:text-base">
             <FileText className="h-4 w-4 mr-2" />
             {t('deed.addNew')}
           </Button>
@@ -122,8 +122,8 @@ export const AllDeedsPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader className="pb-3 md:pb-4">
+      <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+        <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
           <CardTitle className="flex items-center gap-2 text-base md:text-lg">
             <Filter className="h-4 w-4 md:h-5 md:w-5" />
             {t('app.filter')}
@@ -183,12 +183,12 @@ export const AllDeedsPage: React.FC = () => {
       </Card>
 
       {/* Table - Desktop View */}
-      <Card className="hidden md:block">
+      <Card className="hidden md:block overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="border-sky-100/80">
                   <TableHead className="w-[120px]">{t('deed.deedNumber')}</TableHead>
                   <TableHead>{t('deed.propertyDescription')}</TableHead>
                   <TableHead>{t('deed.city')}</TableHead>
@@ -201,7 +201,7 @@ export const AllDeedsPage: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {filteredDeeds.length === 0 ? (
-                  <TableRow>
+                  <TableRow className="border-sky-100/80">
                     <TableCell colSpan={8} className="text-center py-12">
                       <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
                       <p className="text-muted-foreground">{t('search.noResults')}</p>
@@ -288,7 +288,7 @@ export const AllDeedsPage: React.FC = () => {
       {/* Cards View - Mobile */}
       <div className="md:hidden space-y-3">
         {filteredDeeds.length === 0 ? (
-          <Card>
+          <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
             <CardContent className="py-12 text-center">
               <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p className="text-sm text-muted-foreground">{t('search.noResults')}</p>

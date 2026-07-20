@@ -904,7 +904,7 @@ export const ViewDeedPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-6 rounded-[2rem] border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-4 md:p-6 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <Button
@@ -917,7 +917,7 @@ export const ViewDeedPage: React.FC = () => {
           </Button>
 
           <div className="min-w-0">
-            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold truncate">
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold tracking-tight text-slate-800 truncate">
               {isEditing ? 'تعديل الصك' : t('deed.viewDeed')}
             </h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1 truncate">
@@ -972,8 +972,8 @@ export const ViewDeedPage: React.FC = () => {
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3 md:pb-4">
+      <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+        <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
           <CardTitle className="flex items-center gap-2 text-base md:text-lg">
             <FileText className="h-4 w-4 md:h-5 md:w-5" />
             المعلومات الأساسية
@@ -1123,8 +1123,8 @@ export const ViewDeedPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-3 md:pb-4">
+      <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+        <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
           <CardTitle className="flex items-center gap-2 text-base md:text-lg">
             <MapPin className="h-4 w-4 md:h-5 md:w-5" />
             معلومات الموقع
@@ -1340,8 +1340,8 @@ export const ViewDeedPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-3 md:pb-4">
+      <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+        <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
           <CardTitle className="text-base md:text-lg">الملاحظات</CardTitle>
         </CardHeader>
 
@@ -1378,7 +1378,7 @@ export const ViewDeedPage: React.FC = () => {
             type="button"
             onClick={saveEdit}
             disabled={isSavingEdit}
-            className="bg-primary w-full sm:w-auto"
+            className="bg-gradient-to-l from-sky-600 to-blue-700 text-white shadow-[0_12px_35px_rgba(37,99,235,0.22)] hover:from-sky-500 hover:to-blue-600 w-full sm:w-auto"
           >
             <Save className="h-4 w-4 mr-2" />
             {isSavingEdit ? 'جاري الحفظ...' : 'حفظ التعديلات'}
@@ -1386,8 +1386,8 @@ export const ViewDeedPage: React.FC = () => {
         </div>
       )}
 
-      <Card>
-        <CardHeader className="pb-3 md:pb-4">
+      <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+        <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
           <CardTitle className="text-base md:text-lg">{t('attachments.title')}</CardTitle>
         </CardHeader>
 
