@@ -439,11 +439,14 @@ export const AddDeedPage: React.FC = () => {
                 <Input
                   id="area"
                   type="number"
+                  step="any"
+                  inputMode="decimal"
+                  placeholder="مثال: 3148800.55"
                   {...register('area', {
                     required: t('validation.required'),
                     valueAsNumber: true,
                     min: {
-                      value: 1,
+                      value: 0,
                       message: t('validation.invalidNumber'),
                     },
                   })}
