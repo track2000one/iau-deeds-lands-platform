@@ -34,6 +34,15 @@ type Coordinates = {
   longitude: number;
 };
 
+const serializeCoordinates = (value?: Coordinates) => {
+  if (!value) return '';
+
+  return JSON.stringify({
+    latitude: Number(value.latitude),
+    longitude: Number(value.longitude),
+  });
+};
+
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
 
 type UploadResponse = {
@@ -304,7 +313,7 @@ export const AddDeedPage: React.FC = () => {
             deedDate: data.deedDate || '',
             deedDateType,
             area: Number(data.area || 0),
-            coordinates,
+            coordinates: serializeCoordinates(coordinates),
             attachments: [],
           } as any)
         );
@@ -327,6 +336,7 @@ export const AddDeedPage: React.FC = () => {
       coordinates,
       navigate,
       t,
+      deedDateType,
       deedImages,
       siteImages,
       planImages,
