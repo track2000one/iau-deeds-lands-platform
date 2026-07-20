@@ -104,7 +104,7 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="w-full space-y-5">
-      <div className="grid w-full grid-cols-1 gap-5 2xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
+      <div className="grid w-full grid-cols-1 items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
         <div className="space-y-5 2xl:order-2">
           <Card className="future-card">
             <CardContent className="p-5">
