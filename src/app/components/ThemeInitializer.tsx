@@ -485,6 +485,64 @@ const injectFutureStyles = () => {
       backdrop-filter: blur(4px) !important;
     }
 
+
+    .future-app-shell {
+      width: 100%;
+      min-width: 0;
+      background: transparent;
+    }
+
+    .future-app-shell main,
+    .future-app-shell main > div {
+      min-width: 0;
+      width: 100%;
+      max-width: none !important;
+    }
+
+    .future-sidebar {
+      flex-shrink: 0;
+    }
+
+    .future-card {
+      min-width: 0;
+    }
+
+    .future-card > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .future-topbar > div {
+      width: 100%;
+    }
+
+    @media (min-width: 1536px) {
+      .future-card {
+        border-radius: 20px !important;
+      }
+    }
+
+    @media (max-width: 1279px) {
+      .future-card {
+        border-radius: 17px !important;
+      }
+    }
+
+    @media (max-width: 767px) {
+      :root {
+        --future-radius: 15px;
+      }
+
+      .future-card:hover,
+      .future-glow-button:hover {
+        transform: none;
+      }
+
+      .future-hero-art {
+        min-height: 210px;
+      }
+    }
+
     @media (max-width: 768px) {
       .future-card { border-radius: 18px !important; }
     }

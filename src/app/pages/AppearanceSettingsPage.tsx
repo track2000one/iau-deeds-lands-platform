@@ -117,8 +117,8 @@ export const AppearanceSettingsPage: React.FC = () => {
   const selected = themes.find((theme) => theme.id === selectedTheme) || themes[0];
 
   return (
-    <div className="space-y-6">
-      <div className="future-card p-6 md:p-8">
+    <div className="w-full space-y-5">
+      <div className="future-card p-5 md:p-6 2xl:p-8">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div>
             <Badge variant="secondary" className="mb-3">
@@ -152,7 +152,7 @@ export const AppearanceSettingsPage: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
+      <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
         <Card className="future-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -164,7 +164,7 @@ export const AppearanceSettingsPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {themes.map((theme) => {
               const isActive = selectedTheme === theme.id;
               const isSaved = savedTheme === theme.id;
@@ -175,13 +175,13 @@ export const AppearanceSettingsPage: React.FC = () => {
                   type="button"
                   onClick={() => previewTheme(theme)}
                   className={[
-                    'future-card text-right p-4 border transition-all',
+                    'future-card min-w-0 text-right p-4 border transition-all',
                     isActive ? 'ring-2 ring-primary' : '',
                   ].join(' ')}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
+                  <div className="flex items-start justify-between gap-3 min-w-0">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-bold text-lg">{theme.title}</h3>
                         <Badge>{theme.badge}</Badge>
                         {isSaved && <Badge variant="secondary">محفوظ</Badge>}
@@ -236,7 +236,7 @@ export const AppearanceSettingsPage: React.FC = () => {
           </CardHeader>
 
           <CardContent>
-            <div className="future-hero-art">
+            <div className="future-hero-art min-h-[240px]">
               <div className="future-shield">
                 <ShieldCheck className="h-24 w-24" />
               </div>

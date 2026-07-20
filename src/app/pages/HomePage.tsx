@@ -103,12 +103,12 @@ export const HomePage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 xl:grid-cols-[340px_1fr] gap-6">
-        <div className="space-y-6 xl:order-2">
+    <div className="w-full space-y-5">
+      <div className="grid w-full grid-cols-1 gap-5 2xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
+        <div className="space-y-5 2xl:order-2">
           <Card className="future-card">
             <CardContent className="p-5">
-              <div className="future-hero-art">
+              <div className="future-hero-art min-h-[230px]">
                 <div className="future-shield">
                   <Shield className="h-24 w-24" />
                 </div>
@@ -157,26 +157,26 @@ export const HomePage: React.FC = () => {
           </Card>
         </div>
 
-        <div className="space-y-6 xl:order-1">
+        <div className="min-w-0 space-y-5 2xl:order-1">
           <div className="text-right">
-            <h1 className="text-3xl md:text-4xl font-bold">{t('home.welcome')}</h1>
+            <h1 className="text-2xl md:text-3xl 2xl:text-4xl font-bold">{t('home.welcome')}</h1>
             <p className="text-muted-foreground mt-2">{t('app.subtitle')}</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {topStats.map((item) => {
               const Icon = item.icon;
 
               return (
-                <Card key={item.label} className="future-card">
-                  <CardContent className="p-5">
-                    <div className="flex items-start justify-between gap-3">
+                <Card key={item.label} className="future-card min-h-[132px]">
+                  <CardContent className="h-full p-4 2xl:p-5">
+                    <div className="flex h-full items-center justify-between gap-4">
                       <div className="future-stat-icon h-12 w-12 bg-primary/10">
                         <Icon className={`h-6 w-6 ${item.accent}`} />
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-muted-foreground">{item.label}</p>
-                        <p className="mt-4 text-2xl font-bold">{item.value}</p>
+                        <p className="mt-2 text-2xl 2xl:text-3xl font-bold tabular-nums">{item.value}</p>
                         <p className="text-xs text-muted-foreground mt-1">{item.sub}</p>
                       </div>
                     </div>
@@ -231,7 +231,7 @@ export const HomePage: React.FC = () => {
               <CardDescription>العمليات الشائعة للوصول السريع</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 {quickActions.map((action) => {
                   const Icon = action.icon;
 
@@ -239,12 +239,12 @@ export const HomePage: React.FC = () => {
                     <Button
                       key={action.id}
                       variant="outline"
-                      className="future-glow-button h-20 flex-col gap-2"
+                      className="future-glow-button h-[92px] min-w-0 flex-col gap-1.5 px-3 whitespace-normal"
                       onClick={() => navigate(action.path)}
                     >
                       <Icon className="h-6 w-6 text-primary" />
-                      <span className="font-bold">{action.label}</span>
-                      <span className="text-xs text-muted-foreground">{action.sub}</span>
+                      <span className="font-bold leading-tight">{action.label}</span>
+                      <span className="text-center text-xs leading-tight text-muted-foreground">{action.sub}</span>
                     </Button>
                   );
                 })}
@@ -252,8 +252,8 @@ export const HomePage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <Card className="future-card xl:col-span-2">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+            <Card className="future-card min-w-0">
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
                   <div>
