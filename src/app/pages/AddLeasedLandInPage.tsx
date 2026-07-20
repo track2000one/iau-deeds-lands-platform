@@ -192,7 +192,7 @@ export const AddLeasedLandInPage: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     <Label>المساحة (م²) *</Label>
-                    <Input type="number" step="0.01" {...register('area', { required: 'مطلوب' })} />
+                    <Input type="number" step="any" {...register('area', { required: 'مطلوب' })} />
                   </div>
                   <div className="space-y-2">
                     <Label>الموقع *</Label>

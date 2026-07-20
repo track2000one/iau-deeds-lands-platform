@@ -211,7 +211,7 @@ export const AddDeliveredLandPage: React.FC = () => {
                     <Input
                       id="area"
                       type="number"
-                      step="0.01"
+                      step="any"
                       {...register('area', { required: 'هذا الحقل مطلوب', min: 0 })}
                       placeholder="أدخل المساحة"
                     />

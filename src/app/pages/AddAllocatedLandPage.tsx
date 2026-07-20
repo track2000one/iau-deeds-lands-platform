@@ -175,7 +175,7 @@ export const AddAllocatedLandPage: React.FC = () => {
                     <Input
                       id="area"
                       type="number"
-                      step="0.01"
+                      step="any"
                       {...register('area', {
                         required: 'هذا الحقل مطلوب',
                         min: { value: 0, message: 'المساحة يجب أن تكون أكبر من صفر' }
