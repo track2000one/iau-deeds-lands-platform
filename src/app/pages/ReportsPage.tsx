@@ -14,6 +14,10 @@ import {
   PieChart,
   TrendingUp,
   Layers,
+  Filter,
+  Edit3,
+  Stamp,
+  PenLine,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -54,6 +58,56 @@ type ReportSectionType =
   | 'leasedIn'
   | 'buildingsOut'
   | 'buildingsIn';
+
+type ReportFilters = {
+  region: string;
+  city: string;
+  district: string;
+  usageType: string;
+  isPlanned: 'all' | 'planned' | 'unplanned';
+  coordinates: 'all' | 'with' | 'without';
+  attachments: 'all' | 'with' | 'without';
+};
+
+type PrintSettings = {
+  universityName: string;
+  platformName: string;
+  reportTitle: string;
+  introText: string;
+  footerText: string;
+  showSignature: boolean;
+  showStamp: boolean;
+  signatureLabel: string;
+  stampLabel: string;
+  fontFamily: string;
+  fontSize: number;
+  headerColor: string;
+};
+
+const emptyFilters: ReportFilters = {
+  region: '',
+  city: '',
+  district: '',
+  usageType: '',
+  isPlanned: 'all',
+  coordinates: 'all',
+  attachments: 'all',
+};
+
+const defaultPrintSettings: PrintSettings = {
+  universityName: 'جامعة الإمام عبدالرحمن بن فيصل',
+  platformName: 'منصة إدارة الصكوك والأراضي',
+  reportTitle: '',
+  introText: '',
+  footerText: 'منصة إدارة الصكوك والأراضي',
+  showSignature: true,
+  showStamp: true,
+  signatureLabel: 'التوقيع',
+  stampLabel: 'الختم',
+  fontFamily: 'Tahoma, Arial, sans-serif',
+  fontSize: 13,
+  headerColor: '#1f4e79',
+};
 
 export const ReportsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -152,6 +206,26 @@ export const ReportsPage: React.FC = () => {
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [reportType, setReportType] = useState<'detailed' | 'summary' | 'statistical' | 'graphical'>('detailed');
 
+  const [reportFilters, setReportFilters] = useState<Record<ReportSectionType, ReportFilters>>({
+    deeds: { ...emptyFilters },
+    allocated: { ...emptyFilters },
+    delivered: { ...emptyFilters },
+    leasedOut: { ...emptyFilters },
+    leasedIn: { ...emptyFilters },
+    buildingsOut: { ...emptyFilters },
+    buildingsIn: { ...emptyFilters },
+  });
+
+  const [printSettingsBySection, setPrintSettingsBySection] = useState<Record<ReportSectionType, PrintSettings>>({
+    deeds: { ...defaultPrintSettings, reportTitle: 'تقرير الصكوك' },
+    allocated: { ...defaultPrintSettings, reportTitle: 'تقرير الأراضي المخصصة' },
+    delivered: { ...defaultPrintSettings, reportTitle: 'تقرير الأراضي المسلمة' },
+    leasedOut: { ...defaultPrintSettings, reportTitle: 'تقرير الأراضي المؤجرة من الجامعة' },
+    leasedIn: { ...defaultPrintSettings, reportTitle: 'تقرير الأراضي المستأجرة للجامعة' },
+    buildingsOut: { ...defaultPrintSettings, reportTitle: 'تقرير المباني المؤجرة من الجامعة' },
+    buildingsIn: { ...defaultPrintSettings, reportTitle: 'تقرير المباني المستأجرة للجامعة' },
+  });
+
   const [selectedColumns, setSelectedColumns] = useState<any>({
     deeds: deedsColumns,
     allocated: allocatedLandsColumns,
@@ -192,6 +266,105 @@ export const ReportsPage: React.FC = () => {
       ...prev,
       [section]: prev[section].map((col: any) => ({ ...col, enabled: !allEnabled })),
     }));
+  };
+
+  const updateReportFilter = (
+    section: ReportSectionType,
+    key: keyof ReportFilters,
+    value: string
+  ) => {
+    setReportFilters((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [key]: value,
+      },
+    }));
+  };
+
+  const resetReportFilters = (section: ReportSectionType) => {
+    setReportFilters((prev) => ({
+      ...prev,
+      [section]: { ...emptyFilters },
+    }));
+  };
+
+  const updatePrintSetting = <K extends keyof PrintSettings>(
+    section: ReportSectionType,
+    key: K,
+    value: PrintSettings[K]
+  ) => {
+    setPrintSettingsBySection((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [key]: value,
+      },
+    }));
+  };
+
+  const resetPrintSettings = (section: ReportSectionType, title: string) => {
+    setPrintSettingsBySection((prev) => ({
+      ...prev,
+      [section]: {
+        ...defaultPrintSettings,
+        reportTitle: `تقرير ${title}`,
+      },
+    }));
+  };
+
+  const hasCoordinates = (item: any) => {
+    if (!item?.coordinates) return false;
+
+    if (typeof item.coordinates === 'string') {
+      return item.coordinates.trim().length > 0;
+    }
+
+    if (typeof item.coordinates === 'object') {
+      return Boolean(item.coordinates.latitude || item.coordinates.longitude || item.coordinates.lat || item.coordinates.lng);
+    }
+
+    return false;
+  };
+
+  const hasAttachments = (item: any) => {
+    return Array.isArray(item?.attachments) && item.attachments.length > 0;
+  };
+
+  const normalizeText = (value: any) => String(value ?? '').trim();
+
+  const getUniqueOptions = (data: any[], key: string) => {
+    const values = new Set<string>();
+
+    data.forEach((item) => {
+      const value = normalizeText(item?.[key]);
+
+      if (value) values.add(value);
+    });
+
+    return Array.from(values).sort((a, b) => a.localeCompare(b, 'ar'));
+  };
+
+  const applyFilters = (data: any[], filters: ReportFilters) => {
+    const safeData = Array.isArray(data) ? data : [];
+
+    return safeData.filter((item) => {
+      if (filters.region && normalizeText(item.region) !== filters.region) return false;
+      if (filters.city && normalizeText(item.city) !== filters.city) return false;
+      if (filters.district && normalizeText(item.district) !== filters.district) return false;
+      if (filters.usageType && normalizeText(item.usageType) !== filters.usageType) return false;
+
+      if (filters.isPlanned === 'planned' && !item.isPlanned) return false;
+      if (filters.isPlanned === 'unplanned' && item.isPlanned) return false;
+
+      if (filters.coordinates === 'with' && !hasCoordinates(item)) return false;
+      if (filters.coordinates === 'without' && hasCoordinates(item)) return false;
+
+      if (filters.attachments === 'with' && !hasAttachments(item)) return false;
+      if (filters.attachments === 'without' && hasAttachments(item)) return false;
+
+      return true;
+    });
   };
 
   const statistics = useMemo(() => {
@@ -387,10 +560,17 @@ export const ReportsPage: React.FC = () => {
     data: any[],
     columns: any[],
     title: string,
-    stats?: { total: number; totalArea?: string }
+    stats?: { total: number; totalArea?: string },
+    settings?: PrintSettings,
+    filters?: ReportFilters
   ) => {
     const enabledColumns = columns.filter((col) => col.enabled);
     const currentDate = new Date();
+    const effectiveSettings = {
+      ...defaultPrintSettings,
+      ...(settings || {}),
+      reportTitle: settings?.reportTitle || title,
+    };
 
     const dateString = currentDate.toLocaleDateString('ar-SA', {
       year: 'numeric',
@@ -402,6 +582,30 @@ export const ReportsPage: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
+
+    const safeIntro = escapeHtml(effectiveSettings.introText).replaceAll('\n', '<br />');
+    const safeFooter = escapeHtml(effectiveSettings.footerText).replaceAll('\n', '<br />');
+
+    const activeFiltersHtml = filters
+      ? [
+          filters.region ? `المنطقة: ${escapeHtml(filters.region)}` : '',
+          filters.city ? `المدينة: ${escapeHtml(filters.city)}` : '',
+          filters.district ? `الحي: ${escapeHtml(filters.district)}` : '',
+          filters.usageType ? `نوع الاستخدام: ${escapeHtml(filters.usageType)}` : '',
+          filters.isPlanned !== 'all'
+            ? `مخططة: ${filters.isPlanned === 'planned' ? 'نعم' : 'لا'}`
+            : '',
+          filters.coordinates !== 'all'
+            ? `الإحداثيات: ${filters.coordinates === 'with' ? 'يوجد' : 'لا يوجد'}`
+            : '',
+          filters.attachments !== 'all'
+            ? `المرفقات: ${filters.attachments === 'with' ? 'يوجد' : 'لا يوجد'}`
+            : '',
+        ]
+          .filter(Boolean)
+          .map((item) => `<span class="filter-chip">${item}</span>`)
+          .join('')
+      : '';
 
     const rowsHtml =
       data.length === 0
@@ -426,7 +630,7 @@ export const ReportsPage: React.FC = () => {
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(title)}</title>
+  <title>${escapeHtml(effectiveSettings.reportTitle)}</title>
   <style>
     @page {
       size: A4 landscape;
@@ -444,8 +648,8 @@ export const ReportsPage: React.FC = () => {
       unicode-bidi: plaintext;
       background: #ffffff;
       color: #111827;
-      font-family: Tahoma, Arial, "Segoe UI", sans-serif;
-      font-size: 13px;
+      font-family: ${effectiveSettings.fontFamily};
+      font-size: ${Number(effectiveSettings.fontSize || 13)}px;
       line-height: 1.7;
     }
 
@@ -457,7 +661,7 @@ export const ReportsPage: React.FC = () => {
 
     .header {
       border: 1px solid #d8dee9;
-      border-top: 5px solid #1f4e79;
+      border-top: 5px solid ${effectiveSettings.headerColor};
       border-radius: 10px;
       padding: 16px 18px;
       margin-bottom: 16px;
@@ -521,7 +725,7 @@ export const ReportsPage: React.FC = () => {
     }
 
     .stat-value {
-      color: #1f4e79;
+      color: ${effectiveSettings.headerColor};
       font-size: 18px;
       font-weight: 700;
     }
@@ -535,8 +739,8 @@ export const ReportsPage: React.FC = () => {
     }
 
     th {
-      background: #eaf1f8;
-      color: #0f172a;
+      background: ${effectiveSettings.headerColor};
+      color: #ffffff;
       font-weight: 700;
       border: 1px solid #cbd5e1;
       padding: 8px 6px;
@@ -560,6 +764,33 @@ export const ReportsPage: React.FC = () => {
     .empty-cell {
       padding: 20px;
       color: #64748b;
+    }
+
+
+    .intro {
+      margin: 12px 0;
+      padding: 10px 12px;
+      border: 1px solid #d8dee9;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #334155;
+    }
+
+    .filters {
+      margin: 12px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .filter-chip {
+      display: inline-block;
+      padding: 4px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 11px;
     }
 
     .footer {
@@ -637,14 +868,17 @@ export const ReportsPage: React.FC = () => {
     </div>
 
     <div class="header">
-      <div class="university">جامعة الإمام عبدالرحمن بن فيصل</div>
-      <div class="subtitle">منصة إدارة الصكوك والأراضي</div>
-      <div class="title">${escapeHtml(title)}</div>
+      <div class="university">${escapeHtml(effectiveSettings.universityName)}</div>
+      <div class="subtitle">${escapeHtml(effectiveSettings.platformName)}</div>
+      <div class="title">${escapeHtml(effectiveSettings.reportTitle)}</div>
       <div class="meta">
         <div>التاريخ: ${escapeHtml(dateString)}</div>
         <div>الوقت: ${escapeHtml(timeString)}</div>
       </div>
     </div>
+
+    ${safeIntro ? `<div class="intro">${safeIntro}</div>` : ''}
+    ${activeFiltersHtml ? `<div class="filters">${activeFiltersHtml}</div>` : ''}
 
     ${
       stats
@@ -681,14 +915,26 @@ export const ReportsPage: React.FC = () => {
       </div>
       <div>
         تمت الطباعة بتاريخ: ${escapeHtml(dateString)}<br />
-        منصة إدارة الصكوك والأراضي
+        ${safeFooter}
       </div>
     </div>
 
-    <div class="signature">
-      <div class="signature-item">التوقيع</div>
-      <div class="signature-item">الختم</div>
-    </div>
+    ${
+      effectiveSettings.showSignature || effectiveSettings.showStamp
+        ? `<div class="signature">
+            ${
+              effectiveSettings.showSignature
+                ? `<div class="signature-item">${escapeHtml(effectiveSettings.signatureLabel || 'التوقيع')}</div>`
+                : ''
+            }
+            ${
+              effectiveSettings.showStamp
+                ? `<div class="signature-item">${escapeHtml(effectiveSettings.stampLabel || 'الختم')}</div>`
+                : ''
+            }
+          </div>`
+        : ''
+    }
   </div>
 </body>
 </html>`;
@@ -725,11 +971,25 @@ export const ReportsPage: React.FC = () => {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
-  const exportToPDF = (data: any[], columns: any[], title: string, filename: string) => {
+  const exportToPDF = (
+    data: any[],
+    columns: any[],
+    title: string,
+    filename: string,
+    settings?: PrintSettings,
+    filters?: ReportFilters
+  ) => {
     try {
-      const html = buildPrintableReportHtml(data, columns, title, {
-        total: Array.isArray(data) ? data.length : 0,
-      });
+      const html = buildPrintableReportHtml(
+        data,
+        columns,
+        title,
+        {
+          total: Array.isArray(data) ? data.length : 0,
+        },
+        settings,
+        filters
+      );
 
       openPrintableHtml(html, true);
       toast.success('تم فتح نافذة الطباعة. اختر Save as PDF للحفظ بصيغة PDF.');
@@ -743,10 +1003,12 @@ export const ReportsPage: React.FC = () => {
     data: any[],
     columns: any[],
     title: string,
-    stats?: { total: number; totalArea?: string }
+    stats?: { total: number; totalArea?: string },
+    settings?: PrintSettings,
+    filters?: ReportFilters
   ) => {
     try {
-      const html = buildPrintableReportHtml(data, columns, title, stats);
+      const html = buildPrintableReportHtml(data, columns, title, stats, settings, filters);
       openPrintableHtml(html, true);
     } catch (error) {
       console.error('Print Error:', error);
@@ -798,8 +1060,15 @@ export const ReportsPage: React.FC = () => {
     columns: any[],
     refKey: keyof typeof printRefs
   ) => {
-    const safeData = Array.isArray(data) ? data : [];
+    const originalData = Array.isArray(data) ? data : [];
+    const filters = reportFilters[type];
+    const printSettings = printSettingsBySection[type];
+    const safeData = applyFilters(originalData, filters);
     const enabledColumns = columns.filter((col) => col.enabled);
+    const regionOptions = getUniqueOptions(originalData, 'region');
+    const cityOptions = getUniqueOptions(originalData, 'city');
+    const districtOptions = getUniqueOptions(originalData, 'district');
+    const usageOptions = getUniqueOptions(originalData, 'usageType');
     const sectionStats = getSectionStatistics(type);
     const distribution = getDistributionData(type);
 
@@ -814,7 +1083,7 @@ export const ReportsPage: React.FC = () => {
               </CardTitle>
 
               <CardDescription className="mt-2">
-                إجمالي: <strong>{safeData.length}</strong> سجل
+                إجمالي بعد الفرز: <strong>{safeData.length}</strong> من <strong>{originalData.length}</strong> سجل
                 {sectionStats.totalArea > 0 && (
                   <>
                     {' '}
@@ -866,6 +1135,269 @@ export const ReportsPage: React.FC = () => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm flex items-center gap-2">
+                        <Filter className="h-4 w-4" />
+                        الفرز قبل الطباعة والتصدير
+                      </CardTitle>
+
+                      <Button variant="outline" size="sm" onClick={() => resetReportFilters(type)}>
+                        مسح الفرز
+                      </Button>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <div className="space-y-2">
+                        <Label>المنطقة</Label>
+                        <select
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={filters.region}
+                          onChange={(event) => updateReportFilter(type, 'region', event.target.value)}
+                        >
+                          <option value="">الكل</option>
+                          {regionOptions.map((value) => (
+                            <option key={value} value={value}>{value}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>المدينة</Label>
+                        <select
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={filters.city}
+                          onChange={(event) => updateReportFilter(type, 'city', event.target.value)}
+                        >
+                          <option value="">الكل</option>
+                          {cityOptions.map((value) => (
+                            <option key={value} value={value}>{value}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>الحي</Label>
+                        <select
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={filters.district}
+                          onChange={(event) => updateReportFilter(type, 'district', event.target.value)}
+                        >
+                          <option value="">الكل</option>
+                          {districtOptions.map((value) => (
+                            <option key={value} value={value}>{value}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>نوع الاستخدام</Label>
+                        <select
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={filters.usageType}
+                          onChange={(event) => updateReportFilter(type, 'usageType', event.target.value)}
+                        >
+                          <option value="">الكل</option>
+                          {usageOptions.map((value) => (
+                            <option key={value} value={value}>{value}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>مخططة؟</Label>
+                        <select
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={filters.isPlanned}
+                          onChange={(event) => updateReportFilter(type, 'isPlanned', event.target.value)}
+                        >
+                          <option value="all">الكل</option>
+                          <option value="planned">مخططة</option>
+                          <option value="unplanned">غير مخططة</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>الإحداثيات</Label>
+                        <select
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={filters.coordinates}
+                          onChange={(event) => updateReportFilter(type, 'coordinates', event.target.value)}
+                        >
+                          <option value="all">الكل</option>
+                          <option value="with">يوجد إحداثيات</option>
+                          <option value="without">لا يوجد إحداثيات</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>المرفقات</Label>
+                        <select
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={filters.attachments}
+                          onChange={(event) => updateReportFilter(type, 'attachments', event.target.value)}
+                        >
+                          <option value="all">الكل</option>
+                          <option value="with">يوجد مرفقات</option>
+                          <option value="without">لا يوجد مرفقات</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 text-sm text-muted-foreground">
+                      سيتم تطبيق الفرز على الجدول الحالي، Excel، PDF، والمعاينة والطباعة.
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gray-50">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Edit3 className="h-4 w-4" />
+                        إعدادات العناوين والتوقيع والختم
+                      </CardTitle>
+
+                      <Button variant="outline" size="sm" onClick={() => resetPrintSettings(type, title)}>
+                        استعادة إعدادات التقرير
+                      </Button>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label>اسم الجامعة</Label>
+                        <input
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={printSettings.universityName}
+                          onChange={(event) => updatePrintSetting(type, 'universityName', event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>اسم المنصة</Label>
+                        <input
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={printSettings.platformName}
+                          onChange={(event) => updatePrintSetting(type, 'platformName', event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>عنوان التقرير</Label>
+                        <input
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={printSettings.reportTitle}
+                          onChange={(event) => updatePrintSetting(type, 'reportTitle', event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-3">
+                        <Label>عبارة قبل الجدول</Label>
+                        <textarea
+                          className="w-full min-h-20 rounded-md border bg-background px-3 py-2 text-sm"
+                          placeholder="اكتب عبارة اختيارية تظهر قبل الجدول..."
+                          value={printSettings.introText}
+                          onChange={(event) => updatePrintSetting(type, 'introText', event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-3">
+                        <Label>عبارة أسفل التقرير</Label>
+                        <textarea
+                          className="w-full min-h-20 rounded-md border bg-background px-3 py-2 text-sm"
+                          value={printSettings.footerText}
+                          onChange={(event) => updatePrintSetting(type, 'footerText', event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>نوع الخط</Label>
+                        <select
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={printSettings.fontFamily}
+                          onChange={(event) => updatePrintSetting(type, 'fontFamily', event.target.value)}
+                        >
+                          <option value="Tahoma, Arial, sans-serif">Tahoma</option>
+                          <option value="Arial, Tahoma, sans-serif">Arial</option>
+                          <option value="'Segoe UI', Tahoma, Arial, sans-serif">Segoe UI</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>حجم الخط</Label>
+                        <select
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={printSettings.fontSize}
+                          onChange={(event) => updatePrintSetting(type, 'fontSize', Number(event.target.value))}
+                        >
+                          <option value={11}>صغير</option>
+                          <option value={12}>متوسط صغير</option>
+                          <option value={13}>متوسط</option>
+                          <option value={14}>كبير</option>
+                          <option value={15}>كبير جدًا</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>لون رأس الجدول</Label>
+                        <input
+                          type="color"
+                          className="w-full h-10 rounded-md border bg-background px-2"
+                          value={printSettings.headerColor}
+                          onChange={(event) => updatePrintSetting(type, 'headerColor', event.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="rounded-lg border bg-background p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="flex items-center gap-2">
+                            <PenLine className="h-4 w-4" />
+                            إظهار التوقيع
+                          </Label>
+                          <Checkbox
+                            checked={printSettings.showSignature}
+                            onCheckedChange={(checked) => updatePrintSetting(type, 'showSignature', Boolean(checked))}
+                          />
+                        </div>
+
+                        <input
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={printSettings.signatureLabel}
+                          onChange={(event) => updatePrintSetting(type, 'signatureLabel', event.target.value)}
+                          disabled={!printSettings.showSignature}
+                        />
+                      </div>
+
+                      <div className="rounded-lg border bg-background p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="flex items-center gap-2">
+                            <Stamp className="h-4 w-4" />
+                            إظهار الختم
+                          </Label>
+                          <Checkbox
+                            checked={printSettings.showStamp}
+                            onCheckedChange={(checked) => updatePrintSetting(type, 'showStamp', Boolean(checked))}
+                          />
+                        </div>
+
+                        <input
+                          className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                          value={printSettings.stampLabel}
+                          onChange={(event) => updatePrintSetting(type, 'stampLabel', event.target.value)}
+                          disabled={!printSettings.showStamp}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gray-50">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm flex items-center gap-2">
                         <Settings className="h-4 w-4" />
                         اختيار الأعمدة
                       </CardTitle>
@@ -904,7 +1436,7 @@ export const ReportsPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
                   <Button
-                    onClick={() => exportToExcel(safeData, columns, title)}
+                    onClick={() => exportToExcel(safeData, columns, printSettings.reportTitle || title)}
                     variant="outline"
                     className="w-full h-10 md:h-11 text-sm md:text-base"
                   >
@@ -913,7 +1445,7 @@ export const ReportsPage: React.FC = () => {
                   </Button>
 
                   <Button
-                    onClick={() => exportToPDF(safeData, columns, title, type)}
+                    onClick={() => exportToPDF(safeData, columns, printSettings.reportTitle || title, type, printSettings, filters)}
                     variant="outline"
                     className="w-full h-10 md:h-11 text-sm md:text-base"
                   >
@@ -923,10 +1455,17 @@ export const ReportsPage: React.FC = () => {
 
                   <Button
                     onClick={() => {
-                      handlePrint(safeData, columns, title, {
-                        total: safeData.length,
-                        totalArea: Number(sectionStats.totalArea || 0).toLocaleString(),
-                      });
+                      handlePrint(
+                        safeData,
+                        columns,
+                        printSettings.reportTitle || title,
+                        {
+                          total: safeData.length,
+                          totalArea: safeData.reduce((sum: number, item: any) => sum + Number(item.area || 0), 0).toLocaleString(),
+                        },
+                        printSettings,
+                        filters
+                      );
                     }}
                     variant="default"
                     className="w-full h-10 md:h-11 text-sm md:text-base bg-blue-600 hover:bg-blue-700"
