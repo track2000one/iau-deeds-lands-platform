@@ -201,6 +201,7 @@ export const AddAllocatedLandPage: React.FC = () => {
                       <option value="governmental">حكومي</option>
                       <option value="mixed">مختلط</option>
                       <option value="other">أخرى</option>
+                      <option value="other">إداري</option>
                     </NativeSelect>
                   </div>
                 </div>

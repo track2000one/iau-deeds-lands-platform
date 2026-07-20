@@ -67,7 +67,7 @@ type EditFormState = {
   notes: string;
 };
 
-const usageTypes = ['سكني', 'تجاري', 'صناعي', 'استثماري', 'تعليمي', 'زراعي', 'حكومي'];
+const usageTypes = ['سكني', 'تجاري', 'صناعي', 'استثماري', 'تعليمي', 'زراعي', 'حكومي' , 'إداري'];
 const cities = ['الدمام', 'الخبر', 'الظهران', 'القطيف', 'الجبيل', 'الأحساء', 'حفر الباطن'];
 
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';

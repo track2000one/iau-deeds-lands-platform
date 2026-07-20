@@ -121,6 +121,7 @@ const usageTypeOptions = [
   { value: 'governmental', label: 'حكومي' },
   { value: 'mixed', label: 'مختلط' },
   { value: 'other', label: 'أخرى' },
+  { value: 'other', label: 'إداري' },
 ];
 
 const getUsageLabel = (value?: string) => {

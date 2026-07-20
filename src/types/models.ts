@@ -8,6 +8,7 @@ export type UsageType =
   | 'agricultural' // زراعي
   | 'educational' // تعليمي
   | 'governmental' // حكومي
+  | 'governmental' // إداري
   | 'mixed' // مختلط
   | 'other'; // أخرى
 

@@ -108,7 +108,7 @@ export const AddDeedPage: React.FC = () => {
   const isPlanned = watch('isPlanned');
 
   const cities = ['الدمام', 'الخبر', 'الظهران', 'القطيف', 'الجبيل', 'الأحساء', 'حفر الباطن'];
-  const usageTypes = ['سكني', 'تجاري', 'صناعي', 'استثماري', 'تعليمي', 'زراعي', 'حكومي'];
+  const usageTypes = ['سكني', 'تجاري', 'صناعي', 'استثماري', 'تعليمي', 'زراعي', 'حكومي' , 'إداري'];
 
   const handleIsPlannedChange = React.useCallback(
     (checked: boolean) => {
