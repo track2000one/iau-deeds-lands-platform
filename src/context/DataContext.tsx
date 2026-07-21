@@ -64,21 +64,21 @@ type CollectionName =
   | 'leasedBuildingsOut'
   | 'leasedBuildingsIn';
 
-const storageKey = (collectionName: CollectionName) => `iau_web_${collectionName}`;
+type RecordResource =
+  | 'allocated-lands'
+  | 'delivered-lands'
+  | 'leased-lands-out'
+  | 'leased-lands-in'
+  | 'leased-buildings-out'
+  | 'leased-buildings-in';
 
-const loadBrowserCollection = <T,>(collectionName: CollectionName): T[] => {
-  const raw = localStorage.getItem(storageKey(collectionName));
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveBrowserCollection = <T,>(collectionName: CollectionName, records: T[]) => {
-  localStorage.setItem(storageKey(collectionName), JSON.stringify(records));
+const resourceMap: Record<Exclude<CollectionName, 'deeds'>, RecordResource> = {
+  allocatedLands: 'allocated-lands',
+  deliveredLands: 'delivered-lands',
+  leasedLandsOut: 'leased-lands-out',
+  leasedLandsIn: 'leased-lands-in',
+  leasedBuildingsOut: 'leased-buildings-out',
+  leasedBuildingsIn: 'leased-buildings-in',
 };
 
 const normalizeDateFields = <T extends Record<string, any>>(record: T): T => {
@@ -92,17 +92,15 @@ const normalizeDateFields = <T extends Record<string, any>>(record: T): T => {
   return next as T;
 };
 
-const normalizeRecords = <T extends Record<string, any>>(records: T[]): T[] => records.map(normalizeDateFields) as T[];
+const normalizeRecords = <T extends Record<string, any>>(records: T[]): T[] =>
+  records.map(normalizeDateFields) as T[];
 
-const sortRecords = <T extends Record<string, any>>(records: T[]): T[] => {
-  return [...records].sort((a, b) => {
+const sortRecords = <T extends Record<string, any>>(records: T[]): T[] =>
+  [...records].sort((a, b) => {
     const bDate = new Date(b.updatedAt || b.createdAt || 0).getTime();
     const aDate = new Date(a.updatedAt || a.createdAt || 0).getTime();
     return bDate - aDate;
   });
-};
-
-const nowDate = () => new Date();
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [deeds, setDeeds] = useState<Deed[]>([]);
@@ -136,25 +134,49 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     let mounted = true;
+
     const loadAll = async () => {
-      const collections: CollectionName[] = ['deeds', 'allocatedLands', 'deliveredLands', 'leasedLandsOut', 'leasedLandsIn', 'leasedBuildingsOut', 'leasedBuildingsIn'];
+      if (!isApiEnabled) {
+        toast.error('VITE_API_URL غير مفعّل؛ تم إيقاف الحفظ المحلي لحماية البيانات من الفقد.');
+        setLoading(false);
+        return;
+      }
+
       try {
-        for (const collectionName of collections) {
-          let records: any[] = [];
-          if (collectionName === 'deeds' && isApiEnabled) {
-            records = await api.getDeeds<any>();
-          } else {
-            records = loadBrowserCollection(collectionName);
-          }
-          if (mounted) setCollectionState(collectionName, records);
-        }
+        const [
+          deedsData,
+          allocatedData,
+          deliveredData,
+          landsOutData,
+          landsInData,
+          buildingsOutData,
+          buildingsInData,
+        ] = await Promise.all([
+          api.getDeeds<any>(),
+          api.getRecords<any>('allocated-lands'),
+          api.getRecords<any>('delivered-lands'),
+          api.getRecords<any>('leased-lands-out'),
+          api.getRecords<any>('leased-lands-in'),
+          api.getRecords<any>('leased-buildings-out'),
+          api.getRecords<any>('leased-buildings-in'),
+        ]);
+
+        if (!mounted) return;
+        setCollectionState('deeds', deedsData);
+        setCollectionState('allocatedLands', allocatedData);
+        setCollectionState('deliveredLands', deliveredData);
+        setCollectionState('leasedLandsOut', landsOutData);
+        setCollectionState('leasedLandsIn', landsInData);
+        setCollectionState('leasedBuildingsOut', buildingsOutData);
+        setCollectionState('leasedBuildingsIn', buildingsInData);
       } catch (error) {
         console.error('Failed to load data:', error);
-        toast.error('تعذر تحميل البيانات من الخادم، سيتم استخدام التخزين المحلي عند الحاجة');
+        toast.error(error instanceof Error ? error.message : 'تعذر تحميل البيانات من الخادم');
       } finally {
         if (mounted) setLoading(false);
       }
     };
+
     loadAll();
     return () => {
       mounted = false;
@@ -167,21 +189,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     successMessage: string
   ) => {
     try {
-      let newRecord: T;
-      if (collectionName === 'deeds' && isApiEnabled) {
-        newRecord = normalizeDateFields(await api.addDeed<T>(record as Partial<T>));
-        setCollectionState(collectionName, [newRecord, ...getCollectionState<T>(collectionName)]);
-      } else {
-        const createdAt = nowDate();
-        newRecord = { ...record, id: `${collectionName}-${Date.now()}`, createdAt, updatedAt: createdAt } as T;
-        const nextRecords = [newRecord, ...getCollectionState<T>(collectionName)];
-        setCollectionState(collectionName, nextRecords);
-        saveBrowserCollection(collectionName, nextRecords);
-      }
+      if (!isApiEnabled) throw new Error('الاتصال بالخادم غير مفعّل');
+
+      const saved = collectionName === 'deeds'
+        ? await api.addDeed<T>(record as Partial<T>)
+        : await api.addRecord<T>(resourceMap[collectionName as Exclude<CollectionName, 'deeds'>], record as Partial<T>);
+
+      const newRecord = normalizeDateFields(saved);
+      setCollectionState(collectionName, [newRecord, ...getCollectionState<T>(collectionName)]);
       toast.success(successMessage);
     } catch (error) {
       console.error(`Failed to add record to ${collectionName}:`, error);
-      toast.error('فشل في حفظ البيانات');
+      toast.error(error instanceof Error ? error.message : 'فشل في حفظ البيانات');
       throw error;
     }
   };
@@ -193,22 +212,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     successMessage: string
   ) => {
     try {
-      let nextRecords: T[];
-      if (collectionName === 'deeds' && isApiEnabled) {
-        const updated = normalizeDateFields(await api.updateDeed<T>(id, updates));
-        nextRecords = getCollectionState<T>(collectionName).map((record) => (record.id === id ? updated : record));
-      } else {
-        const updatedAt = nowDate();
-        nextRecords = getCollectionState<T>(collectionName).map((record) =>
-          record.id === id ? ({ ...record, ...updates, id, updatedAt } as T) : record
-        );
-        saveBrowserCollection(collectionName, nextRecords);
-      }
+      if (!isApiEnabled) throw new Error('الاتصال بالخادم غير مفعّل');
+
+      const saved = collectionName === 'deeds'
+        ? await api.updateDeed<T>(id, updates)
+        : await api.updateRecord<T>(resourceMap[collectionName as Exclude<CollectionName, 'deeds'>], id, updates);
+
+      const updated = normalizeDateFields(saved);
+      const nextRecords = getCollectionState<T>(collectionName).map((record) =>
+        record.id === id ? updated : record
+      );
       setCollectionState(collectionName, nextRecords);
       toast.success(successMessage);
     } catch (error) {
       console.error(`Failed to update record in ${collectionName}:`, error);
-      toast.error('فشل في تحديث البيانات');
+      toast.error(error instanceof Error ? error.message : 'فشل في تحديث البيانات');
       throw error;
     }
   };
@@ -219,16 +237,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     successMessage: string
   ) => {
     try {
-      if (collectionName === 'deeds' && isApiEnabled) {
+      if (!isApiEnabled) throw new Error('الاتصال بالخادم غير مفعّل');
+
+      if (collectionName === 'deeds') {
         await api.deleteDeed(id);
+      } else {
+        await api.deleteRecord(resourceMap[collectionName as Exclude<CollectionName, 'deeds'>], id);
       }
-      const nextRecords = getCollectionState<T>(collectionName).filter((record) => record.id !== id);
-      setCollectionState(collectionName, nextRecords);
-      if (!(collectionName === 'deeds' && isApiEnabled)) saveBrowserCollection(collectionName, nextRecords);
+
+      setCollectionState(
+        collectionName,
+        getCollectionState<T>(collectionName).filter((record) => record.id !== id)
+      );
       toast.success(successMessage);
     } catch (error) {
       console.error(`Failed to delete record from ${collectionName}:`, error);
-      toast.error('فشل في حذف البيانات');
+      toast.error(error instanceof Error ? error.message : 'فشل في حذف البيانات');
       throw error;
     }
   };
@@ -248,7 +272,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       totalLeasedBuildingsOut: leasedBuildingsOut.length,
       totalLeasedBuildingsIn: leasedBuildingsIn.length,
       totalArea,
-      totalRecords: deeds.length + allocatedLands.length + deliveredLands.length + leasedLandsOut.length + leasedLandsIn.length + leasedBuildingsOut.length + leasedBuildingsIn.length,
+      totalRecords:
+        deeds.length + allocatedLands.length + deliveredLands.length + leasedLandsOut.length +
+        leasedLandsIn.length + leasedBuildingsOut.length + leasedBuildingsIn.length,
     };
   };
 
