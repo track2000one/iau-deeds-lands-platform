@@ -69,6 +69,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     };
   }, [sidebarOpen]);
 
+  React.useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
   const toggleLanguage = () => {
     const newLang = i18n.language === 'ar' ? 'en' : 'ar';
 
@@ -125,17 +129,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const now = new Date();
 
   return (
-    <div className="future-app-shell h-screen flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className="future-app-shell min-h-dvh h-dvh w-full min-w-0 flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
       <ThemeInitializer />
 
-      <header className="future-topbar text-foreground z-30 relative shrink-0">
-        <div className="flex items-center justify-between px-3 md:px-5 py-3">
+      <header className="future-topbar text-foreground z-30 relative shrink-0 min-h-[68px]">
+        <div className="flex min-h-[68px] items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6 2xl:px-8">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden shrink-0 h-9 w-9 future-glow-button"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden shrink-0 h-10 w-10 rounded-xl future-glow-button"
+              onClick={() => setSidebarOpen((prev) => !prev)}
             >
               {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
@@ -192,7 +196,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="flex-1 flex overflow-hidden relative">
         {sidebarOpen && (
           <div
-            className="lg:hidden fixed inset-0 top-0 bg-black/60 z-40 backdrop-blur-sm"
+            className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
             onClick={() => setSidebarOpen(false)}
             aria-hidden="true"
           />
@@ -203,20 +207,21 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           className={`
             future-sidebar
             fixed lg:static
-            top-0 lg:top-auto
-            h-screen lg:h-auto
+            inset-y-0 lg:inset-y-auto
+            h-dvh lg:h-auto
             z-50 lg:z-0
-            w-[78vw] max-w-[300px] lg:w-64
+            w-[88vw] max-w-[320px] shrink-0
+            lg:w-[250px] xl:w-[270px] 2xl:w-[290px]
             bg-sidebar text-sidebar-foreground
             transition-transform duration-300 ease-in-out
             flex flex-col
-            ${isRTL ? 'left-0 lg:border-l' : 'right-0 lg:border-r'}
+            ${isRTL ? 'right-0 lg:border-l' : 'left-0 lg:border-r'}
             ${
               sidebarOpen
                 ? 'translate-x-0'
                 : isRTL
-                  ? '-translate-x-full'
-                  : 'translate-x-full'
+                  ? 'translate-x-full'
+                  : '-translate-x-full'
             }
             lg:translate-x-0
           `}
@@ -248,7 +253,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           </div>
 
-          <ScrollArea className="flex-1 px-3 py-4 overflow-y-auto">
+          <ScrollArea className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-3 sm:py-4">
             <nav className="space-y-2">
               {menuItems.map((item) => {
                 const Icon = item.icon;
@@ -285,8 +290,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </ScrollArea>
         </aside>
 
-        <main className="flex-1 overflow-auto bg-background/70 w-full">
-          <div className="container mx-auto p-3 md:p-5 lg:p-6 max-w-7xl">
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background/70">
+          <div className="w-full max-w-none px-2.5 py-3 sm:px-3 sm:py-4 md:px-5 md:py-5 2xl:px-7">
             {children}
           </div>
         </main>
