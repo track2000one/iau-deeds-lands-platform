@@ -532,11 +532,14 @@ export const ViewDeedPage: React.FC = () => {
         coordinates: serializeCoordinates(coordinates),
       };
 
-      const originalDeedNumber = String(deed.deedNumber || '').trim();
-      const nextDeedNumber = editForm.deedNumber.trim();
+      const normalizeDeedNumber = (value: unknown) =>
+        String(value ?? '').trim().replace(/\s+/g, '');
 
-      // لا نرسل رقم الصك عند عدم تغييره حتى لا يحدث تعارض Unique Constraint في قاعدة البيانات.
-      if (nextDeedNumber && nextDeedNumber !== originalDeedNumber) {
+      const originalDeedNumber = normalizeDeedNumber(deed.deedNumber);
+      const nextDeedNumber = normalizeDeedNumber(editForm.deedNumber);
+
+      // لا نرسل رقم الصك إذا لم يتغير حتى لا يُعامل السجل الحالي كسجل مكرر.
+      if (nextDeedNumber !== originalDeedNumber) {
         payload.deedNumber = nextDeedNumber;
       }
 
@@ -551,11 +554,12 @@ export const ViewDeedPage: React.FC = () => {
 
       if (
         errorMessage.includes('Unique constraint') ||
-        errorMessage.includes('deedNumber')
+        errorMessage.includes('deedNumber') ||
+        errorMessage.includes('رقم الصك مستخدم')
       ) {
-        toast.error('رقم الصك مستخدم في سجل آخر. غيّر رقم الصك أو اتركه كما هو.');
+        toast.error('رقم الصك مستخدم في سجل آخر. استخدم رقمًا مختلفًا.');
       } else {
-        toast.error('فشل في حفظ التعديلات');
+        toast.error(errorMessage || 'فشل في حفظ التعديلات');
       }
     } finally {
       setIsSavingEdit(false);
