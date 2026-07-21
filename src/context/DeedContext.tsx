@@ -146,15 +146,46 @@ export const DeedProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateDeed = async (id: string, deedData: Partial<Deed>): Promise<Deed | null> => {
     const updatedAt = new Date().toISOString();
+    const currentDeed = deeds.find((deed) => deed.id === id) || null;
+
+    if (!currentDeed) {
+      return null;
+    }
+
+    const normalizeDeedNumber = (value: unknown) =>
+      String(value ?? '').trim().replace(/\s+/g, '');
+
+    const sanitizedData: Partial<Deed> = { ...deedData };
+
+    if (Object.prototype.hasOwnProperty.call(sanitizedData, 'deedNumber')) {
+      const currentNumber = normalizeDeedNumber(currentDeed.deedNumber);
+      const nextNumber = normalizeDeedNumber(sanitizedData.deedNumber);
+
+      if (nextNumber === currentNumber) {
+        delete sanitizedData.deedNumber;
+      } else {
+        const duplicateExists = deeds.some(
+          (deed) =>
+            deed.id !== id &&
+            normalizeDeedNumber(deed.deedNumber) === nextNumber
+        );
+
+        if (duplicateExists) {
+          throw new Error('رقم الصك مستخدم في سجل آخر.');
+        }
+
+        sanitizedData.deedNumber = nextNumber as any;
+      }
+    }
 
     try {
       if (isApiEnabled) {
         const savedDeed = await api.updateDeed<Deed>(id, {
-          ...deedData,
+          ...sanitizedData,
           area:
-            deedData.area !== undefined && deedData.area !== null
-              ? Number(deedData.area)
-              : deedData.area,
+            sanitizedData.area !== undefined && sanitizedData.area !== null
+              ? Number(sanitizedData.area)
+              : sanitizedData.area,
         });
 
         const normalized = normalizeDeed(savedDeed);
@@ -168,22 +199,16 @@ export const DeedProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return normalized;
       }
 
-      const currentDeed = deeds.find((deed) => deed.id === id) || null;
-
-      if (!currentDeed) {
-        return null;
-      }
-
       const mergedDeed: Deed = {
         ...currentDeed,
-        ...deedData,
+        ...sanitizedData,
         id,
         updatedAt,
       };
 
       if (window.localAPI?.updateDeed) {
         const savedDeed = await window.localAPI.updateDeed(id, {
-          ...deedData,
+          ...sanitizedData,
           updatedAt,
         });
 
