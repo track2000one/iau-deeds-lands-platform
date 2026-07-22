@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
   Upload,
@@ -88,7 +88,7 @@ type ArchiveFormState = {
   files: File[];
 };
 
-const STORAGE_KEY = 'iau_archive_documents_v1';
+const LEGACY_STORAGE_KEY = 'iau_archive_documents_v1';
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
 
 const emptyForm: ArchiveFormState = {
@@ -163,24 +163,11 @@ const getConfidentialityVariant = (value: ArchiveDocument['confidentiality']) =>
   return 'outline';
 };
 
-const loadArchiveDocuments = (): ArchiveDocument[] => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveArchiveDocuments = (items: ArchiveDocument[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-};
 
 export const ArchivePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [documents, setDocuments] = useState<ArchiveDocument[]>(() => loadArchiveDocuments());
+  const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterConfidentiality, setFilterConfidentiality] = useState('');
@@ -194,6 +181,132 @@ export const ArchivePage: React.FC = () => {
   const [selectedDocument, setSelectedDocument] = useState<ArchiveDocument | null>(null);
   const [documentToDelete, setDocumentToDelete] = useState<ArchiveDocument | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  const archiveRequest = async <T,>(
+    path = '',
+    options: RequestInit = {}
+  ): Promise<T> => {
+    if (!API_BASE_URL) {
+      throw new Error('VITE_API_URL غير موجود. تأكد من ربط الواجهة بالـ Backend.');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/archive${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(body?.message || 'تعذر تنفيذ عملية الأرشفة');
+    }
+
+    return body as T;
+  };
+
+  const loadDocumentsFromServer = async () => {
+    const remote = await archiveRequest<ArchiveDocument[]>();
+    setDocuments(Array.isArray(remote) ? remote : []);
+    return Array.isArray(remote) ? remote : [];
+  };
+
+  const migrateLegacyDocuments = async (remoteDocuments: ArchiveDocument[]) => {
+    const migrationMarker = 'iau_archive_documents_migrated_to_postgres_v1';
+
+    if (localStorage.getItem(migrationMarker) === 'done') {
+      return remoteDocuments;
+    }
+
+    let legacyDocuments: ArchiveDocument[] = [];
+
+    try {
+      const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      legacyDocuments = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      legacyDocuments = [];
+    }
+
+    if (legacyDocuments.length === 0) {
+      localStorage.setItem(migrationMarker, 'done');
+      return remoteDocuments;
+    }
+
+    const existingKeys = new Set(
+      remoteDocuments.map(
+        (document) =>
+          `${document.driveUrl || ''}|${document.originalName || ''}|${document.documentNumber || ''}`
+      )
+    );
+
+    let migratedCount = 0;
+
+    for (const legacy of legacyDocuments) {
+      const key = `${legacy.driveUrl || ''}|${legacy.originalName || ''}|${legacy.documentNumber || ''}`;
+
+      if (!legacy.driveUrl || existingKeys.has(key)) {
+        continue;
+      }
+
+      await archiveRequest<ArchiveDocument>('', {
+        method: 'POST',
+        body: JSON.stringify(legacy),
+      });
+
+      existingKeys.add(key);
+      migratedCount += 1;
+    }
+
+    localStorage.setItem(migrationMarker, 'done');
+
+    if (migratedCount > 0) {
+      toast.success(`تم نقل ${migratedCount} ملف أرشيف قديم إلى قاعدة البيانات`);
+      return loadDocumentsFromServer();
+    }
+
+    return remoteDocuments;
+  };
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeArchive = async () => {
+      try {
+        const remote = await loadDocumentsFromServer();
+
+        if (!mounted) return;
+
+        await migrateLegacyDocuments(remote);
+      } catch (error) {
+        console.error('Archive load error:', error);
+
+        if (mounted) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : 'تعذر تحميل الأرشفة من الخادم'
+          );
+        }
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    initializeArchive();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filteredDocuments = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -217,11 +330,6 @@ export const ArchivePage: React.FC = () => {
 
   const updateFormField = (field: keyof ArchiveFormState, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const persistDocuments = (items: ArchiveDocument[]) => {
-    setDocuments(items);
-    saveArchiveDocuments(items);
   };
 
   const openAddForm = () => {
@@ -265,19 +373,33 @@ export const ArchivePage: React.FC = () => {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!documentToDelete) return;
-    const next = documents.filter((doc) => doc.id !== documentToDelete.id);
-    persistDocuments(next);
-    toast.success('تم حذف الملف من الأرشفة');
-    setDeleteDialogOpen(false);
-    setDocumentToDelete(null);
-    if (selectedDocument?.id === documentToDelete.id) {
-      setSelectedDocument(null);
-      setDetailsOpen(false);
+
+    try {
+      await archiveRequest<void>(`/${documentToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      setDocuments((current) =>
+        current.filter((doc) => doc.id !== documentToDelete.id)
+      );
+
+      toast.success('تم حذف الملف من الأرشفة');
+      setDeleteDialogOpen(false);
+      setDocumentToDelete(null);
+
+      if (selectedDocument?.id === documentToDelete.id) {
+        setSelectedDocument(null);
+        setDetailsOpen(false);
+      }
+    } catch (error) {
+      console.error('Archive delete error:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'فشل في حذف ملف الأرشفة'
+      );
     }
   };
-
   const validateForm = () => {
     if (!form.title.trim()) {
       toast.error('عنوان الملف مطلوب');
@@ -320,11 +442,12 @@ export const ArchivePage: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
+
     setIsSaving(true);
 
     try {
       if (formMode === 'add') {
-        const newDocuments: ArchiveDocument[] = [];
+        const savedDocuments: ArchiveDocument[] = [];
 
         for (const file of form.files) {
           const uploaded = await uploadFileToGoogleDrive(file);
@@ -335,8 +458,7 @@ export const ArchivePage: React.FC = () => {
               ? baseTitle
               : `${baseTitle} - ${file.name.replace(/\.[^/.]+$/, '')}`;
 
-          newDocuments.push({
-            id: `archive-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          const payload = {
             title,
             category: form.category.trim(),
             documentNumber: form.documentNumber.trim(),
@@ -348,20 +470,29 @@ export const ArchivePage: React.FC = () => {
             description: form.description.trim(),
             fileName: uploaded.fileName || file.name,
             originalName: file.name,
-            mimeType: uploaded.mimeType || file.type || 'application/octet-stream',
+            mimeType:
+              uploaded.mimeType ||
+              file.type ||
+              'application/octet-stream',
             fileSize: file.size,
             driveUrl: uploaded.driveUrl,
             driveFileId: uploaded.driveFileId,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+          };
+
+          const saved = await archiveRequest<ArchiveDocument>('', {
+            method: 'POST',
+            body: JSON.stringify(payload),
           });
+
+          savedDocuments.push(saved);
         }
 
-        persistDocuments([...newDocuments, ...documents]);
+        setDocuments((current) => [...savedDocuments, ...current]);
+
         toast.success(
-          newDocuments.length === 1
+          savedDocuments.length === 1
             ? 'تمت أرشفة الملف بنجاح'
-            : `تمت أرشفة ${newDocuments.length} ملفات بنجاح`
+            : `تمت أرشفة ${savedDocuments.length} ملفات بنجاح`
         );
       } else if (selectedDocument) {
         let updatedFileData: Partial<ArchiveDocument> = {};
@@ -369,36 +500,48 @@ export const ArchivePage: React.FC = () => {
         if (form.files.length > 0) {
           const file = form.files[0];
           const uploaded = await uploadFileToGoogleDrive(file);
+
           updatedFileData = {
             fileName: uploaded.fileName || file.name,
             originalName: file.name,
-            mimeType: uploaded.mimeType || file.type || 'application/octet-stream',
+            mimeType:
+              uploaded.mimeType ||
+              file.type ||
+              'application/octet-stream',
             fileSize: file.size,
             driveUrl: uploaded.driveUrl,
             driveFileId: uploaded.driveFileId,
           };
         }
 
-        const next = documents.map((doc) =>
-          doc.id === selectedDocument.id
-            ? {
-                ...doc,
-                title: form.title.trim(),
-                category: form.category.trim(),
-                documentNumber: form.documentNumber.trim(),
-                documentDate: form.documentDate || '',
-                documentDateType: form.documentDateType,
-                issuingAuthority: form.issuingAuthority.trim(),
-                confidentiality: form.confidentiality,
-                tags: form.tags.trim(),
-                description: form.description.trim(),
-                ...updatedFileData,
-                updatedAt: new Date().toISOString(),
-              }
-            : doc
+        const payload = {
+          ...selectedDocument,
+          title: form.title.trim(),
+          category: form.category.trim(),
+          documentNumber: form.documentNumber.trim(),
+          documentDate: form.documentDate || '',
+          documentDateType: form.documentDateType,
+          issuingAuthority: form.issuingAuthority.trim(),
+          confidentiality: form.confidentiality,
+          tags: form.tags.trim(),
+          description: form.description.trim(),
+          ...updatedFileData,
+        };
+
+        const updated = await archiveRequest<ArchiveDocument>(
+          `/${selectedDocument.id}`,
+          {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          }
         );
 
-        persistDocuments(next);
+        setDocuments((current) =>
+          current.map((doc) =>
+            doc.id === selectedDocument.id ? updated : doc
+          )
+        );
+
         toast.success('تم تحديث بيانات الملف');
       }
 
@@ -407,12 +550,15 @@ export const ArchivePage: React.FC = () => {
       setForm(emptyForm);
     } catch (error) {
       console.error('Archive save error:', error);
-      toast.error(error instanceof Error ? error.message : 'فشل في حفظ بيانات الأرشفة');
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'فشل في حفظ بيانات الأرشفة'
+      );
     } finally {
       setIsSaving(false);
     }
   };
-
   const selectFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
 
@@ -466,6 +612,15 @@ export const ArchivePage: React.FC = () => {
     setFilterCategory('');
     setFilterConfidentiality('');
   };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6 flex items-center justify-center min-h-[300px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="mr-3">جاري تحميل الأرشفة...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
@@ -985,3 +1140,4 @@ const InfoBlock = ({ label, value }: { label: string; value: string }) => {
     </div>
   );
 };
+
