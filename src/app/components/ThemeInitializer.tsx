@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
   DEFAULT_THEME_ID,
@@ -64,7 +64,10 @@ const hexToHsl = (hex: string) => {
   )}%`;
 };
 
-const applyFontControls = (settings: FontControlSettings) => {
+const applyFontControls = (
+  settings: FontControlSettings,
+  allowColorOverrides = true
+) => {
   const root = document.documentElement;
 
   root.style.setProperty(
@@ -80,32 +83,34 @@ const applyFontControls = (settings: FontControlSettings) => {
     settings.headingFontWeight || '800'
   );
 
-  const optionalColors = [
-    ['--foreground', settings.foreground],
-    ['--muted-foreground', settings.mutedForeground],
-    ['--card-foreground', settings.cardForeground],
-    ['--sidebar-foreground', settings.sidebarForeground],
-    ['--primary', settings.primary],
-  ] as const;
+  if (allowColorOverrides) {
+    const optionalColors = [
+      ['--foreground', settings.foreground],
+      ['--muted-foreground', settings.mutedForeground],
+      ['--card-foreground', settings.cardForeground],
+      ['--sidebar-foreground', settings.sidebarForeground],
+      ['--primary', settings.primary],
+    ] as const;
 
-  optionalColors.forEach(([variable, color]) => {
-    if (!color) return;
-    const hsl = hexToHsl(color);
-    if (hsl) root.style.setProperty(variable, hsl);
-  });
+    optionalColors.forEach(([variable, color]) => {
+      if (!color) return;
+      const hsl = hexToHsl(color);
+      if (hsl) root.style.setProperty(variable, hsl);
+    });
 
-  if (settings.sidebarForeground) {
-    const sidebar = hexToHsl(settings.sidebarForeground);
-    if (sidebar) {
-      root.style.setProperty('--sidebar-accent-foreground', sidebar);
+    if (settings.sidebarForeground) {
+      const sidebar = hexToHsl(settings.sidebarForeground);
+      if (sidebar) {
+        root.style.setProperty('--sidebar-accent-foreground', sidebar);
+      }
     }
-  }
 
-  if (settings.primary) {
-    const primary = hexToHsl(settings.primary);
-    if (primary) {
-      root.style.setProperty('--ring', primary);
-      root.style.setProperty('--sidebar-primary', primary);
+    if (settings.primary) {
+      const primary = hexToHsl(settings.primary);
+      if (primary) {
+        root.style.setProperty('--ring', primary);
+        root.style.setProperty('--sidebar-primary', primary);
+      }
     }
   }
 };
@@ -549,6 +554,150 @@ const injectAppearanceStyles = () => {
       --muted-foreground: 215 28% 76%;
       --popover-foreground: 214 52% 97%;
     }
+
+    /* FINAL_DARK_READABILITY_FIX */
+    html[data-appearance-mode="dark"] {
+      color-scheme: dark;
+    }
+
+    html[data-appearance-mode="dark"] body,
+    html[data-appearance-mode="dark"] main {
+      color: hsl(var(--foreground)) !important;
+    }
+
+    html[data-appearance-mode="dark"] main {
+      background:
+        radial-gradient(circle at 12% 8%, var(--appearance-glow), transparent 30%),
+        radial-gradient(circle at 88% 15%, var(--appearance-glow-secondary), transparent 30%),
+        hsl(var(--background) / .88) !important;
+    }
+
+    html[data-appearance-mode="dark"] main [class*="bg-white"],
+    html[data-appearance-mode="dark"] main [class*="bg-slate-50"],
+    html[data-appearance-mode="dark"] main [class*="bg-gray-50"],
+    html[data-appearance-mode="dark"] main [class*="bg-sky-50"],
+    html[data-appearance-mode="dark"] main [class*="bg-blue-50"],
+    html[data-appearance-mode="dark"] main [class*="bg-violet-50"] {
+      color: hsl(var(--card-foreground)) !important;
+      background-color: var(--appearance-glass-strong) !important;
+      border-color: var(--appearance-glass-border) !important;
+    }
+
+    html[data-appearance-mode="dark"] main [class*="from-white"],
+    html[data-appearance-mode="dark"] main [class*="via-white"],
+    html[data-appearance-mode="dark"] main [class*="to-white"],
+    html[data-appearance-mode="dark"] main [class*="from-sky-50"],
+    html[data-appearance-mode="dark"] main [class*="via-sky-50"],
+    html[data-appearance-mode="dark"] main [class*="to-sky-50"],
+    html[data-appearance-mode="dark"] main [class*="from-blue-50"],
+    html[data-appearance-mode="dark"] main [class*="to-blue-50"],
+    html[data-appearance-mode="dark"] main [class*="from-violet-50"],
+    html[data-appearance-mode="dark"] main [class*="to-violet-50"] {
+      color: hsl(var(--card-foreground)) !important;
+      background-color: var(--appearance-glass-strong) !important;
+      background-image:
+        radial-gradient(circle at 14% 8%, var(--appearance-glow), transparent 28%),
+        radial-gradient(circle at 88% 16%, var(--appearance-glow-secondary), transparent 28%),
+        linear-gradient(
+          135deg,
+          var(--appearance-glass-strong),
+          var(--appearance-glass)
+        ) !important;
+      border-color: var(--appearance-glass-border) !important;
+      box-shadow:
+        var(--appearance-card-shadow),
+        inset 0 1px 0 rgba(255,255,255,.08) !important;
+    }
+
+    html[data-appearance-mode="dark"] main .text-slate-950,
+    html[data-appearance-mode="dark"] main .text-slate-900,
+    html[data-appearance-mode="dark"] main .text-slate-800,
+    html[data-appearance-mode="dark"] main .text-slate-700,
+    html[data-appearance-mode="dark"] main .text-gray-950,
+    html[data-appearance-mode="dark"] main .text-gray-900,
+    html[data-appearance-mode="dark"] main .text-gray-800,
+    html[data-appearance-mode="dark"] main .text-gray-700 {
+      color: hsl(var(--foreground)) !important;
+    }
+
+    html[data-appearance-mode="dark"] main .text-slate-600,
+    html[data-appearance-mode="dark"] main .text-slate-500,
+    html[data-appearance-mode="dark"] main .text-gray-600,
+    html[data-appearance-mode="dark"] main .text-gray-500,
+    html[data-appearance-mode="dark"] main .text-muted-foreground {
+      color: hsl(var(--muted-foreground)) !important;
+    }
+
+    html[data-appearance-mode="dark"] main input,
+    html[data-appearance-mode="dark"] main textarea,
+    html[data-appearance-mode="dark"] main select,
+    html[data-appearance-mode="dark"] main [role="combobox"] {
+      color: hsl(var(--foreground)) !important;
+      background-color: hsl(var(--input) / .94) !important;
+      border-color: var(--appearance-glass-border) !important;
+      caret-color: hsl(var(--primary)) !important;
+    }
+
+    html[data-appearance-mode="dark"] main input::placeholder,
+    html[data-appearance-mode="dark"] main textarea::placeholder {
+      color: hsl(var(--muted-foreground)) !important;
+      opacity: .96 !important;
+    }
+
+    html[data-appearance-mode="dark"] main select option {
+      color: hsl(var(--foreground)) !important;
+      background: hsl(var(--popover)) !important;
+    }
+
+    html[data-appearance-mode="dark"] main table,
+    html[data-appearance-mode="dark"] main thead,
+    html[data-appearance-mode="dark"] main tbody,
+    html[data-appearance-mode="dark"] main tr,
+    html[data-appearance-mode="dark"] main th,
+    html[data-appearance-mode="dark"] main td {
+      background-color: transparent !important;
+      border-color: var(--appearance-glass-border) !important;
+    }
+
+    html[data-appearance-mode="dark"] main th {
+      color: hsl(var(--foreground)) !important;
+      font-weight: 750 !important;
+    }
+
+    html[data-appearance-mode="dark"] main td {
+      color: hsl(var(--card-foreground)) !important;
+    }
+
+    html[data-appearance-mode="dark"] main tbody tr:hover {
+      background-color: hsl(var(--muted) / .62) !important;
+    }
+
+    html[data-appearance-mode="dark"] main button[class*="bg-primary"],
+    html[data-appearance-mode="dark"] main button[class*="from-sky-600"],
+    html[data-appearance-mode="dark"] main button[class*="from-blue-600"],
+    html[data-appearance-mode="dark"] main a[class*="bg-primary"] {
+      color: hsl(var(--primary-foreground)) !important;
+    }
+
+    html[data-appearance-theme="future-neon-dark"] {
+      --foreground: 210 100% 98%;
+      --card-foreground: 210 100% 98%;
+      --muted-foreground: 215 42% 82%;
+      --popover-foreground: 210 100% 98%;
+      --sidebar-foreground: 210 100% 97%;
+      --sidebar-accent-foreground: 210 100% 98%;
+    }
+
+    html[data-appearance-theme="silver-noir"] {
+      --foreground: 214 55% 98%;
+      --card-foreground: 214 55% 98%;
+      --muted-foreground: 215 32% 80%;
+      --popover-foreground: 214 55% 98%;
+      --sidebar-foreground: 214 55% 97%;
+      --sidebar-accent-foreground: 214 55% 98%;
+    }
+
+
     @media (max-width: 1279px) {
       .future-card {
         border-radius: 18px !important;
@@ -599,7 +748,10 @@ export const ThemeInitializer: React.FC = () => {
       const storedFont = localStorage.getItem(keys.font);
 
       if (storedFont) {
-        applyFontControls(JSON.parse(storedFont));
+        applyFontControls(
+          JSON.parse(storedFont),
+          normalizedTheme.mode !== 'dark'
+        );
       } else {
         applyFontControls({
           fontFamily: 'Tajawal, Cairo, Arial, sans-serif',
