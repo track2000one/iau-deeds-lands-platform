@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
+import { PLATFORM_LOGO_URL } from '../config/branding';
 import { Lock, User, Eye, EyeOff, LogIn, Shield, Languages } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
-import logoImage from '../../imports/103144.png';
+
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -63,7 +64,7 @@ export const LoginPage: React.FC = () => {
         <CardHeader className="space-y-3 md:space-y-4 text-center pb-2">
           <div className="flex justify-center mb-2">
             <img
-              src={logoImage}
+              src={PLATFORM_LOGO_URL}
               alt="منصة إدارة الصكوك والأراضي"
               className="w-20 h-20 md:w-24 md:h-24 object-contain drop-shadow-xl"
             />

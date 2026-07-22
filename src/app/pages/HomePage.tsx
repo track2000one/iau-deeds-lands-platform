@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useDeeds } from '../../context/DeedContext';
 import { useData } from '../../context/DataContext';
+import { PLATFORM_LOGO_URL } from '../config/branding';
 import {
   FileText,
   MapPin,
@@ -110,7 +111,11 @@ export const HomePage: React.FC = () => {
             <CardContent className="p-5">
               <div className="future-hero-art min-h-[230px]">
                 <div className="future-shield">
-                  <Shield className="h-24 w-24" />
+                  <img
+                    src={PLATFORM_LOGO_URL}
+                    alt="Platform logo"
+                    className="h-36 w-36 object-contain drop-shadow-[0_0_30px_hsl(var(--primary)/0.35)]"
+                  />
                 </div>
               </div>
 

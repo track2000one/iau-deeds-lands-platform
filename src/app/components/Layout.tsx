@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { ThemeInitializer } from './ThemeInitializer';
+import { PLATFORM_LOGO_URL } from '../config/branding';
 import {
   Home,
   FileText,
@@ -186,9 +187,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <p className="text-xs opacity-75 truncate">{t('app.subtitle')}</p>
             </div>
 
-            <div className="h-12 w-12 rounded-2xl border bg-primary/10 grid place-items-center shadow-[0_0_25px_hsl(var(--primary)/0.25)]">
-              <Shield className="h-7 w-7 text-primary" />
-            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              aria-label="Platform home"
+              className="h-12 w-12 overflow-hidden rounded-2xl border bg-background/60 p-1.5 grid place-items-center shadow-[0_0_25px_hsl(var(--primary)/0.25)] transition-transform hover:scale-105"
+            >
+              <img
+                src={PLATFORM_LOGO_URL}
+                alt="Platform logo"
+                className="h-full w-full object-contain"
+              />
+            </button>
           </div>
         </div>
       </header>
