@@ -1,26 +1,21 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-
-type AppearanceMode = 'light' | 'dark';
-
-type ThemeId =
-  | 'future-neon-dark'
-  | 'future-glass-light'
-  | 'official-classic-navy';
+import {
+  DEFAULT_THEME_ID,
+  applyAppearanceTheme,
+  getThemeById,
+} from '../theme/appearanceThemes';
 
 type FontControlSettings = {
   fontFamily: string;
   baseFontSize: string;
   headingFontWeight: string;
-  foreground: string;
-  mutedForeground: string;
-  cardForeground: string;
-  sidebarForeground: string;
-  primary: string;
+  foreground?: string;
+  mutedForeground?: string;
+  cardForeground?: string;
+  sidebarForeground?: string;
+  primary?: string;
 };
-
-const DEFAULT_THEME_ID: ThemeId = 'future-glass-light';
-const DEFAULT_MODE: AppearanceMode = 'light';
 
 const getUserKey = (username?: string | null) => {
   const safeUser = username?.trim() || 'guest';
@@ -32,146 +27,13 @@ const getUserKey = (username?: string | null) => {
   };
 };
 
-const variableNameMap: Record<string, string> = {
-  background: '--background',
-  foreground: '--foreground',
-  card: '--card',
-  cardForeground: '--card-foreground',
-  popover: '--popover',
-  popoverForeground: '--popover-foreground',
-  primary: '--primary',
-  primaryForeground: '--primary-foreground',
-  secondary: '--secondary',
-  secondaryForeground: '--secondary-foreground',
-  muted: '--muted',
-  mutedForeground: '--muted-foreground',
-  accent: '--accent',
-  accentForeground: '--accent-foreground',
-  border: '--border',
-  input: '--input',
-  ring: '--ring',
-  destructive: '--destructive',
-  destructiveForeground: '--destructive-foreground',
-  sidebar: '--sidebar',
-  sidebarForeground: '--sidebar-foreground',
-  sidebarPrimary: '--sidebar-primary',
-  sidebarPrimaryForeground: '--sidebar-primary-foreground',
-  sidebarAccent: '--sidebar-accent',
-  sidebarAccentForeground: '--sidebar-accent-foreground',
-  sidebarBorder: '--sidebar-border',
-  sidebarRing: '--sidebar-ring',
-};
-
-const themeVariables: Record<ThemeId, Record<string, string>> = {
-  'future-neon-dark': {
-    background: '231 56% 6%',
-    foreground: '214 100% 96%',
-    card: '230 48% 9%',
-    cardForeground: '214 100% 96%',
-    popover: '230 48% 9%',
-    popoverForeground: '214 100% 96%',
-    primary: '191 100% 50%',
-    primaryForeground: '230 55% 7%',
-    secondary: '258 92% 63%',
-    secondaryForeground: '214 100% 96%',
-    muted: '229 35% 15%',
-    mutedForeground: '219 34% 74%',
-    accent: '267 94% 63%',
-    accentForeground: '214 100% 96%',
-    border: '218 80% 28%',
-    input: '229 34% 16%',
-    ring: '191 100% 50%',
-    destructive: '348 84% 54%',
-    destructiveForeground: '0 0% 100%',
-    sidebar: '230 58% 7%',
-    sidebarForeground: '214 100% 96%',
-    sidebarPrimary: '191 100% 50%',
-    sidebarPrimaryForeground: '230 55% 7%',
-    sidebarAccent: '230 42% 14%',
-    sidebarAccentForeground: '214 100% 96%',
-    sidebarBorder: '218 80% 26%',
-    sidebarRing: '191 100% 50%',
-  },
-  'future-glass-light': {
-    background: '220 100% 99%',
-    foreground: '231 50% 24%',
-    card: '0 0% 100%',
-    cardForeground: '231 50% 24%',
-    popover: '0 0% 100%',
-    popoverForeground: '231 50% 24%',
-    primary: '222 100% 63%',
-    primaryForeground: '0 0% 100%',
-    secondary: '262 100% 70%',
-    secondaryForeground: '0 0% 100%',
-    muted: '226 90% 96%',
-    mutedForeground: '231 20% 48%',
-    accent: '189 95% 65%',
-    accentForeground: '231 50% 20%',
-    border: '229 80% 90%',
-    input: '229 80% 90%',
-    ring: '222 100% 63%',
-    destructive: '348 84% 54%',
-    destructiveForeground: '0 0% 100%',
-    sidebar: '0 0% 100%',
-    sidebarForeground: '231 50% 26%',
-    sidebarPrimary: '222 100% 63%',
-    sidebarPrimaryForeground: '0 0% 100%',
-    sidebarAccent: '229 100% 97%',
-    sidebarAccentForeground: '222 100% 48%',
-    sidebarBorder: '229 80% 90%',
-    sidebarRing: '222 100% 63%',
-  },
-  'official-classic-navy': {
-    background: '48 65% 97%',
-    foreground: '211 56% 18%',
-    card: '0 0% 100%',
-    cardForeground: '211 56% 18%',
-    popover: '0 0% 100%',
-    popoverForeground: '211 56% 18%',
-    primary: '208 52% 28%',
-    primaryForeground: '0 0% 100%',
-    secondary: '207 36% 48%',
-    secondaryForeground: '0 0% 100%',
-    muted: '42 34% 94%',
-    mutedForeground: '213 20% 45%',
-    accent: '207 46% 58%',
-    accentForeground: '0 0% 100%',
-    border: '38 34% 82%',
-    input: '38 34% 82%',
-    ring: '207 46% 58%',
-    destructive: '350 82% 42%',
-    destructiveForeground: '0 0% 100%',
-    sidebar: '208 52% 28%',
-    sidebarForeground: '0 0% 100%',
-    sidebarPrimary: '207 46% 58%',
-    sidebarPrimaryForeground: '0 0% 100%',
-    sidebarAccent: '208 44% 38%',
-    sidebarAccentForeground: '0 0% 100%',
-    sidebarBorder: '208 38% 38%',
-    sidebarRing: '207 46% 58%',
-  },
-};
-
-const defaultFontControls: FontControlSettings = {
-  fontFamily: 'Tajawal, Cairo, Arial, sans-serif',
-  baseFontSize: '15px',
-  headingFontWeight: '800',
-  foreground: '#24315F',
-  mutedForeground: '#667085',
-  cardForeground: '#24315F',
-  sidebarForeground: '#24315F',
-  primary: '#3F7CFF',
-};
-
 const hexToHsl = (hex: string) => {
   const normalized = hex.replace('#', '');
-
   if (normalized.length !== 6) return null;
 
   const r = parseInt(normalized.slice(0, 2), 16) / 255;
   const g = parseInt(normalized.slice(2, 4), 16) / 255;
   const b = parseInt(normalized.slice(4, 6), 16) / 255;
-
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   let h = 0;
@@ -197,63 +59,63 @@ const hexToHsl = (hex: string) => {
     h /= 6;
   }
 
-  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-};
-
-const applyMode = (mode: AppearanceMode) => {
-  const root = document.documentElement;
-
-  root.classList.toggle('dark', mode === 'dark');
-  root.dataset.appearanceMode = mode;
-};
-
-const applyThemeVariables = (themeId: ThemeId) => {
-  const root = document.documentElement;
-  const variables = themeVariables[themeId] || themeVariables[DEFAULT_THEME_ID];
-
-  Object.entries(variables).forEach(([key, value]) => {
-    const cssVariable = variableNameMap[key];
-    if (cssVariable) root.style.setProperty(cssVariable, value);
-  });
-
-  root.dataset.appearanceTheme = themeId;
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(
+    l * 100
+  )}%`;
 };
 
 const applyFontControls = (settings: FontControlSettings) => {
   const root = document.documentElement;
 
-  root.style.setProperty('--app-font-family', settings.fontFamily);
-  root.style.setProperty('--app-base-font-size', settings.baseFontSize);
-  root.style.setProperty('--app-heading-font-weight', settings.headingFontWeight);
+  root.style.setProperty(
+    '--app-font-family',
+    settings.fontFamily || 'Tajawal, Cairo, Arial, sans-serif'
+  );
+  root.style.setProperty(
+    '--app-base-font-size',
+    settings.baseFontSize || '15px'
+  );
+  root.style.setProperty(
+    '--app-heading-font-weight',
+    settings.headingFontWeight || '800'
+  );
 
-  const foreground = hexToHsl(settings.foreground);
-  const mutedForeground = hexToHsl(settings.mutedForeground);
-  const cardForeground = hexToHsl(settings.cardForeground);
-  const sidebarForeground = hexToHsl(settings.sidebarForeground);
-  const primary = hexToHsl(settings.primary);
+  const optionalColors = [
+    ['--foreground', settings.foreground],
+    ['--muted-foreground', settings.mutedForeground],
+    ['--card-foreground', settings.cardForeground],
+    ['--sidebar-foreground', settings.sidebarForeground],
+    ['--primary', settings.primary],
+  ] as const;
 
-  if (foreground) root.style.setProperty('--foreground', foreground);
-  if (mutedForeground) root.style.setProperty('--muted-foreground', mutedForeground);
-  if (cardForeground) root.style.setProperty('--card-foreground', cardForeground);
+  optionalColors.forEach(([variable, color]) => {
+    if (!color) return;
+    const hsl = hexToHsl(color);
+    if (hsl) root.style.setProperty(variable, hsl);
+  });
 
-  if (sidebarForeground) {
-    root.style.setProperty('--sidebar-foreground', sidebarForeground);
-    root.style.setProperty('--sidebar-accent-foreground', sidebarForeground);
+  if (settings.sidebarForeground) {
+    const sidebar = hexToHsl(settings.sidebarForeground);
+    if (sidebar) {
+      root.style.setProperty('--sidebar-accent-foreground', sidebar);
+    }
   }
 
-  if (primary) {
-    root.style.setProperty('--primary', primary);
-    root.style.setProperty('--ring', primary);
-    root.style.setProperty('--sidebar-primary', primary);
+  if (settings.primary) {
+    const primary = hexToHsl(settings.primary);
+    if (primary) {
+      root.style.setProperty('--ring', primary);
+      root.style.setProperty('--sidebar-primary', primary);
+    }
   }
-
-  root.dataset.customFontColors = 'enabled';
 };
 
-const injectFutureStyles = () => {
-  const styleId = 'iau-future-platform-theme';
+const injectAppearanceStyles = () => {
+  const oldStyle = document.getElementById('iau-future-platform-theme');
+  oldStyle?.remove();
 
-  if (document.getElementById(styleId)) return;
+  const styleId = 'iau-modern-appearance-themes';
+  document.getElementById(styleId)?.remove();
 
   const style = document.createElement('style');
   style.id = styleId;
@@ -263,228 +125,29 @@ const injectFutureStyles = () => {
       --app-base-font-size: 15px;
       --app-heading-font-weight: 800;
       --future-radius: 22px;
+      --appearance-body-bg: linear-gradient(180deg, #ffffff, #f7faff);
+      --appearance-glass: rgba(255,255,255,.74);
+      --appearance-glass-strong: rgba(255,255,255,.90);
+      --appearance-glass-border: rgba(109,139,240,.24);
+      --appearance-glow: rgba(63,124,255,.22);
+      --appearance-glow-secondary: rgba(184,125,255,.17);
+      --appearance-card-shadow: 0 20px 55px rgba(67,83,145,.14);
+      --appearance-topbar: rgba(255,255,255,.84);
+      --appearance-sidebar: rgba(255,255,255,.88);
     }
 
     body {
       font-family: var(--app-font-family) !important;
       font-size: var(--app-base-font-size) !important;
       color: hsl(var(--foreground)) !important;
-      transition: background 300ms ease, color 300ms ease;
+      background: var(--appearance-body-bg) !important;
+      background-attachment: fixed !important;
+      transition: background 320ms ease, color 260ms ease;
     }
 
     h1, h2, h3, h4, h5, h6, .font-bold, .font-semibold {
       font-weight: var(--app-heading-font-weight) !important;
     }
-
-    html[data-appearance-theme="future-neon-dark"] body {
-      background:
-        radial-gradient(circle at 18% 10%, rgba(124, 77, 255, 0.26), transparent 34%),
-        radial-gradient(circle at 80% 15%, rgba(0, 229, 255, 0.18), transparent 30%),
-        radial-gradient(circle at 50% 90%, rgba(0, 248, 181, 0.10), transparent 34%),
-        #060A1F !important;
-    }
-
-    html[data-appearance-theme="future-glass-light"] body {
-      background:
-        radial-gradient(circle at 20% 10%, rgba(90, 145, 255, 0.13), transparent 28%),
-        radial-gradient(circle at 82% 18%, rgba(174, 110, 255, 0.12), transparent 30%),
-        linear-gradient(180deg, #ffffff 0%, #f7faff 100%) !important;
-    }
-
-    html[data-appearance-theme="official-classic-navy"] body {
-      background:
-        radial-gradient(circle at 12% 10%, rgba(44, 79, 115, 0.06), transparent 26%),
-        linear-gradient(180deg, #fcfaf1 0%, #f8f4e7 100%) !important;
-    }
-
-    .future-app-shell { background: transparent; }
-
-    .future-topbar {
-      border-bottom: 1px solid hsl(var(--border) / 0.55);
-      backdrop-filter: blur(20px);
-      position: relative;
-      isolation: isolate;
-    }
-
-    html[data-appearance-theme="future-neon-dark"] .future-topbar {
-      background:
-        linear-gradient(90deg, rgba(3, 9, 28, 0.96), rgba(11, 20, 58, 0.88), rgba(3, 9, 28, 0.96)) !important;
-      box-shadow: 0 0 35px rgba(0, 229, 255, 0.12);
-    }
-
-    html[data-appearance-theme="future-glass-light"] .future-topbar {
-      background: rgba(255, 255, 255, 0.78) !important;
-      box-shadow: 0 12px 40px rgba(65, 105, 225, 0.08);
-    }
-
-    .future-sidebar {
-      backdrop-filter: blur(24px);
-      position: relative;
-      overflow: hidden;
-    }
-
-    html[data-appearance-theme="future-neon-dark"] .future-sidebar {
-      background:
-        linear-gradient(180deg, rgba(7, 13, 38, 0.96), rgba(6, 10, 31, 0.98)) !important;
-      border-color: rgba(0, 229, 255, 0.18) !important;
-      box-shadow: inset 0 0 24px rgba(0, 229, 255, 0.08), 0 0 45px rgba(0, 0, 0, 0.45);
-    }
-
-    html[data-appearance-theme="future-glass-light"] .future-sidebar {
-      background: rgba(255, 255, 255, 0.82) !important;
-      border-color: rgba(120, 145, 255, 0.24) !important;
-      box-shadow: inset 0 0 28px rgba(121, 155, 255, 0.10), 0 20px 50px rgba(80, 96, 160, 0.10);
-    }
-
-    .future-nav-item {
-      border: 1px solid transparent !important;
-      transition: all 250ms ease !important;
-      border-radius: 16px !important;
-    }
-
-    html[data-appearance-theme="future-neon-dark"] .future-nav-item:hover,
-    html[data-appearance-theme="future-neon-dark"] .future-nav-item.is-active {
-      background: linear-gradient(90deg, rgba(0, 229, 255, 0.14), rgba(124, 77, 255, 0.18)) !important;
-      border-color: rgba(0, 229, 255, 0.35) !important;
-      box-shadow: 0 0 26px rgba(0, 229, 255, 0.18), inset 0 0 18px rgba(124, 77, 255, 0.12);
-      color: #eaf8ff !important;
-    }
-
-    html[data-appearance-theme="future-glass-light"] .future-nav-item:hover,
-    html[data-appearance-theme="future-glass-light"] .future-nav-item.is-active {
-      background: linear-gradient(90deg, rgba(63, 124, 255, 0.09), rgba(184, 125, 255, 0.10)) !important;
-      border-color: rgba(63, 124, 255, 0.22) !important;
-      box-shadow: 0 10px 26px rgba(63, 124, 255, 0.12);
-      color: #3759d7 !important;
-    }
-
-    .future-card {
-      border-radius: var(--future-radius) !important;
-      border: 1px solid hsl(var(--border) / 0.72) !important;
-      backdrop-filter: blur(18px);
-      position: relative;
-      overflow: hidden;
-      transition: transform 260ms ease, box-shadow 260ms ease, border-color 260ms ease;
-    }
-
-    .future-card:hover { transform: translateY(-2px); }
-
-    html[data-appearance-theme="future-neon-dark"] .future-card {
-      background:
-        linear-gradient(180deg, rgba(18, 28, 68, 0.66), rgba(8, 14, 38, 0.82)) !important;
-      box-shadow: 0 0 34px rgba(0, 229, 255, 0.08), inset 0 0 18px rgba(124, 77, 255, 0.07);
-    }
-
-    html[data-appearance-theme="future-neon-dark"] .future-card:hover {
-      border-color: rgba(0, 229, 255, 0.42) !important;
-      box-shadow: 0 0 40px rgba(0, 229, 255, 0.18), inset 0 0 24px rgba(124, 77, 255, 0.10);
-    }
-
-    html[data-appearance-theme="future-glass-light"] .future-card {
-      background: rgba(255, 255, 255, 0.76) !important;
-      box-shadow: 0 18px 45px rgba(80, 96, 160, 0.10);
-    }
-
-    html[data-appearance-theme="future-glass-light"] .future-card:hover {
-      border-color: rgba(63, 124, 255, 0.26) !important;
-      box-shadow: 0 22px 60px rgba(80, 96, 160, 0.16);
-    }
-
-    .future-card::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background:
-        radial-gradient(circle at 18% 10%, hsl(var(--primary) / 0.12), transparent 24%),
-        radial-gradient(circle at 88% 18%, hsl(var(--secondary) / 0.10), transparent 24%);
-      opacity: 0.75;
-    }
-
-    .future-card > * {
-      position: relative;
-      z-index: 1;
-    }
-
-    .future-stat-icon {
-      display: grid;
-      place-items: center;
-      border-radius: 18px;
-      box-shadow: 0 0 24px hsl(var(--primary) / 0.22);
-    }
-
-    .future-glow-button {
-      border-radius: 16px !important;
-      border: 1px solid hsl(var(--primary) / 0.30) !important;
-      box-shadow: 0 0 24px hsl(var(--primary) / 0.20);
-      transition: all 220ms ease !important;
-    }
-
-    .future-glow-button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 34px hsl(var(--primary) / 0.34);
-    }
-
-    .future-hero-art {
-      min-height: 260px;
-      border-radius: 26px;
-      overflow: hidden;
-      border: 1px solid hsl(var(--primary) / 0.24);
-      background:
-        radial-gradient(circle at 50% 65%, hsl(var(--primary) / 0.36), transparent 18%),
-        radial-gradient(circle at 50% 65%, hsl(var(--secondary) / 0.20), transparent 34%),
-        linear-gradient(135deg, hsl(var(--card) / 0.82), hsl(var(--muted) / 0.42));
-      position: relative;
-    }
-
-    .future-hero-art::before {
-      content: "";
-      position: absolute;
-      inset: 18%;
-      border-radius: 28px;
-      border: 1px solid hsl(var(--primary) / 0.36);
-      box-shadow: 0 0 38px hsl(var(--primary) / 0.26), inset 0 0 24px hsl(var(--secondary) / 0.18);
-      transform: perspective(700px) rotateX(14deg) rotateY(-8deg);
-    }
-
-    .future-hero-art::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      bottom: 36px;
-      width: 190px;
-      height: 38px;
-      transform: translateX(-50%);
-      border-radius: 999px;
-      background: hsl(var(--primary) / 0.30);
-      filter: blur(18px);
-    }
-
-    .future-shield {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      color: hsl(var(--primary));
-      filter: drop-shadow(0 0 22px hsl(var(--primary) / 0.65));
-    }
-
-    html[data-appearance-theme] [role="dialog"],
-    html[data-appearance-theme] [data-radix-dialog-content] {
-      background: hsl(var(--popover)) !important;
-      color: hsl(var(--popover-foreground)) !important;
-      opacity: 1 !important;
-      border: 1px solid hsl(var(--border)) !important;
-      box-shadow: 0 24px 70px rgba(24, 39, 55, 0.28) !important;
-      border-radius: 18px !important;
-      backdrop-filter: none !important;
-    }
-
-    html[data-appearance-theme] [data-radix-dialog-overlay] {
-      background: rgba(15, 23, 42, 0.58) !important;
-      backdrop-filter: blur(4px) !important;
-    }
-
 
     .future-app-shell {
       width: 100%;
@@ -494,17 +157,131 @@ const injectFutureStyles = () => {
 
     .future-app-shell main,
     .future-app-shell main > div {
-      min-width: 0;
       width: 100%;
+      min-width: 0;
       max-width: none !important;
     }
 
+    .future-topbar {
+      position: relative;
+      isolation: isolate;
+      border-bottom: 1px solid var(--appearance-glass-border) !important;
+      background: var(--appearance-topbar) !important;
+      backdrop-filter: blur(24px) saturate(135%);
+      -webkit-backdrop-filter: blur(24px) saturate(135%);
+      box-shadow:
+        0 12px 38px var(--appearance-glow),
+        inset 0 -1px 0 rgba(255,255,255,.16);
+    }
+
+    .future-topbar > div {
+      width: 100%;
+    }
+
     .future-sidebar {
+      position: relative;
       flex-shrink: 0;
+      overflow: hidden;
+      border-color: var(--appearance-glass-border) !important;
+      background: var(--appearance-sidebar) !important;
+      backdrop-filter: blur(28px) saturate(135%);
+      -webkit-backdrop-filter: blur(28px) saturate(135%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.18),
+        0 20px 58px var(--appearance-glow);
+    }
+
+    .future-sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 0%, var(--appearance-glow), transparent 30%),
+        radial-gradient(circle at 100% 65%, var(--appearance-glow-secondary), transparent 28%);
+      opacity: .70;
+    }
+
+    .future-sidebar > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .future-nav-item {
+      border: 1px solid transparent !important;
+      border-radius: 16px !important;
+      transition:
+        transform 220ms ease,
+        background 220ms ease,
+        box-shadow 220ms ease,
+        border-color 220ms ease !important;
+    }
+
+    .future-nav-item:hover,
+    .future-nav-item.is-active {
+      color: hsl(var(--sidebar-accent-foreground)) !important;
+      border-color: var(--appearance-glass-border) !important;
+      background:
+        linear-gradient(
+          100deg,
+          hsl(var(--sidebar-primary) / .14),
+          hsl(var(--secondary) / .12)
+        ) !important;
+      box-shadow:
+        0 10px 28px var(--appearance-glow),
+        inset 0 1px 0 rgba(255,255,255,.15);
     }
 
     .future-card {
+      position: relative;
       min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--appearance-glass-border) !important;
+      border-radius: var(--future-radius) !important;
+      background: var(--appearance-glass) !important;
+      backdrop-filter: blur(22px) saturate(138%);
+      -webkit-backdrop-filter: blur(22px) saturate(138%);
+      box-shadow: var(--appearance-card-shadow);
+      transition:
+        transform 240ms ease,
+        box-shadow 240ms ease,
+        border-color 240ms ease;
+    }
+
+    .future-card:hover {
+      transform: translateY(-2px);
+      border-color: hsl(var(--primary) / .38) !important;
+      box-shadow:
+        var(--appearance-card-shadow),
+        0 0 34px var(--appearance-glow);
+    }
+
+    .future-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 14% 8%, var(--appearance-glow), transparent 25%),
+        radial-gradient(circle at 90% 16%, var(--appearance-glow-secondary), transparent 25%);
+      opacity: .72;
+    }
+
+    .future-card::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 8%;
+      left: 8%;
+      height: 1px;
+      pointer-events: none;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,.72),
+        transparent
+      );
+      opacity: .72;
     }
 
     .future-card > * {
@@ -512,19 +289,115 @@ const injectFutureStyles = () => {
       z-index: 1;
     }
 
-    .future-topbar > div {
-      width: 100%;
+    .future-glass-thick {
+      border: 1px solid var(--appearance-glass-border) !important;
+      background: var(--appearance-glass-strong) !important;
+      backdrop-filter: blur(30px) saturate(145%) !important;
+      -webkit-backdrop-filter: blur(30px) saturate(145%) !important;
+      box-shadow:
+        var(--appearance-card-shadow),
+        inset 0 1px 0 rgba(255,255,255,.36),
+        0 0 34px var(--appearance-glow-secondary) !important;
     }
 
-    @media (min-width: 1536px) {
-      .future-card {
-        border-radius: 20px !important;
-      }
+    .future-stat-icon {
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      box-shadow:
+        0 0 24px var(--appearance-glow),
+        inset 0 1px 0 rgba(255,255,255,.20);
+    }
+
+    .future-glow-button {
+      border: 1px solid hsl(var(--primary) / .34) !important;
+      border-radius: 16px !important;
+      box-shadow:
+        0 0 24px var(--appearance-glow),
+        inset 0 1px 0 rgba(255,255,255,.20);
+      transition:
+        transform 220ms ease,
+        box-shadow 220ms ease !important;
+    }
+
+    .future-glow-button:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 0 38px var(--appearance-glow),
+        0 12px 32px var(--appearance-glow-secondary);
+    }
+
+    .future-hero-art {
+      position: relative;
+      min-height: 260px;
+      overflow: hidden;
+      border: 1px solid var(--appearance-glass-border);
+      border-radius: 28px;
+      background:
+        radial-gradient(circle at 50% 65%, var(--appearance-glow), transparent 19%),
+        radial-gradient(circle at 50% 65%, var(--appearance-glow-secondary), transparent 36%),
+        linear-gradient(135deg, var(--appearance-glass-strong), var(--appearance-glass));
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.24),
+        0 20px 58px var(--appearance-glow);
+      backdrop-filter: blur(26px);
+      -webkit-backdrop-filter: blur(26px);
+    }
+
+    .future-hero-art::before {
+      content: "";
+      position: absolute;
+      inset: 18%;
+      border: 1px solid hsl(var(--primary) / .38);
+      border-radius: 30px;
+      box-shadow:
+        0 0 42px var(--appearance-glow),
+        inset 0 0 28px var(--appearance-glow-secondary);
+      transform: perspective(720px) rotateX(14deg) rotateY(-8deg);
+    }
+
+    .future-hero-art::after {
+      content: "";
+      position: absolute;
+      bottom: 34px;
+      left: 50%;
+      width: 190px;
+      height: 38px;
+      border-radius: 999px;
+      background: var(--appearance-glow);
+      filter: blur(18px);
+      transform: translateX(-50%);
+    }
+
+    .future-shield {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: hsl(var(--primary));
+      filter: drop-shadow(0 0 24px var(--appearance-glow));
+    }
+
+    html[data-appearance-theme] [role="dialog"],
+    html[data-appearance-theme] [data-radix-dialog-content] {
+      color: hsl(var(--popover-foreground)) !important;
+      border: 1px solid var(--appearance-glass-border) !important;
+      border-radius: 20px !important;
+      background: hsl(var(--popover)) !important;
+      box-shadow:
+        0 26px 78px rgba(15,23,42,.30),
+        0 0 34px var(--appearance-glow) !important;
+      opacity: 1 !important;
+    }
+
+    html[data-appearance-theme] [data-radix-dialog-overlay] {
+      background: rgba(15,23,42,.58) !important;
+      backdrop-filter: blur(5px) !important;
     }
 
     @media (max-width: 1279px) {
       .future-card {
-        border-radius: 17px !important;
+        border-radius: 18px !important;
       }
     }
 
@@ -543,8 +416,13 @@ const injectFutureStyles = () => {
       }
     }
 
-    @media (max-width: 768px) {
-      .future-card { border-radius: 18px !important; }
+    @media (prefers-reduced-motion: reduce) {
+      .future-card,
+      .future-glow-button,
+      .future-nav-item,
+      body {
+        transition: none !important;
+      }
     }
   `;
 
@@ -555,21 +433,37 @@ export const ThemeInitializer: React.FC = () => {
   const { username } = useAuth();
 
   useEffect(() => {
-    injectFutureStyles();
+    injectAppearanceStyles();
 
     const keys = getUserKey(username);
-    const savedTheme = (localStorage.getItem(keys.theme) as ThemeId) || DEFAULT_THEME_ID;
-    const normalizedTheme: ThemeId = themeVariables[savedTheme] ? savedTheme : DEFAULT_THEME_ID;
-    const savedMode = (localStorage.getItem(keys.mode) as AppearanceMode) || (normalizedTheme === 'future-neon-dark' ? 'dark' : DEFAULT_MODE);
+    const storedTheme = localStorage.getItem(keys.theme);
+    const normalizedTheme = getThemeById(storedTheme);
 
-    applyThemeVariables(normalizedTheme);
-    applyMode(savedMode);
+    applyAppearanceTheme(normalizedTheme.id);
 
     try {
       const storedFont = localStorage.getItem(keys.font);
-      applyFontControls(storedFont ? JSON.parse(storedFont) : defaultFontControls);
+
+      if (storedFont) {
+        applyFontControls(JSON.parse(storedFont));
+      } else {
+        applyFontControls({
+          fontFamily: 'Tajawal, Cairo, Arial, sans-serif',
+          baseFontSize: '15px',
+          headingFontWeight: '800',
+        });
+      }
     } catch {
-      applyFontControls(defaultFontControls);
+      applyFontControls({
+        fontFamily: 'Tajawal, Cairo, Arial, sans-serif',
+        baseFontSize: '15px',
+        headingFontWeight: '800',
+      });
+    }
+
+    if (!storedTheme) {
+      localStorage.setItem(keys.theme, DEFAULT_THEME_ID);
+      localStorage.setItem(keys.mode, normalizedTheme.mode);
     }
   }, [username]);
 
