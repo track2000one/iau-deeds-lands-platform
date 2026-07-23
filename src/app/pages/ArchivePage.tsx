@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
   Upload,
@@ -45,6 +45,8 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { authenticatedFetch } from '../../lib/http';
+import { usePermissions } from '../../context/PermissionsContext';
 
 type ArchiveDocument = {
   id: string;
@@ -166,6 +168,7 @@ const getConfidentialityVariant = (value: ArchiveDocument['confidentiality']) =>
 
 export const ArchivePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { isAdmin } = usePermissions();
 
   const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -192,7 +195,7 @@ export const ArchivePage: React.FC = () => {
       throw new Error('VITE_API_URL غير موجود. تأكد من ربط الواجهة بالـ Backend.');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/archive${path}`, {
+    const response = await authenticatedFetch(`/api/archive${path}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -285,7 +288,9 @@ export const ArchivePage: React.FC = () => {
 
         if (!mounted) return;
 
-        await migrateLegacyDocuments(remote);
+        if (isAdmin) {
+          await migrateLegacyDocuments(remote);
+        }
       } catch (error) {
         console.error('Archive load error:', error);
 
@@ -306,7 +311,7 @@ export const ArchivePage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isAdmin]);
 
   const filteredDocuments = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -333,6 +338,11 @@ export const ArchivePage: React.FC = () => {
   };
 
   const openAddForm = () => {
+    if (!isAdmin) {
+      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+      return;
+    }
+
     setFormMode('add');
     setSelectedDocument(null);
     setDetailsOpen(false);
@@ -342,6 +352,11 @@ export const ArchivePage: React.FC = () => {
   };
 
   const openEditForm = (doc: ArchiveDocument) => {
+    if (!isAdmin) {
+      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+      return;
+    }
+
     setFormMode('edit');
     setSelectedDocument(doc);
     setDetailsOpen(false);
@@ -369,11 +384,21 @@ export const ArchivePage: React.FC = () => {
   };
 
   const requestDelete = (doc: ArchiveDocument) => {
+    if (!isAdmin) {
+      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+      return;
+    }
+
     setDocumentToDelete(doc);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = async () => {
+    if (!isAdmin) {
+      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+      return;
+    }
+
     if (!documentToDelete) return;
 
     try {
@@ -424,7 +449,7 @@ export const ArchivePage: React.FC = () => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${API_BASE_URL}/api/uploads`, {
+    const response = await authenticatedFetch('/api/uploads', {
       method: 'POST',
       body: formData,
     });
@@ -441,6 +466,11 @@ export const ArchivePage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (!isAdmin) {
+      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+      return;
+    }
+
     if (!validateForm()) return;
 
     setIsSaving(true);
@@ -632,10 +662,12 @@ export const ArchivePage: React.FC = () => {
           </p>
         </div>
 
-        <Button onClick={openAddForm} className="w-full lg:w-auto">
-          <Plus className="ml-2 h-4 w-4" />
-          إضافة ملف للأرشفة
-        </Button>
+        {isAdmin && (
+          <Button onClick={openAddForm} className="w-full lg:w-auto">
+            <Plus className="ml-2 h-4 w-4" />
+            إضافة ملف للأرشفة
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -969,16 +1001,18 @@ export const ArchivePage: React.FC = () => {
               </CardContent>
             </Card>
 
-            <div className="flex flex-col md:flex-row justify-end gap-2">
-              <Button variant="outline" onClick={() => openEditForm(selectedDocument)}>
-                <Edit className="ml-2 h-4 w-4" />
-                تعديل البيانات
-              </Button>
-              <Button variant="destructive" onClick={() => requestDelete(selectedDocument)}>
-                <Trash2 className="ml-2 h-4 w-4" />
-                حذف
-              </Button>
-            </div>
+            {isAdmin && (
+              <div className="flex flex-col md:flex-row justify-end gap-2">
+                <Button variant="outline" onClick={() => openEditForm(selectedDocument)}>
+                  <Edit className="ml-2 h-4 w-4" />
+                  تعديل البيانات
+                </Button>
+                <Button variant="destructive" onClick={() => requestDelete(selectedDocument)}>
+                  <Trash2 className="ml-2 h-4 w-4" />
+                  حذف
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1085,12 +1119,16 @@ export const ArchivePage: React.FC = () => {
                           <Button variant="ghost" size="icon" title="فتح الملف" onClick={() => openFile(doc)}>
                             <ExternalLink className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" title="تعديل" onClick={() => openEditForm(doc)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" title="حذف" onClick={() => requestDelete(doc)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {isAdmin && (
+                            <>
+                              <Button variant="ghost" size="icon" title="تعديل" onClick={() => openEditForm(doc)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" title="حذف" onClick={() => requestDelete(doc)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
