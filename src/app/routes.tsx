@@ -22,6 +22,7 @@ import { LeasedBuildingsInPage } from './pages/LeasedBuildingsInPage';
 import { AddLeasedBuildingInPage } from './pages/AddLeasedBuildingInPage';
 import { UnifiedSearchPage } from './pages/UnifiedSearchPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { AuditLogPage } from './pages/AuditLogPage';
 import { ArchivePage } from './pages/ArchivePage';
 import { AppearanceSettingsPage } from './pages/AppearanceSettingsPage';
 import { RequireAdmin } from './components/RequireAdmin';
@@ -83,6 +84,10 @@ export const router = createHashRouter([
       {
         path: 'admin',
         element: adminOnly(<AdminDashboardPage />),
+      },
+      {
+        path: 'audit',
+        element: adminOnly(<AuditLogPage />),
       },
       {
         path: 'lands',
