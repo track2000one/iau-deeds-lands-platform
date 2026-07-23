@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { createHashRouter, Navigate } from 'react-router';
 import { Root } from './Root';
 import { HomePage } from './pages/HomePage';
@@ -22,9 +23,12 @@ import { AddLeasedBuildingInPage } from './pages/AddLeasedBuildingInPage';
 import { UnifiedSearchPage } from './pages/UnifiedSearchPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { ArchivePage } from './pages/ArchivePage';
-import { Archive } from 'lucide-react';
 import { AppearanceSettingsPage } from './pages/AppearanceSettingsPage';
+import { RequireAdmin } from './components/RequireAdmin';
 
+const adminOnly = (element: ReactNode) => (
+  <RequireAdmin>{element}</RequireAdmin>
+);
 
 export const router = createHashRouter([
   {
@@ -48,7 +52,7 @@ export const router = createHashRouter([
           },
           {
             path: 'new',
-            element: <AddDeedPage />,
+            element: adminOnly(<AddDeedPage />),
           },
           {
             path: ':deedId',
@@ -61,7 +65,7 @@ export const router = createHashRouter([
         element: <ReportsPage />,
       },
       {
-        path: '/archive',
+        path: 'archive',
         element: <ArchivePage />,
       },
       {
@@ -78,7 +82,7 @@ export const router = createHashRouter([
       },
       {
         path: 'admin',
-        element: <AdminDashboardPage />,
+        element: adminOnly(<AdminDashboardPage />),
       },
       {
         path: 'lands',
@@ -89,7 +93,7 @@ export const router = createHashRouter([
           },
           {
             path: 'allocated/new',
-            element: <AddAllocatedLandPage />,
+            element: adminOnly(<AddAllocatedLandPage />),
           },
           {
             path: 'delivered',
@@ -97,7 +101,7 @@ export const router = createHashRouter([
           },
           {
             path: 'delivered/new',
-            element: <AddDeliveredLandPage />,
+            element: adminOnly(<AddDeliveredLandPage />),
           },
           {
             path: 'leased-out',
@@ -105,7 +109,7 @@ export const router = createHashRouter([
           },
           {
             path: 'leased-out/new',
-            element: <AddLeasedLandOutPage />,
+            element: adminOnly(<AddLeasedLandOutPage />),
           },
           {
             path: 'leased-in',
@@ -113,7 +117,7 @@ export const router = createHashRouter([
           },
           {
             path: 'leased-in/new',
-            element: <AddLeasedLandInPage />,
+            element: adminOnly(<AddLeasedLandInPage />),
           },
         ],
       },
@@ -126,7 +130,7 @@ export const router = createHashRouter([
           },
           {
             path: 'leased-out/new',
-            element: <AddLeasedBuildingOutPage />,
+            element: adminOnly(<AddLeasedBuildingOutPage />),
           },
           {
             path: 'leased-in',
@@ -134,7 +138,7 @@ export const router = createHashRouter([
           },
           {
             path: 'leased-in/new',
-            element: <AddLeasedBuildingInPage />,
+            element: adminOnly(<AddLeasedBuildingInPage />),
           },
         ],
       },

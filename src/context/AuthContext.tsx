@@ -1,31 +1,41 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import {
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  User,
-  createUserWithEmailAndPassword,
-} from 'firebase/auth';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { auth, db, isFirebaseConfigured } from '../config/firebase';
-import { COLLECTIONS } from '../config/firestore-collections';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+import { apiJson } from '../lib/http';
+import { authStorage } from '../lib/authStorage';
 import type { UserProfile, UserRole } from '../types/permissions';
-import {
-  ADMIN_PERMISSIONS,
-  EMPLOYEE_DEFAULT_PERMISSIONS,
-  getPermissionsByRole,
-} from '../types/permissions';
-import { demoAuth } from '../lib/demoAuth';
+import { getPermissionsByRole } from '../types/permissions';
+
+type ApiUser = {
+  uid: string;
+  email: string;
+  username: string;
+  role: UserRole;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt?: string | null;
+};
+
+type CurrentUser = {
+  uid: string;
+  email: string;
+};
+
+type UpdateUserInput = {
+  username: string;
+  email: string;
+  role: UserRole;
+  isActive: boolean;
+};
 
 interface AuthContextType {
-  currentUser: User | null;
+  currentUser: CurrentUser | null;
   userProfile: UserProfile | null;
   users: UserProfile[];
   isAuthenticated: boolean;
@@ -33,165 +43,142 @@ interface AuthContextType {
   username: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  createEmployee: (email: string, password: string, username: string, role: UserRole) => Promise<void>;
+  createEmployee: (
+    email: string,
+    password: string,
+    username: string,
+    role: UserRole
+  ) => Promise<void>;
+  updateEmployee: (uid: string, input: UpdateUserInput) => Promise<void>;
+  deleteEmployee: (uid: string) => Promise<void>;
+  resetEmployeePassword: (uid: string, password: string) => Promise<void>;
   refreshUsers: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const makeDemoProfile = (demoUser: {
-  uid: string;
-  email: string;
-  username: string;
-  role: UserRole;
-  createdAt?: string;
-  updatedAt?: string;
-}): UserProfile => {
-  return {
-    uid: demoUser.uid,
-    email: demoUser.email,
-    username: demoUser.username,
-    role: demoUser.role,
-    permissions: demoUser.role === 'admin' ? ADMIN_PERMISSIONS : EMPLOYEE_DEFAULT_PERMISSIONS,
-    createdAt: demoUser.createdAt ? new Date(demoUser.createdAt) : new Date(),
-    updatedAt: demoUser.updatedAt ? new Date(demoUser.updatedAt) : new Date(),
-  };
-};
+const normalizeUser = (user: ApiUser): UserProfile => ({
+  uid: user.uid,
+  email: user.email,
+  username: user.username,
+  role: user.role,
+  isActive: user.isActive,
+  permissions: getPermissionsByRole(user.role),
+  createdAt: new Date(user.createdAt),
+  updatedAt: new Date(user.updatedAt),
+  lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt) : null,
+});
 
-const normalizeFirestoreProfile = (data: any): UserProfile => {
-  const role: UserRole = data.role === 'admin' ? 'admin' : 'employee';
-
-  return {
-    uid: data.uid,
-    email: data.email,
-    username: data.username,
-    role,
-    permissions: data.permissions || getPermissionsByRole(role),
-    createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || Date.now()),
-    updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now()),
-  };
-};
-
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const refreshUsers = async (): Promise<void> => {
-    if (!isFirebaseConfigured() || !db) {
-      setUsers(demoAuth.getUsers().map(makeDemoProfile));
+  const currentUser = useMemo<CurrentUser | null>(() => {
+    if (!userProfile) return null;
+
+    return {
+      uid: userProfile.uid,
+      email: userProfile.email,
+    };
+  }, [userProfile]);
+
+  const loadCurrentUser = async () => {
+    const token = authStorage.getToken();
+
+    if (!token) {
+      setUserProfile(null);
+      setUsers([]);
       return;
     }
 
-    const snapshot = await getDocs(collection(db, COLLECTIONS.USERS));
-    const profiles = snapshot.docs.map((userDoc) => normalizeFirestoreProfile(userDoc.data()));
-    setUsers(profiles);
+    const response = await apiJson<{ user: ApiUser }>('/api/auth/me');
+    setUserProfile(normalizeUser(response.user));
+  };
+
+  const refreshUsers = async (): Promise<void> => {
+    if (userProfile?.role !== 'admin') {
+      setUsers([]);
+      return;
+    }
+
+    const response = await apiJson<ApiUser[]>('/api/users');
+    setUsers(response.map(normalizeUser));
   };
 
   useEffect(() => {
-    if (!isFirebaseConfigured() || !auth) {
-      const demoUser = demoAuth.getCurrentUser();
-
-      if (demoUser) {
-        setCurrentUser({ uid: demoUser.uid, email: demoUser.email } as User);
-        setUserProfile(makeDemoProfile(demoUser));
-      }
-
-      refreshUsers().finally(() => setLoading(false));
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-
-      if (user && db) {
-        try {
-          const userDocRef = doc(db, COLLECTIONS.USERS, user.uid);
-          const userDoc = await getDoc(userDocRef);
-
-          if (userDoc.exists()) {
-            setUserProfile(normalizeFirestoreProfile(userDoc.data()));
-          } else {
-            setUserProfile(null);
-          }
-
-          await refreshUsers();
-        } catch (error) {
-          console.error('Error loading user profile:', error);
-          setUserProfile(null);
-        }
-      } else {
+    const initialize = async () => {
+      try {
+        await loadCurrentUser();
+      } catch (error) {
+        console.error('Unable to restore session:', error);
+        authStorage.clear();
         setUserProfile(null);
         setUsers([]);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setLoading(false);
-    });
+    initialize();
 
-    return unsubscribe;
+    const handleExpired = () => {
+      setUserProfile(null);
+      setUsers([]);
+    };
+
+    const refreshSession = () => {
+      if (!authStorage.getToken()) return;
+
+      loadCurrentUser().catch((error) => {
+        console.error('Unable to refresh session:', error);
+      });
+    };
+
+    const intervalId = window.setInterval(refreshSession, 60_000);
+
+    window.addEventListener('iau-auth-expired', handleExpired);
+    window.addEventListener('focus', refreshSession);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('iau-auth-expired', handleExpired);
+      window.removeEventListener('focus', refreshSession);
+    };
   }, []);
 
+  useEffect(() => {
+    if (userProfile?.role === 'admin') {
+      refreshUsers().catch((error) => {
+        console.error('Unable to load users:', error);
+      });
+    } else {
+      setUsers([]);
+    }
+  }, [userProfile?.uid, userProfile?.role]);
+
   const login = async (email: string, password: string): Promise<void> => {
-    if (!isFirebaseConfigured() || !auth || !db) {
-      const demoUser = demoAuth.login(email, password);
-
-      if (!demoUser) {
-        throw new Error('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+    const response = await apiJson<{ token: string; user: ApiUser }>(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+        }),
       }
+    );
 
-      setCurrentUser({ uid: demoUser.uid, email: demoUser.email } as User);
-      setUserProfile(makeDemoProfile(demoUser));
-      await refreshUsers();
-      return;
-    }
-
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      const userDocRef = doc(db, COLLECTIONS.USERS, user.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        setUserProfile(normalizeFirestoreProfile(userDoc.data()));
-      }
-
-      await refreshUsers();
-    } catch (error: any) {
-      console.error('Login error:', error);
-
-      if (error.code === 'auth/api-key-not-valid') {
-        throw new Error('Firebase غير مُعد بشكل صحيح. راجع ملف FIREBASE_SETUP.md');
-      }
-
-      if (
-        error.code === 'auth/invalid-credential' ||
-        error.code === 'auth/user-not-found' ||
-        error.code === 'auth/wrong-password'
-      ) {
-        throw new Error('البريد الإلكتروني أو كلمة المرور غير صحيحة');
-      }
-
-      throw new Error(error.message || 'فشل تسجيل الدخول');
-    }
+    authStorage.setToken(response.token);
+    setUserProfile(normalizeUser(response.user));
   };
 
   const logout = async (): Promise<void> => {
-    if (!isFirebaseConfigured() || !auth) {
-      demoAuth.logout();
-      setCurrentUser(null);
-      setUserProfile(null);
-      return;
-    }
-
-    try {
-      await signOut(auth);
-      setUserProfile(null);
-    } catch (error: any) {
-      console.error('Logout error:', error);
-      throw new Error(error.message || 'فشل تسجيل الخروج');
-    }
+    authStorage.clear();
+    setUserProfile(null);
+    setUsers([]);
   };
 
   const createEmployee = async (
@@ -200,62 +187,82 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     username: string,
     role: UserRole
   ): Promise<void> => {
-    if (!email.trim() || !password.trim() || !username.trim()) {
-      throw new Error('يرجى تعبئة جميع بيانات المستخدم');
-    }
-
-    if (!isFirebaseConfigured() || !auth || !db) {
-      demoAuth.createUser(email, password, username, role);
-      await refreshUsers();
-      return;
-    }
-
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      const userProfile: UserProfile = {
-        uid: user.uid,
-        email,
-        username,
+    await apiJson<ApiUser>('/api/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        password,
+        username: username.trim(),
         role,
-        permissions: getPermissionsByRole(role),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      }),
+    });
 
-      await setDoc(doc(db, COLLECTIONS.USERS, user.uid), {
-        ...userProfile,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+    await refreshUsers();
+  };
 
-      await refreshUsers();
-    } catch (error: any) {
-      console.error('Create employee error:', error);
+  const updateEmployee = async (
+    uid: string,
+    input: UpdateUserInput
+  ): Promise<void> => {
+    const updated = await apiJson<ApiUser>(`/api/users/${uid}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        ...input,
+        email: input.email.trim().toLowerCase(),
+        username: input.username.trim(),
+      }),
+    });
 
-      if (error.code === 'auth/email-already-in-use') {
-        throw new Error('يوجد حساب مسجل بهذا البريد الإلكتروني مسبقًا');
-      }
+    setUsers((current) =>
+      current.map((user) =>
+        user.uid === uid ? normalizeUser(updated) : user
+      )
+    );
 
-      throw new Error(error.message || 'فشل إنشاء حساب المستخدم');
+    if (userProfile?.uid === uid) {
+      setUserProfile(normalizeUser(updated));
     }
   };
 
-  const value = {
+  const deleteEmployee = async (uid: string): Promise<void> => {
+    await apiJson<void>(`/api/users/${uid}`, {
+      method: 'DELETE',
+    });
+
+    setUsers((current) => current.filter((user) => user.uid !== uid));
+  };
+
+  const resetEmployeePassword = async (
+    uid: string,
+    password: string
+  ): Promise<void> => {
+    await apiJson<void>(`/api/users/${uid}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ password }),
+    });
+  };
+
+  const value: AuthContextType = {
     currentUser,
     userProfile,
     users,
-    isAuthenticated: !!currentUser,
+    isAuthenticated: Boolean(userProfile),
     loading,
     username: userProfile?.username || null,
     login,
     logout,
     createEmployee,
+    updateEmployee,
+    deleteEmployee,
+    resetEmployeePassword,
     refreshUsers,
   };
 
-  return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {

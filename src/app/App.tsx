@@ -3,7 +3,6 @@ import { ThemeProvider } from '../context/ThemeContext';
 import { CustomThemeProvider } from '../context/CustomThemeContext';
 import { AuthProvider } from '../context/AuthContext';
 import { PermissionsProvider } from '../context/PermissionsContext';
-import { DataProvider } from '../context/DataContext';
 import { router } from './routes';
 import '../i18n/config';
 import '../styles/fonts.css';
@@ -15,9 +14,7 @@ export default function App() {
       <CustomThemeProvider>
         <AuthProvider>
           <PermissionsProvider>
-            <DataProvider>
-              <RouterProvider router={router} />
-            </DataProvider>
+            <RouterProvider router={router} />
           </PermissionsProvider>
         </AuthProvider>
       </CustomThemeProvider>

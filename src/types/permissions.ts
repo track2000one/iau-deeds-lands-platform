@@ -1,4 +1,3 @@
-// أنواع الصلاحيات
 export type UserRole = 'admin' | 'employee';
 
 export type ModuleName =
@@ -9,6 +8,7 @@ export type ModuleName =
   | 'leased_lands_in'
   | 'leased_buildings_out'
   | 'leased_buildings_in'
+  | 'archive'
   | 'reports'
   | 'admin';
 
@@ -28,6 +28,7 @@ export interface UserPermissions {
   leased_lands_in: ModulePermissions;
   leased_buildings_out: ModulePermissions;
   leased_buildings_in: ModulePermissions;
+  archive: ModulePermissions;
   reports: ModulePermissions;
   admin: ModulePermissions;
 }
@@ -37,9 +38,11 @@ export interface UserProfile {
   email: string;
   username: string;
   role: UserRole;
+  isActive: boolean;
   permissions: UserPermissions;
   createdAt: Date;
   updatedAt: Date;
+  lastLoginAt?: Date | null;
 }
 
 const FULL_ACCESS: ModulePermissions = {
@@ -66,7 +69,6 @@ const NO_ACCESS: ModulePermissions = {
   canView: false,
 };
 
-// الصلاحيات الافتراضية للمسؤول: جميع الصلاحيات
 export const ADMIN_PERMISSIONS: UserPermissions = {
   deeds: FULL_ACCESS,
   allocated_lands: FULL_ACCESS,
@@ -75,11 +77,11 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   leased_lands_in: FULL_ACCESS,
   leased_buildings_out: FULL_ACCESS,
   leased_buildings_in: FULL_ACCESS,
+  archive: FULL_ACCESS,
   reports: FULL_ACCESS,
   admin: FULL_ACCESS,
 };
 
-// الصلاحيات الافتراضية للمستخدم المحدود: عرض وطباعة فقط بدون إضافة أو تعديل أو حذف
 export const EMPLOYEE_DEFAULT_PERMISSIONS: UserPermissions = {
   deeds: VIEW_ONLY,
   allocated_lands: VIEW_ONLY,
@@ -88,10 +90,10 @@ export const EMPLOYEE_DEFAULT_PERMISSIONS: UserPermissions = {
   leased_lands_in: VIEW_ONLY,
   leased_buildings_out: VIEW_ONLY,
   leased_buildings_in: VIEW_ONLY,
+  archive: VIEW_ONLY,
   reports: VIEW_ONLY,
   admin: NO_ACCESS,
 };
 
-export const getPermissionsByRole = (role: UserRole): UserPermissions => {
-  return role === 'admin' ? ADMIN_PERMISSIONS : EMPLOYEE_DEFAULT_PERMISSIONS;
-};
+export const getPermissionsByRole = (role: UserRole): UserPermissions =>
+  role === 'admin' ? ADMIN_PERMISSIONS : EMPLOYEE_DEFAULT_PERMISSIONS;
