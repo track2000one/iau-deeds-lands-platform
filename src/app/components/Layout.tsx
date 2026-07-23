@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
+import { usePermissions } from '../../context/PermissionsContext';
 import { ThemeInitializer } from './ThemeInitializer';
 import { PLATFORM_LOGO_URL } from '../config/branding';
 import {
@@ -25,6 +26,7 @@ import {
   Mail,
   Globe2,
   CalendarDays,
+  History,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -49,6 +51,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const { t, i18n } = useTranslation();
   const { logout, username } = useAuth();
+  const { isAdmin } = usePermissions();
 
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = React.useState(false);
@@ -89,7 +92,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const menuItems = [
     { id: 'home', path: '/', icon: Home, label: t('nav.home') },
-    { id: 'add-deed', path: '/deeds/new', icon: PlusCircle, label: t('nav.addDeed') },
+    { id: 'add-deed', path: '/deeds/new', icon: PlusCircle, label: t('nav.addDeed'), adminOnly: true },
     { id: 'all-deeds', path: '/deeds', icon: FileText, label: t('nav.allDeeds') },
     { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: t('nav.allocatedLands') },
     { id: 'delivered-lands', path: '/lands/delivered', icon: MapPin, label: t('nav.deliveredLands') },
@@ -99,7 +102,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'leased-buildings-in', path: '/buildings/leased-in', icon: Building, label: t('nav.leasedBuildingsIn') },
     { id: 'search', path: '/search', icon: Search, label: t('nav.search') },
     { id: 'reports', path: '/reports', icon: BarChart3, label: t('nav.reports') },
-    { id: 'admin', path: '/admin', icon: Shield, label: t('nav.admin') },
+    { id: 'admin', path: '/admin', icon: Shield, label: t('nav.admin'), adminOnly: true },
+    { id: 'audit', path: '/audit', icon: History, label: 'سجل العمليات', adminOnly: true },
     { id: 'archive', path: '/archive', icon: Archive, label: 'الأرشفة' },
     { id: 'appearance', path: '/appearance', icon: Palette, label: 'المظهر' },
   ];
@@ -121,6 +125,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/archive')) return 'archive';
     if (path.startsWith('/appearance')) return 'appearance';
     if (path.startsWith('/admin')) return 'admin';
+    if (path.startsWith('/audit')) return 'audit';
     if (path.startsWith('/settings')) return 'settings';
 
     return 'home';
@@ -265,7 +270,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           <ScrollArea className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-3 sm:py-4">
             <nav className="space-y-2">
-              {menuItems.map((item) => {
+              {menuItems
+                .filter(
+                  (item) =>
+                    !('adminOnly' in item) ||
+                    !item.adminOnly ||
+                    isAdmin
+                )
+                .map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPage === item.id;
 

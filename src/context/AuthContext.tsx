@@ -176,9 +176,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const logout = async (): Promise<void> => {
-    authStorage.clear();
-    setUserProfile(null);
-    setUsers([]);
+    try {
+      await apiJson<void>('/api/auth/logout', {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.warn('Unable to record logout:', error);
+    } finally {
+      authStorage.clear();
+      setUserProfile(null);
+      setUsers([]);
+    }
   };
 
   const createEmployee = async (
