@@ -14,7 +14,7 @@ import {
   Download,
   Eye,
   X,
-  Upload,
+  Link as LinkIcon,
   Save,
   Loader2,
 } from 'lucide-react';
@@ -47,6 +47,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { toast } from 'sonner';
+import { authenticatedFetch } from '../../lib/http';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -94,15 +95,6 @@ type BackendAttachment = {
   fileType?: string | null;
   fileSize?: number | null;
 };
-
-type UploadResponse = {
-  fileName: string;
-  driveUrl: string;
-  driveFileId: string;
-  mimeType: string;
-  attachment?: unknown;
-};
-
 const toApiAttachmentType = (type: UiAttachmentType): ApiAttachmentType => {
   switch (type) {
     case 'deed':
@@ -378,6 +370,9 @@ export const ViewDeedPage: React.FC = () => {
   const [backendAttachments, setBackendAttachments] = useState<BackendAttachment[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [showAttachmentLinkForm, setShowAttachmentLinkForm] = useState(false);
+  const [attachmentTitle, setAttachmentTitle] = useState('');
+  const [attachmentUrl, setAttachmentUrl] = useState('');
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -410,7 +405,7 @@ export const ViewDeedPage: React.FC = () => {
     try {
       setAttachmentsLoading(true);
 
-      const response = await fetch(`${API_BASE_URL}/api/attachments/deed/${deedId}`);
+      const response = await authenticatedFetch(`/api/attachments/deed/${deedId}`);
       const body = await response.json().catch(() => []);
 
       if (!response.ok) {
@@ -579,95 +574,78 @@ export const ViewDeedPage: React.FC = () => {
     }
   };
 
-  const uploadFileToGoogleDrive = async (file: File): Promise<UploadResponse> => {
-    if (!API_BASE_URL) {
-      throw new Error('VITE_API_URL غير موجود. تأكد من ربط الواجهة بالـ Backend في Railway.');
+  const saveLinkAttachment = async (type: UiAttachmentType) => {
+    if (!deedId) {
+      toast.error('رقم الصك غير متوفر');
+      return;
     }
 
-    const maxSizeMB = 10;
+    const title = attachmentTitle.trim();
+    const driveUrl = attachmentUrl.trim();
 
-    if (file.size > maxSizeMB * 1024 * 1024) {
-      throw new Error(`حجم الملف ${file.name} أكبر من الحد المسموح ${maxSizeMB} ميجا`);
+    if (!title) {
+      toast.error('أدخل اسم المرفق');
+      return;
     }
 
-    const formData = new FormData();
-    formData.append('file', file);
+    try {
+      const parsedUrl = new URL(driveUrl);
 
-    const response = await fetch(`${API_BASE_URL}/api/uploads`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    const body = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(body?.message || 'تعذر رفع الملف إلى Google Drive');
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        throw new Error();
+      }
+    } catch {
+      toast.error('أدخل رابط Google Drive أو رابط ويب صحيحًا');
+      return;
     }
-
-    if (!body?.driveUrl) {
-      throw new Error('تم رفع الملف لكن لم يتم إرجاع رابط Google Drive');
-    }
-
-    return body as UploadResponse;
-  };
-
-  const saveBackendAttachment = async (file: File, uploaded: UploadResponse) => {
-    if (!deedId || !API_BASE_URL) {
-      throw new Error('لا يمكن حفظ المرفق بدون رقم الصك أو رابط الـ Backend');
-    }
-
-    const response = await fetch(`${API_BASE_URL}/api/attachments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        entityType: 'deed',
-        entityId: deedId,
-        attachmentType: toApiAttachmentType(uploadTab),
-        title: file.name,
-        driveUrl: uploaded.driveUrl,
-        driveFileId: uploaded.driveFileId || null,
-        mimeType: uploaded.mimeType || file.type || null,
-      }),
-    });
-
-    const body = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(body?.message || 'تم رفع الملف لكن تعذر حفظ بيانات المرفق');
-    }
-
-    return body as BackendAttachment;
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-
-    if (!files || files.length === 0 || !deedId) return;
 
     try {
       setIsUploadingAttachment(true);
 
-      const savedAttachments: BackendAttachment[] = [];
+      const response = await authenticatedFetch('/api/attachments', {
+        method: 'POST',
+        body: JSON.stringify({
+          entityType: 'deed',
+          entityId: deedId,
+          attachmentType: toApiAttachmentType(type),
+          title,
+          driveUrl,
+          driveFileId:
+            extractGoogleDriveFileId({ driveUrl }) || null,
+          mimeType: null,
+        }),
+      });
 
-      for (const file of Array.from(files)) {
-        const uploaded = await uploadFileToGoogleDrive(file);
-        const savedAttachment = await saveBackendAttachment(file, uploaded);
-        savedAttachments.push(savedAttachment);
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          body?.message || 'تعذر حفظ رابط المرفق'
+        );
       }
 
-      setBackendAttachments((prev) => [...savedAttachments, ...prev]);
-      toast.success(files.length === 1 ? 'تم رفع المرفق بنجاح' : `تم رفع ${files.length} مرفقات بنجاح`);
+      setBackendAttachments((previous) => [
+        body,
+        ...previous,
+      ]);
+
+      setAttachmentTitle('');
+      setAttachmentUrl('');
+      setShowAttachmentLinkForm(false);
+
+      toast.success('تم حفظ رابط المرفق');
     } catch (error) {
-      console.error('Attachment upload error:', error);
-      toast.error(error instanceof Error ? error.message : 'فشل في رفع المرفق');
+      console.error('Attachment link error:', error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'تعذر حفظ رابط المرفق'
+      );
     } finally {
       setIsUploadingAttachment(false);
-      event.target.value = '';
     }
   };
-
   const getAttachmentsByType = (type: UiAttachmentType) => {
     const remoteAttachments = backendAttachments.filter(
       (att) => fromApiAttachmentType(String(att.attachmentType)) === type
@@ -772,17 +750,71 @@ export const ViewDeedPage: React.FC = () => {
             disabled={isUploadingAttachment}
             onClick={() => {
               setUploadTab(type as UiAttachmentType);
-              document.getElementById('file-upload')?.click();
+              setShowAttachmentLinkForm(true);
+              setAttachmentTitle('');
+              setAttachmentUrl('');
             }}
           >
-            {isUploadingAttachment ? (
-              <Loader2 className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2 animate-spin" />
-            ) : (
-              <Upload className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-            )}
-            {isUploadingAttachment ? 'جاري الرفع...' : 'رفع ملف'}
+            <LinkIcon className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+            إضافة رابط
           </Button>
         </div>
+        {showAttachmentLinkForm && uploadTab === type && (
+          <Card className="border-dashed p-3 md:p-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-5 md:items-end">
+              <div className="space-y-2 md:col-span-2">
+                <Label>اسم المرفق</Label>
+                <Input
+                  value={attachmentTitle}
+                  onChange={(event) =>
+                    setAttachmentTitle(event.target.value)
+                  }
+                  placeholder="مثال: صورة الصك"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>رابط Google Drive</Label>
+                <Input
+                  value={attachmentUrl}
+                  onChange={(event) =>
+                    setAttachmentUrl(event.target.value)
+                  }
+                  placeholder="https://drive.google.com/..."
+                  dir="ltr"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  className="flex-1"
+                  disabled={isUploadingAttachment}
+                  onClick={() => saveLinkAttachment(type)}
+                >
+                  {isUploadingAttachment ? (
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <LinkIcon className="ml-2 h-4 w-4" />
+                  )}
+                  {isUploadingAttachment
+                    ? 'جاري الحفظ...'
+                    : 'حفظ الرابط'}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    setShowAttachmentLinkForm(false)
+                  }
+                >
+                  إلغاء
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {attachmentsLoading ? (
           <div className="text-center py-6 md:py-8 border-2 border-dashed rounded-lg">
@@ -860,7 +892,7 @@ export const ViewDeedPage: React.FC = () => {
                     onClick={async () => {
                       try {
                         if (API_BASE_URL && att.id) {
-                          const response = await fetch(`${API_BASE_URL}/api/attachments/${att.id}`, {
+                          const response = await authenticatedFetch(`/api/attachments/${att.id}`, {
                             method: 'DELETE',
                           });
 
@@ -1439,15 +1471,6 @@ export const ViewDeedPage: React.FC = () => {
               <AttachmentList type="additional" title={t('attachments.additional')} icon={PlusCircle} />
             </TabsContent>
           </Tabs>
-
-          <input
-            id="file-upload"
-            type="file"
-            multiple
-            accept="image/*,.pdf,.doc,.docx"
-            className="hidden"
-            onChange={handleFileUpload}
-          />
         </CardContent>
       </Card>
 
