@@ -13,6 +13,7 @@ import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
+import { authenticatedFetch } from '../../lib/http';
 
 interface DriveLinkItem {
   title: string;
@@ -127,7 +128,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${API_BASE_URL}/api/uploads`, {
+    const response = await authenticatedFetch('/api/uploads', {
       method: 'POST',
       body: formData,
     });

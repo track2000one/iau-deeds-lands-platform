@@ -185,21 +185,52 @@ const makeAttachments = (
   }));
 };
 
-const getLandCoordinates = (land: any) => {
-  if (!land?.coordinates) return null;
+const parseCoordinates = (
+  value: unknown
+): { latitude: number; longitude: number } | null => {
+  if (!value) return null;
 
-  if (typeof land.coordinates === 'string') {
-    return land.coordinates;
+  if (typeof value === 'string') {
+    const [latitudeValue, longitudeValue] = value
+      .split(',')
+      .map((part) => Number(part.trim()));
+
+    if (
+      !Number.isNaN(latitudeValue) &&
+      !Number.isNaN(longitudeValue)
+    ) {
+      return {
+        latitude: latitudeValue,
+        longitude: longitudeValue,
+      };
+    }
+
+    return null;
   }
 
-  if (
-    typeof land.coordinates.latitude === 'number' &&
-    typeof land.coordinates.longitude === 'number'
-  ) {
-    return `${land.coordinates.latitude},${land.coordinates.longitude}`;
+  if (typeof value === 'object') {
+    const coordinates = value as {
+      latitude?: unknown;
+      longitude?: unknown;
+    };
+
+    const latitude = Number(coordinates.latitude);
+    const longitude = Number(coordinates.longitude);
+
+    if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+      return { latitude, longitude };
+    }
   }
 
   return null;
+};
+
+const getLandCoordinates = (land: any) => {
+  const coordinates = parseCoordinates(land?.coordinates);
+
+  return coordinates
+    ? `${coordinates.latitude},${coordinates.longitude}`
+    : null;
 };
 
 export const DeliveredLandsPage: React.FC = () => {
@@ -324,34 +355,38 @@ export const DeliveredLandsPage: React.FC = () => {
     setFormMode('edit');
     setSelectedLand(land);
 
-    const coordinates = land.coordinates || {};
+    const coordinates = parseCoordinates(land.coordinates);
 
     setForm({
-      receiptNumber: land.receiptNumber || '',
+      receiptNumber:
+        land.receiptNumber || land.deliveryMinutesNumber || '',
       receiptDate: land.receiptDate || land.deliveryDate || '',
-      receiptDateType: land.receiptDateType || land.deliveryDateType || 'gregorian',
+      receiptDateType:
+        land.receiptDateType || land.deliveryDateType || 'gregorian',
       deliveringEntity: land.deliveringEntity || '',
-      recipientEntity: land.recipientEntity || '',
-      landName: land.landName || '',
-      description: land.description || land.propertyDescription || '',
+      recipientEntity:
+        land.recipientEntity || 'جامعة الإمام عبدالرحمن بن فيصل',
+      landName:
+        land.landName ||
+        land.propertyDescription ||
+        land.description ||
+        '',
+      description:
+        land.description || land.propertyDescription || '',
       region: land.region || 'المنطقة الشرقية',
       city: land.city || '',
       district: land.district || '',
       plotNumber: land.plotNumber || '',
       planNumber: land.planNumber || '',
-      area: land.area || '',
+      area: land.area ?? '',
       usageType: land.usageType || '',
       status: land.status || 'مستلمة رسميًا',
-      hasRelatedDeed: Boolean(land.hasRelatedDeed),
+      hasRelatedDeed: Boolean(
+        land.hasRelatedDeed || land.relatedDeedNumber
+      ),
       relatedDeedNumber: land.relatedDeedNumber || '',
-      latitude:
-        typeof coordinates.latitude === 'number'
-          ? String(coordinates.latitude)
-          : '',
-      longitude:
-        typeof coordinates.longitude === 'number'
-          ? String(coordinates.longitude)
-          : '',
+      latitude: coordinates ? String(coordinates.latitude) : '',
+      longitude: coordinates ? String(coordinates.longitude) : '',
       location: land.location || '',
       notes: land.notes || '',
       attachments: getLandAttachments(land),
