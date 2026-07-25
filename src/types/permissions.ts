@@ -10,28 +10,18 @@ export type ModuleName =
   | 'leased_buildings_in'
   | 'archive'
   | 'reports'
-  | 'admin';
+  | 'admin'
+  | 'audit';
 
 export interface ModulePermissions {
+  canView: boolean;
   canAdd: boolean;
   canEdit: boolean;
   canDelete: boolean;
   canPrint: boolean;
-  canView: boolean;
 }
 
-export interface UserPermissions {
-  deeds: ModulePermissions;
-  allocated_lands: ModulePermissions;
-  delivered_lands: ModulePermissions;
-  leased_lands_out: ModulePermissions;
-  leased_lands_in: ModulePermissions;
-  leased_buildings_out: ModulePermissions;
-  leased_buildings_in: ModulePermissions;
-  archive: ModulePermissions;
-  reports: ModulePermissions;
-  admin: ModulePermissions;
-}
+export type UserPermissions = Record<ModuleName, ModulePermissions>;
 
 export interface UserProfile {
   uid: string;
@@ -45,55 +35,92 @@ export interface UserProfile {
   lastLoginAt?: Date | null;
 }
 
-const FULL_ACCESS: ModulePermissions = {
+export const MODULE_LABELS: Record<ModuleName, string> = {
+  deeds: 'الصكوك',
+  allocated_lands: 'الأراضي المخصصة',
+  delivered_lands: 'الأراضي المستلمة',
+  leased_lands_out: 'الأراضي المؤجرة',
+  leased_lands_in: 'الأراضي المستأجرة',
+  leased_buildings_out: 'المباني المؤجرة',
+  leased_buildings_in: 'المباني المستأجرة',
+  archive: 'الأرشفة',
+  reports: 'التقارير',
+  admin: 'لوحة التحكم',
+  audit: 'سجل العمليات',
+};
+
+const FULL: ModulePermissions = {
+  canView: true,
   canAdd: true,
   canEdit: true,
   canDelete: true,
   canPrint: true,
-  canView: true,
 };
 
-const VIEW_ONLY: ModulePermissions = {
-  canAdd: false,
-  canEdit: false,
-  canDelete: false,
-  canPrint: true,
-  canView: true,
-};
-
-const NO_ACCESS: ModulePermissions = {
+const NONE: ModulePermissions = {
+  canView: false,
   canAdd: false,
   canEdit: false,
   canDelete: false,
   canPrint: false,
-  canView: false,
 };
+
+export const createEmptyPermissions = (): UserPermissions => ({
+  deeds: { ...NONE },
+  allocated_lands: { ...NONE },
+  delivered_lands: { ...NONE },
+  leased_lands_out: { ...NONE },
+  leased_lands_in: { ...NONE },
+  leased_buildings_out: { ...NONE },
+  leased_buildings_in: { ...NONE },
+  archive: { ...NONE },
+  reports: { ...NONE },
+  admin: { ...NONE },
+  audit: { ...NONE },
+});
 
 export const ADMIN_PERMISSIONS: UserPermissions = {
-  deeds: FULL_ACCESS,
-  allocated_lands: FULL_ACCESS,
-  delivered_lands: FULL_ACCESS,
-  leased_lands_out: FULL_ACCESS,
-  leased_lands_in: FULL_ACCESS,
-  leased_buildings_out: FULL_ACCESS,
-  leased_buildings_in: FULL_ACCESS,
-  archive: FULL_ACCESS,
-  reports: FULL_ACCESS,
-  admin: FULL_ACCESS,
+  deeds: { ...FULL },
+  allocated_lands: { ...FULL },
+  delivered_lands: { ...FULL },
+  leased_lands_out: { ...FULL },
+  leased_lands_in: { ...FULL },
+  leased_buildings_out: { ...FULL },
+  leased_buildings_in: { ...FULL },
+  archive: { ...FULL },
+  reports: { ...FULL },
+  admin: { ...FULL },
+  audit: { ...FULL },
 };
 
-export const EMPLOYEE_DEFAULT_PERMISSIONS: UserPermissions = {
-  deeds: VIEW_ONLY,
-  allocated_lands: VIEW_ONLY,
-  delivered_lands: VIEW_ONLY,
-  leased_lands_out: VIEW_ONLY,
-  leased_lands_in: VIEW_ONLY,
-  leased_buildings_out: VIEW_ONLY,
-  leased_buildings_in: VIEW_ONLY,
-  archive: VIEW_ONLY,
-  reports: VIEW_ONLY,
-  admin: NO_ACCESS,
+export const EMPLOYEE_DEFAULT_PERMISSIONS = createEmptyPermissions();
+
+export const normalizePermissions = (
+  permissions?: Partial<UserPermissions> | null
+): UserPermissions => {
+  const output = createEmptyPermissions();
+
+  for (const moduleName of Object.keys(output) as ModuleName[]) {
+    output[moduleName] = {
+      ...output[moduleName],
+      ...(permissions?.[moduleName] || {}),
+    };
+
+    if (
+      output[moduleName].canAdd ||
+      output[moduleName].canEdit ||
+      output[moduleName].canDelete ||
+      output[moduleName].canPrint
+    ) {
+      output[moduleName].canView = true;
+    }
+  }
+
+  return output;
 };
 
-export const getPermissionsByRole = (role: UserRole): UserPermissions =>
-  role === 'admin' ? ADMIN_PERMISSIONS : EMPLOYEE_DEFAULT_PERMISSIONS;
+export const getPermissionsByRole = (
+  role: UserRole,
+  permissions?: Partial<UserPermissions> | null
+): UserPermissions =>
+  role === 'admin' ? ADMIN_PERMISSIONS : normalizePermissions(permissions);

@@ -64,13 +64,20 @@ import {
 } from '../components/ui/alert-dialog';
 import { useData } from '../../context/DataContext';
 import { toast } from 'sonner';
-import type { UserProfile, UserRole } from '../../types/permissions';
+import type {
+  UserPermissions,
+  UserProfile,
+  UserRole,
+} from '../../types/permissions';
+import { createEmptyPermissions } from '../../types/permissions';
+import { PermissionMatrix } from '../components/PermissionMatrix';
 
 type EditForm = {
   username: string;
   email: string;
   role: UserRole;
   isActive: boolean;
+  permissions: UserPermissions;
 };
 
 const emptyEditForm: EditForm = {
@@ -78,6 +85,7 @@ const emptyEditForm: EditForm = {
   email: '',
   role: 'employee',
   isActive: true,
+  permissions: createEmptyPermissions(),
 };
 
 export const AdminDashboardPage: React.FC = () => {
@@ -100,6 +108,8 @@ export const AdminDashboardPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('employee');
+  const [newPermissions, setNewPermissions] =
+    useState<UserPermissions>(createEmptyPermissions());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -151,7 +161,13 @@ export const AdminDashboardPage: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      await createEmployee(email, password, username, role);
+      await createEmployee(
+        email,
+        password,
+        username,
+        role,
+        newPermissions
+      );
       await refreshUsers();
 
       toast.success('تم إنشاء حساب المستخدم بنجاح');
@@ -159,6 +175,7 @@ export const AdminDashboardPage: React.FC = () => {
       setEmail('');
       setPassword('');
       setRole('employee');
+      setNewPermissions(createEmptyPermissions());
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -177,6 +194,7 @@ export const AdminDashboardPage: React.FC = () => {
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      permissions: user.permissions,
     });
     setEditOpen(true);
   };
@@ -399,6 +417,15 @@ export const AdminDashboardPage: React.FC = () => {
                     </option>
                   </NativeSelect>
                 </div>
+
+                {role === 'employee' && (
+                  <div className="md:col-span-2">
+                    <PermissionMatrix
+                      value={newPermissions}
+                      onChange={setNewPermissions}
+                    />
+                  </div>
+                )}
 
                 <div className="md:col-span-2 flex justify-end">
                   <Button type="submit" disabled={isSubmitting}>
@@ -662,6 +689,18 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           </div>
 
+          {editForm.role === 'employee' && (
+            <PermissionMatrix
+              value={editForm.permissions}
+              onChange={(permissions) =>
+                setEditForm((current) => ({
+                  ...current,
+                  permissions,
+                }))
+              }
+            />
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               إلغاء
@@ -692,6 +731,18 @@ export const AdminDashboardPage: React.FC = () => {
               placeholder="8 أحرف على الأقل"
             />
           </div>
+
+          {editForm.role === 'employee' && (
+            <PermissionMatrix
+              value={editForm.permissions}
+              onChange={(permissions) =>
+                setEditForm((current) => ({
+                  ...current,
+                  permissions,
+                }))
+              }
+            />
+          )}
 
           <DialogFooter>
             <Button

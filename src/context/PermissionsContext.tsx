@@ -1,31 +1,48 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import { useAuth } from './AuthContext';
 import type {
-  UserPermissions,
   ModuleName,
   ModulePermissions,
+  UserPermissions,
   UserProfile,
 } from '../types/permissions';
 import {
   ADMIN_PERMISSIONS,
-  EMPLOYEE_DEFAULT_PERMISSIONS,
+  createEmptyPermissions,
 } from '../types/permissions';
 
 interface PermissionsContextType {
   permissions: UserPermissions | null;
   userProfile: UserProfile | null;
   loading: boolean;
-  hasPermission: (module: ModuleName, action: keyof ModulePermissions) => boolean;
+  hasPermission: (
+    module: ModuleName,
+    action: keyof ModulePermissions
+  ) => boolean;
   isAdmin: boolean;
   refreshPermissions: () => Promise<void>;
 }
 
-const PermissionsContext = createContext<PermissionsContextType | undefined>(undefined);
+const PermissionsContext =
+  createContext<PermissionsContextType | undefined>(undefined);
 
-export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, userProfile: authUserProfile } = useAuth();
-  const [permissions, setPermissions] = useState<UserPermissions | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+export const PermissionsProvider: React.FC<{
+  children: React.ReactNode;
+}> = ({ children }) => {
+  const {
+    currentUser,
+    userProfile: authUserProfile,
+  } = useAuth();
+
+  const [permissions, setPermissions] =
+    useState<UserPermissions | null>(null);
+  const [userProfile, setUserProfile] =
+    useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadUserPermissions = async () => {
@@ -41,13 +58,12 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const normalizedPermissions =
       authUserProfile.role === 'admin'
         ? ADMIN_PERMISSIONS
-        : authUserProfile.permissions || EMPLOYEE_DEFAULT_PERMISSIONS;
+        : authUserProfile.permissions || createEmptyPermissions();
 
     setUserProfile({
       ...authUserProfile,
       permissions: normalizedPermissions,
     });
-
     setPermissions(normalizedPermissions);
     setLoading(false);
   };
@@ -56,19 +72,17 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
     loadUserPermissions();
   }, [currentUser, authUserProfile]);
 
-  const hasPermission = (module: ModuleName, action: keyof ModulePermissions): boolean => {
+  const hasPermission = (
+    module: ModuleName,
+    action: keyof ModulePermissions
+  ): boolean => {
     if (!permissions) return false;
-
     if (userProfile?.role === 'admin') return true;
 
     return Boolean(permissions[module]?.[action]);
   };
 
   const isAdmin = userProfile?.role === 'admin';
-
-  const refreshPermissions = async () => {
-    await loadUserPermissions();
-  };
 
   return (
     <PermissionsContext.Provider
@@ -78,7 +92,7 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
         loading,
         hasPermission,
         isAdmin,
-        refreshPermissions,
+        refreshPermissions: loadUserPermissions,
       }}
     >
       {children}
@@ -89,8 +103,10 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
 export const usePermissions = (): PermissionsContextType => {
   const context = useContext(PermissionsContext);
 
-  if (context === undefined) {
-    throw new Error('usePermissions must be used within a PermissionsProvider');
+  if (!context) {
+    throw new Error(
+      'usePermissions must be used within a PermissionsProvider'
+    );
   }
 
   return context;

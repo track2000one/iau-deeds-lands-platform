@@ -8,8 +8,15 @@ import React, {
 } from 'react';
 import { apiJson } from '../lib/http';
 import { authStorage } from '../lib/authStorage';
-import type { UserProfile, UserRole } from '../types/permissions';
-import { getPermissionsByRole } from '../types/permissions';
+import type {
+  UserPermissions,
+  UserProfile,
+  UserRole,
+} from '../types/permissions';
+import {
+  createEmptyPermissions,
+  getPermissionsByRole,
+} from '../types/permissions';
 
 type ApiUser = {
   uid: string;
@@ -17,6 +24,7 @@ type ApiUser = {
   username: string;
   role: UserRole;
   isActive: boolean;
+  permissions?: Partial<UserPermissions> | null;
   createdAt: string;
   updatedAt: string;
   lastLoginAt?: string | null;
@@ -27,11 +35,12 @@ type CurrentUser = {
   email: string;
 };
 
-type UpdateUserInput = {
+export type UpdateUserInput = {
   username: string;
   email: string;
   role: UserRole;
   isActive: boolean;
+  permissions: UserPermissions;
 };
 
 interface AuthContextType {
@@ -47,7 +56,8 @@ interface AuthContextType {
     email: string,
     password: string,
     username: string,
-    role: UserRole
+    role: UserRole,
+    permissions?: UserPermissions
   ) => Promise<void>;
   updateEmployee: (uid: string, input: UpdateUserInput) => Promise<void>;
   deleteEmployee: (uid: string) => Promise<void>;
@@ -63,7 +73,10 @@ const normalizeUser = (user: ApiUser): UserProfile => ({
   username: user.username,
   role: user.role,
   isActive: user.isActive,
-  permissions: getPermissionsByRole(user.role),
+  permissions: getPermissionsByRole(
+    user.role,
+    user.permissions
+  ),
   createdAt: new Date(user.createdAt),
   updatedAt: new Date(user.updatedAt),
   lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt) : null,
@@ -193,7 +206,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     email: string,
     password: string,
     username: string,
-    role: UserRole
+    role: UserRole,
+    permissions: UserPermissions = createEmptyPermissions()
   ): Promise<void> => {
     await apiJson<ApiUser>('/api/users', {
       method: 'POST',
@@ -202,6 +216,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         password,
         username: username.trim(),
         role,
+        permissions,
       }),
     });
 

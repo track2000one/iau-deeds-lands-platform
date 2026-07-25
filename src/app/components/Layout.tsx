@@ -51,7 +51,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const { t, i18n } = useTranslation();
   const { logout, username } = useAuth();
-  const { isAdmin } = usePermissions();
+  const { isAdmin, hasPermission } = usePermissions();
 
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = React.useState(false);
@@ -91,22 +91,22 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const menuItems = [
-    { id: 'home', path: '/', icon: Home, label: t('nav.home') },
-    { id: 'add-deed', path: '/deeds/new', icon: PlusCircle, label: t('nav.addDeed'), adminOnly: true },
-    { id: 'all-deeds', path: '/deeds', icon: FileText, label: t('nav.allDeeds') },
-    { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: t('nav.allocatedLands') },
-    { id: 'delivered-lands', path: '/lands/delivered', icon: MapPin, label: t('nav.deliveredLands') },
-    { id: 'leased-lands-out', path: '/lands/leased-out', icon: MapPin, label: t('nav.leasedLandsOut') },
-    { id: 'leased-lands-in', path: '/lands/leased-in', icon: MapPin, label: t('nav.leasedLandsIn') },
-    { id: 'leased-buildings-out', path: '/buildings/leased-out', icon: Building, label: t('nav.leasedBuildingsOut') },
-    { id: 'leased-buildings-in', path: '/buildings/leased-in', icon: Building, label: t('nav.leasedBuildingsIn') },
-    { id: 'search', path: '/search', icon: Search, label: t('nav.search') },
-    { id: 'reports', path: '/reports', icon: BarChart3, label: t('nav.reports') },
+    { id: 'home', path: '/', icon: Home, label: t('nav.home'), alwaysVisible: true },
+    { id: 'add-deed', path: '/deeds/new', icon: PlusCircle, label: t('nav.addDeed'), module: 'deeds', action: 'canAdd' },
+    { id: 'all-deeds', path: '/deeds', icon: FileText, label: t('nav.allDeeds'), module: 'deeds', action: 'canView' },
+    { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: t('nav.allocatedLands'), module: 'allocated_lands', action: 'canView' },
+    { id: 'delivered-lands', path: '/lands/delivered', icon: MapPin, label: t('nav.deliveredLands'), module: 'delivered_lands', action: 'canView' },
+    { id: 'leased-lands-out', path: '/lands/leased-out', icon: MapPin, label: t('nav.leasedLandsOut'), module: 'leased_lands_out', action: 'canView' },
+    { id: 'leased-lands-in', path: '/lands/leased-in', icon: MapPin, label: t('nav.leasedLandsIn'), module: 'leased_lands_in', action: 'canView' },
+    { id: 'leased-buildings-out', path: '/buildings/leased-out', icon: Building, label: t('nav.leasedBuildingsOut'), module: 'leased_buildings_out', action: 'canView' },
+    { id: 'leased-buildings-in', path: '/buildings/leased-in', icon: Building, label: t('nav.leasedBuildingsIn'), module: 'leased_buildings_in', action: 'canView' },
+    { id: 'search', path: '/search', icon: Search, label: t('nav.search'), alwaysVisible: true },
+    { id: 'reports', path: '/reports', icon: BarChart3, label: t('nav.reports'), module: 'reports', action: 'canView' },
     { id: 'admin', path: '/admin', icon: Shield, label: t('nav.admin'), adminOnly: true },
     { id: 'audit', path: '/audit', icon: History, label: 'سجل العمليات', adminOnly: true },
-    { id: 'archive', path: '/archive', icon: Archive, label: 'الأرشفة' },
-    { id: 'appearance', path: '/appearance', icon: Palette, label: 'المظهر' },
-  ];
+    { id: 'archive', path: '/archive', icon: Archive, label: 'الأرشفة', module: 'archive', action: 'canView' },
+    { id: 'appearance', path: '/appearance', icon: Palette, label: 'المظهر', alwaysVisible: true },
+  ] as const;
 
   const getCurrentPage = () => {
     const path = location.pathname;
@@ -271,12 +271,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <ScrollArea className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-3 sm:py-4">
             <nav className="space-y-2">
               {menuItems
-                .filter(
-                  (item) =>
-                    !('adminOnly' in item) ||
-                    !item.adminOnly ||
-                    isAdmin
-                )
+                .filter((item) => {
+                  if ('adminOnly' in item && item.adminOnly) return isAdmin;
+                  if ('alwaysVisible' in item && item.alwaysVisible) return true;
+                  if ('module' in item && 'action' in item) {
+                    return hasPermission(item.module, item.action);
+                  }
+                  return false;
+                })
                 .map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPage === item.id;
