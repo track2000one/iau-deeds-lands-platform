@@ -8,6 +8,8 @@ import { ViewDeedPage } from './pages/ViewDeedPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { AllocatedLandsPage } from './pages/AllocatedLandsPage';
 import { AddAllocatedLandPage } from './pages/AddAllocatedLandPage';
 import { DeliveredLandsPage } from './pages/DeliveredLandsPage';
@@ -35,6 +37,14 @@ export const router = createHashRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/forgot-password',
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordPage />,
   },
   {
     path: '/',

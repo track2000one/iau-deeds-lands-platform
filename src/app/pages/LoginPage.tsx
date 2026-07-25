@@ -1,15 +1,28 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { PLATFORM_LOGO_URL } from '../config/branding';
-import { Lock, User, Eye, EyeOff, LogIn, Shield, Languages } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Languages,
+  Lock,
+  LogIn,
+  Shield,
+  User,
+} from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card';
 import { toast } from 'sonner';
-
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -34,9 +47,13 @@ export const LoginPage: React.FC = () => {
 
     try {
       await login(email.trim(), password);
-      toast.success(i18n.language === 'ar' ? 'تم تسجيل الدخول بنجاح' : 'Login successful');
+      toast.success(
+        i18n.language === 'ar'
+          ? 'تم تسجيل الدخول بنجاح'
+          : 'Login successful'
+      );
       navigate('/');
-    } catch (error) {
+    } catch {
       toast.error(
         i18n.language === 'ar'
           ? 'تعذر تسجيل الدخول، يرجى التحقق من البريد الإلكتروني وكلمة المرور'
@@ -49,37 +66,39 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent p-3 md:p-4">
+    <div className="flex min-h-screen w-full items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent p-3 md:p-4">
       <Button
         variant="ghost"
         size="sm"
         onClick={toggleLanguage}
-        className="absolute top-3 right-3 md:top-4 md:right-4 text-white hover:bg-white/10 h-8 md:h-9"
+        className="absolute right-3 top-3 h-8 text-white hover:bg-white/10 md:right-4 md:top-4 md:h-9"
       >
-        <Languages className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-        <span className="text-xs md:text-sm">{i18n.language === 'ar' ? 'EN' : 'ع'}</span>
+        <Languages className="ml-1 h-3 w-3 md:ml-2 md:h-4 md:w-4" />
+        <span className="text-xs md:text-sm">
+          {i18n.language === 'ar' ? 'EN' : 'ع'}
+        </span>
       </Button>
 
       <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="space-y-3 md:space-y-4 text-center pb-2">
-          <div className="flex justify-center mb-2">
+        <CardHeader className="space-y-3 pb-2 text-center md:space-y-4">
+          <div className="mb-2 flex justify-center">
             <img
               src={PLATFORM_LOGO_URL}
               alt="منصة إدارة الصكوك والأراضي"
-              className="w-20 h-20 md:w-24 md:h-24 object-contain drop-shadow-xl"
+              className="h-20 w-20 object-contain drop-shadow-xl md:h-24 md:w-24"
             />
           </div>
 
           <div>
-            <CardTitle className="text-xl md:text-2xl font-bold text-primary">
+            <CardTitle className="text-xl font-bold text-primary md:text-2xl">
               {t('app.title') || 'منصة إدارة الصكوك والأراضي'}
             </CardTitle>
-            <CardDescription className="text-sm md:text-base mt-1 md:mt-2">
+            <CardDescription className="mt-1 text-sm md:mt-2 md:text-base">
               {t('app.subtitle') || 'جامعة الإمام عبدالرحمن بن فيصل'}
             </CardDescription>
           </div>
 
-          <div className="flex items-center justify-center gap-2 text-xs md:text-sm text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground md:text-sm">
             <Shield className="h-3 w-3 md:h-4 md:w-4" />
             <span>
               {i18n.language === 'ar'
@@ -90,8 +109,8 @@ export const LoginPage: React.FC = () => {
         </CardHeader>
 
         <CardContent className="pt-4 md:pt-6">
-          <div className="mb-4 md:mb-6 rounded-lg border bg-muted/30 p-3 md:p-4">
-            <p className="text-xs md:text-sm text-muted-foreground leading-6">
+          <div className="mb-4 rounded-lg border bg-muted/30 p-3 md:mb-6 md:p-4">
+            <p className="text-xs leading-6 text-muted-foreground md:text-sm">
               {i18n.language === 'ar'
                 ? 'هذه المنصة مخصصة لإدارة بيانات الصكوك والأراضي والعقارات، ولا يسمح بالدخول أو استخدام الخدمات إلا للمستخدمين المخولين وفق الصلاحيات المعتمدة.'
                 : 'This platform is restricted to authorized users for managing deeds, lands, and real estate records according to approved permissions.'}
@@ -100,7 +119,10 @@ export const LoginPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email" className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base">
+              <Label
+                htmlFor="email"
+                className="flex items-center gap-1.5 text-sm md:gap-2 md:text-base"
+              >
                 <User className="h-3 w-3 md:h-4 md:w-4" />
                 {i18n.language === 'ar' ? 'البريد الإلكتروني' : 'Email'}
               </Label>
@@ -109,19 +131,38 @@ export const LoginPage: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder={i18n.language === 'ar' ? 'أدخل البريد الإلكتروني' : 'Enter email'}
+                placeholder={
+                  i18n.language === 'ar'
+                    ? 'أدخل البريد الإلكتروني'
+                    : 'Enter email'
+                }
                 required
                 disabled={isLoading}
-                className="h-10 md:h-11 text-sm md:text-base"
+                className="h-10 text-sm md:h-11 md:text-base"
                 autoComplete="email"
+                dir="ltr"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base">
-                <Lock className="h-3 w-3 md:h-4 md:w-4" />
-                {i18n.language === 'ar' ? 'كلمة المرور' : 'Password'}
-              </Label>
+              <div className="flex items-center justify-between gap-3">
+                <Label
+                  htmlFor="password"
+                  className="flex items-center gap-1.5 text-sm md:gap-2 md:text-base"
+                >
+                  <Lock className="h-3 w-3 md:h-4 md:w-4" />
+                  {i18n.language === 'ar' ? 'كلمة المرور' : 'Password'}
+                </Label>
+
+                <Link
+                  to="/forgot-password"
+                  className="text-xs font-medium text-primary hover:underline md:text-sm"
+                >
+                  {i18n.language === 'ar'
+                    ? 'نسيت كلمة المرور؟'
+                    : 'Forgot password?'}
+                </Link>
+              </div>
 
               <div className="relative">
                 <Input
@@ -129,10 +170,14 @@ export const LoginPage: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder={i18n.language === 'ar' ? 'أدخل كلمة المرور' : 'Enter password'}
+                  placeholder={
+                    i18n.language === 'ar'
+                      ? 'أدخل كلمة المرور'
+                      : 'Enter password'
+                  }
                   required
                   disabled={isLoading}
-                  className="h-10 md:h-11 pr-10 text-sm md:text-base"
+                  className="h-10 pl-10 text-sm md:h-11 md:text-base"
                   autoComplete="current-password"
                 />
 
@@ -140,9 +185,14 @@ export const LoginPage: React.FC = () => {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 md:h-9 md:w-9"
+                  className="absolute left-1 top-1/2 h-8 w-8 -translate-y-1/2 md:h-9 md:w-9"
                   onClick={() => setShowPassword((value) => !value)}
                   disabled={isLoading}
+                  aria-label={
+                    showPassword
+                      ? 'إخفاء كلمة المرور'
+                      : 'إظهار كلمة المرور'
+                  }
                 >
                   {showPassword ? (
                     <EyeOff className="h-3 w-3 md:h-4 md:w-4" />
@@ -155,27 +205,34 @@ export const LoginPage: React.FC = () => {
 
             <Button
               type="submit"
-              className="w-full h-10 md:h-11 text-sm md:text-base"
+              className="h-10 w-full text-sm md:h-11 md:text-base"
               disabled={isLoading}
             >
               {isLoading ? (
                 <>
-                  <div className="h-3 w-3 md:h-4 md:w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  {i18n.language === 'ar' ? 'جاري تسجيل الدخول...' : 'Signing in...'}
+                  <div className="ml-2 h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent md:h-4 md:w-4" />
+                  {i18n.language === 'ar'
+                    ? 'جاري تسجيل الدخول...'
+                    : 'Signing in...'}
                 </>
               ) : (
                 <>
-                  <LogIn className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                  {i18n.language === 'ar' ? 'تسجيل الدخول' : 'Sign in'}
+                  <LogIn className="ml-2 h-4 w-4 md:h-5 md:w-5" />
+                  {i18n.language === 'ar'
+                    ? 'تسجيل الدخول'
+                    : 'Sign in'}
                 </>
               )}
             </Button>
           </form>
         </CardContent>
 
-        <div className="px-4 md:px-6 pb-4 md:pb-6 text-center">
+        <div className="px-4 pb-4 text-center md:px-6 md:pb-6">
           <p className="text-xs text-muted-foreground">
-            © 2024 {i18n.language === 'ar' ? 'جامعة الإمام عبدالرحمن بن فيصل' : 'Imam Abdulrahman Bin Faisal University'}
+            © 2026{' '}
+            {i18n.language === 'ar'
+              ? 'جامعة الإمام عبدالرحمن بن فيصل'
+              : 'Imam Abdulrahman Bin Faisal University'}
           </p>
         </div>
       </Card>
