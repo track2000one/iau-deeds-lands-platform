@@ -159,23 +159,63 @@ export const ViewSiteInspectionPage: React.FC = () => {
       )}
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />صور المعاينة ({record.attachments.length})</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            صور المعاينة ({record.attachments.length})
+          </CardTitle>
+        </CardHeader>
+
         <CardContent>
           {record.attachments.length === 0 ? (
-            <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">لا توجد صور مرفقة.</p>
+            <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+              لا توجد صور مرفقة.
+            </p>
           ) : (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-              {record.attachments.map((attachment) => (
-                <button
-                  key={attachment.id || attachment.driveUrl}
-                  type="button"
-                  className="overflow-hidden rounded-xl border text-right"
-                  onClick={() => window.open(attachment.driveUrl, '_blank')}
-                >
-                  <img src={attachment.driveUrl} alt={attachment.title} className="aspect-square w-full object-cover" />
-                  <p className="truncate p-2 text-xs">{attachment.title}</p>
-                </button>
-              ))}
+            <div className="space-y-6">
+              {[
+                ['general', 'صور عامة للموقع'],
+                ['observations', 'صور الملاحظات والمخالفات'],
+                ['boundaries', 'صور الحدود والمداخل'],
+                ['other', 'صور إضافية'],
+              ].map(([category, title]) => {
+                const images = record.attachments.filter(
+                  (attachment) =>
+                    (attachment.notes || 'general') === category
+                );
+
+                if (images.length === 0) return null;
+
+                return (
+                  <section key={category} className="space-y-3">
+                    <h3 className="font-bold">
+                      {title} ({images.length})
+                    </h3>
+
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                      {images.map((attachment) => (
+                        <button
+                          key={attachment.id || attachment.driveUrl}
+                          type="button"
+                          className="overflow-hidden rounded-xl border text-right"
+                          onClick={() =>
+                            window.open(attachment.driveUrl, '_blank')
+                          }
+                        >
+                          <img
+                            src={attachment.driveUrl}
+                            alt={attachment.title}
+                            className="aspect-square w-full object-cover"
+                          />
+                          <p className="truncate p-2 text-xs">
+                            {attachment.title}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
             </div>
           )}
         </CardContent>

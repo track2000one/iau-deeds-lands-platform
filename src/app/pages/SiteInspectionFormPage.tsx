@@ -149,7 +149,10 @@ export const SiteInspectionFormPage: React.FC = () => {
     setField('items', form.items.filter((_, itemIndex) => itemIndex !== index));
   };
 
-  const selectImages = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadImagesForCategory = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    category: string
+  ) => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
 
@@ -161,13 +164,24 @@ export const SiteInspectionFormPage: React.FC = () => {
         if (!file.type.startsWith('image/')) {
           throw new Error(`الملف ${file.name} ليس صورة`);
         }
-        uploaded.push(await uploadInspectionImage(file));
+
+        const image = await uploadInspectionImage(file);
+
+        uploaded.push({
+          ...image,
+          title: file.name,
+          notes: category,
+        });
       }
 
       setField('attachments', [...form.attachments, ...uploaded]);
       toast.success(`تم رفع ${uploaded.length} صورة`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر رفع الصور');
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'تعذر رفع الصور'
+      );
     } finally {
       setUploading(false);
       event.target.value = '';
@@ -404,39 +418,64 @@ export const SiteInspectionFormPage: React.FC = () => {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Camera className="h-5 w-5" />صور الموقع</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center hover:bg-muted/30">
-            {uploading ? <Loader2 className="mb-2 h-8 w-8 animate-spin" /> : <Camera className="mb-2 h-8 w-8 text-primary" />}
-            <span className="font-semibold">{uploading ? 'جاري رفع الصور...' : 'التقاط صور أو اختيارها'}</span>
-            <span className="mt-1 text-xs text-muted-foreground">يمكن اختيار عدة صور من كاميرا الهاتف أو المعرض</span>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              className="hidden"
-              disabled={uploading}
-              onChange={selectImages}
-            />
-          </label>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Camera className="h-5 w-5" />
+            صور الموقع
+          </CardTitle>
+        </CardHeader>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            {form.attachments.map((attachment, index) => (
-              <div key={`${attachment.driveUrl}-${index}`} className="relative overflow-hidden rounded-xl border">
-                <img src={attachment.driveUrl} alt={attachment.title} className="aspect-square w-full object-cover" />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  className="absolute left-2 top-2"
-                  onClick={() => removeAttachment(index)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                <p className="truncate p-2 text-xs">{attachment.title}</p>
-              </div>
-            ))}
+        <CardContent className="space-y-5">
+          <p className="text-sm text-muted-foreground">
+            يمكن رفع عدة صور في كل خانة. زر الكاميرا يلتقط صورة جديدة،
+            وزر المعرض يسمح باختيار عدة صور دفعة واحدة.
+          </p>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <ImageUploadSection
+              title="صور عامة للموقع"
+              description="صور شاملة توضح الموقع من عدة اتجاهات"
+              category="general"
+              uploading={uploading}
+              attachments={form.attachments}
+              onUpload={uploadImagesForCategory}
+              onRemove={removeAttachment}
+            />
+
+            <ImageUploadSection
+              title="صور الملاحظات والمخالفات"
+              description="التعديات، المخلفات، التلفيات أو أي ملاحظة ميدانية"
+              category="observations"
+              uploading={uploading}
+              attachments={form.attachments}
+              onUpload={uploadImagesForCategory}
+              onRemove={removeAttachment}
+            />
+
+            <ImageUploadSection
+              title="صور الحدود والمداخل"
+              description="الأسوار، البوابات، المداخل، اللوحات والطرق المحيطة"
+              category="boundaries"
+              uploading={uploading}
+              attachments={form.attachments}
+              onUpload={uploadImagesForCategory}
+              onRemove={removeAttachment}
+            />
+
+            <ImageUploadSection
+              title="صور إضافية"
+              description="مخططات أو مستندات مصورة أو أي صور أخرى"
+              category="other"
+              uploading={uploading}
+              attachments={form.attachments}
+              onUpload={uploadImagesForCategory}
+              onRemove={removeAttachment}
+            />
+          </div>
+
+          <div className="rounded-xl border bg-muted/20 p-3 text-sm">
+            إجمالي الصور المرفوعة:
+            <strong className="mr-1">{form.attachments.length}</strong>
           </div>
         </CardContent>
       </Card>
@@ -450,6 +489,132 @@ export const SiteInspectionFormPage: React.FC = () => {
           {saving ? 'جاري الحفظ...' : 'حفظ المعاينة'}
         </Button>
       </div>
+    </div>
+  );
+};
+
+
+type ImageUploadSectionProps = {
+  title: string;
+  description: string;
+  category: string;
+  uploading: boolean;
+  attachments: InspectionAttachment[];
+  onUpload: (
+    event: React.ChangeEvent<HTMLInputElement>,
+    category: string
+  ) => Promise<void>;
+  onRemove: (index: number) => void;
+};
+
+const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
+  title,
+  description,
+  category,
+  uploading,
+  attachments,
+  onUpload,
+  onRemove,
+}) => {
+  const categoryAttachments = attachments
+    .map((attachment, originalIndex) => ({
+      attachment,
+      originalIndex,
+    }))
+    .filter(({ attachment }) => (attachment.notes || 'general') === category);
+
+  const cameraInputId = `inspection-camera-${category}`;
+  const galleryInputId = `inspection-gallery-${category}`;
+
+  return (
+    <div className="space-y-3 rounded-xl border p-3 sm:p-4">
+      <div>
+        <h3 className="font-bold">{title}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {description}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label
+          htmlFor={cameraInputId}
+          className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-3 text-center transition hover:bg-muted/30"
+        >
+          {uploading ? (
+            <Loader2 className="mb-2 h-6 w-6 animate-spin" />
+          ) : (
+            <Camera className="mb-2 h-6 w-6 text-primary" />
+          )}
+          <span className="text-sm font-semibold">التقاط صورة</span>
+        </label>
+
+        <label
+          htmlFor={galleryInputId}
+          className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-3 text-center transition hover:bg-muted/30"
+        >
+          {uploading ? (
+            <Loader2 className="mb-2 h-6 w-6 animate-spin" />
+          ) : (
+            <Plus className="mb-2 h-6 w-6 text-primary" />
+          )}
+          <span className="text-sm font-semibold">اختيار عدة صور</span>
+        </label>
+
+        <input
+          id={cameraInputId}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          disabled={uploading}
+          onChange={(event) => onUpload(event, category)}
+        />
+
+        <input
+          id={galleryInputId}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          disabled={uploading}
+          onChange={(event) => onUpload(event, category)}
+        />
+      </div>
+
+      {categoryAttachments.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {categoryAttachments.map(({ attachment, originalIndex }) => (
+            <div
+              key={`${attachment.driveUrl}-${originalIndex}`}
+              className="relative overflow-hidden rounded-lg border"
+            >
+              <img
+                src={attachment.driveUrl}
+                alt={attachment.title}
+                className="aspect-square w-full object-cover"
+              />
+
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute left-1.5 top-1.5 h-9 w-9"
+                onClick={() => onRemove(originalIndex)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+
+              <p className="truncate p-2 text-xs">
+                {attachment.title}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        عدد الصور في هذه الخانة: {categoryAttachments.length}
+      </p>
     </div>
   );
 };

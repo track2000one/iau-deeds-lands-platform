@@ -48,7 +48,15 @@ export const uploadInspectionImage = async (
   const result = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(result?.message || 'تعذر رفع صورة المعاينة');
+    const rawMessage = String(result?.message || result?.error || '');
+
+    if (rawMessage.includes('invalid_grant')) {
+      throw new Error(
+        'تعذر الاتصال بـ Google Drive لأن صلاحية الربط منتهية أو ملغاة. يجب تحديث بيانات Google Drive في Backend/Railway.'
+      );
+    }
+
+    throw new Error(rawMessage || 'تعذر رفع صورة المعاينة');
   }
 
   if (!result?.driveUrl) {
