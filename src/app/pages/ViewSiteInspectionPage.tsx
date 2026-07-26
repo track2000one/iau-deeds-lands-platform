@@ -40,6 +40,50 @@ const labels: Record<string, string> = {
   other: 'أخرى',
 };
 
+
+const extractGoogleDriveFileId = (attachment: {
+  driveFileId?: string | null;
+  driveUrl: string;
+}): string | null => {
+  if (attachment.driveFileId) return attachment.driveFileId;
+
+  const patterns = [
+    /\/file\/d\/([^/]+)/,
+    /[?&]id=([^&]+)/,
+    /\/d\/([^/]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = attachment.driveUrl.match(pattern);
+    if (match?.[1]) return decodeURIComponent(match[1]);
+  }
+
+  return null;
+};
+
+const getAttachmentPreviewUrl = (attachment: {
+  driveFileId?: string | null;
+  driveUrl: string;
+  mimeType?: string | null;
+}): string => {
+  const fileId = extractGoogleDriveFileId(attachment);
+
+  if (!fileId) return attachment.driveUrl;
+
+  if (attachment.mimeType === 'application/pdf') {
+    return `https://drive.google.com/file/d/${fileId}/preview`;
+  }
+
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
+};
+
+const isPdfAttachment = (attachment: {
+  mimeType?: string | null;
+  title: string;
+}): boolean =>
+  attachment.mimeType === 'application/pdf' ||
+  attachment.title.toLowerCase().endsWith('.pdf');
+
 export const ViewSiteInspectionPage: React.FC = () => {
   const { inspectionId } = useParams();
   const navigate = useNavigate();
@@ -202,11 +246,23 @@ export const ViewSiteInspectionPage: React.FC = () => {
                             window.open(attachment.driveUrl, '_blank')
                           }
                         >
-                          <img
-                            src={attachment.driveUrl}
-                            alt={attachment.title}
-                            className="aspect-square w-full object-cover"
-                          />
+                          {isPdfAttachment(attachment) ? (
+                            <iframe
+                              src={getAttachmentPreviewUrl(attachment)}
+                              title={attachment.title}
+                              className="aspect-square w-full bg-white"
+                              onClick={(event) => event.stopPropagation()}
+                            />
+                          ) : (
+                            <img
+                              src={getAttachmentPreviewUrl(attachment)}
+                              alt={attachment.title}
+                              className="aspect-square w-full bg-muted object-contain"
+                              onError={(event) => {
+                                event.currentTarget.src = attachment.driveUrl;
+                              }}
+                            />
+                          )}
                           <p className="truncate p-2 text-xs">
                             {attachment.title}
                           </p>

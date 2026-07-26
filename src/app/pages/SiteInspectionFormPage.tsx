@@ -161,8 +161,14 @@ export const SiteInspectionFormPage: React.FC = () => {
       const uploaded: InspectionAttachment[] = [];
 
       for (const file of files) {
-        if (!file.type.startsWith('image/')) {
-          throw new Error(`الملف ${file.name} ليس صورة`);
+        const supported =
+          file.type.startsWith('image/') ||
+          file.type === 'application/pdf';
+
+        if (!supported) {
+          throw new Error(
+            `الملف ${file.name} غير مدعوم. المسموح: الصور وPDF`
+          );
         }
 
         const image = await uploadInspectionImage(file);
@@ -427,8 +433,8 @@ export const SiteInspectionFormPage: React.FC = () => {
 
         <CardContent className="space-y-5">
           <p className="text-sm text-muted-foreground">
-            يمكن رفع عدة صور في كل خانة. زر الكاميرا يلتقط صورة جديدة،
-            وزر المعرض يسمح باختيار عدة صور دفعة واحدة.
+            يمكن رفع عدة صور أو ملفات PDF في كل خانة. زر الكاميرا يلتقط
+            صورة جديدة، وزر الملفات يسمح باختيار عدة ملفات دفعة واحدة.
           </p>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -474,7 +480,7 @@ export const SiteInspectionFormPage: React.FC = () => {
           </div>
 
           <div className="rounded-xl border bg-muted/20 p-3 text-sm">
-            إجمالي الصور المرفوعة:
+            إجمالي الملفات المرفوعة:
             <strong className="mr-1">{form.attachments.length}</strong>
           </div>
         </CardContent>
@@ -493,6 +499,47 @@ export const SiteInspectionFormPage: React.FC = () => {
   );
 };
 
+
+
+const extractGoogleDriveFileId = (
+  attachment: InspectionAttachment
+): string | null => {
+  if (attachment.driveFileId) return attachment.driveFileId;
+
+  const url = attachment.driveUrl || '';
+  const patterns = [
+    /\/file\/d\/([^/]+)/,
+    /[?&]id=([^&]+)/,
+    /\/d\/([^/]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match?.[1]) return decodeURIComponent(match[1]);
+  }
+
+  return null;
+};
+
+const getAttachmentPreviewUrl = (
+  attachment: InspectionAttachment
+): string => {
+  const fileId = extractGoogleDriveFileId(attachment);
+
+  if (!fileId) return attachment.driveUrl;
+
+  if (attachment.mimeType === 'application/pdf') {
+    return `https://drive.google.com/file/d/${fileId}/preview`;
+  }
+
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`;
+};
+
+const isPdfAttachment = (
+  attachment: InspectionAttachment
+): boolean =>
+  attachment.mimeType === 'application/pdf' ||
+  attachment.title.toLowerCase().endsWith('.pdf');
 
 type ImageUploadSectionProps = {
   title: string;
@@ -557,7 +604,7 @@ const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
           ) : (
             <Plus className="mb-2 h-6 w-6 text-primary" />
           )}
-          <span className="text-sm font-semibold">اختيار عدة صور</span>
+          <span className="text-sm font-semibold">اختيار عدة ملفات</span>
         </label>
 
         <input
@@ -573,7 +620,7 @@ const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
         <input
           id={galleryInputId}
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf"
           multiple
           className="hidden"
           disabled={uploading}
@@ -588,11 +635,22 @@ const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
               key={`${attachment.driveUrl}-${originalIndex}`}
               className="relative overflow-hidden rounded-lg border"
             >
-              <img
-                src={attachment.driveUrl}
-                alt={attachment.title}
-                className="aspect-square w-full object-cover"
-              />
+              {isPdfAttachment(attachment) ? (
+                <iframe
+                  src={getAttachmentPreviewUrl(attachment)}
+                  title={attachment.title}
+                  className="aspect-square w-full bg-white"
+                />
+              ) : (
+                <img
+                  src={getAttachmentPreviewUrl(attachment)}
+                  alt={attachment.title}
+                  className="aspect-square w-full bg-muted object-contain"
+                  onError={(event) => {
+                    event.currentTarget.src = attachment.driveUrl;
+                  }}
+                />
+              )}
 
               <Button
                 type="button"
@@ -604,16 +662,22 @@ const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
                 <Trash2 className="h-4 w-4" />
               </Button>
 
-              <p className="truncate p-2 text-xs">
+              <button
+                type="button"
+                className="w-full truncate p-2 text-right text-xs hover:underline"
+                onClick={() =>
+                  window.open(attachment.driveUrl, '_blank')
+                }
+              >
                 {attachment.title}
-              </p>
+              </button>
             </div>
           ))}
         </div>
       )}
 
       <p className="text-xs text-muted-foreground">
-        عدد الصور في هذه الخانة: {categoryAttachments.length}
+        عدد الملفات في هذه الخانة: {categoryAttachments.length}
       </p>
     </div>
   );
