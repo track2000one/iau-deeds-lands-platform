@@ -4,7 +4,6 @@ import { DeedProvider } from '../context/DeedContext';
 import { DataProvider } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Layout } from './components/Layout';
-import { Toaster } from './components/ui/sonner';
 
 export const Root = () => {
   const { isAuthenticated } = useAuth();
@@ -47,7 +46,6 @@ export const Root = () => {
         <Layout>
           <Outlet />
         </Layout>
-        <Toaster position="top-center" richColors />
       </DataProvider>
     </DeedProvider>
   );
