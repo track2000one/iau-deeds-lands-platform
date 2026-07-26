@@ -54,17 +54,14 @@ export const LoginPage: React.FC = () => {
       );
       navigate('/');
     } catch (error) {
-      const fallbackMessage =
-        i18n.language === 'ar'
-          ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة.'
-          : 'The email address or password is incorrect.';
-
-      toast.error(
+      const message =
         error instanceof Error && error.message
           ? error.message
-          : fallbackMessage
-      );
+          : i18n.language === 'ar'
+            ? 'اسم المستخدم أو كلمة المرور غير صحيحة.'
+            : 'The username or password is incorrect.';
 
+      toast.error(message);
       setPassword('');
     } finally {
       setIsLoading(false);

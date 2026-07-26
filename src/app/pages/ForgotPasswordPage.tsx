@@ -69,7 +69,7 @@ export const ForgotPasswordPage: React.FC = () => {
               نسيت كلمة المرور
             </CardTitle>
             <CardDescription className="mt-2 leading-6">
-              أدخل بريدك الإلكتروني المسجل في المنصة لإرسال رابط آمن لإعادة تعيين كلمة المرور.
+              أدخل بريدك الإلكتروني المسجل وسنرسل لك رابطًا آمنًا لإعادة تعيين كلمة المرور.
             </CardDescription>
           </div>
         </CardHeader>
@@ -84,7 +84,7 @@ export const ForgotPasswordPage: React.FC = () => {
               <div>
                 <p className="font-semibold">تحقق من بريدك الإلكتروني</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  تم قبول الطلب وإرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني المسجل.
+                  تم إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني المسجل.
                 </p>
               </div>
 
