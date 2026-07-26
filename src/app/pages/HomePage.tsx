@@ -104,17 +104,17 @@ export const HomePage: React.FC = () => {
   ];
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full min-w-0 space-y-4 sm:space-y-5">
       <div className="grid w-full grid-cols-1 items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
         <div className="space-y-5 2xl:order-2">
-          <Card className="future-card">
-            <CardContent className="p-5">
-              <div className="future-hero-art min-h-[230px]">
+          <Card className="future-card overflow-hidden">
+            <CardContent className="p-4 sm:p-5">
+              <div className="future-hero-art min-h-[165px] sm:min-h-[210px]">
                 <div className="future-shield">
                   <img
                     src={PLATFORM_LOGO_URL}
                     alt="Platform logo"
-                    className="h-36 w-36 object-contain drop-shadow-[0_0_30px_hsl(var(--primary)/0.35)]"
+                    className="h-24 w-24 sm:h-32 sm:w-32 object-contain drop-shadow-[0_0_30px_hsl(var(--primary)/0.35)]"
                   />
                 </div>
               </div>
@@ -128,7 +128,7 @@ export const HomePage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="future-card">
+          <Card className="future-card overflow-hidden">
             <CardHeader>
               <CardTitle>إجراء سريع</CardTitle>
               <CardDescription>الوصول السريع لأهم العمليات</CardDescription>
@@ -141,7 +141,7 @@ export const HomePage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="future-card">
+          <Card className="future-card overflow-hidden">
             <CardHeader>
               <CardTitle>معلومات النظام</CardTitle>
             </CardHeader>
@@ -168,14 +168,14 @@ export const HomePage: React.FC = () => {
             <p className="text-muted-foreground mt-2">{t('app.subtitle')}</p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             {topStats.map((item) => {
               const Icon = item.icon;
 
               return (
-                <Card key={item.label} className="future-card min-h-[132px]">
-                  <CardContent className="h-full p-4 2xl:p-5">
-                    <div className="flex h-full items-center justify-between gap-4">
+                <Card key={item.label} className="future-card min-h-[118px] overflow-hidden">
+                  <CardContent className="h-full p-3 sm:p-4 2xl:p-5">
+                    <div className="flex h-full flex-col items-start justify-between gap-2 sm:flex-row sm:items-center sm:gap-4">
                       <div className="future-stat-icon h-12 w-12 bg-primary/10">
                         <Icon className={`h-6 w-6 ${item.accent}`} />
                       </div>
@@ -191,7 +191,7 @@ export const HomePage: React.FC = () => {
             })}
           </div>
 
-          <Card className="future-card">
+          <Card className="future-card overflow-hidden">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>نظرة عامة على المنصة</span>
@@ -200,7 +200,7 @@ export const HomePage: React.FC = () => {
               <CardDescription>ملخص شامل لأداء المنصة والعمليات الرئيسية</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
                 <div className="text-center rounded-2xl border bg-background/40 p-4">
                   <Users className="h-7 w-7 mx-auto mb-3 text-primary" />
                   <p className="text-2xl font-bold">{dataStats.totalRecords}</p>
@@ -230,13 +230,13 @@ export const HomePage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="future-card">
+          <Card className="future-card overflow-hidden">
             <CardHeader>
               <CardTitle>{t('home.quickActions')}</CardTitle>
               <CardDescription>العمليات الشائعة للوصول السريع</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 xl:grid-cols-5">
                 {quickActions.map((action) => {
                   const Icon = action.icon;
 
@@ -244,7 +244,7 @@ export const HomePage: React.FC = () => {
                     <Button
                       key={action.id}
                       variant="outline"
-                      className="future-glow-button h-[92px] min-w-0 flex-col gap-1.5 px-3 whitespace-normal"
+                      className="future-glow-button h-[88px] sm:h-[92px] min-w-0 flex-col gap-1.5 px-3 whitespace-normal"
                       onClick={() => navigate(action.path)}
                     >
                       <Icon className="h-6 w-6 text-primary" />
@@ -281,7 +281,7 @@ export const HomePage: React.FC = () => {
                     {recentDeeds.map((deed, index) => (
                       <div key={deed.id}>
                         <div
-                          className="flex items-center justify-between p-3 rounded-2xl border bg-background/35 hover:bg-primary/5 cursor-pointer transition-colors gap-3"
+                          className="flex flex-col items-stretch justify-between gap-3 rounded-2xl border bg-background/35 p-3 transition-colors hover:bg-primary/5 sm:flex-row sm:items-center cursor-pointer"
                           onClick={() => navigate(`/deeds/${deed.id}`)}
                         >
                           <div className="flex items-center gap-3 min-w-0">
@@ -299,7 +299,7 @@ export const HomePage: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="text-left shrink-0">
+                          <div className="flex shrink-0 items-center justify-between gap-3 text-right sm:block sm:text-left">
                             <p className="font-bold">{safeNumber(deed.area).toLocaleString()} {t('deed.sqm')}</p>
                             <p className="text-xs text-muted-foreground">
                               {deed.createdAt ? new Date(deed.createdAt).toLocaleDateString('ar-SA') : '-'}
@@ -314,7 +314,7 @@ export const HomePage: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card className="future-card">
+            <Card className="future-card overflow-hidden">
               <CardHeader>
                 <CardTitle>الأمان والموثوقية</CardTitle>
                 <CardDescription>مستوى أمان متقدم</CardDescription>
@@ -336,7 +336,7 @@ export const HomePage: React.FC = () => {
             </Card>
           </div>
 
-          <Card className="future-card">
+          <Card className="future-card overflow-hidden">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="h-5 w-5 text-primary" />

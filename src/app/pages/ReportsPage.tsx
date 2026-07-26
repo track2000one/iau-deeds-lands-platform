@@ -1075,7 +1075,7 @@ export const ReportsPage: React.FC = () => {
     return (
       <Card key={type} className="shadow-lg hover:shadow-xl transition-shadow">
         <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-start">
             <div>
               <CardTitle className="text-xl flex items-center gap-2">
                 <Layers className="h-5 w-5 text-blue-600" />
@@ -1108,7 +1108,7 @@ export const ReportsPage: React.FC = () => {
         {expandedSection === type && (
           <CardContent className="space-y-6 pt-6">
             <Tabs value={reportType} onValueChange={(value: any) => setReportType(value)}>
-              <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-1">
+              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-4">
                 <TabsTrigger value="detailed" className="text-xs md:text-sm">
                   <FileText className="h-3 w-3 md:h-4 md:w-4 ml-1 md:ml-2" />
                   تقرير مفصل
@@ -1133,7 +1133,7 @@ export const ReportsPage: React.FC = () => {
               <TabsContent value="detailed" className="space-y-4">
                 <Card className="bg-gray-50">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
                       <CardTitle className="text-sm flex items-center gap-2">
                         <Filter className="h-4 w-4" />
                         الفرز قبل الطباعة والتصدير
@@ -1251,7 +1251,7 @@ export const ReportsPage: React.FC = () => {
 
                 <Card className="bg-gray-50">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
                       <CardTitle className="text-sm flex items-center gap-2">
                         <Edit3 className="h-4 w-4" />
                         إعدادات العناوين والتوقيع والختم
@@ -1352,7 +1352,7 @@ export const ReportsPage: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="rounded-lg border bg-background p-3 space-y-3">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
                           <Label className="flex items-center gap-2">
                             <PenLine className="h-4 w-4" />
                             إظهار التوقيع
@@ -1372,7 +1372,7 @@ export const ReportsPage: React.FC = () => {
                       </div>
 
                       <div className="rounded-lg border bg-background p-3 space-y-3">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
                           <Label className="flex items-center gap-2">
                             <Stamp className="h-4 w-4" />
                             إظهار الختم
@@ -1396,7 +1396,7 @@ export const ReportsPage: React.FC = () => {
 
                 <Card className="bg-gray-50">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
                       <CardTitle className="text-sm flex items-center gap-2">
                         <Settings className="h-4 w-4" />
                         اختيار الأعمدة
@@ -1641,7 +1641,7 @@ export const ReportsPage: React.FC = () => {
                       </CardHeader>
 
                       <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
+                        <ResponsiveContainer width="100%" height={240}>
                           <BarChart data={distribution.data}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />
@@ -1659,7 +1659,7 @@ export const ReportsPage: React.FC = () => {
                       </CardHeader>
 
                       <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
+                        <ResponsiveContainer width="100%" height={240}>
                           <RechartsPie>
                             <Pie
                               data={distribution.data}
@@ -1691,13 +1691,13 @@ export const ReportsPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="mx-auto w-full min-w-0 space-y-4 p-0 sm:space-y-6 sm:p-2 md:p-4 lg:p-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold sm:text-3xl lg:text-4xl bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
           {t('reports.title') || 'التقارير'}
         </h1>
 
-        <p className="text-muted-foreground text-lg">
+        <p className="text-sm text-muted-foreground sm:text-base lg:text-lg">
           تقارير شاملة واحترافية لجميع أنواع الأراضي والمباني والصكوك مع خيارات متقدمة.
         </p>
       </div>

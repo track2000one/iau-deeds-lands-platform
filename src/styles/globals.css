@@ -129,3 +129,98 @@ html {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
 }
+
+
+/* ===== Mobile responsive system ===== */
+html {
+  min-height: 100%;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100%;
+  overscroll-behavior-x: none;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+table {
+  min-width: max-content;
+}
+
+.mobile-page-shell {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 767px) {
+  .future-app-shell {
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+
+  .future-topbar {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .future-card,
+  [data-slot="card"] {
+    border-radius: 1rem;
+  }
+
+  [data-slot="card-header"] {
+    padding: 1rem;
+  }
+
+  [data-slot="card-content"] {
+    padding: 1rem;
+  }
+
+  [data-slot="dialog-content"],
+  [role="alertdialog"] {
+    width: calc(100vw - 1rem) !important;
+    max-width: calc(100vw - 1rem) !important;
+    max-height: calc(100dvh - 1rem);
+    overflow-y: auto;
+    border-radius: 1rem;
+  }
+
+  .recharts-responsive-container {
+    min-height: 220px;
+  }
+
+  .overflow-x-auto {
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  html {
+    font-size: 15px;
+  }
+
+  .mobile-page-shell {
+    padding-inline: 0.4rem;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+  }
+
+  h2 {
+    font-size: 1.15rem;
+  }
+}

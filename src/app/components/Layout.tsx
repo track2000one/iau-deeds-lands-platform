@@ -138,8 +138,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="future-app-shell min-h-dvh h-dvh w-full min-w-0 flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
       <ThemeInitializer />
 
-      <header className="future-topbar text-foreground z-30 relative shrink-0 min-h-[68px]">
-        <div className="flex min-h-[68px] items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6 2xl:px-8">
+      <header className="future-topbar text-foreground z-30 relative shrink-0 min-h-[58px] sm:min-h-[64px]">
+        <div className="flex min-h-[58px] sm:min-h-[64px] items-center justify-between gap-2 px-2.5 py-2 sm:gap-3 sm:px-4 md:px-6 2xl:px-8">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <Button
               variant="ghost"
@@ -196,7 +196,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               type="button"
               onClick={() => navigate('/')}
               aria-label="Platform home"
-              className="h-12 w-12 overflow-hidden rounded-2xl border bg-background/60 p-1.5 grid place-items-center shadow-[0_0_25px_hsl(var(--primary)/0.25)] transition-transform hover:scale-105"
+              className="h-10 w-10 sm:h-12 sm:w-12 overflow-hidden rounded-2xl border bg-background/60 p-1.5 grid place-items-center shadow-[0_0_25px_hsl(var(--primary)/0.25)] transition-transform hover:scale-105"
             >
               <img
                 src={PLATFORM_LOGO_URL}
@@ -225,7 +225,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             inset-y-0 lg:inset-y-auto
             h-dvh lg:h-auto
             z-50 lg:z-0
-            w-[88vw] max-w-[320px] shrink-0
+            w-[84vw] max-w-[300px] shrink-0
             lg:w-[250px] xl:w-[270px] 2xl:w-[290px]
             bg-sidebar text-sidebar-foreground
             transition-transform duration-300 ease-in-out
@@ -314,8 +314,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </ScrollArea>
         </aside>
 
-        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background/70">
-          <div className="w-full max-w-none px-2.5 py-3 sm:px-3 sm:py-4 md:px-5 md:py-5 2xl:px-7">
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background/70">
+          <div className="mobile-page-shell w-full max-w-none px-2 py-2.5 sm:px-3 sm:py-4 md:px-5 md:py-5 2xl:px-7">
             {children}
           </div>
         </main>

@@ -104,7 +104,7 @@ export const AllDeedsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 rounded-[2rem] border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-4 md:p-6 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl">
+    <div className="space-y-4 sm:space-y-6 rounded-2xl sm:rounded-[2rem] border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-3 sm:p-4 md:p-6 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
         <div className="min-w-0">
@@ -286,7 +286,7 @@ export const AllDeedsPage: React.FC = () => {
       </Card>
 
       {/* Cards View - Mobile */}
-      <div className="md:hidden space-y-3">
+      <div className="space-y-3 md:hidden">
         {filteredDeeds.length === 0 ? (
           <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
             <CardContent className="py-12 text-center">
@@ -296,7 +296,7 @@ export const AllDeedsPage: React.FC = () => {
           </Card>
         ) : (
           filteredDeeds.map((deed) => (
-            <Card key={deed.id} className="overflow-hidden">
+            <Card key={deed.id} className="overflow-hidden border-sky-200/70 bg-white/90 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
@@ -331,11 +331,11 @@ export const AllDeedsPage: React.FC = () => {
 
                 <Separator className="mb-3" />
 
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:flex">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1 text-xs h-8"
+                    className="h-10 flex-1 text-xs"
                     onClick={() => navigate(`/deeds/${deed.id}`)}
                   >
                     <Eye className="h-3 w-3 mr-1" />
@@ -346,7 +346,7 @@ export const AllDeedsPage: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 text-xs h-8"
+                        className="h-10 flex-1 text-xs"
                         onClick={() => navigate(`/deeds/${deed.id}`)}
                       >
                         <Edit className="h-3 w-3 mr-1" />

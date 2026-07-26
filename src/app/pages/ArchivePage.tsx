@@ -645,7 +645,7 @@ export const ArchivePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 flex items-center justify-center min-h-[300px]">
+      <div className="flex min-h-[300px] items-center justify-center p-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <span className="mr-3">جاري تحميل الأرشفة...</span>
       </div>
@@ -653,7 +653,7 @@ export const ArchivePage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
+    <div className="mx-auto w-full min-w-0 space-y-4 p-0 sm:p-3 md:space-y-6 md:p-5">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">الأرشفة</h1>
@@ -1064,7 +1064,7 @@ export const ArchivePage: React.FC = () => {
         </CardHeader>
 
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1136,6 +1136,61 @@ export const ArchivePage: React.FC = () => {
                 )}
               </TableBody>
             </Table>
+          </div>
+
+          <div className="grid gap-3 md:hidden">
+            {filteredDocuments.length === 0 ? (
+              <div className="rounded-xl border p-8 text-center text-muted-foreground">
+                <Archive className="mx-auto mb-3 h-10 w-10 opacity-30" />
+                لا توجد ملفات مؤرشفة مطابقة للبحث.
+              </div>
+            ) : (
+              filteredDocuments.map((doc) => (
+                <Card key={doc.id} className="overflow-hidden">
+                  <CardContent className="space-y-4 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words font-bold">{doc.title}</p>
+                        <p className="mt-1 break-all text-xs text-muted-foreground">{doc.originalName}</p>
+                      </div>
+                      <Badge variant={getConfidentialityVariant(doc.confidentiality) as any}>
+                        {getConfidentialityLabel(doc.confidentiality)}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <InfoItem label="التصنيف" value={doc.category} />
+                      <InfoItem label="رقم المستند" value={doc.documentNumber || '-'} />
+                      <InfoItem label="تاريخ المستند" value={formatArchiveDocumentDate(doc.documentDate, doc.documentDateType)} />
+                      <InfoItem label="الحجم" value={formatFileSize(doc.fileSize)} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 border-t pt-3">
+                      <Button variant="outline" onClick={() => openDetails(doc)}>
+                        <Eye className="ml-2 h-4 w-4" />
+                        التفاصيل
+                      </Button>
+                      <Button variant="outline" onClick={() => openFile(doc)}>
+                        <ExternalLink className="ml-2 h-4 w-4" />
+                        فتح
+                      </Button>
+                      {isAdmin && (
+                        <>
+                          <Button variant="outline" onClick={() => openEditForm(doc)}>
+                            <Edit className="ml-2 h-4 w-4" />
+                            تعديل
+                          </Button>
+                          <Button variant="destructive" onClick={() => requestDelete(doc)}>
+                            <Trash2 className="ml-2 h-4 w-4" />
+                            حذف
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

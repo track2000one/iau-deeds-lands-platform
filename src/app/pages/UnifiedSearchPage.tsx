@@ -431,7 +431,7 @@ export const UnifiedSearchPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full min-w-0 space-y-4 sm:space-y-5">
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">
@@ -693,7 +693,7 @@ export const UnifiedSearchPage: React.FC = () => {
                 </Table>
               </div>
 
-              <div className="grid gap-3 p-3 lg:hidden">
+              <div className="grid gap-3 p-2.5 sm:p-3 lg:hidden">
                 {filteredRecords.map((record) => {
                   const coordinates =
                     parseCoordinates(
@@ -707,8 +707,8 @@ export const UnifiedSearchPage: React.FC = () => {
                       key={`${record.type}-${record.id}`}
                       className="overflow-hidden"
                     >
-                      <CardContent className="space-y-4 p-4">
-                        <div className="flex items-start justify-between gap-3">
+                      <CardContent className="space-y-4 p-3.5 sm:p-4">
+                        <div className="flex flex-col items-start justify-between gap-2 xs:flex-row xs:gap-3">
                           <div className="flex items-center gap-2">
                             {getRecordIcon(record.type)}
                             <Badge variant="outline">
@@ -753,7 +753,7 @@ export const UnifiedSearchPage: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-2 border-t pt-3">
+                        <div className="grid grid-cols-1 gap-2 border-t pt-3 sm:flex sm:flex-wrap">
                           <Button
                             type="button"
                             size="sm"
