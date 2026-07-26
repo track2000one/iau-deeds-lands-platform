@@ -27,6 +27,7 @@ import {
   Globe2,
   CalendarDays,
   History,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -96,6 +97,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'all-deeds', path: '/deeds', icon: FileText, label: t('nav.allDeeds'), module: 'deeds', action: 'canView' },
     { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: t('nav.allocatedLands'), module: 'allocated_lands', action: 'canView' },
     { id: 'delivered-lands', path: '/lands/delivered', icon: MapPin, label: t('nav.deliveredLands'), module: 'delivered_lands', action: 'canView' },
+    { id: 'site-inspections', path: '/site-inspections', icon: ClipboardCheck, label: 'معاينة أرض أو موقع', module: 'site_inspections', action: 'canView' },
     { id: 'leased-lands-out', path: '/lands/leased-out', icon: MapPin, label: t('nav.leasedLandsOut'), module: 'leased_lands_out', action: 'canView' },
     { id: 'leased-lands-in', path: '/lands/leased-in', icon: MapPin, label: t('nav.leasedLandsIn'), module: 'leased_lands_in', action: 'canView' },
     { id: 'leased-buildings-out', path: '/buildings/leased-out', icon: Building, label: t('nav.leasedBuildingsOut'), module: 'leased_buildings_out', action: 'canView' },
@@ -116,6 +118,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/deeds')) return 'all-deeds';
     if (path.startsWith('/lands/allocated')) return 'allocated-lands';
     if (path.startsWith('/lands/delivered')) return 'delivered-lands';
+    if (path.startsWith('/site-inspections')) return 'site-inspections';
     if (path.startsWith('/lands/leased-out')) return 'leased-lands-out';
     if (path.startsWith('/lands/leased-in')) return 'leased-lands-in';
     if (path.startsWith('/buildings/leased-out')) return 'leased-buildings-out';

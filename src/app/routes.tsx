@@ -28,6 +28,9 @@ import { AuditLogPage } from './pages/AuditLogPage';
 import { ArchivePage } from './pages/ArchivePage';
 import { AppearanceSettingsPage } from './pages/AppearanceSettingsPage';
 import { RequireAdmin } from './components/RequireAdmin';
+import { SiteInspectionsPage } from './pages/SiteInspectionsPage';
+import { SiteInspectionFormPage } from './pages/SiteInspectionFormPage';
+import { ViewSiteInspectionPage } from './pages/ViewSiteInspectionPage';
 
 const adminOnly = (element: ReactNode) => (
   <RequireAdmin>{element}</RequireAdmin>
@@ -68,6 +71,28 @@ export const router = createHashRouter([
           {
             path: ':deedId',
             element: <ViewDeedPage />,
+          },
+        ],
+      },
+
+      {
+        path: 'site-inspections',
+        children: [
+          {
+            index: true,
+            element: <SiteInspectionsPage />,
+          },
+          {
+            path: 'new',
+            element: <SiteInspectionFormPage />,
+          },
+          {
+            path: ':inspectionId',
+            element: <ViewSiteInspectionPage />,
+          },
+          {
+            path: ':inspectionId/edit',
+            element: <SiteInspectionFormPage />,
           },
         ],
       },
