@@ -33,6 +33,7 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { AttachmentPreviewGrid } from '../components/AttachmentPreview';
 import { AppDateField } from '../components/AppDateField';
 import { formatFlexibleDate } from '../../utils/dateUtils';
 import type { DateType } from '../../utils/dateUtils';
@@ -1360,27 +1361,14 @@ const InfoBlock = ({ label, value }: { label: string; value: string }) => {
   );
 };
 
-const AttachmentGroups = ({ attachments }: { attachments: AttachmentItem[] }) => {
-  if (!attachments.length) {
-    return <p className="text-sm text-muted-foreground">لا توجد مرفقات.</p>;
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      {attachments.map((attachment) => (
-        <a
-          key={attachment.id}
-          href={attachment.driveUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="rounded-lg border p-3 hover:border-primary transition-colors"
-        >
-          <p className="font-medium truncate">{attachment.title}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {attachment.attachmentType}
-          </p>
-        </a>
-      ))}
-    </div>
-  );
-};
+const AttachmentGroups = ({
+  attachments,
+}: {
+  attachments: AttachmentItem[];
+}) => (
+  <AttachmentPreviewGrid
+    attachments={attachments}
+    emptyText="لا توجد مرفقات."
+    compact
+  />
+);

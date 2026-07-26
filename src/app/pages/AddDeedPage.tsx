@@ -905,11 +905,21 @@ const FilesPreview: React.FC<{
               <img
                 src={URL.createObjectURL(file)}
                 alt={file.name}
-                className="w-full h-full object-cover"
+                className="h-full w-full object-contain"
+              />
+            ) : file.type === 'application/pdf' ||
+              file.name.toLowerCase().endsWith('.pdf') ? (
+              <iframe
+                src={URL.createObjectURL(file)}
+                title={file.name}
+                className="h-full w-full bg-white"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
+              <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-center">
                 <FileText className="h-12 w-12 md:h-16 md:w-16 text-muted-foreground" />
+                <span className="line-clamp-2 text-xs text-muted-foreground">
+                  {file.name}
+                </span>
               </div>
             )}
           </div>

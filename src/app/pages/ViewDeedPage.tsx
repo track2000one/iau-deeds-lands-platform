@@ -49,6 +49,7 @@ import {
 import { toast } from 'sonner';
 import { authenticatedFetch } from '../../lib/http';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { AttachmentPreviewCard } from '../components/AttachmentPreview';
 import 'leaflet/dist/leaflet.css';
 
 type EditFormState = {
@@ -833,36 +834,16 @@ export const ViewDeedPage: React.FC = () => {
                 key={att.id || getAttachmentUrl(att) || `${getAttachmentName(att)}-${index}`}
                 className="border rounded-lg p-2 md:p-3 hover:border-primary transition-colors"
               >
-                {isImageAttachment(att) ? (
-                  <div
-                    className="aspect-square bg-muted rounded-md mb-2 overflow-hidden cursor-pointer"
-                    onClick={() => openAttachment(att)}
-                  >
-                    <img
-                      src={getGoogleDrivePreviewUrl(att)}
-                      alt={getAttachmentName(att)}
-                      className="w-full h-full object-cover"
-                      onError={(event) => {
-                        event.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="aspect-square bg-muted rounded-md mb-2 flex items-center justify-center cursor-pointer"
-                    onClick={() => openAttachment(att)}
-                  >
-                    <FileText className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground" />
-                  </div>
-                )}
-
-                <p className="text-xs font-medium truncate mb-1">
-                  {getAttachmentName(att)}
-                </p>
-
-                <p className="text-xs text-muted-foreground mb-2">
-                  {att.fileSize ? formatFileSize(att.fileSize) : getAttachmentMimeType(att) || 'Google Drive'}
-                </p>
+                <AttachmentPreviewCard
+                  attachment={{
+                    ...att,
+                    title: getAttachmentName(att),
+                    driveUrl: getAttachmentUrl(att),
+                    mimeType: getAttachmentMimeType(att),
+                  }}
+                  compact
+                  onOpen={() => openAttachment(att)}
+                />
 
                 <div className="grid grid-cols-3 gap-1">
                   <Button

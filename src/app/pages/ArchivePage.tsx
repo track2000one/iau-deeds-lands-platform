@@ -47,6 +47,7 @@ import {
 import { toast } from 'sonner';
 import { authenticatedFetch } from '../../lib/http';
 import { usePermissions } from '../../context/PermissionsContext';
+import { AttachmentPreviewCard } from '../components/AttachmentPreview';
 
 type ArchiveDocument = {
   id: string;
@@ -980,7 +981,11 @@ export const ArchivePage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
 
-              <CardContent>
+              <CardContent className="space-y-4">
+                <AttachmentPreviewCard
+                  attachment={selectedDocument}
+                />
+
                 <div className="rounded-lg border p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold">{selectedDocument.originalName}</p>
