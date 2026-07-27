@@ -82,13 +82,12 @@ export const LoginPage: React.FC = () => {
         </span>
       </Button>
 
-      <Card className="login-card shadow-2xl">
-        <CardHeader className="space-y-3 pb-2 text-center md:space-y-4">
-          <div className="mb-2 flex justify-center">
-            <img
-              src={PLATFORM_LOGO_URL}
-              alt="منصة إدارة الصكوك والأراضي"
-              className="h-20 w-20 object-contain drop-shadow-xl md:h-24 md:w-24"
+      <Card
+        className="login-card w-full shadow-2xl"
+        style={{
+          width: 'min(100%, 448px)',
+          maxWidth: '448px',
+        }}
             />
           </div>
 
