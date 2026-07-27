@@ -366,7 +366,7 @@ export const AddDeedPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 rounded-2xl sm:rounded-[2rem] border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-3 sm:p-4 md:p-6 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl">
+    <div className="mobile-full-width w-full min-w-0 space-y-4 rounded-2xl border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-3 sm:p-4 md:p-6 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-800">{t('deed.addNew')}</h1>
@@ -689,7 +689,7 @@ export const AddDeedPage: React.FC = () => {
 
           <CardContent>
             <Tabs defaultValue="deed" className="w-full">
-              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-4">
+              <TabsList className="grid h-auto w-full grid-cols-1 gap-1 min-[390px]:grid-cols-2 md:grid-cols-4">
                 <TabsTrigger value="deed" className="text-xs md:text-sm py-2 md:py-2.5">
                   <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
                   صورة الصك
@@ -897,7 +897,7 @@ const FilesPreview: React.FC<{
   if (files.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:gap-4">
+    <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 md:gap-4">
       {files.map((file, index) => (
         <div key={`${file.name}-${index}`} className="relative group">
           <div className="aspect-square rounded-lg border-2 border-border overflow-hidden bg-muted">

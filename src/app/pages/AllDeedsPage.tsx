@@ -104,7 +104,7 @@ export const AllDeedsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 rounded-2xl sm:rounded-[2rem] border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-3 sm:p-4 md:p-6 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl">
+    <div className="mobile-full-width w-full min-w-0 space-y-4 rounded-2xl border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-3 sm:p-4 md:p-6 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
         <div className="min-w-0">
@@ -331,7 +331,7 @@ export const AllDeedsPage: React.FC = () => {
 
                 <Separator className="mb-3" />
 
-                <div className="grid grid-cols-2 gap-2 sm:flex">
+                <div className="mobile-actions-grid">
                   <Button
                     variant="outline"
                     size="sm"
@@ -355,7 +355,7 @@ export const AllDeedsPage: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-xs h-8 text-destructive hover:text-destructive"
+                        className="col-span-2 h-10 w-full text-xs text-destructive hover:text-destructive"
                         onClick={() => handleDelete(deed.id)}
                       >
                         <Trash2 className="h-3 w-3" />

@@ -118,8 +118,8 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
   };
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-xl border bg-card p-4">
+    <div className="mobile-map-shell w-full min-w-0 space-y-3">
+      <div className="w-full min-w-0 rounded-xl border bg-card p-3 sm:p-4">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h4 className="font-semibold text-sm md:text-base">
@@ -133,13 +133,13 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
           <button
             type="button"
             onClick={useCurrentLocation}
-            className="rounded-md border px-3 py-2 text-xs md:text-sm hover:bg-muted"
+            className="w-full rounded-md border px-3 py-2 text-xs hover:bg-muted sm:w-auto md:text-sm"
           >
             استخدام موقعي الحالي
           </button>
         </div>
 
-        <div className="h-[360px] w-full overflow-hidden rounded-xl border bg-muted">
+        <div className="h-[260px] w-full min-w-0 overflow-hidden rounded-xl border bg-muted sm:h-[320px] lg:h-[380px]">
           <MapContainer
             center={position}
             zoom={zoom}

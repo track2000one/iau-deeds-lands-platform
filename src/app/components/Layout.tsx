@@ -211,7 +211,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="relative flex min-h-0 w-full min-w-0 flex-1 overflow-hidden">
         {sidebarOpen && (
           <div
             className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
@@ -317,8 +317,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </ScrollArea>
         </aside>
 
-        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background/70">
-          <div className="mobile-page-shell w-full max-w-none px-2 py-2.5 sm:px-3 sm:py-4 md:px-5 md:py-5 2xl:px-7">
+        <main className="min-h-0 w-full min-w-0 basis-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background/70">
+          <div className="mobile-page-shell mx-auto w-full min-w-0 max-w-[1680px] px-2.5 py-3 sm:px-4 sm:py-4 md:px-5 md:py-5 2xl:px-7">
             {children}
           </div>
         </main>

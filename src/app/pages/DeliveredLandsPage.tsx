@@ -580,7 +580,7 @@ export const DeliveredLandsPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
+    <div className="mobile-full-width w-full min-w-0 space-y-4 sm:space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">الأراضي المستلمة</h1>
@@ -597,7 +597,7 @@ export const DeliveredLandsPage: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 xl:grid-cols-4 sm:gap-4">
         <Card>
           <CardContent className="p-5 flex items-center justify-between">
             <div>
@@ -691,7 +691,7 @@ export const DeliveredLandsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hidden md:block">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
@@ -822,8 +822,81 @@ export const DeliveredLandsPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      <div className="space-y-3 md:hidden">
+        {filteredLands.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">
+              لا توجد أراضٍ مستلمة مطابقة للبحث.
+            </CardContent>
+          </Card>
+        ) : (
+          filteredLands.map((land: any) => (
+            <Card key={land.id} className="w-full overflow-hidden">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold">
+                      {land.landName || land.receiptNumber || 'أرض مستلمة'}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {land.city || '-'} — {land.district || '-'}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={getStatusBadgeVariant(land.status) as any}
+                    className="shrink-0"
+                  >
+                    {land.status || 'غير محدد'}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <InfoItem label="رقم المحضر" value={land.receiptNumber || '-'} />
+                  <InfoItem
+                    label="المساحة"
+                    value={`${Number(land.area || 0).toLocaleString()} م²`}
+                  />
+                  <InfoItem label="القطعة" value={land.plotNumber || '-'} />
+                  <InfoItem label="المخطط" value={land.planNumber || '-'} />
+                </div>
+
+                <div className="mobile-actions-grid">
+                  <Button variant="outline" onClick={() => openDetails(land)}>
+                    <Eye className="ml-2 h-4 w-4" />
+                    عرض
+                  </Button>
+
+                  <Button variant="outline" onClick={() => openEditForm(land)}>
+                    <Edit className="ml-2 h-4 w-4" />
+                    تعديل
+                  </Button>
+
+                  {getLandCoordinates(land) && (
+                    <Button variant="outline" onClick={() => openMap(land)}>
+                      <MapPin className="ml-2 h-4 w-4" />
+                      الخريطة
+                    </Button>
+                  )}
+
+                  {hasPermission('delivered_lands', 'canDelete') && (
+                    <Button
+                      variant="outline"
+                      className="text-destructive"
+                      onClick={() => requestDelete(land)}
+                    >
+                      <Trash2 className="ml-2 h-4 w-4" />
+                      حذف
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
       {formOpen && (
-        <div id="delivered-land-form" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
+        <div id="delivered-land-form" className="w-full min-w-0 rounded-xl border bg-card p-3 shadow-sm sm:p-4 md:p-6">
           <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h2 className="text-xl md:text-2xl font-bold">
@@ -1120,7 +1193,7 @@ export const DeliveredLandsPage: React.FC = () => {
 
               <CardContent>
                 <Tabs defaultValue="minutes" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+                  <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-5">
                     <TabsTrigger value="minutes">محضر الاستلام</TabsTrigger>
                     <TabsTrigger value="deed">الصك</TabsTrigger>
                     <TabsTrigger value="plan">المخطط</TabsTrigger>
@@ -1226,7 +1299,7 @@ export const DeliveredLandsPage: React.FC = () => {
       )}
 
       {detailsOpen && selectedLand && (
-        <div id="delivered-land-details" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
+        <div id="delivered-land-details" className="w-full min-w-0 rounded-xl border bg-card p-3 shadow-sm sm:p-4 md:p-6">
           <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h2 className="text-xl md:text-2xl font-bold">تفاصيل الأرض المستلمة</h2>

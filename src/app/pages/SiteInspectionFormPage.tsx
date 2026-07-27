@@ -228,7 +228,7 @@ export const SiteInspectionFormPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full min-w-0 space-y-4 sm:space-y-6">
+    <div className="mobile-full-width w-full min-w-0 space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold sm:text-3xl">
@@ -244,7 +244,7 @@ export const SiteInspectionFormPage: React.FC = () => {
         </Button>
       </div>
 
-      <Card>
+      <Card className="w-full min-w-0 overflow-hidden">
         <CardHeader><CardTitle>بيانات الزيارة والموقع</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Field label="عنوان المعاينة *">
@@ -302,7 +302,7 @@ export const SiteInspectionFormPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="w-full min-w-0 overflow-hidden">
         <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />الإحداثيات</CardTitle></CardHeader>
         <CardContent>
           <MapCoordinatePicker
@@ -323,7 +323,7 @@ export const SiteInspectionFormPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="w-full min-w-0 overflow-hidden">
         <CardHeader><CardTitle>الحالة والملاحظات</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Field label="الحالة العامة">
@@ -373,7 +373,7 @@ export const SiteInspectionFormPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="w-full min-w-0 overflow-hidden">
         <CardHeader>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>عناصر المعاينة التفصيلية</CardTitle>
@@ -423,7 +423,7 @@ export const SiteInspectionFormPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="w-full min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Camera className="h-5 w-5" />
@@ -486,7 +486,7 @@ export const SiteInspectionFormPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <div className="sticky bottom-0 z-20 flex flex-col-reverse gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row sm:justify-end">
+      <div className="mobile-sticky-actions sticky bottom-0 z-20 flex w-full flex-col-reverse gap-2 rounded-t-xl border bg-background/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:justify-end">
         <Button variant="outline" onClick={() => navigate('/site-inspections')} disabled={saving}>
           إلغاء
         </Button>
@@ -582,7 +582,7 @@ const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
         <label
           htmlFor={cameraInputId}
           className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-3 text-center transition hover:bg-muted/30"
@@ -629,7 +629,7 @@ const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
       </div>
 
       {categoryAttachments.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2 sm:grid-cols-3">
           {categoryAttachments.map(({ attachment, originalIndex }) => (
             <div
               key={`${attachment.driveUrl}-${originalIndex}`}
