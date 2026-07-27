@@ -354,6 +354,8 @@ const getReportStyles = () => `
   .print-note button:disabled { cursor: wait; opacity: .55; }
   .report-header {
     position: relative;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
     overflow: hidden;
     border: 1px solid #d7ddd9;
     border-radius: 22px;
@@ -379,6 +381,8 @@ const getReportStyles = () => `
   .badge { border: 1px solid rgba(89,102,110,.25); background: rgba(255,255,255,.76); border-radius: 999px; padding: 5px 9px; font-size: 10px; color: #425466; }
   .intro-note {
     margin-bottom: 13px;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
     border: 1px solid #d9dfdc;
     border-radius: 15px;
     padding: 12px 14px;
@@ -389,6 +393,8 @@ const getReportStyles = () => `
   .intro-note p { margin: 0; }
   .section {
     border: 1px solid #dfe4e1;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
     border-radius: 17px;
     margin-bottom: 13px;
     padding: 16px;
@@ -409,26 +415,87 @@ const getReportStyles = () => `
   .inspection-item-heading { display: flex; justify-content: space-between; gap: 12px; }
   .inspection-item-heading span { color: #7c6f64; font-size: 10px; }
   .inspection-item p { margin: 4px 0 0; color: #56616a; }
-  .photo-section { margin-top: 16px; }
+  .photo-documentation {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .photo-section {
+    margin-top: 16px;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
   .photo-section h3 { margin: 0 0 9px; color: #273c50; font-size: 14px; }
   .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 11px; }
   .photo-card { margin: 0; overflow: hidden; border: 1px solid #d9dfdc; border-radius: 13px; background: #fff; break-inside: avoid; box-shadow: 0 5px 16px rgba(20,30,40,.06); }
   .photo-card img { display: block; width: 100%; height: 225px; object-fit: contain; background: #f2f3f1; }
   .photo-card figcaption { padding: 8px 9px; display: flex; flex-direction: column; gap: 1px; }
   .photo-card figcaption span { font-size: 9px; color: #6b7280; word-break: break-word; }
-  .attachments-list { margin-top: 15px; }
+  .attachments-list {
+    margin-top: 15px;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
   .attachments-list h3 { color: #273c50; font-size: 14px; }
-  .attachment-row { display: flex; gap: 9px; padding: 8px 0; border-bottom: 1px solid #ecefed; }
+  .attachment-row {
+    display: flex;
+    gap: 9px;
+    padding: 8px 0;
+    border-bottom: 1px solid #ecefed;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
   .attachment-row > span { width: 23px; height: 23px; display: grid; place-items: center; border-radius: 50%; background: #e8ece9; }
   .attachment-row div { display: flex; flex-direction: column; }
   .attachment-row small { color: #7b858c; }
-  .footer { margin-top: 22px; padding-top: 9px; border-top: 1px solid #dfe3e0; color: #69757e; display: flex; justify-content: space-between; gap: 16px; font-size: 9px; }
+  .footer {
+    margin-top: 22px;
+    padding-top: 9px;
+    border-top: 1px solid #dfe3e0;
+    color: #69757e;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 9px;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
   .empty-text { color: #7b858c; text-align: center; }
   @media print {
     body { background: #fff; }
     .reports-wrapper { max-width: none; padding: 0; }
     .print-note { display: none; }
+    .inspection-report { padding: 0; }
     .section, .report-header, .photo-card { box-shadow: none; }
+
+    .report-header,
+    .intro-note,
+    .section:not(.photo-documentation),
+    .narrative-card,
+    .inspection-item,
+    .photo-card,
+    .attachment-row,
+    .footer {
+      break-inside: avoid-page !important;
+      page-break-inside: avoid !important;
+    }
+
+    .photo-documentation,
+    .photo-section,
+    .attachments-list {
+      break-inside: auto !important;
+      page-break-inside: auto !important;
+    }
+
+    .section-title,
+    .photo-section h3,
+    .attachments-list h3 {
+      break-after: avoid-page;
+      page-break-after: avoid;
+    }
+
+    .section {
+      margin-bottom: 10px;
+    }
   }
   @media (max-width: 720px) {
     .reports-wrapper { padding: 8px; }
