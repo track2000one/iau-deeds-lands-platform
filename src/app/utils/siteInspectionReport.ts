@@ -397,7 +397,8 @@ const getReportStyles = () => `
 `;
 
 export const buildSiteInspectionReportHtml = (
-  records: SiteInspection[]
+  records: SiteInspection[],
+  autoPrint = false
 ): string => {
   const safeRecords = records.filter(Boolean);
   const title =
@@ -467,12 +468,15 @@ export const buildSiteInspectionReportHtml = (
         setTimeout(markReady, 12000);
       }
 
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('autoprint') === '1') {
+      const shouldAutoPrint = ${autoPrint ? 'true' : 'false'};
+      if (shouldAutoPrint) {
         const timer = window.setInterval(() => {
           if (!ready) return;
           window.clearInterval(timer);
-          setTimeout(() => window.print(), 300);
+          setTimeout(() => {
+            window.focus();
+            window.print();
+          }, 500);
         }, 150);
       }
     })();
@@ -488,19 +492,20 @@ export const openSiteInspectionReports = (
   if (!records.length) return false;
 
   try {
-    const html = buildSiteInspectionReportHtml(records);
+    const html = buildSiteInspectionReportHtml(records, autoPrint);
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const objectUrl = URL.createObjectURL(blob);
-    const reportUrl = autoPrint ? `${objectUrl}?autoprint=1` : objectUrl;
-    const reportWindow = window.open(reportUrl, '_blank');
+
+    // لا تضاف query parameters إلى رابط Blob؛ إضافتها تسبب ERR_FILE_NOT_FOUND في Chrome.
+    const reportWindow = window.open(objectUrl, '_blank', 'noopener,noreferrer');
 
     if (!reportWindow) {
       URL.revokeObjectURL(objectUrl);
       return false;
     }
 
-    // إبقاء الرابط مدة كافية حتى تنتهي الصور ونافذة الحفظ PDF من استخدامه.
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5 * 60 * 1000);
+    // إبقاء الرابط مدة طويلة، ثم تحريره بعد انتهاء العرض والطباعة.
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 15 * 60 * 1000);
     return true;
   } catch (error) {
     console.error('Site inspection PDF report error:', error);
