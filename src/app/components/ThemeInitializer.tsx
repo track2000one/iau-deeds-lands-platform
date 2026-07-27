@@ -184,7 +184,6 @@ const injectAppearanceStyles = () => {
     }
 
     .future-sidebar {
-      position: relative;
       flex-shrink: 0;
       overflow: hidden;
       border-color: var(--appearance-glass-border) !important;
@@ -194,6 +193,18 @@ const injectAppearanceStyles = () => {
       box-shadow:
         inset 0 1px 0 rgba(255,255,255,.18),
         0 20px 58px var(--appearance-glow);
+    }
+
+    @media (max-width: 1023px) {
+      .future-sidebar {
+        position: fixed !important;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .future-sidebar {
+        position: static !important;
+      }
     }
 
     .future-sidebar::before {

@@ -440,3 +440,19 @@ body,
     max-width: 28rem !important;
   }
 }
+
+
+/* ===== Actual sidebar flow fix ===== */
+@media (max-width: 1023px) {
+  .future-sidebar {
+    position: fixed !important;
+    flex: none !important;
+  }
+
+  .future-app-shell main {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+  }
+}
