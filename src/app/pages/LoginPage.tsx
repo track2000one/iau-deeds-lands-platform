@@ -69,7 +69,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent p-3 md:p-4">
+    <div className="login-page flex w-full items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent p-3 sm:p-5">
       <Button
         variant="ghost"
         size="sm"
@@ -82,7 +82,7 @@ export const LoginPage: React.FC = () => {
         </span>
       </Button>
 
-      <Card className="w-full max-w-md shadow-2xl">
+      <Card className="login-card shadow-2xl">
         <CardHeader className="space-y-3 pb-2 text-center md:space-y-4">
           <div className="mb-2 flex justify-center">
             <img
