@@ -8,7 +8,6 @@ import {
   Database,
   Edit,
   KeyRound,
-  MailCheck,
   Shield,
   Trash2,
   UserPlus,
@@ -98,7 +97,6 @@ export const AdminDashboardPage: React.FC = () => {
     deleteEmployee,
     refreshUsers,
     resetEmployeePassword,
-    resendActivationEmail,
     updateEmployee,
     users,
   } = useAuth();
@@ -123,9 +121,6 @@ export const AdminDashboardPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
-
-  const [resendingActivationId, setResendingActivationId] =
-    useState<string | null>(null);
 
   const [deleteUser, setDeleteUser] = useState<UserProfile | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -175,9 +170,7 @@ export const AdminDashboardPage: React.FC = () => {
       );
       await refreshUsers();
 
-      toast.success(
-        'تم إنشاء الحساب وإرسال رسالة التفعيل إلى البريد الإلكتروني.'
-      );
+      toast.success('تم إنشاء حساب المستخدم بنجاح');
       setUsername('');
       setEmail('');
       setPassword('');
@@ -255,24 +248,6 @@ export const AdminDashboardPage: React.FC = () => {
       );
     } finally {
       setPasswordSaving(false);
-    }
-  };
-
-  const handleResendActivation = async (
-    user: UserProfile
-  ) => {
-    try {
-      setResendingActivationId(user.uid);
-      const message = await resendActivationEmail(user.uid);
-      toast.success(message);
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : 'تعذر إعادة إرسال رابط التفعيل'
-      );
-    } finally {
-      setResendingActivationId(null);
     }
   };
 
@@ -379,7 +354,7 @@ export const AdminDashboardPage: React.FC = () => {
                 إضافة مستخدم جديد
               </CardTitle>
               <CardDescription>
-                أنشئ الحساب وحدد كلمة المرور الأولية، وسيصل للمستخدم بريد لتفعيل الحساب خلال 24 ساعة.
+                أنشئ حساب مسؤول أو مستخدم عادي للعرض فقط.
               </CardDescription>
             </CardHeader>
 
@@ -522,17 +497,6 @@ export const AdminDashboardPage: React.FC = () => {
                             <TableCell>
                               {user.isActive ? (
                                 <Badge variant="secondary">نشط</Badge>
-                              ) : user.activationPending ? (
-                                user.activationExpires &&
-                                user.activationExpires <= new Date() ? (
-                                  <Badge variant="destructive">
-                                    انتهى رابط التفعيل
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline">
-                                    بانتظار التفعيل
-                                  </Badge>
-                                )
                               ) : (
                                 <Badge variant="destructive">معطل</Badge>
                               )}
@@ -546,30 +510,6 @@ export const AdminDashboardPage: React.FC = () => {
 
                             <TableCell>
                               <div className="flex justify-end gap-1">
-                                {!user.isActive &&
-                                  user.activationPending && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      title="إعادة إرسال رابط التفعيل"
-                                      disabled={
-                                        resendingActivationId === user.uid
-                                      }
-                                      onClick={() =>
-                                        handleResendActivation(user)
-                                      }
-                                    >
-                                      <MailCheck
-                                        className={`h-4 w-4 ${
-                                          resendingActivationId === user.uid
-                                            ? 'animate-pulse'
-                                            : ''
-                                        }`}
-                                      />
-                                    </Button>
-                                  )}
-
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -642,6 +582,7 @@ export const AdminDashboardPage: React.FC = () => {
                       'الصكوك',
                       'الأراضي المخصصة',
                       'الأراضي المستلمة',
+                      'معاينة أرض أو موقع',
                       'الأراضي المؤجرة',
                       'الأراضي المستأجرة',
                       'المباني المؤجرة',
@@ -736,7 +677,6 @@ export const AdminDashboardPage: React.FC = () => {
               <Label>حالة الحساب</Label>
               <NativeSelect
                 value={editForm.isActive ? 'active' : 'inactive'}
-                disabled={Boolean(editingUser?.activationPending)}
                 onChange={(event) =>
                   setEditForm((current) => ({
                     ...current,
@@ -745,19 +685,8 @@ export const AdminDashboardPage: React.FC = () => {
                 }
               >
                 <option value="active">نشط</option>
-                <option value="inactive">
-                  {editingUser?.activationPending
-                    ? 'بانتظار التفعيل من المستخدم'
-                    : 'معطل'}
-                </option>
+                <option value="inactive">معطل</option>
               </NativeSelect>
-
-              {editingUser?.activationPending && (
-                <p className="text-xs text-muted-foreground">
-                  لا يمكن تفعيل الحساب يدويًا؛ يجب على المستخدم
-                  فتح رابط التفعيل المرسل إلى بريده.
-                </p>
-              )}
             </div>
           </div>
 

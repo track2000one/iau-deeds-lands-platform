@@ -12,6 +12,7 @@ const MODULES: ModuleName[] = [
   'deeds',
   'allocated_lands',
   'delivered_lands',
+  'site_inspections',
   'leased_lands_out',
   'leased_lands_in',
   'leased_buildings_out',
