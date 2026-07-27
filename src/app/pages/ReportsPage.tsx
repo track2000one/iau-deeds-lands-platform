@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useData } from '../../context/DataContext';
+import { usePermissions } from '../../context/PermissionsContext';
 import { formatFlexibleDate, getFlexibleDateType } from '../../utils/dateUtils';
 import {
   FileSpreadsheet,
@@ -29,6 +30,8 @@ import {
   CalendarDays,
   Images,
   MapPin,
+  Printer,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -45,7 +48,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from 'sonner';
 import type { SiteInspection } from '../../types/siteInspection';
-import { getSiteInspections } from '../api/siteInspections';
+import { getSiteInspection, getSiteInspections } from '../api/siteInspections';
+import { openSiteInspectionReport, openSiteInspectionReports } from '../utils/siteInspectionReport';
 import * as XLSX from 'xlsx';
 import { Badge } from '../components/ui/badge';
 import {
@@ -254,6 +258,8 @@ export const ReportsPage: React.FC = () => {
   } = useData();
 
   const [siteInspections, setSiteInspections] = useState<SiteInspection[]>([]);
+  const [printingInspectionId, setPrintingInspectionId] = useState<string | null>(null);
+  const [printingAllInspections, setPrintingAllInspections] = useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -272,6 +278,57 @@ export const ReportsPage: React.FC = () => {
       cancelled = true;
     };
   }, []);
+
+  const printSingleInspection = async (inspection: SiteInspection) => {
+    if (!canPrintInspections || printingInspectionId || printingAllInspections) return;
+
+    try {
+      setPrintingInspectionId(inspection.id);
+      const fullRecord = await getSiteInspection(inspection.id);
+      const opened = openSiteInspectionReport(fullRecord);
+
+      if (!opened) {
+        toast.error('تعذر فتح نافذة الطباعة. فعّل السماح بالنوافذ المنبثقة في المتصفح.');
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'تعذر تجهيز تقرير المعاينة للطباعة'
+      );
+    } finally {
+      setPrintingInspectionId(null);
+    }
+  };
+
+  const printAllInspectionReports = async () => {
+    if (!canPrintInspections || printingAllInspections || printingInspectionId) return;
+
+    if (siteInspections.length === 0) {
+      toast.error('لا توجد معاينات مسجلة للطباعة.');
+      return;
+    }
+
+    try {
+      setPrintingAllInspections(true);
+      const fullRecords = await Promise.all(
+        siteInspections.map((inspection) => getSiteInspection(inspection.id))
+      );
+      const opened = openSiteInspectionReports(fullRecords);
+
+      if (!opened) {
+        toast.error('تعذر فتح نافذة الطباعة. فعّل السماح بالنوافذ المنبثقة في المتصفح.');
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'تعذر تجهيز تقارير المعاينات للطباعة'
+      );
+    } finally {
+      setPrintingAllInspections(false);
+    }
+  };
 
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [reportType, setReportType] = useState<'detailed' | 'summary' | 'statistical' | 'graphical'>('detailed');
@@ -2198,9 +2255,34 @@ export const ReportsPage: React.FC = () => {
                 </div>
               </div>
 
-              <Badge variant="outline" className="w-fit rounded-full bg-white/70 px-3 py-1.5">
-                {siteInspections.length} تقرير
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="w-fit rounded-full bg-white/70 px-3 py-1.5">
+                  {siteInspections.length} تقرير
+                </Badge>
+
+                {canPrintInspections && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl border-white/60 bg-white/75 shadow-sm hover:bg-white"
+                    onClick={printAllInspectionReports}
+                    disabled={
+                      printingAllInspections ||
+                      Boolean(printingInspectionId) ||
+                      siteInspections.length === 0
+                    }
+                  >
+                    {printingAllInspections ? (
+                      <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Printer className="ml-2 h-4 w-4" />
+                    )}
+                    {printingAllInspections
+                      ? 'جاري تجهيز التقارير...'
+                      : 'طباعة جميع التقارير'}
+                  </Button>
+                )}
+              </div>
             </div>
           </CardHeader>
 
@@ -2251,14 +2333,38 @@ export const ReportsPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <Button
-                        type="button"
-                        className="w-full rounded-xl"
-                        onClick={() => navigate(`/site-inspections/${inspection.id}`)}
-                      >
-                        <Eye className="ml-2 h-4 w-4" />
-                        فتح التقرير المستقل
-                      </Button>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full rounded-xl border-white/60 bg-white/70"
+                          onClick={() => navigate(`/site-inspections/${inspection.id}`)}
+                        >
+                          <Eye className="ml-2 h-4 w-4" />
+                          عرض التقرير
+                        </Button>
+
+                        {canPrintInspections && (
+                          <Button
+                            type="button"
+                            className="w-full rounded-xl"
+                            onClick={() => printSingleInspection(inspection)}
+                            disabled={
+                              printingAllInspections ||
+                              Boolean(printingInspectionId)
+                            }
+                          >
+                            {printingInspectionId === inspection.id ? (
+                              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Printer className="ml-2 h-4 w-4" />
+                            )}
+                            {printingInspectionId === inspection.id
+                              ? 'جاري التجهيز...'
+                              : 'طباعة التقرير'}
+                          </Button>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
