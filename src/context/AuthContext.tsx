@@ -24,6 +24,10 @@ type ApiUser = {
   username: string;
   role: UserRole;
   isActive: boolean;
+  activationPending?: boolean;
+  activationExpires?: string | null;
+  activationSentAt?: string | null;
+  activatedAt?: string | null;
   permissions?: Partial<UserPermissions> | null;
   createdAt: string;
   updatedAt: string;
@@ -62,6 +66,7 @@ interface AuthContextType {
   updateEmployee: (uid: string, input: UpdateUserInput) => Promise<void>;
   deleteEmployee: (uid: string) => Promise<void>;
   resetEmployeePassword: (uid: string, password: string) => Promise<void>;
+  resendActivationEmail: (uid: string) => Promise<string>;
   refreshUsers: () => Promise<void>;
 }
 
@@ -73,6 +78,16 @@ const normalizeUser = (user: ApiUser): UserProfile => ({
   username: user.username,
   role: user.role,
   isActive: user.isActive,
+  activationPending: Boolean(user.activationPending),
+  activationExpires: user.activationExpires
+    ? new Date(user.activationExpires)
+    : null,
+  activationSentAt: user.activationSentAt
+    ? new Date(user.activationSentAt)
+    : null,
+  activatedAt: user.activatedAt
+    ? new Date(user.activatedAt)
+    : null,
   permissions: getPermissionsByRole(
     user.role,
     user.permissions
@@ -265,6 +280,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     });
   };
 
+
+  const resendActivationEmail = async (
+    uid: string
+  ): Promise<string> => {
+    const response = await apiJson<{
+      user: ApiUser;
+      message: string;
+    }>(`/api/users/${uid}/resend-activation`, {
+      method: 'POST',
+    });
+
+    setUsers((current) =>
+      current.map((user) =>
+        user.uid === uid ? normalizeUser(response.user) : user
+      )
+    );
+
+    return response.message;
+  };
+
   const value: AuthContextType = {
     currentUser,
     userProfile,
@@ -278,6 +313,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     updateEmployee,
     deleteEmployee,
     resetEmployeePassword,
+    resendActivationEmail,
     refreshUsers,
   };
 

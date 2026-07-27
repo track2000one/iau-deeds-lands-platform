@@ -30,6 +30,10 @@ export interface UserProfile {
   username: string;
   role: UserRole;
   isActive: boolean;
+  activationPending?: boolean;
+  activationExpires?: Date | null;
+  activationSentAt?: Date | null;
+  activatedAt?: Date | null;
   permissions: UserPermissions;
   createdAt: Date;
   updatedAt: Date;

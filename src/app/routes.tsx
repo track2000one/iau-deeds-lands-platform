@@ -10,6 +10,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { ActivateAccountPage } from './pages/ActivateAccountPage';
 import { AllocatedLandsPage } from './pages/AllocatedLandsPage';
 import { AddAllocatedLandPage } from './pages/AddAllocatedLandPage';
 import { DeliveredLandsPage } from './pages/DeliveredLandsPage';
@@ -48,6 +49,10 @@ export const router = createHashRouter([
   {
     path: '/reset-password',
     element: <ResetPasswordPage />,
+  },
+  {
+    path: '/activate-account',
+    element: <ActivateAccountPage />,
   },
   {
     path: '/',
