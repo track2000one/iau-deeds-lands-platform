@@ -286,17 +286,38 @@ const getReportStyles = () => `
   .page-break { page-break-after: always; break-after: page; }
   .print-note {
     position: sticky;
-    top: 0;
+    top: 10px;
     z-index: 50;
-    margin-bottom: 12px;
-    border: 1px solid #dfcfaf;
-    border-radius: 12px;
-    background: #fff8e8;
-    color: #725826;
-    padding: 9px 12px;
-    text-align: center;
-    box-shadow: 0 8px 25px rgba(15, 23, 42, .08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+    border: 1px solid #d8c8aa;
+    border-radius: 16px;
+    background: rgba(255, 252, 244, .96);
+    color: #594724;
+    padding: 10px 12px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, .10);
+    backdrop-filter: blur(12px);
   }
+  .print-note > div { display: flex; flex-direction: column; gap: 2px; }
+  .print-note strong { color: #26384a; font-size: 13px; }
+  .print-note span { color: #77684f; font-size: 10px; }
+  .print-note button {
+    appearance: none;
+    border: 1px solid #253f55;
+    border-radius: 11px;
+    background: #253f55;
+    color: #fff;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .print-note button:hover { background: #172f43; }
+  .print-note button:disabled { cursor: wait; opacity: .55; }
   .report-header {
     position: relative;
     overflow: hidden;
@@ -394,8 +415,12 @@ export const buildSiteInspectionReportHtml = (
 </head>
 <body>
   <main class="reports-wrapper">
-    <div class="print-note">
-      انتظر حتى اكتمال تحميل الصور، ثم اختر الطابعة أو الحفظ بصيغة PDF.
+    <div class="print-note" id="pdf-toolbar">
+      <div>
+        <strong>تقرير المعاينة جاهز للحفظ بصيغة PDF</strong>
+        <span id="loading-message">جاري التحقق من تحميل الصور...</span>
+      </div>
+      <button type="button" id="save-pdf-button" disabled>حفظ PDF</button>
     </div>
     ${safeRecords
       .map((record, index) => buildInspectionBody(record, index, safeRecords.length))
@@ -403,49 +428,85 @@ export const buildSiteInspectionReportHtml = (
   </main>
 
   <script>
-    let printStarted = false;
-    const startPrint = () => {
-      if (printStarted) return;
-      printStarted = true;
-      setTimeout(() => window.print(), 500);
-    };
+    (() => {
+      const button = document.getElementById('save-pdf-button');
+      const message = document.getElementById('loading-message');
+      let ready = false;
 
-    const images = Array.from(document.images);
-    if (!images.length) {
-      startPrint();
-    } else {
-      let completed = 0;
-      const finishOne = () => {
-        completed += 1;
-        if (completed >= images.length) startPrint();
-      };
-      images.forEach((img) => {
-        if (img.complete) finishOne();
-        else {
-          img.addEventListener('load', finishOne, { once: true });
-          img.addEventListener('error', finishOne, { once: true });
+      const markReady = () => {
+        if (ready) return;
+        ready = true;
+        if (button) button.disabled = false;
+        if (message) {
+          message.textContent = 'اضغط حفظ PDF، ثم اختر Save as PDF من نافذة الطباعة.';
         }
-      });
-      setTimeout(startPrint, 10000);
-    }
+      };
+
+      if (button) {
+        button.addEventListener('click', () => window.print());
+      }
+
+      const images = Array.from(document.images);
+      if (!images.length) {
+        markReady();
+      } else {
+        let completed = 0;
+        const finishOne = () => {
+          completed += 1;
+          if (completed >= images.length) markReady();
+        };
+
+        images.forEach((img) => {
+          if (img.complete) finishOne();
+          else {
+            img.addEventListener('load', finishOne, { once: true });
+            img.addEventListener('error', finishOne, { once: true });
+          }
+        });
+
+        setTimeout(markReady, 12000);
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('autoprint') === '1') {
+        const timer = window.setInterval(() => {
+          if (!ready) return;
+          window.clearInterval(timer);
+          setTimeout(() => window.print(), 300);
+        }, 150);
+      }
+    })();
   </script>
 </body>
 </html>`;
 };
 
 export const openSiteInspectionReports = (
-  records: SiteInspection[]
+  records: SiteInspection[],
+  autoPrint = true
 ): boolean => {
   if (!records.length) return false;
 
-  const reportWindow = window.open('', '_blank', 'noopener,noreferrer');
-  if (!reportWindow) return false;
+  try {
+    const html = buildSiteInspectionReportHtml(records);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const objectUrl = URL.createObjectURL(blob);
+    const reportUrl = autoPrint ? `${objectUrl}?autoprint=1` : objectUrl;
+    const reportWindow = window.open(reportUrl, '_blank');
 
-  reportWindow.document.open();
-  reportWindow.document.write(buildSiteInspectionReportHtml(records));
-  reportWindow.document.close();
-  return true;
+    if (!reportWindow) {
+      URL.revokeObjectURL(objectUrl);
+      return false;
+    }
+
+    // إبقاء الرابط مدة كافية حتى تنتهي الصور ونافذة الحفظ PDF من استخدامه.
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5 * 60 * 1000);
+    return true;
+  } catch (error) {
+    console.error('Site inspection PDF report error:', error);
+    return false;
+  }
 };
 
 export const openSiteInspectionReport = (record: SiteInspection): boolean =>
-  openSiteInspectionReports([record]);
+  openSiteInspectionReports([record], true);

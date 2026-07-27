@@ -291,13 +291,13 @@ export const ReportsPage: React.FC = () => {
       const opened = openSiteInspectionReport(fullRecord);
 
       if (!opened) {
-        toast.error('تعذر فتح نافذة الطباعة. فعّل السماح بالنوافذ المنبثقة في المتصفح.');
+        toast.error('تعذر فتح تقرير PDF. فعّل السماح بالنوافذ المنبثقة في المتصفح.');
       }
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : 'تعذر تجهيز تقرير المعاينة للطباعة'
+          : 'تعذر تجهيز تقرير المعاينة بصيغة PDF'
       );
     } finally {
       setPrintingInspectionId(null);
@@ -308,7 +308,7 @@ export const ReportsPage: React.FC = () => {
     if (!canPrintInspections || printingAllInspections || printingInspectionId) return;
 
     if (siteInspections.length === 0) {
-      toast.error('لا توجد معاينات مسجلة للطباعة.');
+      toast.error('لا توجد معاينات مسجلة لإنشاء PDF.');
       return;
     }
 
@@ -320,13 +320,13 @@ export const ReportsPage: React.FC = () => {
       const opened = openSiteInspectionReports(fullRecords);
 
       if (!opened) {
-        toast.error('تعذر فتح نافذة الطباعة. فعّل السماح بالنوافذ المنبثقة في المتصفح.');
+        toast.error('تعذر فتح تقرير PDF. فعّل السماح بالنوافذ المنبثقة في المتصفح.');
       }
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : 'تعذر تجهيز تقارير المعاينات للطباعة'
+          : 'تعذر تجهيز تقارير المعاينات بصيغة PDF'
       );
     } finally {
       setPrintingAllInspections(false);
@@ -2253,7 +2253,7 @@ export const ReportsPage: React.FC = () => {
                 <div>
                   <CardTitle className="text-xl">تقارير معاينات الأراضي والمواقع</CardTitle>
                   <CardDescription className="mt-2 max-w-3xl leading-7">
-                    كل معاينة لها تقرير سردي مستقل لا يعتمد على الجدول، ويجمع وصف الزيارة والملاحظات والتوصيات وعناصر المعاينة والصور في قالب رسمي قابل للطباعة والحفظ PDF.
+                    كل معاينة لها تقرير سردي مستقل لا يعتمد على الجدول، ويجمع وصف الزيارة والملاحظات والتوصيات وعناصر المعاينة والصور في قالب رسمي قابل للحفظ بصيغة PDF مع الصور.
                   </CardDescription>
                 </div>
               </div>
@@ -2278,11 +2278,11 @@ export const ReportsPage: React.FC = () => {
                     {printingAllInspections ? (
                       <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <Printer className="ml-2 h-4 w-4" />
+                      <FileText className="ml-2 h-4 w-4" />
                     )}
                     {printingAllInspections
                       ? 'جاري تجهيز التقارير...'
-                      : 'طباعة جميع التقارير'}
+                      : 'حفظ جميع التقارير PDF'}
                   </Button>
                 )}
               </div>
@@ -2360,11 +2360,11 @@ export const ReportsPage: React.FC = () => {
                             {printingInspectionId === inspection.id ? (
                               <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                             ) : (
-                              <Printer className="ml-2 h-4 w-4" />
+                              <FileText className="ml-2 h-4 w-4" />
                             )}
                             {printingInspectionId === inspection.id
                               ? 'جاري التجهيز...'
-                              : 'طباعة التقرير'}
+                              : 'حفظ التقرير PDF'}
                           </Button>
                         )}
                       </div>
