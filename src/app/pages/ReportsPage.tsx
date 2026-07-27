@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useData } from '../../context/DataContext';
 import { formatFlexibleDate, getFlexibleDateType } from '../../utils/dateUtils';
@@ -24,7 +25,6 @@ import {
   Wallet,
   Sparkles,
   ShieldCheck,
-  ClipboardCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -139,6 +139,7 @@ const defaultPrintSettings: PrintSettings = {
 
 export const ReportsPage: React.FC = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const deedsColumns = [
     { key: 'deedNumber', label: 'رقم الصك', enabled: true },
@@ -2178,13 +2179,89 @@ export const ReportsPage: React.FC = () => {
           'buildingsIn'
         )}
 
-        {renderReportSection(
-          'siteInspections',
-          'معاينة أرض أو موقع',
-          siteInspections,
-          selectedColumns.siteInspections,
-          'siteInspections'
-        )}
+        <Card className="relative overflow-hidden rounded-[30px] border border-white/45 bg-white/60 shadow-[0_20px_60px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
+          <CardHeader className="border-b border-white/50 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,239,231,0.74),rgba(236,231,223,0.58))]">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/60 bg-white/75 shadow-inner">
+                  <ClipboardCheck className="h-6 w-6 text-slate-700" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">تقارير معاينات الأراضي والمواقع</CardTitle>
+                  <CardDescription className="mt-2 max-w-3xl leading-7">
+                    كل معاينة لها تقرير سردي مستقل لا يعتمد على الجدول، ويجمع وصف الزيارة والملاحظات والتوصيات وعناصر المعاينة والصور في قالب رسمي قابل للطباعة والحفظ PDF.
+                  </CardDescription>
+                </div>
+              </div>
+
+              <Badge variant="outline" className="w-fit rounded-full bg-white/70 px-3 py-1.5">
+                {siteInspections.length} تقرير
+              </Badge>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-4 sm:p-5">
+            {siteInspections.length === 0 ? (
+              <div className="rounded-[22px] border border-dashed border-white/60 bg-white/45 p-10 text-center text-muted-foreground">
+                لا توجد معاينات مسجلة لإنشاء تقارير مستقلة.
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {siteInspections.map((inspection) => (
+                  <Card
+                    key={inspection.id}
+                    className="overflow-hidden rounded-[24px] border border-white/50 bg-white/72 shadow-[0_12px_34px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_rgba(15,23,42,0.11)]"
+                  >
+                    <CardContent className="space-y-4 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-bold">{inspection.title}</p>
+                          <p className="mt-1 font-mono text-xs text-muted-foreground">
+                            {inspection.inspectionNumber}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 rounded-full bg-white/60">
+                          {inspectionWorkflowLabels[inspection.workflowStatus] || inspection.workflowStatus}
+                        </Badge>
+                      </div>
+
+                      <div className="rounded-2xl border border-white/55 bg-white/55 p-3">
+                        <p className="font-medium">{inspection.siteName}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {[inspection.city, inspection.district].filter(Boolean).join(' - ') || 'الموقع غير محدد'}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div className="rounded-xl border border-white/55 bg-white/55 p-2">
+                          <CalendarDays className="mx-auto mb-1 h-4 w-4 text-slate-600" />
+                          {new Date(inspection.visitDate).toLocaleDateString('ar-SA')}
+                        </div>
+                        <div className="rounded-xl border border-white/55 bg-white/55 p-2">
+                          <Images className="mx-auto mb-1 h-4 w-4 text-slate-600" />
+                          {inspection.attachments?.length || 0} مرفق
+                        </div>
+                        <div className="rounded-xl border border-white/55 bg-white/55 p-2">
+                          <MapPin className="mx-auto mb-1 h-4 w-4 text-slate-600" />
+                          {inspection.latitude != null && inspection.longitude != null ? 'محدد' : 'غير محدد'}
+                        </div>
+                      </div>
+
+                      <Button
+                        type="button"
+                        className="w-full rounded-xl"
+                        onClick={() => navigate(`/site-inspections/${inspection.id}`)}
+                      >
+                        <Eye className="ml-2 h-4 w-4" />
+                        فتح التقرير المستقل
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

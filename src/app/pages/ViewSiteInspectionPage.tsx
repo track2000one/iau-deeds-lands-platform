@@ -4,7 +4,10 @@ import {
   ArrowRight,
   Edit,
   ExternalLink,
+  CalendarDays,
+  ClipboardCheck,
   FileText,
+  Images,
   MapPin,
   Printer,
 } from 'lucide-react';
@@ -84,6 +87,404 @@ const isPdfAttachment = (attachment: {
   attachment.mimeType === 'application/pdf' ||
   attachment.title.toLowerCase().endsWith('.pdf');
 
+
+const escapeHtml = (value: unknown): string =>
+  String(value ?? '-')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+
+const buildInspectionReportHtml = (record: SiteInspection): string => {
+  const reportDate = new Date().toLocaleDateString('ar-SA', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const visitDate = new Date(record.visitDate).toLocaleString('ar-SA');
+  const followUpDate = record.followUpDate
+    ? new Date(record.followUpDate).toLocaleDateString('ar-SA')
+    : '-';
+
+  const imageAttachments = record.attachments.filter(
+    (attachment) => !isPdfAttachment(attachment)
+  );
+  const pdfAttachments = record.attachments.filter(isPdfAttachment);
+
+  const imageGroups = [
+    ['general', 'صور عامة للموقع'],
+    ['observations', 'صور الملاحظات والمخالفات'],
+    ['boundaries', 'صور الحدود والمداخل'],
+    ['other', 'صور إضافية'],
+  ] as const;
+
+  const infoRow = (label: string, value: unknown) => `
+    <div class="info-item">
+      <span class="info-label">${escapeHtml(label)}</span>
+      <span class="info-value">${escapeHtml(value)}</span>
+    </div>
+  `;
+
+  const textSection = (title: string, value: unknown) => `
+    <section class="narrative-card">
+      <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(value || '-').replaceAll('\n', '<br />')}</p>
+    </section>
+  `;
+
+  const itemsHtml = record.items.length
+    ? record.items
+        .map(
+          (item, index) => `
+            <div class="inspection-item">
+              <div class="inspection-item-number">${index + 1}</div>
+              <div class="inspection-item-body">
+                <div class="inspection-item-heading">
+                  <strong>${escapeHtml(item.category)}</strong>
+                  <span>${escapeHtml(labels[item.priority] || item.priority)}</span>
+                </div>
+                <p>${escapeHtml(item.note || 'لا توجد تفاصيل')}</p>
+              </div>
+            </div>
+          `
+        )
+        .join('')
+    : '<p class="empty-text">لا توجد عناصر تفصيلية مسجلة.</p>';
+
+  const imagesHtml = imageGroups
+    .map(([category, title]) => {
+      const group = imageAttachments.filter(
+        (attachment) => (attachment.notes || 'general') === category
+      );
+
+      if (!group.length) return '';
+
+      return `
+        <section class="photo-section">
+          <h3>${escapeHtml(title)}</h3>
+          <div class="photo-grid">
+            ${group
+              .map(
+                (attachment, index) => `
+                  <figure class="photo-card">
+                    <img
+                      src="${escapeHtml(getAttachmentPreviewUrl(attachment))}"
+                      alt="${escapeHtml(attachment.title)}"
+                      crossorigin="anonymous"
+                    />
+                    <figcaption>
+                      <strong>صورة ${index + 1}</strong>
+                      <span>${escapeHtml(attachment.title)}</span>
+                    </figcaption>
+                  </figure>
+                `
+              )
+              .join('')}
+          </div>
+        </section>
+      `;
+    })
+    .join('');
+
+  const pdfHtml = pdfAttachments.length
+    ? `
+      <section class="attachments-list">
+        <h3>المستندات المرفقة</h3>
+        ${pdfAttachments
+          .map(
+            (attachment, index) => `
+              <div class="attachment-row">
+                <span>${index + 1}</span>
+                <div>
+                  <strong>${escapeHtml(attachment.title)}</strong>
+                  <small>${escapeHtml(attachment.driveUrl)}</small>
+                </div>
+              </div>
+            `
+          )
+          .join('')}
+      </section>
+    `
+    : '';
+
+  return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تقرير ${escapeHtml(record.inspectionNumber)}</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #172033;
+      background: #eef1f3;
+      font-family: Tahoma, Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.8;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .report {
+      width: 100%;
+      max-width: 920px;
+      margin: 0 auto;
+      background: #fff;
+    }
+    .report-header {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #d9ddd9;
+      border-radius: 22px;
+      padding: 24px;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #ffffff 0%, #f4f0e9 48%, #e9eee9 100%);
+      box-shadow: 0 12px 36px rgba(27, 38, 50, 0.10);
+    }
+    .report-header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(115deg, transparent 0 38%, rgba(255,255,255,.72) 48%, transparent 58%);
+      pointer-events: none;
+    }
+    .university { font-size: 18px; font-weight: 800; color: #24364b; }
+    .platform { margin-top: 2px; color: #6b7280; font-size: 12px; }
+    .report-title {
+      margin: 18px 0 10px;
+      font-size: 24px;
+      font-weight: 900;
+      color: #223c52;
+    }
+    .report-subtitle { color: #5e6b76; }
+    .header-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .badge {
+      border: 1px solid rgba(89, 102, 110, .25);
+      background: rgba(255,255,255,.72);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 11px;
+      color: #425466;
+    }
+    .section {
+      border: 1px solid #dfe4e1;
+      border-radius: 18px;
+      margin-bottom: 14px;
+      padding: 18px;
+      background: linear-gradient(145deg, #fff, #faf9f6);
+      box-shadow: 0 8px 24px rgba(27, 38, 50, 0.055);
+      break-inside: avoid;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 13px;
+      padding-bottom: 9px;
+      border-bottom: 2px solid #c8bda9;
+      color: #24364b;
+      font-size: 17px;
+      font-weight: 900;
+    }
+    .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .info-item {
+      border: 1px solid #e2e6e2;
+      border-radius: 12px;
+      padding: 9px 11px;
+      background: #fff;
+    }
+    .info-label { display: block; color: #7a858d; font-size: 10px; margin-bottom: 2px; }
+    .info-value { display: block; color: #1f3348; font-weight: 700; word-break: break-word; }
+    .narrative-card {
+      border-right: 4px solid #99866f;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      background: #fbfaf7;
+      break-inside: avoid;
+    }
+    .narrative-card h3 { margin: 0 0 6px; font-size: 14px; color: #2c4053; }
+    .narrative-card p { margin: 0; color: #43515d; white-space: normal; }
+    .inspection-item { display: flex; gap: 10px; margin-bottom: 9px; break-inside: avoid; }
+    .inspection-item-number {
+      width: 28px; height: 28px; flex: 0 0 28px;
+      display: grid; place-items: center;
+      border-radius: 50%; background: #33495c; color: #fff; font-weight: 800;
+    }
+    .inspection-item-body { flex: 1; border: 1px solid #e0e5e2; border-radius: 12px; padding: 10px 12px; background: #fff; }
+    .inspection-item-heading { display: flex; justify-content: space-between; gap: 12px; }
+    .inspection-item-heading span { color: #7c6f64; font-size: 11px; }
+    .inspection-item p { margin: 5px 0 0; color: #56616a; }
+    .photo-section { margin-top: 18px; break-before: auto; }
+    .photo-section h3 { margin: 0 0 10px; color: #273c50; font-size: 15px; }
+    .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .photo-card {
+      margin: 0;
+      overflow: hidden;
+      border: 1px solid #d9dfdc;
+      border-radius: 14px;
+      background: #fff;
+      break-inside: avoid;
+      box-shadow: 0 6px 18px rgba(20, 30, 40, .07);
+    }
+    .photo-card img {
+      display: block;
+      width: 100%;
+      height: 235px;
+      object-fit: contain;
+      background: #f2f3f1;
+    }
+    .photo-card figcaption { padding: 8px 10px; display: flex; flex-direction: column; gap: 1px; }
+    .photo-card figcaption span { font-size: 10px; color: #6b7280; word-break: break-word; }
+    .attachments-list { margin-top: 16px; }
+    .attachment-row { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid #ecefed; }
+    .attachment-row > span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: #e8ece9; }
+    .attachment-row div { display: flex; flex-direction: column; }
+    .attachment-row small { direction: ltr; color: #7b858c; word-break: break-all; }
+    .signature-area {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 80px;
+      margin-top: 42px;
+      padding: 0 32px;
+      break-inside: avoid;
+    }
+    .signature-line { padding-top: 8px; border-top: 1px solid #273646; text-align: center; font-weight: 700; }
+    .footer {
+      margin-top: 24px;
+      padding-top: 10px;
+      border-top: 1px solid #dfe3e0;
+      color: #69757e;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+    }
+    .empty-text { color: #7b858c; text-align: center; }
+    .print-note {
+      margin-bottom: 12px; border: 1px solid #e2d4b8; border-radius: 10px;
+      background: #fff9ea; color: #7a5f2d; padding: 8px 10px; text-align: center;
+    }
+    @media print {
+      body { background: #fff; }
+      .report { max-width: none; }
+      .print-note { display: none; }
+      .section, .report-header, .photo-card { box-shadow: none; }
+    }
+    @media (max-width: 720px) {
+      .info-grid { grid-template-columns: 1fr 1fr; }
+      .photo-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="report">
+    <div class="print-note">تم إعداد التقرير للطباعة. انتظر اكتمال تحميل الصور ثم اختر الطابعة أو الحفظ بصيغة PDF.</div>
+
+    <header class="report-header">
+      <div class="university">جامعة الإمام عبدالرحمن بن فيصل</div>
+      <div class="platform">منصة إدارة الصكوك والأراضي</div>
+      <div class="report-title">تقرير معاينة أرض أو موقع</div>
+      <div class="report-subtitle">${escapeHtml(record.title)} — ${escapeHtml(record.siteName)}</div>
+      <div class="header-badges">
+        <span class="badge">رقم المعاينة: ${escapeHtml(record.inspectionNumber)}</span>
+        <span class="badge">تاريخ الزيارة: ${escapeHtml(visitDate)}</span>
+        <span class="badge">الحالة: ${escapeHtml(labels[record.workflowStatus] || record.workflowStatus)}</span>
+        <span class="badge">الأولوية: ${escapeHtml(labels[record.priority] || record.priority)}</span>
+      </div>
+    </header>
+
+    <section class="section">
+      <h2 class="section-title">بيانات المعاينة والموقع</h2>
+      <div class="info-grid">
+        ${infoRow('نوع الموقع', labels[record.siteType] || record.siteType)}
+        ${infoRow('اسم الموقع', record.siteName)}
+        ${infoRow('القائم بالمعاينة', record.inspectorName || '-')}
+        ${infoRow('الجهة المرافقة', record.accompanyingEntity || '-')}
+        ${infoRow('المنطقة', record.region || '-')}
+        ${infoRow('المدينة', record.city || '-')}
+        ${infoRow('الحي', record.district || '-')}
+        ${infoRow('رقم الصك', record.deedNumber || '-')}
+        ${infoRow('رقم القطعة', record.plotNumber || '-')}
+        ${infoRow('رقم المخطط', record.planNumber || '-')}
+        ${infoRow('الحالة العامة', labels[record.overallStatus] || record.overallStatus)}
+        ${infoRow('تاريخ المتابعة', followUpDate)}
+        ${infoRow('الإحداثيات', record.latitude != null && record.longitude != null ? `${record.latitude}, ${record.longitude}` : '-')}
+        ${infoRow('الجهة المحال إليها', record.referredEntity || '-')}
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">وصف الزيارة ونتائج المعاينة</h2>
+      ${textSection('وصف الموقع', record.locationDescription)}
+      ${textSection('سبب الزيارة', record.visitPurpose)}
+      ${textSection('الملاحظات المرصودة', record.observations)}
+      ${textSection('الإجراء المقترح والتوصيات', record.recommendedAction)}
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">عناصر المعاينة التفصيلية</h2>
+      ${itemsHtml}
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">التوثيق المصور</h2>
+      ${imagesHtml || '<p class="empty-text">لا توجد صور مرفقة بالمعاينة.</p>'}
+      ${pdfHtml}
+    </section>
+
+    <div class="signature-area">
+      <div class="signature-line">القائم بالمعاينة</div>
+      <div class="signature-line">الاعتماد</div>
+    </div>
+
+    <footer class="footer">
+      <span>تاريخ إعداد التقرير: ${escapeHtml(reportDate)}</span>
+      <span>جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الصكوك والأراضي</span>
+    </footer>
+  </main>
+
+  <script>
+    const images = Array.from(document.images);
+    const done = () => setTimeout(() => window.print(), 450);
+    if (!images.length) {
+      done();
+    } else {
+      let completed = 0;
+      const finishOne = () => {
+        completed += 1;
+        if (completed >= images.length) done();
+      };
+      images.forEach((img) => {
+        if (img.complete) finishOne();
+        else {
+          img.addEventListener('load', finishOne, { once: true });
+          img.addEventListener('error', finishOne, { once: true });
+        }
+      });
+      setTimeout(done, 7000);
+    }
+  </script>
+</body>
+</html>`;
+};
+
+const openInspectionReport = (record: SiteInspection) => {
+  const html = buildInspectionReportHtml(record);
+  const reportWindow = window.open('', '_blank', 'noopener,noreferrer');
+
+  if (!reportWindow) {
+    toast.error('تعذر فتح التقرير. فعّل السماح بالنوافذ المنبثقة في المتصفح.');
+    return;
+  }
+
+  reportWindow.document.open();
+  reportWindow.document.write(html);
+  reportWindow.document.close();
+};
+
 export const ViewSiteInspectionPage: React.FC = () => {
   const { inspectionId } = useParams();
   const navigate = useNavigate();
@@ -119,9 +520,9 @@ export const ViewSiteInspectionPage: React.FC = () => {
         </div>
         <div className="flex flex-wrap gap-2">
           {canPrint && (
-            <Button variant="outline" onClick={() => window.print()}>
+            <Button variant="outline" onClick={() => openInspectionReport(record)}>
               <Printer className="ml-2 h-4 w-4" />
-              طباعة
+              التقرير المستقل
             </Button>
           )}
           {canEdit && (
@@ -132,6 +533,20 @@ export const ViewSiteInspectionPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      <Card className="overflow-hidden rounded-[26px] border border-white/50 bg-white/65 shadow-[0_18px_55px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
+        <CardContent className="grid gap-4 p-5 sm:grid-cols-[auto_1fr] sm:items-center">
+          <div className="grid h-14 w-14 place-items-center rounded-2xl border border-white/60 bg-white/75 shadow-inner">
+            <ClipboardCheck className="h-7 w-7 text-slate-700" />
+          </div>
+          <div>
+            <p className="font-bold">تقرير معاينة مستقل</p>
+            <p className="mt-1 text-sm leading-7 text-muted-foreground">
+              تقرير سردي متكامل يضم بيانات الموقع وسبب الزيارة والملاحظات والتوصيات وعناصر المعاينة والصور، ويُطبع بصيغة رسمية مستقلة عن الجداول العامة.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Info label="نوع الموقع" value={labels[record.siteType] || record.siteType} />
