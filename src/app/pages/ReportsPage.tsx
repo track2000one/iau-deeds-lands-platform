@@ -261,6 +261,14 @@ export const ReportsPage: React.FC = () => {
   } = useData();
 
   const [siteInspections, setSiteInspections] = useState<SiteInspection[]>([]);
+  const [inspectionReportTitle, setInspectionReportTitle] = useState('');
+  const [inspectionReportSubtitle, setInspectionReportSubtitle] = useState('');
+  const [inspectionReportIntroduction, setInspectionReportIntroduction] = useState('');
+  const [inspectionReportFooter, setInspectionReportFooter] = useState('');
+  const [inspectionReportIncludeItems, setInspectionReportIncludeItems] = useState(true);
+  const [inspectionReportIncludePhotos, setInspectionReportIncludePhotos] = useState(true);
+  const [inspectionReportIncludeDocuments, setInspectionReportIncludeDocuments] = useState(true);
+  const [inspectionReportIncludeLocation, setInspectionReportIncludeLocation] = useState(true);
   const [printingInspectionId, setPrintingInspectionId] = useState<string | null>(null);
   const [printingAllInspections, setPrintingAllInspections] = useState(false);
 
@@ -282,13 +290,24 @@ export const ReportsPage: React.FC = () => {
     };
   }, []);
 
+  const inspectionReportOptions = {
+    customTitle: inspectionReportTitle.trim() || undefined,
+    customSubtitle: inspectionReportSubtitle.trim() || undefined,
+    introduction: inspectionReportIntroduction.trim() || undefined,
+    footerNote: inspectionReportFooter.trim() || undefined,
+    includeItems: inspectionReportIncludeItems,
+    includePhotos: inspectionReportIncludePhotos,
+    includeDocuments: inspectionReportIncludeDocuments,
+    includeLocationData: inspectionReportIncludeLocation,
+  };
+
   const printSingleInspection = async (inspection: SiteInspection) => {
     if (!canPrintInspections || printingInspectionId || printingAllInspections) return;
 
     try {
       setPrintingInspectionId(inspection.id);
       const fullRecord = await getSiteInspection(inspection.id);
-      const opened = openSiteInspectionReport(fullRecord);
+      const opened = openSiteInspectionReport(fullRecord, inspectionReportOptions);
 
       if (!opened) {
         toast.error('تعذر فتح تقرير PDF. فعّل السماح بالنوافذ المنبثقة في المتصفح.');
@@ -317,7 +336,7 @@ export const ReportsPage: React.FC = () => {
       const fullRecords = await Promise.all(
         siteInspections.map((inspection) => getSiteInspection(inspection.id))
       );
-      const opened = openSiteInspectionReports(fullRecords);
+      const opened = openSiteInspectionReports(fullRecords, true, inspectionReportOptions);
 
       if (!opened) {
         toast.error('تعذر فتح تقرير PDF. فعّل السماح بالنوافذ المنبثقة في المتصفح.');
@@ -2289,7 +2308,100 @@ export const ReportsPage: React.FC = () => {
             </div>
           </CardHeader>
 
-          <CardContent className="p-4 sm:p-5">
+          <CardContent className="space-y-5 p-4 sm:p-5">
+            <div className="rounded-[24px] border border-white/55 bg-white/58 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl sm:p-5">
+              <div className="mb-4">
+                <h3 className="font-bold">إعدادات التقرير المرنة</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  جميع الحقول النصية اختيارية، وعند تركها فارغة يستخدم النظام العنوان والعبارات الافتراضية.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>عنوان التقرير اليدوي — اختياري</Label>
+                  <input
+                    className="h-11 w-full rounded-xl border bg-white/75 px-3 text-sm outline-none focus:ring-2 focus:ring-amber-700/20"
+                    value={inspectionReportTitle}
+                    onChange={(event) => setInspectionReportTitle(event.target.value)}
+                    placeholder="مثال: تقرير المعاينة الميدانية لأرض الجبيل"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>العنوان الفرعي — اختياري</Label>
+                  <input
+                    className="h-11 w-full rounded-xl border bg-white/75 px-3 text-sm outline-none focus:ring-2 focus:ring-amber-700/20"
+                    value={inspectionReportSubtitle}
+                    onChange={(event) => setInspectionReportSubtitle(event.target.value)}
+                    placeholder="مثال: زيارة التحقق من حدود الموقع وجاهزيته"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label>تمهيد التقرير — اختياري</Label>
+                  <textarea
+                    className="min-h-24 w-full rounded-xl border bg-white/75 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-700/20"
+                    value={inspectionReportIntroduction}
+                    onChange={(event) => setInspectionReportIntroduction(event.target.value)}
+                    placeholder="اكتب مقدمة أو مرجع الخطاب أو الغرض العام من إعداد التقرير..."
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label>عبارة التذييل — اختياري</Label>
+                  <input
+                    className="h-11 w-full rounded-xl border bg-white/75 px-3 text-sm outline-none focus:ring-2 focus:ring-amber-700/20"
+                    value={inspectionReportFooter}
+                    onChange={(event) => setInspectionReportFooter(event.target.value)}
+                    placeholder="مثال: إدارة أوقاف وأملاك الجامعة"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ['عناصر المعاينة', inspectionReportIncludeItems, setInspectionReportIncludeItems],
+                  ['الصور', inspectionReportIncludePhotos, setInspectionReportIncludePhotos],
+                  ['المستندات', inspectionReportIncludeDocuments, setInspectionReportIncludeDocuments],
+                  ['بيانات الموقع والإحداثيات', inspectionReportIncludeLocation, setInspectionReportIncludeLocation],
+                ].map(([label, checked, setter]) => (
+                  <label
+                    key={String(label)}
+                    className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/55 bg-white/65 p-3"
+                  >
+                    <span className="text-sm font-medium">{String(label)}</span>
+                    <Checkbox
+                      checked={Boolean(checked)}
+                      onCheckedChange={(value) => (setter as React.Dispatch<React.SetStateAction<boolean>>)(Boolean(value))}
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-900/10 bg-amber-50/55 p-3 text-sm text-stone-700">
+                <span>تم حذف خانات التوقيع والاعتماد من أسفل التقرير نهائيًا.</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl bg-white/70"
+                  onClick={() => {
+                    setInspectionReportTitle('');
+                    setInspectionReportSubtitle('');
+                    setInspectionReportIntroduction('');
+                    setInspectionReportFooter('');
+                    setInspectionReportIncludeItems(true);
+                    setInspectionReportIncludePhotos(true);
+                    setInspectionReportIncludeDocuments(true);
+                    setInspectionReportIncludeLocation(true);
+                  }}
+                >
+                  استعادة الإعدادات الافتراضية
+                </Button>
+              </div>
+            </div>
+
             {siteInspections.length === 0 ? (
               <div className="rounded-[22px] border border-dashed border-white/60 bg-white/45 p-10 text-center text-muted-foreground">
                 لا توجد معاينات مسجلة لإنشاء تقارير مستقلة.

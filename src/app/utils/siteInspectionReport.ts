@@ -1,5 +1,23 @@
 import type { SiteInspection } from '../../types/siteInspection';
 
+export interface SiteInspectionReportOptions {
+  customTitle?: string;
+  customSubtitle?: string;
+  introduction?: string;
+  footerNote?: string;
+  includeItems?: boolean;
+  includePhotos?: boolean;
+  includeDocuments?: boolean;
+  includeLocationData?: boolean;
+}
+
+const defaultReportOptions: Required<Omit<SiteInspectionReportOptions, 'customTitle' | 'customSubtitle' | 'introduction' | 'footerNote'>> = {
+  includeItems: true,
+  includePhotos: true,
+  includeDocuments: true,
+  includeLocationData: true,
+};
+
 const labels: Record<string, string> = {
   excellent: 'ممتازة',
   good: 'جيدة',
@@ -86,7 +104,13 @@ const textSection = (title: string, value: unknown) => `
   </section>
 `;
 
-const buildInspectionBody = (record: SiteInspection, index: number, total: number) => {
+const buildInspectionBody = (
+  record: SiteInspection,
+  index: number,
+  total: number,
+  options: SiteInspectionReportOptions
+) => {
+  const effectiveOptions = { ...defaultReportOptions, ...options };
   const visitDate = new Date(record.visitDate).toLocaleString('ar-SA');
   const followUpDate = record.followUpDate
     ? new Date(record.followUpDate).toLocaleDateString('ar-SA')
@@ -104,7 +128,7 @@ const buildInspectionBody = (record: SiteInspection, index: number, total: numbe
     ['other', 'صور إضافية'],
   ] as const;
 
-  const itemsHtml = record.items.length
+  const itemsHtml = effectiveOptions.includeItems && record.items.length
     ? record.items
         .map(
           (item, itemIndex) => `
@@ -124,7 +148,8 @@ const buildInspectionBody = (record: SiteInspection, index: number, total: numbe
         .join('')
     : '<p class="empty-text">لا توجد عناصر تفصيلية مسجلة.</p>';
 
-  const imagesHtml = imageGroups
+  const imagesHtml = effectiveOptions.includePhotos
+    ? imageGroups
     .map(([category, title]) => {
       const group = imageAttachments.filter(
         (attachment) => (attachment.notes || 'general') === category
@@ -156,9 +181,10 @@ const buildInspectionBody = (record: SiteInspection, index: number, total: numbe
         </section>
       `;
     })
-    .join('');
+    .join('')
+    : '';
 
-  const documentsHtml = documentAttachments.length
+  const documentsHtml = effectiveOptions.includeDocuments && documentAttachments.length
     ? `
       <section class="attachments-list">
         <h3>المستندات والملفات المرفقة</h3>
@@ -179,6 +205,14 @@ const buildInspectionBody = (record: SiteInspection, index: number, total: numbe
     `
     : '';
 
+  const reportTitle = options.customTitle?.trim() || 'تقرير معاينة أرض أو موقع';
+  const reportSubtitle =
+    options.customSubtitle?.trim() ||
+    `${record.title} — ${record.siteName}`;
+  const introductionHtml = options.introduction?.trim()
+    ? `<section class="intro-note"><p>${escapeHtml(options.introduction).replaceAll('\n', '<br />')}</p></section>`
+    : '';
+
   return `
     <article class="inspection-report ${index < total - 1 ? 'page-break' : ''}">
       <header class="report-header">
@@ -190,8 +224,8 @@ const buildInspectionBody = (record: SiteInspection, index: number, total: numbe
           <div class="report-sequence">${total > 1 ? `التقرير ${index + 1} من ${total}` : 'تقرير رسمي'}</div>
         </div>
 
-        <div class="report-title">تقرير معاينة أرض أو موقع</div>
-        <div class="report-subtitle">${escapeHtml(record.title)} — ${escapeHtml(record.siteName)}</div>
+        <div class="report-title">${escapeHtml(reportTitle)}</div>
+        <div class="report-subtitle">${escapeHtml(reportSubtitle)}</div>
 
         <div class="header-badges">
           <span class="badge">رقم المعاينة: ${escapeHtml(record.inspectionNumber)}</span>
@@ -201,6 +235,8 @@ const buildInspectionBody = (record: SiteInspection, index: number, total: numbe
         </div>
       </header>
 
+      ${introductionHtml}
+
       <section class="section">
         <h2 class="section-title">أولًا: بيانات المعاينة والموقع</h2>
         <div class="info-grid">
@@ -208,20 +244,20 @@ const buildInspectionBody = (record: SiteInspection, index: number, total: numbe
           ${infoRow('اسم الموقع', record.siteName)}
           ${infoRow('القائم بالمعاينة', record.inspectorName || '-')}
           ${infoRow('الجهة المرافقة', record.accompanyingEntity || '-')}
-          ${infoRow('المنطقة', record.region || '-')}
-          ${infoRow('المدينة', record.city || '-')}
-          ${infoRow('الحي', record.district || '-')}
-          ${infoRow('رقم الصك', record.deedNumber || '-')}
-          ${infoRow('رقم القطعة', record.plotNumber || '-')}
-          ${infoRow('رقم المخطط', record.planNumber || '-')}
+          ${effectiveOptions.includeLocationData ? infoRow('المنطقة', record.region || '-') : ''}
+          ${effectiveOptions.includeLocationData ? infoRow('المدينة', record.city || '-') : ''}
+          ${effectiveOptions.includeLocationData ? infoRow('الحي', record.district || '-') : ''}
+          ${effectiveOptions.includeLocationData ? infoRow('رقم الصك', record.deedNumber || '-') : ''}
+          ${effectiveOptions.includeLocationData ? infoRow('رقم القطعة', record.plotNumber || '-') : ''}
+          ${effectiveOptions.includeLocationData ? infoRow('رقم المخطط', record.planNumber || '-') : ''}
           ${infoRow('الحالة العامة', labels[record.overallStatus] || record.overallStatus)}
           ${infoRow('تاريخ المتابعة', followUpDate)}
-          ${infoRow(
+          ${effectiveOptions.includeLocationData ? infoRow(
             'الإحداثيات',
             record.latitude != null && record.longitude != null
               ? `${record.latitude}, ${record.longitude}`
               : '-'
-          )}
+          ) : ''}
           ${infoRow('الجهة المحال إليها', record.referredEntity || '-')}
         </div>
       </section>
@@ -234,26 +270,24 @@ const buildInspectionBody = (record: SiteInspection, index: number, total: numbe
         ${textSection('الإجراء المقترح والتوصيات', record.recommendedAction)}
       </section>
 
-      <section class="section">
-        <h2 class="section-title">ثالثًا: عناصر المعاينة التفصيلية</h2>
-        ${itemsHtml}
-      </section>
+      ${effectiveOptions.includeItems ? `
+        <section class="section">
+          <h2 class="section-title">ثالثًا: عناصر المعاينة التفصيلية</h2>
+          ${itemsHtml}
+        </section>
+      ` : ''}
 
-      <section class="section photo-documentation">
-        <h2 class="section-title">رابعًا: التوثيق المصور والمرفقات</h2>
-        ${imagesHtml || '<p class="empty-text">لا توجد صور مرفقة بالمعاينة.</p>'}
-        ${documentsHtml}
-      </section>
-
-      <div class="signature-area">
-        <div class="signature-line">القائم بالمعاينة</div>
-        <div class="signature-line">مدير الإدارة</div>
-        <div class="signature-line">الاعتماد</div>
-      </div>
+      ${(effectiveOptions.includePhotos || effectiveOptions.includeDocuments) ? `
+        <section class="section photo-documentation">
+          <h2 class="section-title">التوثيق المصور والمرفقات</h2>
+          ${effectiveOptions.includePhotos ? (imagesHtml || '<p class="empty-text">لا توجد صور مرفقة بالمعاينة.</p>') : ''}
+          ${documentsHtml}
+        </section>
+      ` : ''}
 
       <footer class="footer">
         <span>تاريخ إعداد التقرير: ${escapeHtml(new Date().toLocaleDateString('ar-SA'))}</span>
-        <span>جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الصكوك والأراضي</span>
+        <span>${escapeHtml(options.footerNote?.trim() || 'جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الصكوك والأراضي')}</span>
       </footer>
     </article>
   `;
@@ -343,6 +377,16 @@ const getReportStyles = () => `
   .report-subtitle { color: #5e6b76; font-size: 13px; }
   .header-badges { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
   .badge { border: 1px solid rgba(89,102,110,.25); background: rgba(255,255,255,.76); border-radius: 999px; padding: 5px 9px; font-size: 10px; color: #425466; }
+  .intro-note {
+    margin-bottom: 13px;
+    border: 1px solid #d9dfdc;
+    border-radius: 15px;
+    padding: 12px 14px;
+    background: linear-gradient(145deg, #fffdf8, #f7f2e8);
+    color: #3f4d59;
+    box-shadow: 0 7px 22px rgba(27,38,50,.04);
+  }
+  .intro-note p { margin: 0; }
   .section {
     border: 1px solid #dfe4e1;
     border-radius: 17px;
@@ -378,8 +422,6 @@ const getReportStyles = () => `
   .attachment-row > span { width: 23px; height: 23px; display: grid; place-items: center; border-radius: 50%; background: #e8ece9; }
   .attachment-row div { display: flex; flex-direction: column; }
   .attachment-row small { color: #7b858c; }
-  .signature-area { display: grid; grid-template-columns: repeat(3, 1fr); gap: 42px; margin-top: 38px; padding: 0 22px; break-inside: avoid; }
-  .signature-line { padding-top: 8px; border-top: 1px solid #273646; text-align: center; font-weight: 700; }
   .footer { margin-top: 22px; padding-top: 9px; border-top: 1px solid #dfe3e0; color: #69757e; display: flex; justify-content: space-between; gap: 16px; font-size: 9px; }
   .empty-text { color: #7b858c; text-align: center; }
   @media print {
@@ -392,19 +434,20 @@ const getReportStyles = () => `
     .reports-wrapper { padding: 8px; }
     .info-grid { grid-template-columns: 1fr 1fr; }
     .photo-grid { grid-template-columns: 1fr; }
-    .signature-area { grid-template-columns: 1fr; gap: 32px; }
   }
 `;
 
 export const buildSiteInspectionReportHtml = (
   records: SiteInspection[],
-  autoPrint = false
+  autoPrint = false,
+  options: SiteInspectionReportOptions = {}
 ): string => {
   const safeRecords = records.filter(Boolean);
   const title =
-    safeRecords.length > 1
+    options.customTitle?.trim() ||
+    (safeRecords.length > 1
       ? 'تقارير معاينات الأراضي والمواقع'
-      : `تقرير ${safeRecords[0]?.inspectionNumber || 'معاينة أرض أو موقع'}`;
+      : `تقرير ${safeRecords[0]?.inspectionNumber || 'معاينة أرض أو موقع'}`);
 
   return `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -424,7 +467,9 @@ export const buildSiteInspectionReportHtml = (
       <button type="button" id="save-pdf-button" disabled>حفظ PDF</button>
     </div>
     ${safeRecords
-      .map((record, index) => buildInspectionBody(record, index, safeRecords.length))
+      .map((record, index) =>
+        buildInspectionBody(record, index, safeRecords.length, options)
+      )
       .join('')}
   </main>
 
@@ -487,12 +532,13 @@ export const buildSiteInspectionReportHtml = (
 
 export const openSiteInspectionReports = (
   records: SiteInspection[],
-  autoPrint = true
+  autoPrint = true,
+  options: SiteInspectionReportOptions = {}
 ): boolean => {
   if (!records.length) return false;
 
   try {
-    const html = buildSiteInspectionReportHtml(records, autoPrint);
+    const html = buildSiteInspectionReportHtml(records, autoPrint, options);
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const objectUrl = URL.createObjectURL(blob);
 
@@ -513,5 +559,7 @@ export const openSiteInspectionReports = (
   }
 };
 
-export const openSiteInspectionReport = (record: SiteInspection): boolean =>
-  openSiteInspectionReports([record], true);
+export const openSiteInspectionReport = (
+  record: SiteInspection,
+  options: SiteInspectionReportOptions = {}
+): boolean => openSiteInspectionReports([record], true, options);
