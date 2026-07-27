@@ -148,6 +148,9 @@ const defaultPrintSettings: PrintSettings = {
 export const ReportsPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { isAdmin, hasPermission } = usePermissions();
+  const canPrintInspections =
+    isAdmin || hasPermission('site_inspections', 'canPrint');
 
   const deedsColumns = [
     { key: 'deedNumber', label: 'رقم الصك', enabled: true },
