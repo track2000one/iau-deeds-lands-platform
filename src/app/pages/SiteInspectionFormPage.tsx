@@ -82,6 +82,7 @@ export const SiteInspectionFormPage: React.FC = () => {
   const [saving, setSaving] = React.useState(false);
   const [loading, setLoading] = React.useState(isEdit);
   const [uploading, setUploading] = React.useState(false);
+  const [showMap, setShowMap] = React.useState(true);
 
   React.useEffect(() => {
     if (!inspectionId) return;
@@ -303,23 +304,69 @@ export const SiteInspectionFormPage: React.FC = () => {
       </Card>
 
       <Card className="w-full min-w-0 overflow-hidden">
-        <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />الإحداثيات</CardTitle></CardHeader>
-        <CardContent>
-          <MapCoordinatePicker
-            coordinates={
-              form.latitude != null && form.longitude != null
-                ? { latitude: form.latitude, longitude: form.longitude }
-                : undefined
-            }
-            onChange={(coordinates) =>
-              setForm((current) => ({
-                ...current,
-                latitude: coordinates.latitude,
-                longitude: coordinates.longitude,
-                mapUrl: `https://www.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}`,
-              }))
-            }
-          />
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              الإحداثيات
+            </CardTitle>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMap((current) => !current)}
+              className="w-full sm:w-auto"
+            >
+              <MapPin className="ml-2 h-4 w-4" />
+              {showMap ? 'إخفاء الخريطة' : 'تحديد الموقع من الخريطة'}
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+          {form.latitude != null && form.longitude != null ? (
+            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                <span className="text-muted-foreground">خط العرض:</span>
+                <span className="mr-2 font-mono">
+                  {Number(form.latitude).toFixed(6)}
+                </span>
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                <span className="text-muted-foreground">خط الطول:</span>
+                <span className="mr-2 font-mono">
+                  {Number(form.longitude).toFixed(6)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              لم يتم تحديد الإحداثيات بعد.
+            </p>
+          )}
+
+          {showMap && (
+            <MapCoordinatePicker
+              coordinates={
+                form.latitude != null && form.longitude != null
+                  ? {
+                      latitude: form.latitude,
+                      longitude: form.longitude,
+                    }
+                  : undefined
+              }
+              onChange={(coordinates) =>
+                setForm((current) => ({
+                  ...current,
+                  latitude: coordinates.latitude,
+                  longitude: coordinates.longitude,
+                  mapUrl: `https://www.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}`,
+                }))
+              }
+            />
+          )}
         </CardContent>
       </Card>
 
