@@ -191,7 +191,8 @@ export type RecordType =
   | 'leased_land_out'
   | 'leased_land_in'
   | 'leased_building_out'
-  | 'leased_building_in';
+  | 'leased_building_in'
+  | 'site_inspection';
 
 // معايير البحث
 export interface SearchCriteria {

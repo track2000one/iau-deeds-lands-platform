@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useData } from '../../context/DataContext';
@@ -6,6 +6,7 @@ import { useDeeds } from '../../context/DeedContext';
 import { usePermissions } from '../../context/PermissionsContext';
 import {
   Building,
+  ClipboardCheck,
   ExternalLink,
   Eye,
   FileText,
@@ -38,6 +39,8 @@ import {
 import { Badge } from '../components/ui/badge';
 import type { ModuleName } from '../../types/permissions';
 import type { RecordType } from '../../types/models';
+import type { SiteInspection } from '../../types/siteInspection';
+import { getSiteInspections } from '../api/siteInspections';
 
 type SearchRecord = any & {
   type: RecordType;
@@ -63,6 +66,7 @@ const TYPE_MODULE_MAP: Partial<Record<RecordType, ModuleName>> = {
   leased_land_in: 'leased_lands_in',
   leased_building_out: 'leased_buildings_out',
   leased_building_in: 'leased_buildings_in',
+  site_inspection: 'site_inspections',
 };
 
 const parseCoordinates = (value: unknown): SafeCoordinates | null => {
@@ -124,6 +128,21 @@ const parseCoordinates = (value: unknown): SafeCoordinates | null => {
   }
 };
 
+const getRecordCoordinates = (record: SearchRecord): SafeCoordinates | null => {
+  const parsed = parseCoordinates(record.coordinates);
+
+  if (parsed) return parsed;
+
+  const latitude = Number(record.latitude);
+  const longitude = Number(record.longitude);
+
+  if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+    return { latitude, longitude };
+  }
+
+  return null;
+};
+
 const safeText = (value: unknown): string => {
   if (value === null || value === undefined) return '';
 
@@ -154,6 +173,8 @@ const getRecordViewPath = (record: SearchRecord): string => {
       return '/buildings/leased-out';
     case 'leased_building_in':
       return '/buildings/leased-in';
+    case 'site_inspection':
+      return record.id ? `/site-inspections/${record.id}` : '/site-inspections';
     default:
       return '/';
   }
@@ -162,6 +183,7 @@ const getRecordViewPath = (record: SearchRecord): string => {
 const getRecordIdentifier = (record: SearchRecord): string =>
   safeText(
     record.deedNumber ||
+      record.inspectionNumber ||
       record.receiptNumber ||
       record.plotNumber ||
       record.contractNumber ||
@@ -178,6 +200,8 @@ const getRecordBasicInfo = (record: SearchRecord): string =>
       record.landName ||
       record.description ||
       record.recipientEntity ||
+      record.title ||
+      record.siteName ||
       record.tenant?.name ||
       record.tenantName ||
       record.owner?.name ||
@@ -206,6 +230,7 @@ const getRecordLocation = (record: SearchRecord): string => {
     record.district,
     record.location,
     record.locationName,
+    record.locationDescription,
   ]
     .map((item) => safeText(item).trim())
     .filter(Boolean);
@@ -231,6 +256,25 @@ export const UnifiedSearchPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [recordType, setRecordType] =
     useState<RecordType | 'all'>('all');
+  const [siteInspections, setSiteInspections] = useState<SiteInspection[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getSiteInspections()
+      .then((items) => {
+        if (!cancelled) {
+          setSiteInspections(Array.isArray(items) ? items : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSiteInspections([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const typeOptions = useMemo<SearchTypeOption[]>(
     () => [
@@ -269,6 +313,11 @@ export const UnifiedSearchPage: React.FC = () => {
         value: 'leased_building_in',
         label: t('search.leasedBuildingsIn'),
         module: 'leased_buildings_in',
+      },
+      {
+        value: 'site_inspection',
+        label: 'معاينة أرض أو موقع',
+        module: 'site_inspections',
       },
     ],
     [t]
@@ -333,6 +382,15 @@ export const UnifiedSearchPage: React.FC = () => {
         type: 'leased_building_in' as RecordType,
         typeName: t('search.leasedBuildingIn'),
       })),
+      ...siteInspections.map((record) => ({
+        ...record,
+        coordinates:
+          record.latitude != null && record.longitude != null
+            ? `${record.latitude},${record.longitude}`
+            : undefined,
+        type: 'site_inspection' as RecordType,
+        typeName: 'معاينة أرض أو موقع',
+      })),
     ];
 
     return records.filter((record) =>
@@ -346,6 +404,7 @@ export const UnifiedSearchPage: React.FC = () => {
     leasedLandsIn,
     leasedBuildingsOut,
     leasedBuildingsIn,
+    siteInspections,
     t,
     isAdmin,
     hasPermission,
@@ -368,6 +427,9 @@ export const UnifiedSearchPage: React.FC = () => {
         record.plotNumber,
         record.planNumber,
         record.contractNumber,
+        record.inspectionNumber,
+        record.siteName,
+        record.title,
         record.buildingNumber,
         record.region,
         record.city,
@@ -407,6 +469,8 @@ export const UnifiedSearchPage: React.FC = () => {
       case 'leased_building_out':
       case 'leased_building_in':
         return <Building className="h-4 w-4" />;
+      case 'site_inspection':
+        return <ClipboardCheck className="h-4 w-4" />;
       default:
         return <FileText className="h-4 w-4" />;
     }
@@ -417,9 +481,7 @@ export const UnifiedSearchPage: React.FC = () => {
   };
 
   const handleOpenLocation = (record: SearchRecord) => {
-    const coordinates = parseCoordinates(
-      record.coordinates
-    );
+    const coordinates = getRecordCoordinates(record);
 
     if (!coordinates) return;
 
@@ -590,12 +652,11 @@ export const UnifiedSearchPage: React.FC = () => {
 
                   <TableBody>
                     {filteredRecords.map((record) => {
-                      const coordinates =
-                        parseCoordinates(
-                          record.coordinates
-                        );
+                      const coordinates = getRecordCoordinates(record);
                       const isDeed =
                         record.type === 'deed';
+
+                      const isSiteInspection = record.type === 'site_inspection';
 
                       return (
                         <TableRow
@@ -646,6 +707,8 @@ export const UnifiedSearchPage: React.FC = () => {
                                 title={
                                   isDeed
                                     ? 'عرض الصك'
+                                    : isSiteInspection
+                                    ? 'عرض المعاينة'
                                     : 'فتح القسم'
                                 }
                               >
@@ -695,12 +758,11 @@ export const UnifiedSearchPage: React.FC = () => {
 
               <div className="grid gap-3 p-2.5 sm:p-3 lg:hidden">
                 {filteredRecords.map((record) => {
-                  const coordinates =
-                    parseCoordinates(
-                      record.coordinates
-                    );
+                  const coordinates = getRecordCoordinates(record);
                   const isDeed =
                     record.type === 'deed';
+
+                  const isSiteInspection = record.type === 'site_inspection';
 
                   return (
                     <Card
@@ -763,7 +825,11 @@ export const UnifiedSearchPage: React.FC = () => {
                             className="gap-2"
                           >
                             <Eye className="h-4 w-4" />
-                            {isDeed ? 'عرض الصك' : 'فتح القسم'}
+                            {isDeed
+                              ? 'عرض الصك'
+                              : isSiteInspection
+                              ? 'عرض المعاينة'
+                              : 'فتح القسم'}
                           </Button>
 
                           {coordinates && (

@@ -18,6 +18,12 @@ import {
   Edit3,
   Stamp,
   PenLine,
+  Activity,
+  Landmark,
+  Ruler,
+  Wallet,
+  Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -33,6 +39,8 @@ import {
 } from '../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from 'sonner';
+import type { SiteInspection } from '../../types/siteInspection';
+import { getSiteInspections } from '../api/siteInspections';
 import * as XLSX from 'xlsx';
 import { Badge } from '../components/ui/badge';
 import {
@@ -48,7 +56,25 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+const COLORS = ['#7c6f64', '#8f7a66', '#a38b73', '#5f6f73', '#8b6f47', '#8c7a6b', '#6e7d70', '#9c8f84'];
+
+const inspectionWorkflowLabels: Record<string, string> = {
+  new: 'جديدة',
+  under_review: 'قيد المراجعة',
+  referred: 'تمت الإحالة',
+  in_progress: 'جارٍ التنفيذ',
+  resolved: 'تمت المعالجة',
+  closed: 'مغلقة',
+};
+
+const inspectionConditionLabels: Record<string, string> = {
+  excellent: 'ممتازة',
+  good: 'جيدة',
+  follow_up: 'تحتاج متابعة',
+  maintenance: 'تحتاج صيانة',
+  major_notes: 'ملاحظات جوهرية',
+  emergency: 'حالة طارئة',
+};
 
 type ReportSectionType =
   | 'deeds'
@@ -57,7 +83,8 @@ type ReportSectionType =
   | 'leasedOut'
   | 'leasedIn'
   | 'buildingsOut'
-  | 'buildingsIn';
+  | 'buildingsIn'
+  | 'siteInspections';
 
 type ReportFilters = {
   region: string;
@@ -193,6 +220,23 @@ export const ReportsPage: React.FC = () => {
     { key: 'rentAmount', label: t('deed.rentAmount'), enabled: true },
   ];
 
+  const siteInspectionsColumns = [
+    { key: 'inspectionNumber', label: 'رقم المعاينة', enabled: true },
+    { key: 'title', label: 'عنوان المعاينة', enabled: true },
+    { key: 'siteName', label: 'اسم الموقع', enabled: true },
+    { key: 'siteType', label: 'نوع الموقع', enabled: true },
+    { key: 'visitDate', label: 'تاريخ الزيارة', enabled: true },
+    { key: 'city', label: 'المدينة', enabled: true },
+    { key: 'district', label: 'الحي', enabled: true },
+    { key: 'deedNumber', label: 'رقم الصك', enabled: true },
+    { key: 'plotNumber', label: 'رقم القطعة', enabled: true },
+    { key: 'planNumber', label: 'رقم المخطط', enabled: true },
+    { key: 'overallStatus', label: 'الحالة العامة', enabled: true },
+    { key: 'workflowStatus', label: 'سير المعالجة', enabled: true },
+    { key: 'coordinates', label: 'الإحداثيات', enabled: false },
+    { key: 'attachmentsCount', label: 'عدد المرفقات', enabled: true },
+  ];
+
   const {
     deeds,
     allocatedLands,
@@ -202,6 +246,26 @@ export const ReportsPage: React.FC = () => {
     leasedBuildingsOut,
     leasedBuildingsIn,
   } = useData();
+
+  const [siteInspections, setSiteInspections] = useState<SiteInspection[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    getSiteInspections()
+      .then((items) => {
+        if (!cancelled) {
+          setSiteInspections(Array.isArray(items) ? items : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSiteInspections([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [reportType, setReportType] = useState<'detailed' | 'summary' | 'statistical' | 'graphical'>('detailed');
@@ -214,6 +278,7 @@ export const ReportsPage: React.FC = () => {
     leasedIn: { ...emptyFilters },
     buildingsOut: { ...emptyFilters },
     buildingsIn: { ...emptyFilters },
+    siteInspections: { ...emptyFilters },
   });
 
   const [printSettingsBySection, setPrintSettingsBySection] = useState<Record<ReportSectionType, PrintSettings>>({
@@ -224,6 +289,7 @@ export const ReportsPage: React.FC = () => {
     leasedIn: { ...defaultPrintSettings, reportTitle: 'تقرير الأراضي المستأجرة للجامعة' },
     buildingsOut: { ...defaultPrintSettings, reportTitle: 'تقرير المباني المؤجرة من الجامعة' },
     buildingsIn: { ...defaultPrintSettings, reportTitle: 'تقرير المباني المستأجرة للجامعة' },
+    siteInspections: { ...defaultPrintSettings, reportTitle: 'تقرير معاينات الأراضي والمواقع' },
   });
 
   const [selectedColumns, setSelectedColumns] = useState<any>({
@@ -234,6 +300,7 @@ export const ReportsPage: React.FC = () => {
     leasedIn: leasedLandsInColumns,
     buildingsOut: leasedBuildingsOutColumns,
     buildingsIn: leasedBuildingsInColumns,
+    siteInspections: siteInspectionsColumns,
   });
 
   const printRefs = {
@@ -244,6 +311,7 @@ export const ReportsPage: React.FC = () => {
     leasedIn: useRef<HTMLDivElement>(null),
     buildingsOut: useRef<HTMLDivElement>(null),
     buildingsIn: useRef<HTMLDivElement>(null),
+    siteInspections: useRef<HTMLDivElement>(null),
   };
 
   const toggleSection = (section: string) => {
@@ -314,6 +382,10 @@ export const ReportsPage: React.FC = () => {
   };
 
   const hasCoordinates = (item: any) => {
+    if (typeof item?.latitude === 'number' && typeof item?.longitude === 'number') {
+      return true;
+    }
+
     if (!item?.coordinates) return false;
 
     if (typeof item.coordinates === 'string') {
@@ -375,6 +447,7 @@ export const ReportsPage: React.FC = () => {
     const safeLeasedIn = Array.isArray(leasedLandsIn) ? leasedLandsIn : [];
     const safeBuildingsOut = Array.isArray(leasedBuildingsOut) ? leasedBuildingsOut : [];
     const safeBuildingsIn = Array.isArray(leasedBuildingsIn) ? leasedBuildingsIn : [];
+    const safeSiteInspections = Array.isArray(siteInspections) ? siteInspections : [];
 
     return {
       deeds: {
@@ -436,6 +509,21 @@ export const ReportsPage: React.FC = () => {
         totalArea: safeBuildingsIn.reduce((sum: number, item: any) => sum + Number(item.area || 0), 0),
         totalRent: safeBuildingsIn.reduce((sum: number, item: any) => sum + Number(item.rentAmount || 0), 0),
       },
+      siteInspections: {
+        total: safeSiteInspections.length,
+        withCoordinates: safeSiteInspections.filter((item: any) => item.latitude != null && item.longitude != null).length,
+        withAttachments: safeSiteInspections.filter((item: any) => Array.isArray(item.attachments) && item.attachments.length > 0).length,
+        byCity: safeSiteInspections.reduce((acc: any, item: any) => {
+          const key = item.city || 'غير محدد';
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {}),
+        byStatus: safeSiteInspections.reduce((acc: any, item: any) => {
+          const key = inspectionWorkflowLabels[item.workflowStatus] || item.workflowStatus || 'غير محدد';
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {}),
+      },
     };
   }, [
     deeds,
@@ -445,7 +533,70 @@ export const ReportsPage: React.FC = () => {
     leasedLandsIn,
     leasedBuildingsOut,
     leasedBuildingsIn,
+    siteInspections,
   ]);
+
+  const executiveOverview = useMemo(() => {
+    const totalRecords =
+      Number(statistics.deeds.total || 0) +
+      Number(statistics.allocated.total || 0) +
+      Number(statistics.delivered.total || 0) +
+      Number(statistics.leasedOut.total || 0) +
+      Number(statistics.leasedIn.total || 0) +
+      Number(statistics.buildingsOut.total || 0) +
+      Number(statistics.buildingsIn.total || 0) +
+      Number(statistics.siteInspections.total || 0);
+
+    const totalArea =
+      Number(statistics.deeds.totalArea || 0) +
+      Number(statistics.allocated.totalArea || 0) +
+      Number(statistics.delivered.totalArea || 0) +
+      Number(statistics.leasedOut.totalArea || 0) +
+      Number(statistics.leasedIn.totalArea || 0) +
+      Number(statistics.buildingsOut.totalArea || 0) +
+      Number(statistics.buildingsIn.totalArea || 0);
+
+    const totalRent =
+      Number(statistics.leasedOut.totalRent || 0) +
+      Number(statistics.leasedIn.totalRent || 0) +
+      Number(statistics.buildingsOut.totalRent || 0) +
+      Number(statistics.buildingsIn.totalRent || 0);
+
+    const categories = [
+      { name: 'الصكوك', value: Number(statistics.deeds.total || 0) },
+      { name: 'الأراضي المخصصة', value: Number(statistics.allocated.total || 0) },
+      { name: 'الأراضي المسلمة', value: Number(statistics.delivered.total || 0) },
+      { name: 'الأراضي المؤجرة', value: Number(statistics.leasedOut.total || 0) },
+      { name: 'الأراضي المستأجرة', value: Number(statistics.leasedIn.total || 0) },
+      { name: 'المباني المؤجرة', value: Number(statistics.buildingsOut.total || 0) },
+      { name: 'المباني المستأجرة', value: Number(statistics.buildingsIn.total || 0) },
+      { name: 'المعاينات', value: Number(statistics.siteInspections.total || 0) },
+    ];
+
+    const inspectionsTotal = Number(statistics.siteInspections.total || 0);
+    const inspectionsWithCoordinates = Number(
+      statistics.siteInspections.withCoordinates || 0
+    );
+    const inspectionsWithAttachments = Number(
+      statistics.siteInspections.withAttachments || 0
+    );
+
+    return {
+      totalRecords,
+      totalArea,
+      totalRent,
+      inspectionsTotal,
+      categories,
+      coordinateCoverage:
+        inspectionsTotal > 0
+          ? Math.round((inspectionsWithCoordinates / inspectionsTotal) * 100)
+          : 0,
+      attachmentCoverage:
+        inspectionsTotal > 0
+          ? Math.round((inspectionsWithAttachments / inspectionsTotal) * 100)
+          : 0,
+    };
+  }, [statistics]);
 
   const formatDate = (value: any, type = 'gregorian') => {
     return formatFlexibleDate(value, type as any);
@@ -481,7 +632,9 @@ export const ReportsPage: React.FC = () => {
       key === 'deedDate' ||
       key === 'deliveryDate' ||
       key === 'receiptDate' ||
-      key === 'contractStartDate'
+      key === 'contractStartDate' ||
+      key === 'visitDate' ||
+      key === 'followUpDate'
     ) {
       return formatDate(item[key], getFlexibleDateType(item, key));
     }
@@ -495,6 +648,10 @@ export const ReportsPage: React.FC = () => {
     }
 
     if (key === 'coordinates') {
+      if (typeof item?.latitude === 'number' && typeof item?.longitude === 'number') {
+        return `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}`;
+      }
+
       return formatCoordinates(item.coordinates);
     }
 
@@ -504,6 +661,14 @@ export const ReportsPage: React.FC = () => {
 
     if (key === 'attachmentsCount') {
       return Array.isArray(item.attachments) ? item.attachments.length : 0;
+    }
+
+    if (key === 'overallStatus') {
+      return inspectionConditionLabels[item.overallStatus] || item.overallStatus || '-';
+    }
+
+    if (key === 'workflowStatus') {
+      return inspectionWorkflowLabels[item.workflowStatus] || item.workflowStatus || '-';
     }
 
     if (key === 'propertyDescription') {
@@ -1026,6 +1191,22 @@ export const ReportsPage: React.FC = () => {
   const getDistributionData = (type: ReportSectionType) => {
     const sectionStats = getSectionStatistics(type);
 
+    if (type === 'siteInspections') {
+      if (sectionStats.byCity && Object.keys(sectionStats.byCity).length > 0) {
+        return {
+          title: 'توزيع المعاينات حسب المدينة',
+          data: Object.entries(sectionStats.byCity).map(([name, value]) => ({ name, value })),
+        };
+      }
+
+      if (sectionStats.byStatus && Object.keys(sectionStats.byStatus).length > 0) {
+        return {
+          title: 'توزيع المعاينات حسب حالة المعالجة',
+          data: Object.entries(sectionStats.byStatus).map(([name, value]) => ({ name, value })),
+        };
+      }
+    }
+
     if (sectionStats.byCity && Object.keys(sectionStats.byCity).length > 0) {
       return {
         title: 'التوزيع حسب المدينة',
@@ -1073,12 +1254,12 @@ export const ReportsPage: React.FC = () => {
     const distribution = getDistributionData(type);
 
     return (
-      <Card key={type} className="shadow-lg hover:shadow-xl transition-shadow">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+      <Card key={type} className="group relative overflow-hidden rounded-[30px] border border-white/45 bg-white/55 shadow-[0_20px_60px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_26px_80px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.92)]">
+        <CardHeader className="border-b border-white/50 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,239,231,0.72),rgba(236,231,223,0.56))]">
           <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-start">
             <div>
               <CardTitle className="text-xl flex items-center gap-2">
-                <Layers className="h-5 w-5 text-blue-600" />
+                <Layers className="h-5 w-5 text-amber-700" />
                 {title}
               </CardTitle>
 
@@ -1098,7 +1279,7 @@ export const ReportsPage: React.FC = () => {
               variant="ghost"
               size="sm"
               onClick={() => toggleSection(type)}
-              className="hover:bg-blue-100"
+              className="rounded-full border border-white/50 bg-white/70 text-slate-700 shadow-sm hover:bg-white"
             >
               {expandedSection === type ? <ChevronUp /> : <ChevronDown />}
             </Button>
@@ -1108,7 +1289,7 @@ export const ReportsPage: React.FC = () => {
         {expandedSection === type && (
           <CardContent className="space-y-6 pt-6">
             <Tabs value={reportType} onValueChange={(value: any) => setReportType(value)}>
-              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-4">
+              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-[22px] border border-white/50 bg-white/70 p-1 shadow-sm backdrop-blur-xl md:grid-cols-4">
                 <TabsTrigger value="detailed" className="text-xs md:text-sm">
                   <FileText className="h-3 w-3 md:h-4 md:w-4 ml-1 md:ml-2" />
                   تقرير مفصل
@@ -1131,7 +1312,7 @@ export const ReportsPage: React.FC = () => {
               </TabsList>
 
               <TabsContent value="detailed" className="space-y-4">
-                <Card className="bg-gray-50">
+                <Card className="rounded-[24px] border border-white/45 bg-white/55 shadow-[0_10px_35px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-xl">
                   <CardHeader>
                     <div className="flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -1249,7 +1430,7 @@ export const ReportsPage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gray-50">
+                <Card className="rounded-[24px] border border-white/45 bg-white/55 shadow-[0_10px_35px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-xl">
                   <CardHeader>
                     <div className="flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -1394,7 +1575,7 @@ export const ReportsPage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gray-50">
+                <Card className="rounded-[24px] border border-white/45 bg-white/55 shadow-[0_10px_35px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-xl">
                   <CardHeader>
                     <div className="flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -1468,7 +1649,7 @@ export const ReportsPage: React.FC = () => {
                       );
                     }}
                     variant="default"
-                    className="w-full h-10 md:h-11 text-sm md:text-base bg-blue-600 hover:bg-blue-700"
+                    className="w-full h-10 md:h-11 text-sm md:text-base bg-amber-700 hover:bg-blue-700"
                   >
                     <Eye className="h-4 w-4 ml-2" />
                     معاينة وطباعة
@@ -1476,10 +1657,10 @@ export const ReportsPage: React.FC = () => {
                 </div>
 
                 <div ref={printRefs[refKey]}>
-                  <div className="overflow-x-auto rounded-lg border">
+                  <div className="overflow-x-auto rounded-[24px] border border-white/50 bg-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-blue-600 hover:bg-blue-600">
+                        <TableRow className="bg-amber-700 hover:bg-amber-700">
                           <TableHead className="text-center text-white">#</TableHead>
 
                           {enabledColumns.map((col) => (
@@ -1530,15 +1711,15 @@ export const ReportsPage: React.FC = () => {
               </TabsContent>
 
               <TabsContent value="summary" className="space-y-4">
-                <Card className="bg-gradient-to-br from-blue-50 to-indigo-50">
+                <Card className="rounded-[24px] border border-white/45 bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(248,244,238,0.78),rgba(240,234,227,0.7))] shadow-[0_12px_40px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
                   <CardHeader>
                     <CardTitle className="text-lg md:text-xl">ملخص إحصائي</CardTitle>
                   </CardHeader>
 
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                      <div className="text-center p-4 bg-white rounded-lg shadow">
-                        <div className="text-3xl font-bold text-blue-600">
+                      <div className="rounded-[22px] border border-white/45 bg-white/70 p-4 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
+                        <div className="text-3xl font-bold text-amber-700">
                           {safeData.length}
                         </div>
                         <div className="text-sm text-gray-600 mt-1">
@@ -1547,7 +1728,7 @@ export const ReportsPage: React.FC = () => {
                       </div>
 
                       {sectionStats.totalArea > 0 && (
-                        <div className="text-center p-4 bg-white rounded-lg shadow">
+                        <div className="rounded-[22px] border border-white/45 bg-white/70 p-4 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
                           <div className="text-3xl font-bold text-green-600">
                             {Number(sectionStats.totalArea || 0).toLocaleString()}
                           </div>
@@ -1558,7 +1739,7 @@ export const ReportsPage: React.FC = () => {
                       )}
 
                       {sectionStats.totalRent > 0 && (
-                        <div className="text-center p-4 bg-white rounded-lg shadow">
+                        <div className="rounded-[22px] border border-white/45 bg-white/70 p-4 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
                           <div className="text-3xl font-bold text-amber-600">
                             {Number(sectionStats.totalRent || 0).toLocaleString()}
                           </div>
@@ -1568,9 +1749,31 @@ export const ReportsPage: React.FC = () => {
                         </div>
                       )}
 
+                      {type === 'siteInspections' && (
+                        <>
+                          <div className="rounded-[22px] border border-white/45 bg-white/70 p-4 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
+                            <div className="text-3xl font-bold text-slate-700">
+                              {sectionStats.withCoordinates || 0}
+                            </div>
+                            <div className="mt-1 text-sm text-gray-600">
+                              معاينات بإحداثيات
+                            </div>
+                          </div>
+
+                          <div className="rounded-[22px] border border-white/45 bg-white/70 p-4 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
+                            <div className="text-3xl font-bold text-emerald-700">
+                              {sectionStats.withAttachments || 0}
+                            </div>
+                            <div className="mt-1 text-sm text-gray-600">
+                              معاينات بمرفقات
+                            </div>
+                          </div>
+                        </>
+                      )}
+
                       {type === 'deeds' && (
                         <>
-                          <div className="text-center p-4 bg-white rounded-lg shadow">
+                          <div className="rounded-[22px] border border-white/45 bg-white/70 p-4 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
                             <div className="text-3xl font-bold text-purple-600">
                               {sectionStats.plannedCount || 0}
                             </div>
@@ -1579,7 +1782,7 @@ export const ReportsPage: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="text-center p-4 bg-white rounded-lg shadow">
+                          <div className="rounded-[22px] border border-white/45 bg-white/70 p-4 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
                             <div className="text-3xl font-bold text-red-600">
                               {sectionStats.unplannedCount || 0}
                             </div>
@@ -1613,7 +1816,7 @@ export const ReportsPage: React.FC = () => {
                           {distribution.data.map((item: any) => (
                             <div
                               key={item.name}
-                              className="flex justify-between items-center p-2 bg-gray-50 rounded"
+                              className="flex items-center justify-between rounded-2xl border border-white/45 bg-white/70 p-3 shadow-sm backdrop-blur-xl"
                             >
                               <span>{item.name}</span>
                               <Badge>{item.value as number}</Badge>
@@ -1647,7 +1850,7 @@ export const ReportsPage: React.FC = () => {
                             <XAxis dataKey="name" />
                             <YAxis />
                             <Tooltip />
-                            <Bar dataKey="value" fill="#3b82f6" />
+                            <Bar dataKey="value" fill="#8f7a66" />
                           </BarChart>
                         </ResponsiveContainer>
                       </CardContent>
@@ -1691,35 +1894,204 @@ export const ReportsPage: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto w-full min-w-0 space-y-4 p-0 sm:space-y-6 sm:p-2 md:p-4 lg:p-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold sm:text-3xl lg:text-4xl bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-          {t('reports.title') || 'التقارير'}
-        </h1>
-
-        <p className="text-sm text-muted-foreground sm:text-base lg:text-lg">
-          تقارير شاملة واحترافية لجميع أنواع الأراضي والمباني والصكوك مع خيارات متقدمة.
-        </p>
+    <div className="relative mx-auto w-full min-w-0 space-y-5 p-0 sm:space-y-6 sm:p-2 md:p-4 lg:p-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 overflow-hidden">
+        <div className="mx-auto h-44 w-[22rem] rounded-full bg-[radial-gradient(circle,rgba(250,240,220,0.55),transparent_70%)] blur-3xl" />
       </div>
+      <section className="relative overflow-hidden rounded-[34px] border border-white/50 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(247,242,234,0.78),rgba(235,230,222,0.70))] p-5 shadow-[0_24px_70px_rgba(15,23,42,0.11),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl sm:p-7">
+        <div className="pointer-events-none absolute -left-20 -top-24 h-56 w-56 rounded-full bg-amber-200/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 right-1/3 h-64 w-64 rounded-full bg-slate-300/20 blur-3xl" />
 
-      <Card className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-blue-200">
+        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="max-w-3xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/65 px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-sm backdrop-blur-xl">
+              <Sparkles className="h-4 w-4 text-amber-700" />
+              مركز التقارير والتحليلات التنفيذية
+            </div>
+
+            <h1 className="bg-gradient-to-r from-stone-800 via-amber-800 to-slate-700 bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl lg:text-5xl">
+              {t('reports.title') || 'التقارير'}
+            </h1>
+
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+              لوحة موحدة لتحليل الصكوك والأراضي والمباني والمعاينات الميدانية،
+              مع تقارير قابلة للتخصيص والتصدير والطباعة.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-[24px] border border-white/60 bg-white/60 p-3 shadow-[0_12px_35px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
+            <div className="rounded-2xl bg-stone-800 p-3 text-white shadow-lg">
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">حالة البيانات</p>
+              <p className="font-bold text-stone-800">محدثة وجاهزة للتقارير</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          {
+            label: 'إجمالي السجلات',
+            value: executiveOverview.totalRecords.toLocaleString('ar-SA'),
+            hint: 'جميع أنواع السجلات والمعاينات',
+            icon: Landmark,
+          },
+          {
+            label: 'إجمالي المساحات',
+            value: executiveOverview.totalArea.toLocaleString('ar-SA'),
+            suffix: 'م²',
+            hint: 'المساحات المسجلة في المنصة',
+            icon: Ruler,
+          },
+          {
+            label: 'إجمالي القيم الإيجارية',
+            value: executiveOverview.totalRent.toLocaleString('ar-SA'),
+            suffix: 'ر.س',
+            hint: 'قيمة إجمالية للسجلات الإيجارية',
+            icon: Wallet,
+          },
+          {
+            label: 'المعاينات الميدانية',
+            value: executiveOverview.inspectionsTotal.toLocaleString('ar-SA'),
+            hint: 'زيارات الأراضي والمواقع المسجلة',
+            icon: ClipboardCheck,
+          },
+        ].map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <Card
+              key={item.label}
+              className="group relative overflow-hidden rounded-[28px] border border-white/50 bg-white/60 shadow-[0_18px_50px_rgba(15,23,42,0.09),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_26px_70px_rgba(15,23,42,0.13),inset_0_1px_0_rgba(255,255,255,1)]"
+            >
+              <div className="pointer-events-none absolute -left-10 -top-12 h-28 w-28 rounded-full bg-amber-200/20 blur-2xl transition-transform duration-500 group-hover:scale-125" />
+              <CardContent className="relative p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-stone-600">
+                      {item.label}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-baseline gap-2">
+                      <span className="text-3xl font-black text-stone-800">
+                        {item.value}
+                      </span>
+                      {item.suffix && (
+                        <span className="text-sm font-bold text-stone-500">
+                          {item.suffix}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                      {item.hint}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[20px] border border-white/60 bg-[linear-gradient(145deg,rgba(255,255,255,0.9),rgba(238,231,221,0.72))] p-3 text-stone-700 shadow-[0_10px_25px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.95)]">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.8fr)]">
+        <Card className="overflow-hidden rounded-[30px] border border-white/50 bg-white/58 shadow-[0_20px_55px_rgba(15,23,42,0.09),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl">
+          <CardHeader className="border-b border-white/50">
+            <CardTitle className="flex items-center gap-2 text-lg text-stone-800">
+              <BarChart3 className="h-5 w-5 text-amber-700" />
+              توزيع السجلات حسب الفئة
+            </CardTitle>
+            <CardDescription>
+              نظرة تنفيذية على حجم البيانات المسجلة في كل قسم.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={executiveOverview.categories}>
+                <CartesianGrid strokeDasharray="4 6" stroke="rgba(120,113,108,0.18)" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#57534e' }} interval={0} />
+                <YAxis tick={{ fontSize: 11, fill: '#57534e' }} />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 18,
+                    border: '1px solid rgba(255,255,255,0.7)',
+                    background: 'rgba(255,255,255,0.92)',
+                    boxShadow: '0 18px 50px rgba(15,23,42,0.14)',
+                    backdropFilter: 'blur(18px)',
+                  }}
+                />
+                <Bar dataKey="value" fill="#8f7a66" radius={[10, 10, 2, 2]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden rounded-[30px] border border-white/50 bg-white/58 shadow-[0_20px_55px_rgba(15,23,42,0.09),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl">
+          <CardHeader className="border-b border-white/50">
+            <CardTitle className="flex items-center gap-2 text-lg text-stone-800">
+              <Activity className="h-5 w-5 text-emerald-700" />
+              جودة توثيق المعاينات
+            </CardTitle>
+            <CardDescription>
+              مؤشرات اكتمال التوثيق المكاني والمرفقات.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 p-5">
+            {[
+              {
+                label: 'المعاينات المرتبطة بإحداثيات',
+                value: executiveOverview.coordinateCoverage,
+              },
+              {
+                label: 'المعاينات المحتوية على مرفقات',
+                value: executiveOverview.attachmentCoverage,
+              },
+            ].map((item) => (
+              <div key={item.label}>
+                <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                  <span className="font-semibold text-stone-700">{item.label}</span>
+                  <span className="font-black text-stone-800">{item.value}%</span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full border border-white/60 bg-stone-200/55 p-0.5 shadow-inner">
+                  <div
+                    className="h-full rounded-full bg-[linear-gradient(90deg,#8f7a66,#6e7d70)] shadow-[0_0_16px_rgba(110,125,112,0.32)] transition-all duration-700"
+                    style={{ width: `${item.value}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+
+            <div className="rounded-[22px] border border-white/60 bg-white/65 p-4 text-sm leading-6 text-stone-600 shadow-sm backdrop-blur-xl">
+              يعكس هذا المؤشر مستوى اكتمال بيانات الزيارة، ويساعد على تحديد السجلات
+              التي تحتاج استكمال الإحداثيات أو المرفقات.
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card className="rounded-[30px] border border-white/45 bg-[linear-gradient(135deg,rgba(255,255,255,0.85),rgba(247,241,232,0.78),rgba(239,233,226,0.70))] shadow-[0_18px_50px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-2xl">
         <CardContent className="pt-6">
           <div className="flex items-start gap-3">
-            <Download className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
+            <Download className="h-6 w-6 text-amber-700 mt-1 flex-shrink-0" />
 
             <div className="space-y-2">
-              <p className="font-semibold text-blue-900 text-lg">
+              <p className="font-semibold text-stone-800 text-lg">
                 ميزات التقارير الاحترافية:
               </p>
 
-              <ul className="text-sm text-blue-800 space-y-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+              <ul className="text-sm text-stone-700 space-y-1 grid grid-cols-1 md:grid-cols-2 gap-2">
                 <li className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                  <span className="w-2 h-2 bg-amber-700 rounded-full"></span>
                   <strong>تقارير مفصلة</strong>: عرض كامل البيانات مع اختيار الأعمدة.
                 </li>
 
                 <li className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-green-600 rounded-full"></span>
+                  <span className="w-2 h-2 bg-emerald-600 rounded-full"></span>
                   <strong>تقارير ملخصة</strong>: إحصائيات سريعة ومختصرة.
                 </li>
 
@@ -1729,17 +2101,17 @@ export const ReportsPage: React.FC = () => {
                 </li>
 
                 <li className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-purple-600 rounded-full"></span>
+                  <span className="w-2 h-2 bg-violet-600 rounded-full"></span>
                   <strong>رسوم بيانية</strong>: تمثيل مرئي للبيانات.
                 </li>
 
                 <li className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-red-600 rounded-full"></span>
+                  <span className="w-2 h-2 bg-rose-600 rounded-full"></span>
                   <strong>تصدير متعدد</strong>: PDF و Excel وطباعة مباشرة.
                 </li>
 
                 <li className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                  <span className="w-2 h-2 bg-slate-700 rounded-full"></span>
                   <strong>اختيار مخصص</strong>: تحديد الأعمدة المطلوبة فقط.
                 </li>
               </ul>
@@ -1803,6 +2175,14 @@ export const ReportsPage: React.FC = () => {
           leasedBuildingsIn,
           selectedColumns.buildingsIn,
           'buildingsIn'
+        )}
+
+        {renderReportSection(
+          'siteInspections',
+          'معاينة أرض أو موقع',
+          siteInspections,
+          selectedColumns.siteInspections,
+          'siteInspections'
         )}
       </div>
     </div>
