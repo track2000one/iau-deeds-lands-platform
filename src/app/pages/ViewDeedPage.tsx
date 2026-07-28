@@ -49,7 +49,6 @@ import {
 import { toast } from 'sonner';
 import { authenticatedFetch } from '../../lib/http';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import { AttachmentPreviewCard } from '../components/AttachmentPreview';
 import 'leaflet/dist/leaflet.css';
 
 type EditFormState = {
@@ -256,8 +255,40 @@ const MapRecenter = ({ center }: { center: SafeCoordinates }) => {
   const map = useMap();
 
   React.useEffect(() => {
-    map.setView([center.latitude, center.longitude], map.getZoom() || 14);
+    map.setView([center.latitude, center.longitude], map.getZoom() || 16);
+
+    const timer = window.setTimeout(() => {
+      map.invalidateSize();
+      map.setView([center.latitude, center.longitude], map.getZoom() || 16);
+    }, 150);
+
+    return () => window.clearTimeout(timer);
   }, [center.latitude, center.longitude, map]);
+
+  return null;
+};
+
+const MapResizeHandler = () => {
+  const map = useMap();
+
+  React.useEffect(() => {
+    const invalidate = () => {
+      map.invalidateSize();
+    };
+
+    const timers = [
+      window.setTimeout(invalidate, 0),
+      window.setTimeout(invalidate, 150),
+      window.setTimeout(invalidate, 400),
+    ];
+
+    window.addEventListener('resize', invalidate);
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      window.removeEventListener('resize', invalidate);
+    };
+  }, [map]);
 
   return null;
 };
@@ -284,7 +315,7 @@ const EditMapPicker = ({
   };
 
   return (
-    <div className="rounded-xl border overflow-hidden bg-muted">
+    <div className="w-full min-w-0 overflow-hidden rounded-xl border bg-muted">
       <div className="p-3 border-b bg-background flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <p className="font-semibold text-sm">الخريطة — اختر النقطة</p>
@@ -320,8 +351,8 @@ const EditMapPicker = ({
       <MapContainer
         key={`${center.latitude}-${center.longitude}`}
         center={[center.latitude, center.longitude]}
-        zoom={14}
-        style={{ height: 360, width: '100%' }}
+        zoom={16}
+        style={{ height: 420, width: '100%', minHeight: 320 }}
         scrollWheelZoom
       >
         <TileLayer
@@ -329,6 +360,7 @@ const EditMapPicker = ({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <MapRecenter center={center} />
+        <MapResizeHandler />
         <MapClickHandler />
         <Marker position={[center.latitude, center.longitude]} />
       </MapContainer>
@@ -449,7 +481,7 @@ export const ViewDeedPage: React.FC = () => {
       notes: deed.notes || '',
     });
 
-    setShowEditMap(false);
+    setShowEditMap(true);
     setIsEditing(true);
   };
 
@@ -834,16 +866,36 @@ export const ViewDeedPage: React.FC = () => {
                 key={att.id || getAttachmentUrl(att) || `${getAttachmentName(att)}-${index}`}
                 className="border rounded-lg p-2 md:p-3 hover:border-primary transition-colors"
               >
-                <AttachmentPreviewCard
-                  attachment={{
-                    ...att,
-                    title: getAttachmentName(att),
-                    driveUrl: getAttachmentUrl(att),
-                    mimeType: getAttachmentMimeType(att),
-                  }}
-                  compact
-                  onOpen={() => openAttachment(att)}
-                />
+                {isImageAttachment(att) ? (
+                  <div
+                    className="aspect-square bg-muted rounded-md mb-2 overflow-hidden cursor-pointer"
+                    onClick={() => openAttachment(att)}
+                  >
+                    <img
+                      src={getGoogleDrivePreviewUrl(att)}
+                      alt={getAttachmentName(att)}
+                      className="w-full h-full object-cover"
+                      onError={(event) => {
+                        event.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="aspect-square bg-muted rounded-md mb-2 flex items-center justify-center cursor-pointer"
+                    onClick={() => openAttachment(att)}
+                  >
+                    <FileText className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground" />
+                  </div>
+                )}
+
+                <p className="text-xs font-medium truncate mb-1">
+                  {getAttachmentName(att)}
+                </p>
+
+                <p className="text-xs text-muted-foreground mb-2">
+                  {att.fileSize ? formatFileSize(att.fileSize) : getAttachmentMimeType(att) || 'Google Drive'}
+                </p>
 
                 <div className="grid grid-cols-3 gap-1">
                   <Button
@@ -1222,7 +1274,7 @@ export const ViewDeedPage: React.FC = () => {
                     onClick={() => setShowEditMap((prev) => !prev)}
                   >
                     <MapIcon className="h-4 w-4 mr-2" />
-                    {showEditMap ? 'إخفاء الخريطة' : 'تحديد الموقع من الخريطة'}
+                    {showEditMap ? 'إخفاء خريطة تعديل الموقع' : 'إظهار خريطة تعديل الموقع'}
                   </Button>
 
                   <Button
@@ -1244,7 +1296,7 @@ export const ViewDeedPage: React.FC = () => {
                   </Button>
                 </div>
 
-                {showEditMap && (
+                {showEditMap ? (
                   <EditMapPicker
                     latitude={editForm.latitude}
                     longitude={editForm.longitude}
@@ -1253,6 +1305,10 @@ export const ViewDeedPage: React.FC = () => {
                       updateEditField('longitude', longitude.toFixed(6));
                     }}
                   />
+                ) : (
+                  <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+                    الخريطة مخفية حاليًا. اضغط على زر «إظهار خريطة تعديل الموقع» لتغيير نقطة الصك.
+                  </div>
                 )}
               </div>
             </div>
