@@ -17,23 +17,9 @@ export const Root = () => {
     if (viewport) {
       viewport.setAttribute(
         'content',
-        'width=device-width, initial-scale=1, viewport-fit=cover'
+        'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content'
       );
     }
-
-    const style = document.createElement('style');
-    style.textContent = `
-      html, body {
-        overflow-x: hidden;
-        width: 100%;
-        position: relative;
-      }
-    `;
-    document.head.appendChild(style);
-
-    return () => {
-      document.head.removeChild(style);
-    };
   }, []);
 
   if (!isAuthenticated) {

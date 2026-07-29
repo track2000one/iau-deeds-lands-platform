@@ -60,17 +60,25 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isRTL = i18n.language === 'ar';
 
   React.useEffect(() => {
-    if (sidebarOpen && window.innerWidth < 1024) {
-      document.body.style.overflow = 'hidden';
-      document.body.style.height = '100vh';
-    } else {
-      document.body.style.overflow = '';
-      document.body.style.height = '';
-    }
+    if (!sidebarOpen || window.innerWidth >= 1024) return;
+
+    const scrollY = window.scrollY;
+    const previousOverflow = document.body.style.overflow;
+    const previousPosition = document.body.style.position;
+    const previousTop = document.body.style.top;
+    const previousWidth = document.body.style.width;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
 
     return () => {
-      document.body.style.overflow = '';
-      document.body.style.height = '';
+      document.body.style.overflow = previousOverflow;
+      document.body.style.position = previousPosition;
+      document.body.style.top = previousTop;
+      document.body.style.width = previousWidth;
+      window.scrollTo(0, scrollY);
     };
   }, [sidebarOpen]);
 
@@ -211,7 +219,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </header>
 
-      <div className="relative flex min-h-0 w-full min-w-0 flex-1 overflow-hidden">
+      <div className="app-content-row relative flex min-h-0 w-full min-w-0 flex-1 overflow-hidden">
         {sidebarOpen && (
           <div
             className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
@@ -317,7 +325,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </ScrollArea>
         </aside>
 
-        <main className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background/70">
+        <main className="app-main min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background/70">
           <div className="mobile-page-shell w-full max-w-none px-2 py-2.5 sm:px-3 sm:py-4 md:px-5 md:py-5 2xl:px-7">
             {children}
           </div>
