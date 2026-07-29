@@ -138,8 +138,6 @@ const defaultPrintSettings: PrintSettings = {
   footerText: 'منصة إدارة الصكوك والأراضي',
   showSignature: true,
   showStamp: true,
-  signatureLabel: 'التوقيع',
-  stampLabel: 'الختم',
   fontFamily: 'Tahoma, Arial, sans-serif',
   fontSize: 13,
   headerColor: '#1f4e79',
@@ -153,19 +151,19 @@ export const ReportsPage: React.FC = () => {
     isAdmin || hasPermission('site_inspections', 'canPrint');
 
   const deedsColumns = [
+    { key: 'propertyDescription', label: 'وصف العقار', enabled: true },
     { key: 'deedNumber', label: 'رقم الصك', enabled: true },
     { key: 'deedDate', label: 'تاريخ الصك', enabled: true },
-    { key: 'propertyDescription', label: 'وصف العقار', enabled: true },
     { key: 'plotNumber', label: 'رقم القطعة', enabled: true },
     { key: 'planNumber', label: 'رقم المخطط', enabled: true },
     { key: 'area', label: 'المساحة', enabled: true },
     { key: 'region', label: 'المنطقة', enabled: false },
     { key: 'city', label: 'المدينة', enabled: true },
     { key: 'district', label: 'الحي', enabled: true },
-    { key: 'usageType', label: 'نوع الاستخدام', enabled: true },
-    { key: 'isPlanned', label: 'مخططة', enabled: true },
+    { key: 'usageType', label: 'نوع الاستخدام', enabled: false },
+    { key: 'isPlanned', label: 'مخططة', enabled: false },
     { key: 'coordinates', label: 'الإحداثيات', enabled: false },
-    { key: 'attachmentsCount', label: 'عدد المرفقات', enabled: true },
+    { key: 'attachmentsCount', label: 'عدد المرفقات', enabled: false },
     { key: 'notes', label: 'ملاحظات', enabled: false },
   ];
 
