@@ -110,6 +110,11 @@ type ReportFilters = {
   attachments: 'all' | 'with' | 'without';
 };
 
+type ReportSortSettings = {
+  key: string;
+  direction: 'asc' | 'desc';
+};
+
 type PrintSettings = {
   universityName: string;
   platformName: string;
@@ -369,6 +374,17 @@ export const ReportsPage: React.FC = () => {
     siteInspections: { ...emptyFilters },
   });
 
+  const [sortSettingsBySection, setSortSettingsBySection] = useState<Record<ReportSectionType, ReportSortSettings>>({
+    deeds: { key: '', direction: 'asc' },
+    allocated: { key: '', direction: 'asc' },
+    delivered: { key: '', direction: 'asc' },
+    leasedOut: { key: '', direction: 'asc' },
+    leasedIn: { key: '', direction: 'asc' },
+    buildingsOut: { key: '', direction: 'asc' },
+    buildingsIn: { key: '', direction: 'asc' },
+    siteInspections: { key: '', direction: 'asc' },
+  });
+
   const [printSettingsBySection, setPrintSettingsBySection] = useState<Record<ReportSectionType, PrintSettings>>({
     deeds: { ...defaultPrintSettings, reportTitle: 'تقرير الصكوك' },
     allocated: { ...defaultPrintSettings, reportTitle: 'تقرير الأراضي المخصصة' },
@@ -525,6 +541,114 @@ export const ReportsPage: React.FC = () => {
 
       return true;
     });
+  };
+
+  const normalizeSortValue = (item: any, key: string) => {
+    const rawValue = item?.[key];
+
+    if (
+      key === 'area' ||
+      key === 'rentAmount' ||
+      key === 'attachmentsCount' ||
+      key === 'plotNumber' ||
+      key === 'planNumber' ||
+      key === 'buildingNumber'
+    ) {
+      if (key === 'attachmentsCount') {
+        return Array.isArray(item?.attachments) ? item.attachments.length : 0;
+      }
+
+      const numericValue = Number(
+        String(rawValue ?? '')
+          .replaceAll(',', '')
+          .replace(/[^\d.-]/g, '')
+      );
+
+      return Number.isFinite(numericValue) ? numericValue : 0;
+    }
+
+    if (
+      key === 'deedDate' ||
+      key === 'deliveryDate' ||
+      key === 'receiptDate' ||
+      key === 'contractStartDate' ||
+      key === 'visitDate' ||
+      key === 'followUpDate' ||
+      key === 'createdAt' ||
+      key === 'updatedAt'
+    ) {
+      const timestamp = new Date(rawValue || 0).getTime();
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+
+    if (key === 'isPlanned') {
+      return item?.isPlanned ? 1 : 0;
+    }
+
+    if (key === 'overallStatus') {
+      return inspectionConditionLabels[item?.overallStatus] || item?.overallStatus || '';
+    }
+
+    if (key === 'workflowStatus') {
+      return inspectionWorkflowLabels[item?.workflowStatus] || item?.workflowStatus || '';
+    }
+
+    if (key === 'propertyDescription') {
+      return item?.propertyDescription || item?.description || '';
+    }
+
+    if (key === 'tenant' || key === 'owner') {
+      return typeof rawValue === 'object'
+        ? rawValue?.name || ''
+        : String(rawValue || '');
+    }
+
+    return String(rawValue ?? '').trim();
+  };
+
+  const sortReportData = (
+    data: any[],
+    settings: ReportSortSettings
+  ) => {
+    const safeData = Array.isArray(data) ? [...data] : [];
+
+    if (!settings.key) {
+      return safeData;
+    }
+
+    const directionFactor = settings.direction === 'desc' ? -1 : 1;
+
+    return safeData.sort((first, second) => {
+      const firstValue = normalizeSortValue(first, settings.key);
+      const secondValue = normalizeSortValue(second, settings.key);
+
+      if (typeof firstValue === 'number' && typeof secondValue === 'number') {
+        return (firstValue - secondValue) * directionFactor;
+      }
+
+      return String(firstValue).localeCompare(
+        String(secondValue),
+        'ar',
+        {
+          numeric: true,
+          sensitivity: 'base',
+        }
+      ) * directionFactor;
+    });
+  };
+
+  const updateSortSetting = (
+    section: ReportSectionType,
+    key: keyof ReportSortSettings,
+    value: string
+  ) => {
+    setSortSettingsBySection((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [key]: value,
+      },
+    }));
   };
 
   const statistics = useMemo(() => {
@@ -1532,6 +1656,8 @@ export const ReportsPage: React.FC = () => {
     const filters = reportFilters[type];
     const printSettings = printSettingsBySection[type];
     const safeData = applyFilters(originalData, filters);
+    const sortSettings = sortSettingsBySection[type];
+    const sortedData = sortReportData(safeData, sortSettings);
     const enabledColumns = columns.filter((col) => col.enabled);
     const previewTableWidth =
       enabledColumns.length <= 5
@@ -1911,9 +2037,85 @@ export const ReportsPage: React.FC = () => {
                   </CardContent>
                 </Card>
 
+                <Card className="rounded-[24px] border border-white/45 bg-white/55 shadow-[0_10px_35px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-xl">
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      ترتيب الصفوف قبل الطباعة والتصدير
+                    </CardTitle>
+                    <CardDescription>
+                      يطبق الترتيب على الجدول الظاهر وملفات Excel وPDF والمعاينة والطباعة.
+                    </CardDescription>
+                  </CardHeader>
+
+                  <CardContent>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>الترتيب حسب</Label>
+                        <select
+                          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                          value={sortSettings.key}
+                          onChange={(event) =>
+                            updateSortSetting(type, 'key', event.target.value)
+                          }
+                        >
+                          <option value="">بدون ترتيب إضافي</option>
+                          {columns.map((column) => (
+                            <option key={column.key} value={column.key}>
+                              {column.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>اتجاه الترتيب</Label>
+                        <select
+                          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                          value={sortSettings.direction}
+                          disabled={!sortSettings.key}
+                          onChange={(event) =>
+                            updateSortSetting(type, 'direction', event.target.value)
+                          }
+                        >
+                          <option value="asc">تصاعدي: أ–ي / الأصغر أولًا</option>
+                          <option value="desc">تنازلي: ي–أ / الأكبر أولًا</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {sortSettings.key && (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+                        <span>
+                          الترتيب الحالي:{' '}
+                          <strong className="text-foreground">
+                            {columns.find((column) => column.key === sortSettings.key)?.label || sortSettings.key}
+                          </strong>
+                          {' — '}
+                          {sortSettings.direction === 'asc' ? 'تصاعدي' : 'تنازلي'}
+                        </span>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSortSettingsBySection((prev) => ({
+                              ...prev,
+                              [type]: { key: '', direction: 'asc' },
+                            }));
+                          }}
+                        >
+                          إلغاء الترتيب
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
                   <Button
-                    onClick={() => exportToExcel(safeData, columns, printSettings.reportTitle || title)}
+                    onClick={() => exportToExcel(sortedData, columns, printSettings.reportTitle || title)}
                     variant="outline"
                     className="w-full h-10 md:h-11 text-sm md:text-base"
                   >
@@ -1922,7 +2124,7 @@ export const ReportsPage: React.FC = () => {
                   </Button>
 
                   <Button
-                    onClick={() => exportToPDF(safeData, columns, printSettings.reportTitle || title, type, printSettings, filters)}
+                    onClick={() => exportToPDF(sortedData, columns, printSettings.reportTitle || title, type, printSettings, filters)}
                     variant="outline"
                     className="w-full h-10 md:h-11 text-sm md:text-base"
                   >
@@ -1933,12 +2135,12 @@ export const ReportsPage: React.FC = () => {
                   <Button
                     onClick={() => {
                       handlePrint(
-                        safeData,
+                        sortedData,
                         columns,
                         printSettings.reportTitle || title,
                         {
-                          total: safeData.length,
-                          totalArea: safeData.reduce((sum: number, item: any) => sum + Number(item.area || 0), 0).toLocaleString(),
+                          total: sortedData.length,
+                          totalArea: sortedData.reduce((sum: number, item: any) => sum + Number(item.area || 0), 0).toLocaleString(),
                         },
                         printSettings,
                         filters
@@ -1971,7 +2173,7 @@ export const ReportsPage: React.FC = () => {
                       </TableHeader>
 
                       <TableBody>
-                        {safeData.length === 0 ? (
+                        {sortedData.length === 0 ? (
                           <TableRow>
                             <TableCell
                               colSpan={enabledColumns.length + 1}
@@ -1981,7 +2183,7 @@ export const ReportsPage: React.FC = () => {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          safeData.map((item, index) => (
+                          sortedData.map((item, index) => (
                             <TableRow key={item.id || index} className="hover:bg-blue-50">
                               <TableCell className="px-2 py-2 text-center font-medium text-gray-600">
                                 {index + 1}
