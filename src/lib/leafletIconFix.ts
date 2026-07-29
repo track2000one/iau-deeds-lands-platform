@@ -1,30 +1,36 @@
 import L from 'leaflet';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import customMapPinImage from '../assets/custom-map-pin.png';
 
 /**
- * Fixes Leaflet default marker assets when the app is bundled by Vite.
- *
- * Leaflet normally builds marker image URLs at runtime. After bundling,
- * those relative URLs can point to missing files. Importing the images
- * through Vite and assigning them explicitly keeps the marker stable in
- * local builds and Railway deployments.
+ * Unified custom map marker used across add / view / edit map experiences.
+ * The same marker is also applied as Leaflet's default icon so any plain
+ * <Marker /> in the app automatically uses the branded red pin image.
  */
+export const customMapMarkerIcon = L.icon({
+  iconUrl: customMapPinImage,
+  iconSize: [60, 60],
+  iconAnchor: [30, 56],
+  popupAnchor: [0, -52],
+  tooltipAnchor: [0, -46],
+  className: 'app-map-pin-icon',
+});
+
 export const configureLeafletDefaultMarker = (): void => {
   delete (L.Icon.Default.prototype as unknown as {
     _getIconUrl?: unknown;
   })._getIconUrl;
 
+  L.Marker.prototype.options.icon = customMapMarkerIcon;
+
   L.Icon.Default.mergeOptions({
-    iconRetinaUrl: markerIcon2x,
-    iconUrl: markerIcon,
-    shadowUrl: markerShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    tooltipAnchor: [16, -28],
-    shadowSize: [41, 41],
+    iconUrl: customMapPinImage,
+    iconRetinaUrl: customMapPinImage,
+    shadowUrl: undefined,
+    iconSize: [60, 60],
+    iconAnchor: [30, 56],
+    popupAnchor: [0, -52],
+    tooltipAnchor: [0, -46],
+    className: 'app-map-pin-icon',
   });
 };
 

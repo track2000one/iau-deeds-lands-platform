@@ -6,9 +6,8 @@ import {
   useMap,
   useMapEvents,
 } from 'react-leaflet';
-import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import locationPinImage from '../../assets/map-location-pin.png';
+import { customMapMarkerIcon } from '../../lib/leafletIconFix';
 
 type Coordinates = {
   latitude: number;
@@ -22,14 +21,6 @@ type MapCoordinatePickerProps = {
 
 const DEFAULT_POSITION: [number, number] = [26.3927, 50.1906];
 
-const markerIcon = L.icon({
-  iconUrl: locationPinImage,
-  iconSize: [58, 76],
-  iconAnchor: [29, 72],
-  popupAnchor: [0, -70],
-  tooltipAnchor: [0, -64],
-  className: 'selected-location-image-marker',
-});
 
 const MapClickHandler: React.FC<{
   onChange: (coordinates: Coordinates) => void;
@@ -118,14 +109,14 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
           }
         }
 
-        .selected-location-image-marker {
+        .app-map-pin-icon {
           z-index: 1000 !important;
           filter:
             drop-shadow(0 8px 8px rgba(15, 23, 42, .35))
             drop-shadow(0 0 4px rgba(255, 255, 255, .95));
         }
 
-        .selected-location-image-marker::after {
+        .app-map-pin-icon::after {
           content: '';
           position: absolute;
           left: 50%;
@@ -184,7 +175,7 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
             {hasCoordinates && (
               <Marker
                 position={position}
-                icon={markerIcon}
+                icon={customMapMarkerIcon}
                 title="الموقع المحدد"
                 zIndexOffset={1000}
                 riseOnHover

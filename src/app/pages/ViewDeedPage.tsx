@@ -49,6 +49,7 @@ import {
 import { toast } from 'sonner';
 import { authenticatedFetch } from '../../lib/http';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { customMapMarkerIcon } from '../../lib/leafletIconFix';
 import 'leaflet/dist/leaflet.css';
 
 type EditFormState = {
@@ -362,7 +363,7 @@ const EditMapPicker = ({
         <MapRecenter center={center} />
         <MapResizeHandler />
         <MapClickHandler />
-        <Marker position={[center.latitude, center.longitude]} />
+        <Marker position={[center.latitude, center.longitude]} icon={customMapMarkerIcon} />
       </MapContainer>
     </div>
   );
@@ -1402,7 +1403,7 @@ export const ViewDeedPage: React.FC = () => {
                           attribution='&copy; OpenStreetMap'
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
-                        <Marker position={[safeCoordinates.latitude, safeCoordinates.longitude]} />
+                        <Marker position={[safeCoordinates.latitude, safeCoordinates.longitude]} icon={customMapMarkerIcon} />
                       </MapContainer>
                     </div>
                   </div>
