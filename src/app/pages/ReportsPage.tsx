@@ -811,42 +811,34 @@ export const ReportsPage: React.FC = () => {
     const normalizedKey = String(key || '').toLowerCase();
 
     if (index === 0) {
-      return { width: '3.5%', className: 'col-index' };
+      return { width: '4%', className: 'col-index' };
     }
 
     if (/description|propertydescription|locationname|recipiententity|tenant|owner/.test(normalizedKey)) {
-      return { width: '27%', className: 'col-description' };
+      return { width: '25%', className: 'col-description' };
     }
 
     if (/deednumber|receiptnumber|contractnumber|inspectionnumber/.test(normalizedKey)) {
-      return { width: '12.5%', className: 'col-number' };
+      return { width: '12%', className: 'col-number' };
     }
 
     if (/date/.test(normalizedKey)) {
-      return { width: '9.5%', className: 'col-date' };
+      return { width: '10%', className: 'col-date' };
     }
 
     if (/area|rentamount|amount|value/.test(normalizedKey)) {
-      return { width: '10.5%', className: 'col-numeric' };
+      return { width: '10%', className: 'col-numeric' };
     }
 
-    if (/city/.test(normalizedKey)) {
-      return { width: '7.5%', className: 'col-short' };
-    }
-
-    if (/district/.test(normalizedKey)) {
-      return { width: '10%', className: 'col-short' };
-    }
-
-    if (/region|usagetype|status|type/.test(normalizedKey)) {
-      return { width: '8.5%', className: 'col-short' };
+    if (/city|district|region|usagetype|status|type/.test(normalizedKey)) {
+      return { width: '9%', className: 'col-short' };
     }
 
     if (/plotnumber|plannumber|buildingnumber/.test(normalizedKey)) {
-      return { width: '8.5%', className: 'col-code' };
+      return { width: '9%', className: 'col-code' };
     }
 
-    return { width: '9%', className: 'col-default' };
+    return { width: '10%', className: 'col-default' };
   };
 
   const buildPrintableReportHtml = (
@@ -950,7 +942,7 @@ export const ReportsPage: React.FC = () => {
   <style>
     @page {
       size: A4 landscape;
-      margin: 5mm;
+      margin: 7mm;
     }
 
     * {
@@ -967,12 +959,12 @@ export const ReportsPage: React.FC = () => {
       background: #ffffff;
       color: #172033;
       font-family: ${effectiveSettings.fontFamily};
-      font-size: ${Math.max(11, Number(effectiveSettings.fontSize || 13))}px;
-      line-height: 1.5;
+      font-size: ${Math.max(10, Number(effectiveSettings.fontSize || 13) - 1)}px;
+      line-height: 1.45;
     }
 
     body {
-      padding: 0;
+      padding: 8px;
     }
 
     .report {
@@ -987,8 +979,8 @@ export const ReportsPage: React.FC = () => {
       border: 1px solid #d6dee8;
       border-top: 4px solid ${effectiveSettings.headerColor};
       border-radius: 14px;
-      padding: 8px 14px 7px;
-      margin-bottom: 7px;
+      padding: 11px 16px 9px;
+      margin-bottom: 9px;
       text-align: center;
       background: linear-gradient(135deg, #ffffff 0%, #f7fafc 55%, #eef4f8 100%);
       box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
@@ -1007,7 +999,7 @@ export const ReportsPage: React.FC = () => {
     }
 
     .university {
-      font-size: 18px;
+      font-size: 19px;
       line-height: 1.25;
       font-weight: 800;
       color: #0f172a;
@@ -1015,9 +1007,9 @@ export const ReportsPage: React.FC = () => {
     }
 
     .subtitle {
-      font-size: 10px;
+      font-size: 10.5px;
       color: #64748b;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
     }
 
     .title {
@@ -1025,12 +1017,12 @@ export const ReportsPage: React.FC = () => {
       align-items: center;
       justify-content: center;
       min-width: 230px;
-      padding: 4px 16px;
+      padding: 5px 18px;
       border-radius: 999px;
       border: 1px solid #d7e0ea;
       background: rgba(255, 255, 255, .9);
       box-shadow: inset 0 1px 0 #ffffff, 0 3px 9px rgba(15, 23, 42, .05);
-      font-size: 15px;
+      font-size: 16px;
       line-height: 1.25;
       font-weight: 800;
       color: ${effectiveSettings.headerColor};
@@ -1041,7 +1033,7 @@ export const ReportsPage: React.FC = () => {
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      margin-top: 5px;
+      margin-top: 7px;
       color: #64748b;
       font-size: 9.5px;
     }
@@ -1049,14 +1041,14 @@ export const ReportsPage: React.FC = () => {
     .stats {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 7px;
-      margin: 7px 0;
+      gap: 8px;
+      margin: 8px 0;
     }
 
     .stat {
       border: 1px solid #dbe3ec;
       border-radius: 11px;
-      padding: 5px 8px;
+      padding: 6px 9px;
       background: linear-gradient(180deg, #ffffff, #f8fafc);
       text-align: center;
       box-shadow: inset 0 1px 0 #ffffff;
@@ -1070,7 +1062,7 @@ export const ReportsPage: React.FC = () => {
 
     .stat-value {
       color: ${effectiveSettings.headerColor};
-      font-size: 15px;
+      font-size: 16px;
       line-height: 1.2;
       font-weight: 800;
       font-variant-numeric: tabular-nums;
@@ -1106,6 +1098,8 @@ export const ReportsPage: React.FC = () => {
     }
 
     .table-shell {
+      width: calc(100% - 18px);
+      margin-inline: auto;
       overflow: hidden;
       border: 1px solid #cbd6e2;
       border-radius: 10px;
@@ -1123,11 +1117,11 @@ export const ReportsPage: React.FC = () => {
 
     thead th {
       position: relative;
-      padding: 9px 5px;
+      padding: 7px 4px;
       background: linear-gradient(180deg, ${effectiveSettings.headerColor} 0%, #173f62 100%);
       color: #ffffff;
-      font-size: 11.3px;
-      line-height: 1.35;
+      font-size: 9.7px;
+      line-height: 1.25;
       font-weight: 800;
       text-align: center;
       vertical-align: middle;
@@ -1142,12 +1136,12 @@ export const ReportsPage: React.FC = () => {
     }
 
     tbody td {
-      padding: 8px 5px;
+      padding: 6px 4px;
       text-align: center;
       vertical-align: middle;
       color: #1f2937;
-      font-size: 10.8px;
-      line-height: 1.45;
+      font-size: 9.4px;
+      line-height: 1.35;
       border-inline-start: 1px solid #dde5ee;
       border-bottom: 1px solid #dde5ee;
       overflow-wrap: anywhere;
@@ -1215,14 +1209,14 @@ export const ReportsPage: React.FC = () => {
     }
 
     .footer {
-      margin-top: 6px;
-      padding: 5px 3px 0;
+      margin-top: 8px;
+      padding: 7px 3px 0;
       border-top: 1px solid #d7e0ea;
       display: flex;
       justify-content: space-between;
       gap: 14px;
       color: #64748b;
-      font-size: 9.2px;
+      font-size: 8.8px;
       line-height: 1.35;
     }
 
@@ -1230,7 +1224,7 @@ export const ReportsPage: React.FC = () => {
       display: flex;
       justify-content: center;
       gap: 70px;
-      margin-top: 18px;
+      margin-top: 26px;
       color: #111827;
     }
 
@@ -1941,7 +1935,7 @@ export const ReportsPage: React.FC = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-amber-700 hover:bg-amber-700">
-                          <TableHead className="w-12 text-center text-white">#</TableHead>
+                          <TableHead className="text-center text-white">#</TableHead>
 
                           {enabledColumns.map((col) => (
                             <TableHead key={col.key} className="text-center text-white">
@@ -1964,12 +1958,12 @@ export const ReportsPage: React.FC = () => {
                         ) : (
                           safeData.map((item, index) => (
                             <TableRow key={item.id || index} className="hover:bg-blue-50">
-                              <TableCell className="px-3 py-2.5 text-center font-medium text-gray-600">
+                              <TableCell className="text-center font-medium text-gray-600">
                                 {index + 1}
                               </TableCell>
 
                               {enabledColumns.map((col) => (
-                                <TableCell key={col.key} className="px-3 py-2.5 text-center align-middle">
+                                <TableCell key={col.key} className="text-center">
                                   {col.key === 'usageType' ||
                                   col.key === 'rentAmount' ||
                                   col.key === 'isPlanned' ? (
