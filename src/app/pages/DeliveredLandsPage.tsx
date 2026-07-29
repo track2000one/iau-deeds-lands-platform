@@ -33,6 +33,7 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { LocationMapPreview } from '../components/LocationMapPreview';
 import { AttachmentPreviewGrid } from '../components/AttachmentPreview';
 import { AppDateField } from '../components/AppDateField';
 import { formatFlexibleDate } from '../../utils/dateUtils';
@@ -394,7 +395,7 @@ export const DeliveredLandsPage: React.FC = () => {
     });
 
     setDetailsOpen(false);
-    setShowMap(false);
+    setShowMap(true);
     resetAttachmentLinks();
     setFormOpen(true);
     setTimeout(() => {
@@ -1361,6 +1362,13 @@ export const DeliveredLandsPage: React.FC = () => {
               {(selectedLand as any).notes && (
                 <InfoBlock label="الملاحظات" value={(selectedLand as any).notes} />
               )}
+
+              <LocationMapPreview
+                coordinates={(selectedLand as any).coordinates}
+                latitude={(selectedLand as any).latitude}
+                longitude={(selectedLand as any).longitude}
+                title="موقع الأرض المستلمة"
+              />
 
               <Card>
                 <CardHeader>

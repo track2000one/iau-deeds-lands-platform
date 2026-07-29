@@ -48,6 +48,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { LocationMapPreview } from '../components/LocationMapPreview';
 import { AttachmentPreviewGrid } from '../components/AttachmentPreview';
 import { AppDateField } from '../components/AppDateField';
 import { formatFlexibleDate } from '../../utils/dateUtils';
@@ -342,7 +343,7 @@ export const LeasedLandsInPage: React.FC = () => {
       notes: record.notes || '',
       attachments: getRecordAttachments(record),
     });
-    setShowMap(false);
+    setShowMap(true);
     resetAttachmentLinks();
     setFormOpen(true);
     setTimeout(() => document.getElementById('leased-land-in-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
@@ -738,6 +739,13 @@ export const LeasedLandsInPage: React.FC = () => {
             </div>
 
             {(selectedRecord as any).notes && <InfoBlock label="الملاحظات" value={(selectedRecord as any).notes} />}
+
+            <LocationMapPreview
+              coordinates={(selectedRecord as any).coordinates}
+              latitude={(selectedRecord as any).latitude}
+              longitude={(selectedRecord as any).longitude}
+              title="موقع الأرض المستأجرة"
+            />
 
             <Card>
               <CardHeader>

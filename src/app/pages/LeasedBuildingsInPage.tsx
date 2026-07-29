@@ -48,6 +48,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { LocationMapPreview } from '../components/LocationMapPreview';
 import { AttachmentPreviewGrid } from '../components/AttachmentPreview';
 import { toast } from 'sonner';
 import type { LeasedBuildingOut, LeasedBuildingIn } from '../../types/models';
@@ -330,7 +331,7 @@ export const LeasedBuildingsInPage: React.FC = () => {
       notes: record.notes || '',
       attachments: getRecordAttachments(record),
     });
-    setShowMap(false);
+    setShowMap(true);
     resetAttachmentLinks();
     setFormOpen(true);
     setTimeout(() => document.getElementById('leased-building-in-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
@@ -709,6 +710,13 @@ export const LeasedBuildingsInPage: React.FC = () => {
             </div>
 
             {(selectedRecord as any).notes && <InfoBlock label="الملاحظات" value={(selectedRecord as any).notes} />}
+
+            <LocationMapPreview
+              coordinates={(selectedRecord as any).coordinates}
+              latitude={(selectedRecord as any).latitude}
+              longitude={(selectedRecord as any).longitude}
+              title="موقع المبنى المستأجر"
+            />
 
             <Card>
               <CardHeader>

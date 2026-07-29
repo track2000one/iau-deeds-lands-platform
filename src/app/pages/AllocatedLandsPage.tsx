@@ -52,6 +52,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { LocationMapPreview } from '../components/LocationMapPreview';
 import { AttachmentPreviewGrid } from '../components/AttachmentPreview';
 import { toast } from 'sonner';
 import type { AllocatedLand } from '../../types/models';
@@ -306,7 +307,7 @@ export const AllocatedLandsPage: React.FC = () => {
       attachments: getLandAttachments(land),
     });
     resetAttachmentLinks();
-    setShowMap(false);
+    setShowMap(true);
     setFormOpen(true);
     setTimeout(() => {
       document.getElementById('allocated-land-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1128,6 +1129,13 @@ export const AllocatedLandsPage: React.FC = () => {
               {(selectedLand as any).notes && (
                 <InfoBlock label="الملاحظات" value={(selectedLand as any).notes} />
               )}
+
+              <LocationMapPreview
+                coordinates={(selectedLand as any).coordinates}
+                latitude={(selectedLand as any).latitude}
+                longitude={(selectedLand as any).longitude}
+                title="موقع الأرض المخصصة"
+              />
 
               <Card>
                 <CardHeader>
