@@ -900,6 +900,16 @@ export const ReportsPage: React.FC = () => {
       ...getPrintableColumnMeta(column.key, index),
     }));
 
+    const printableColumnCount = printableColumns.length;
+    const printableTableWidth =
+      printableColumnCount <= 6
+        ? '78%'
+        : printableColumnCount <= 8
+        ? '86%'
+        : printableColumnCount <= 10
+        ? '92%'
+        : '96%';
+
     const colgroupHtml = printableColumns
       .map(
         (column) =>
@@ -1098,13 +1108,15 @@ export const ReportsPage: React.FC = () => {
     }
 
     .table-shell {
-      width: calc(100% - 18px);
+      width: var(--report-table-width, 96%);
       margin-inline: auto;
       overflow: hidden;
-      border: 1px solid #cbd6e2;
-      border-radius: 10px;
+      border: 0.65px solid #d8e0e8;
+      border-radius: 9px;
       background: #ffffff;
-      box-shadow: 0 6px 18px rgba(15, 23, 42, .045);
+      box-shadow:
+        0 7px 20px rgba(15, 23, 42, .03),
+        inset 0 1px 0 rgba(255, 255, 255, .96);
     }
 
     table {
@@ -1117,7 +1129,7 @@ export const ReportsPage: React.FC = () => {
 
     thead th {
       position: relative;
-      padding: 7px 4px;
+      padding: 6px 4px;
       background: linear-gradient(180deg, ${effectiveSettings.headerColor} 0%, #173f62 100%);
       color: #ffffff;
       font-size: 9.7px;
@@ -1125,8 +1137,8 @@ export const ReportsPage: React.FC = () => {
       font-weight: 800;
       text-align: center;
       vertical-align: middle;
-      border-inline-start: 1px solid rgba(255, 255, 255, .18);
-      border-bottom: 1px solid #173f62;
+      border-inline-start: 0.6px solid rgba(255, 255, 255, .16);
+      border-bottom: 0.7px solid #173f62;
       white-space: normal;
       overflow-wrap: anywhere;
     }
@@ -1136,14 +1148,14 @@ export const ReportsPage: React.FC = () => {
     }
 
     tbody td {
-      padding: 6px 4px;
+      padding: 5px 4px;
       text-align: center;
       vertical-align: middle;
       color: #1f2937;
       font-size: 9.4px;
       line-height: 1.35;
-      border-inline-start: 1px solid #dde5ee;
-      border-bottom: 1px solid #dde5ee;
+      border-inline-start: 0.6px solid #e2e8ef;
+      border-bottom: 0.6px solid #e2e8ef;
       overflow-wrap: anywhere;
       word-break: normal;
       white-space: normal;
@@ -1335,7 +1347,7 @@ export const ReportsPage: React.FC = () => {
         : ''
     }
 
-    <div class="table-shell">
+    <div class="table-shell" style="--report-table-width:${printableTableWidth}">
       <table>
         <colgroup>${colgroupHtml}</colgroup>
       <thead>
@@ -1520,6 +1532,14 @@ export const ReportsPage: React.FC = () => {
     const printSettings = printSettingsBySection[type];
     const safeData = applyFilters(originalData, filters);
     const enabledColumns = columns.filter((col) => col.enabled);
+    const previewTableWidth =
+      enabledColumns.length <= 5
+        ? '78%'
+        : enabledColumns.length <= 7
+        ? '86%'
+        : enabledColumns.length <= 9
+        ? '92%'
+        : '97%';
     const regionOptions = getUniqueOptions(originalData, 'region');
     const cityOptions = getUniqueOptions(originalData, 'city');
     const districtOptions = getUniqueOptions(originalData, 'district');
@@ -1931,14 +1951,17 @@ export const ReportsPage: React.FC = () => {
                 </div>
 
                 <div ref={printRefs[refKey]}>
-                  <div className="overflow-x-auto rounded-[24px] border border-white/50 bg-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                  <div
+                    className="mx-auto overflow-x-auto rounded-[20px] border border-slate-200/70 bg-white/82 shadow-[0_8px_24px_rgba(15,23,42,0.035),inset_0_1px_0_rgba(255,255,255,0.95)]"
+                    style={{ width: previewTableWidth }}
+                  >
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-amber-700 hover:bg-amber-700">
-                          <TableHead className="text-center text-white">#</TableHead>
+                          <TableHead className="w-10 px-2 py-2 text-center text-white">#</TableHead>
 
                           {enabledColumns.map((col) => (
-                            <TableHead key={col.key} className="text-center text-white">
+                            <TableHead key={col.key} className="px-2 py-2 text-center text-white">
                               {col.label}
                             </TableHead>
                           ))}
@@ -1958,12 +1981,12 @@ export const ReportsPage: React.FC = () => {
                         ) : (
                           safeData.map((item, index) => (
                             <TableRow key={item.id || index} className="hover:bg-blue-50">
-                              <TableCell className="text-center font-medium text-gray-600">
+                              <TableCell className="px-2 py-2 text-center font-medium text-gray-600">
                                 {index + 1}
                               </TableCell>
 
                               {enabledColumns.map((col) => (
-                                <TableCell key={col.key} className="text-center">
+                                <TableCell key={col.key} className="px-2 py-2 text-center">
                                   {col.key === 'usageType' ||
                                   col.key === 'rentAmount' ||
                                   col.key === 'isPlanned' ? (
