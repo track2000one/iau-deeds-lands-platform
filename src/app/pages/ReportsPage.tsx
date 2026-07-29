@@ -136,8 +136,8 @@ const defaultPrintSettings: PrintSettings = {
   reportTitle: '',
   introText: '',
   footerText: 'منصة إدارة الصكوك والأراضي',
-  showSignature: false,
-  showStamp: false,
+  showSignature: true,
+  showStamp: true,
   signatureLabel: 'التوقيع',
   stampLabel: 'الختم',
   fontFamily: 'Tahoma, Arial, sans-serif',
@@ -163,9 +163,9 @@ export const ReportsPage: React.FC = () => {
     { key: 'city', label: 'المدينة', enabled: true },
     { key: 'district', label: 'الحي', enabled: true },
     { key: 'usageType', label: 'نوع الاستخدام', enabled: true },
-    { key: 'isPlanned', label: 'مخططة', enabled: false },
+    { key: 'isPlanned', label: 'مخططة', enabled: true },
     { key: 'coordinates', label: 'الإحداثيات', enabled: false },
-    { key: 'attachmentsCount', label: 'عدد المرفقات', enabled: false },
+    { key: 'attachmentsCount', label: 'عدد المرفقات', enabled: true },
     { key: 'notes', label: 'ملاحظات', enabled: false },
   ];
 
@@ -814,36 +814,36 @@ export const ReportsPage: React.FC = () => {
       return { width: '3.5%', className: 'col-index' };
     }
 
-    if (/description|propertydescription|locationname|recipiententity/.test(normalizedKey)) {
-      return { width: '23%', className: 'col-description' };
-    }
-
-    if (/tenant|owner/.test(normalizedKey)) {
-      return { width: '14%', className: 'col-party' };
+    if (/description|propertydescription|locationname|recipiententity|tenant|owner/.test(normalizedKey)) {
+      return { width: '27%', className: 'col-description' };
     }
 
     if (/deednumber|receiptnumber|contractnumber|inspectionnumber/.test(normalizedKey)) {
-      return { width: '11%', className: 'col-number' };
+      return { width: '12.5%', className: 'col-number' };
     }
 
     if (/date/.test(normalizedKey)) {
-      return { width: '9%', className: 'col-date' };
+      return { width: '9.5%', className: 'col-date' };
     }
 
     if (/area|rentamount|amount|value/.test(normalizedKey)) {
-      return { width: '9%', className: 'col-numeric' };
+      return { width: '10.5%', className: 'col-numeric' };
     }
 
-    if (/city|district|region|usagetype|status|type/.test(normalizedKey)) {
-      return { width: '8%', className: 'col-short' };
+    if (/city/.test(normalizedKey)) {
+      return { width: '7.5%', className: 'col-short' };
+    }
+
+    if (/district/.test(normalizedKey)) {
+      return { width: '10%', className: 'col-short' };
+    }
+
+    if (/region|usagetype|status|type/.test(normalizedKey)) {
+      return { width: '8.5%', className: 'col-short' };
     }
 
     if (/plotnumber|plannumber|buildingnumber/.test(normalizedKey)) {
-      return { width: '8%', className: 'col-code' };
-    }
-
-    if (/attachmentscount|isplanned/.test(normalizedKey)) {
-      return { width: '6%', className: 'col-compact' };
+      return { width: '8.5%', className: 'col-code' };
     }
 
     return { width: '9%', className: 'col-default' };
@@ -950,7 +950,7 @@ export const ReportsPage: React.FC = () => {
   <style>
     @page {
       size: A4 landscape;
-      margin: 7mm;
+      margin: 5mm;
     }
 
     * {
@@ -968,11 +968,11 @@ export const ReportsPage: React.FC = () => {
       color: #172033;
       font-family: ${effectiveSettings.fontFamily};
       font-size: ${Math.max(11, Number(effectiveSettings.fontSize || 13))}px;
-      line-height: 1.45;
+      line-height: 1.5;
     }
 
     body {
-      padding: 5px;
+      padding: 0;
     }
 
     .report {
@@ -987,7 +987,7 @@ export const ReportsPage: React.FC = () => {
       border: 1px solid #d6dee8;
       border-top: 4px solid ${effectiveSettings.headerColor};
       border-radius: 14px;
-      padding: 9px 14px 8px;
+      padding: 8px 14px 7px;
       margin-bottom: 7px;
       text-align: center;
       background: linear-gradient(135deg, #ffffff 0%, #f7fafc 55%, #eef4f8 100%);
@@ -1015,17 +1015,17 @@ export const ReportsPage: React.FC = () => {
     }
 
     .subtitle {
-      font-size: 10.5px;
+      font-size: 10px;
       color: #64748b;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     .title {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 210px;
-      padding: 5px 18px;
+      min-width: 230px;
+      padding: 4px 16px;
       border-radius: 999px;
       border: 1px solid #d7e0ea;
       background: rgba(255, 255, 255, .9);
@@ -1041,7 +1041,7 @@ export const ReportsPage: React.FC = () => {
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      margin-top: 7px;
+      margin-top: 5px;
       color: #64748b;
       font-size: 9.5px;
     }
@@ -1049,8 +1049,8 @@ export const ReportsPage: React.FC = () => {
     .stats {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      margin: 6px 0;
+      gap: 7px;
+      margin: 7px 0;
     }
 
     .stat {
@@ -1117,17 +1117,17 @@ export const ReportsPage: React.FC = () => {
       width: 100%;
       border-collapse: separate;
       border-spacing: 0;
-      table-layout: auto;
+      table-layout: fixed;
       background: #ffffff;
     }
 
     thead th {
       position: relative;
-      padding: 7px 5px;
+      padding: 9px 5px;
       background: linear-gradient(180deg, ${effectiveSettings.headerColor} 0%, #173f62 100%);
       color: #ffffff;
-      font-size: 10.8px;
-      line-height: 1.25;
+      font-size: 11.3px;
+      line-height: 1.35;
       font-weight: 800;
       text-align: center;
       vertical-align: middle;
@@ -1142,11 +1142,11 @@ export const ReportsPage: React.FC = () => {
     }
 
     tbody td {
-      padding: 7px 5px;
+      padding: 8px 5px;
       text-align: center;
       vertical-align: middle;
       color: #1f2937;
-      font-size: 10.6px;
+      font-size: 10.8px;
       line-height: 1.45;
       border-inline-start: 1px solid #dde5ee;
       border-bottom: 1px solid #dde5ee;
@@ -1201,26 +1201,6 @@ export const ReportsPage: React.FC = () => {
     .col-description {
       text-align: right;
       font-weight: 600;
-      min-width: 190px;
-      hyphens: auto;
-    }
-
-    .col-party {
-      min-width: 115px;
-      text-align: right;
-    }
-
-    .col-number,
-    .col-date,
-    .col-code,
-    .col-numeric,
-    .col-short,
-    .col-compact {
-      white-space: nowrap;
-    }
-
-    .col-compact {
-      font-size: 9.8px;
     }
 
     .col-numeric {
@@ -1236,14 +1216,14 @@ export const ReportsPage: React.FC = () => {
 
     .footer {
       margin-top: 6px;
-      padding: 7px 3px 0;
+      padding: 5px 3px 0;
       border-top: 1px solid #d7e0ea;
       display: flex;
       justify-content: space-between;
       gap: 14px;
       color: #64748b;
       font-size: 9.2px;
-      line-height: 1.45;
+      line-height: 1.35;
     }
 
     .signature {
@@ -1305,11 +1285,6 @@ export const ReportsPage: React.FC = () => {
 
       table {
         page-break-inside: auto;
-        width: 100%;
-      }
-
-      tbody {
-        display: table-row-group;
       }
 
       tr {
@@ -1324,19 +1299,6 @@ export const ReportsPage: React.FC = () => {
 
       tfoot {
         display: table-footer-group;
-      }
-
-      .footer {
-        break-before: avoid;
-      }
-
-      .report::after {
-        content: "صفحة " counter(page);
-        position: fixed;
-        left: 7mm;
-        bottom: 3mm;
-        color: #64748b;
-        font-size: 8.5px;
       }
     }
   </style>
@@ -1979,7 +1941,7 @@ export const ReportsPage: React.FC = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-amber-700 hover:bg-amber-700">
-                          <TableHead className="text-center text-white">#</TableHead>
+                          <TableHead className="w-12 text-center text-white">#</TableHead>
 
                           {enabledColumns.map((col) => (
                             <TableHead key={col.key} className="text-center text-white">
@@ -2001,13 +1963,13 @@ export const ReportsPage: React.FC = () => {
                           </TableRow>
                         ) : (
                           safeData.map((item, index) => (
-                            <TableRow key={item.id || index} className="transition-colors hover:bg-amber-50/60">
-                              <TableCell className="text-center font-medium text-gray-600">
+                            <TableRow key={item.id || index} className="hover:bg-blue-50">
+                              <TableCell className="px-3 py-2.5 text-center font-medium text-gray-600">
                                 {index + 1}
                               </TableCell>
 
                               {enabledColumns.map((col) => (
-                                <TableCell key={col.key} className="text-center whitespace-nowrap">
+                                <TableCell key={col.key} className="px-3 py-2.5 text-center align-middle">
                                   {col.key === 'usageType' ||
                                   col.key === 'rentAmount' ||
                                   col.key === 'isPlanned' ? (
