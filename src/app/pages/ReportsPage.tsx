@@ -431,36 +431,6 @@ export const ReportsPage: React.FC = () => {
     }));
   };
 
-  const moveColumn = (
-    section: ReportSectionType,
-    columnKey: string,
-    direction: 'up' | 'down'
-  ) => {
-    setSelectedColumns((prev: any) => {
-      const currentColumns = [...prev[section]];
-      const currentIndex = currentColumns.findIndex(
-        (column: any) => column.key === columnKey
-      );
-
-      if (currentIndex < 0) return prev;
-
-      const targetIndex =
-        direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-
-      if (targetIndex < 0 || targetIndex >= currentColumns.length) {
-        return prev;
-      }
-
-      const [movedColumn] = currentColumns.splice(currentIndex, 1);
-      currentColumns.splice(targetIndex, 0, movedColumn);
-
-      return {
-        ...prev,
-        [section]: currentColumns,
-      };
-    });
-  };
-
   const toggleAllColumns = (section: string) => {
     const allEnabled = selectedColumns[section].every((col: any) => col.enabled);
 
@@ -2051,16 +2021,9 @@ export const ReportsPage: React.FC = () => {
                   </CardHeader>
 
                   <CardContent>
-                    <div className="mb-3 rounded-xl border border-dashed bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-                      يمكنك تغيير ترتيب الأعمدة يدويًا باستخدام السهمين. يطبّق الترتيب مباشرة على الجدول وExcel وPDF والطباعة.
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
-                      {columns.map((col, index) => (
-                        <div
-                          key={col.key}
-                          className="flex min-w-0 items-center gap-2 rounded-xl border bg-background/80 p-2"
-                        >
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {columns.map((col) => (
+                        <div key={col.key} className="flex items-center space-x-2 space-x-reverse">
                           <Checkbox
                             id={`${type}-${col.key}`}
                             checked={col.enabled}
@@ -2069,39 +2032,10 @@ export const ReportsPage: React.FC = () => {
 
                           <Label
                             htmlFor={`${type}-${col.key}`}
-                            className="min-w-0 flex-1 cursor-pointer truncate text-sm"
-                            title={col.label}
+                            className="text-sm cursor-pointer"
                           >
                             {col.label}
                           </Label>
-
-                          <div className="flex shrink-0 items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => moveColumn(type, col.key, 'up')}
-                              disabled={index === 0}
-                              title="تحريك العمود للأعلى في الترتيب"
-                              aria-label={`تحريك عمود ${col.label} للأعلى`}
-                            >
-                              <ChevronUp className="h-3.5 w-3.5" />
-                            </Button>
-
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => moveColumn(type, col.key, 'down')}
-                              disabled={index === columns.length - 1}
-                              title="تحريك العمود للأسفل في الترتيب"
-                              aria-label={`تحريك عمود ${col.label} للأسفل`}
-                            >
-                              <ChevronDown className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
                         </div>
                       ))}
                     </div>
