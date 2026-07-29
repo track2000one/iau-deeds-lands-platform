@@ -385,6 +385,32 @@ export const ReportsPage: React.FC = () => {
     siteInspections: { key: '', direction: 'asc' },
   });
 
+  const [manualOrderEnabledBySection, setManualOrderEnabledBySection] = useState<
+    Record<ReportSectionType, boolean>
+  >({
+    deeds: false,
+    allocated: false,
+    delivered: false,
+    leasedOut: false,
+    leasedIn: false,
+    buildingsOut: false,
+    buildingsIn: false,
+    siteInspections: false,
+  });
+
+  const [manualRowOrderBySection, setManualRowOrderBySection] = useState<
+    Record<ReportSectionType, string[]>
+  >({
+    deeds: [],
+    allocated: [],
+    delivered: [],
+    leasedOut: [],
+    leasedIn: [],
+    buildingsOut: [],
+    buildingsIn: [],
+    siteInspections: [],
+  });
+
   const [printSettingsBySection, setPrintSettingsBySection] = useState<Record<ReportSectionType, PrintSettings>>({
     deeds: { ...defaultPrintSettings, reportTitle: 'تقرير الصكوك' },
     allocated: { ...defaultPrintSettings, reportTitle: 'تقرير الأراضي المخصصة' },
@@ -649,6 +675,129 @@ export const ReportsPage: React.FC = () => {
         [key]: value,
       },
     }));
+  };
+
+  const getManualRowKey = (item: any, index: number): string => {
+    const candidate =
+      item?.id ??
+      item?.deedNumber ??
+      item?.receiptNumber ??
+      item?.contractNumber ??
+      item?.inspectionNumber ??
+      item?.propertyDescription ??
+      item?.locationName;
+
+    return String(candidate ?? `row-${index}`);
+  };
+
+  const applyManualRowOrder = (
+    data: any[],
+    section: ReportSectionType,
+  ): any[] => {
+    if (!manualOrderEnabledBySection[section]) {
+      return data;
+    }
+
+    const manualOrder = manualRowOrderBySection[section] || [];
+    const rank = new Map(manualOrder.map((key, index) => [key, index]));
+
+    return [...data].sort((first, second) => {
+      const firstIndex = data.indexOf(first);
+      const secondIndex = data.indexOf(second);
+      const firstKey = getManualRowKey(first, firstIndex);
+      const secondKey = getManualRowKey(second, secondIndex);
+      const firstRank = rank.has(firstKey) ? rank.get(firstKey)! : Number.MAX_SAFE_INTEGER;
+      const secondRank = rank.has(secondKey) ? rank.get(secondKey)! : Number.MAX_SAFE_INTEGER;
+
+      if (firstRank !== secondRank) {
+        return firstRank - secondRank;
+      }
+
+      return firstIndex - secondIndex;
+    });
+  };
+
+  const enableManualRowOrder = (
+    section: ReportSectionType,
+    data: any[],
+  ) => {
+    setManualRowOrderBySection((prev) => ({
+      ...prev,
+      [section]: data.map((item, index) => getManualRowKey(item, index)),
+    }));
+
+    setManualOrderEnabledBySection((prev) => ({
+      ...prev,
+      [section]: true,
+    }));
+  };
+
+  const disableManualRowOrder = (section: ReportSectionType) => {
+    setManualOrderEnabledBySection((prev) => ({
+      ...prev,
+      [section]: false,
+    }));
+
+    setManualRowOrderBySection((prev) => ({
+      ...prev,
+      [section]: [],
+    }));
+  };
+
+  const moveManualRow = (
+    section: ReportSectionType,
+    rowKey: string,
+    direction: 'up' | 'down',
+  ) => {
+    setManualRowOrderBySection((prev) => {
+      const current = [...(prev[section] || [])];
+      const currentIndex = current.indexOf(rowKey);
+
+      if (currentIndex < 0) return prev;
+
+      const targetIndex =
+        direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+      if (targetIndex < 0 || targetIndex >= current.length) {
+        return prev;
+      }
+
+      [current[currentIndex], current[targetIndex]] = [
+        current[targetIndex],
+        current[currentIndex],
+      ];
+
+      return {
+        ...prev,
+        [section]: current,
+      };
+    });
+  };
+
+  const moveManualRowToPosition = (
+    section: ReportSectionType,
+    rowKey: string,
+    requestedPosition: number,
+  ) => {
+    setManualRowOrderBySection((prev) => {
+      const current = [...(prev[section] || [])];
+      const currentIndex = current.indexOf(rowKey);
+
+      if (currentIndex < 0 || current.length === 0) return prev;
+
+      const targetIndex = Math.max(
+        0,
+        Math.min(current.length - 1, requestedPosition - 1),
+      );
+
+      const [movedKey] = current.splice(currentIndex, 1);
+      current.splice(targetIndex, 0, movedKey);
+
+      return {
+        ...prev,
+        [section]: current,
+      };
+    });
   };
 
   const statistics = useMemo(() => {
@@ -1662,7 +1811,9 @@ export const ReportsPage: React.FC = () => {
     const printSettings = printSettingsBySection[type];
     const safeData = applyFilters(originalData, filters);
     const sortSettings = sortSettingsBySection[type];
-    const sortedData = sortReportData(safeData, sortSettings);
+    const automaticallySortedData = sortReportData(safeData, sortSettings);
+    const sortedData = applyManualRowOrder(automaticallySortedData, type);
+    const manualOrderEnabled = manualOrderEnabledBySection[type];
     const enabledColumns = columns.filter((col) => col.enabled);
     const previewTableWidth =
       enabledColumns.length <= 5
@@ -2054,6 +2205,34 @@ export const ReportsPage: React.FC = () => {
                   </CardHeader>
 
                   <CardContent>
+                    <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-dashed bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="font-semibold text-foreground">
+                          ترتيب يدوي مخصص
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          استخدمه لوضع «الحرم الجامعي الغربي» أولًا، و«الحرم الجامعي الشرقي» ثانيًا، ثم بقية السجلات بالترتيب الذي تحدده.
+                        </div>
+                      </div>
+
+                      {manualOrderEnabled ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => disableManualRowOrder(type)}
+                        >
+                          إلغاء الترتيب اليدوي
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          onClick={() => enableManualRowOrder(type, automaticallySortedData)}
+                        >
+                          بدء الترتيب اليدوي
+                        </Button>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                       <div className="space-y-2 md:col-span-2">
                         <Label>الترتيب حسب</Label>
@@ -2089,7 +2268,13 @@ export const ReportsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {sortSettings.key && (
+                    {manualOrderEnabled && (
+                      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        الترتيب اليدوي مفعّل. استخدم أدوات «ترتيب الصف» داخل الجدول لنقل كل سجل إلى الموضع المطلوب. هذا الترتيب يطبّق على Excel وPDF والطباعة.
+                      </div>
+                    )}
+
+                    {sortSettings.key && !manualOrderEnabled && (
                       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-background/70 px-3 py-2 text-xs text-muted-foreground">
                         <span>
                           الترتيب الحالي:{' '}
@@ -2174,6 +2359,12 @@ export const ReportsPage: React.FC = () => {
                               {col.label}
                             </TableHead>
                           ))}
+
+                          {manualOrderEnabled && (
+                            <TableHead className="w-[170px] px-2 py-2 text-center text-white">
+                              ترتيب الصف
+                            </TableHead>
+                          )}
                         </TableRow>
                       </TableHeader>
 
@@ -2181,7 +2372,7 @@ export const ReportsPage: React.FC = () => {
                         {sortedData.length === 0 ? (
                           <TableRow>
                             <TableCell
-                              colSpan={enabledColumns.length + 1}
+                              colSpan={enabledColumns.length + 1 + (manualOrderEnabled ? 1 : 0)}
                               className="text-center py-8 text-gray-500"
                             >
                               لا توجد بيانات
@@ -2207,6 +2398,56 @@ export const ReportsPage: React.FC = () => {
                                   )}
                                 </TableCell>
                               ))}
+
+                              {manualOrderEnabled && (() => {
+                                const rowKey = getManualRowKey(item, index);
+
+                                return (
+                                  <TableCell className="px-2 py-2">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        disabled={index === 0}
+                                        onClick={() => moveManualRow(type, rowKey, 'up')}
+                                        title="تحريك الصف للأعلى"
+                                      >
+                                        <ChevronUp className="h-4 w-4" />
+                                      </Button>
+
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={sortedData.length}
+                                        value={index + 1}
+                                        onChange={(event) =>
+                                          moveManualRowToPosition(
+                                            type,
+                                            rowKey,
+                                            Number(event.target.value),
+                                          )
+                                        }
+                                        className="h-8 w-14 rounded-md border bg-background px-1 text-center text-xs"
+                                        title="رقم ترتيب الصف"
+                                      />
+
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        disabled={index === sortedData.length - 1}
+                                        onClick={() => moveManualRow(type, rowKey, 'down')}
+                                        title="تحريك الصف للأسفل"
+                                      >
+                                        <ChevronDown className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                );
+                              })()}
                             </TableRow>
                           ))
                         )}
