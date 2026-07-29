@@ -1357,16 +1357,6 @@ export const ReportsPage: React.FC = () => {
       </table>
     </div>
 
-    <div class="footer">
-      <div>
-        <strong>جامعة الإمام عبدالرحمن بن فيصل</strong><br />
-        المملكة العربية السعودية
-      </div>
-      <div>
-        تمت الطباعة بتاريخ: ${escapeHtml(dateString)}<br />
-        ${safeFooter}
-      </div>
-    </div>
 
     ${
       effectiveSettings.showSignature || effectiveSettings.showStamp
