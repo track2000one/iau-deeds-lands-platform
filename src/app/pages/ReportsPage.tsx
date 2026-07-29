@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
+import fananFontUrl from '../../assets/fonts/Fanan.ttf?url';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useData } from '../../context/DataContext';
@@ -66,6 +67,10 @@ import {
 } from 'recharts';
 
 const COLORS = ['#7c6f64', '#8f7a66', '#a38b73', '#5f6f73', '#8b6f47', '#8c7a6b', '#6e7d70', '#9c8f84'];
+
+const FANAN_FONT_FAMILY = "'Fanan', Tahoma, Arial, sans-serif";
+const getFananFontAbsoluteUrl = () =>
+  new URL(fananFontUrl, window.location.origin).href;
 
 const inspectionWorkflowLabels: Record<string, string> = {
   new: 'جديدة',
@@ -948,6 +953,14 @@ export const ReportsPage: React.FC = () => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(effectiveSettings.reportTitle)}</title>
   <style>
+    @font-face {
+      font-family: 'Fanan';
+      src: url('${getFananFontAbsoluteUrl()}') format('truetype');
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+    }
+
     @page {
       size: A4 landscape;
       margin: 7mm;
@@ -1145,18 +1158,6 @@ export const ReportsPage: React.FC = () => {
       border-inline-start: 0;
     }
 
-    thead th,
-    thead th.col-index,
-    thead th.col-number,
-    thead th.col-code,
-    thead th.col-numeric,
-    thead th.col-date,
-    thead th.col-description,
-    thead th.col-short,
-    thead th.col-default {
-      color: #ffffff !important;
-    }
-
     tbody td {
       padding: 5px 4px;
       text-align: center;
@@ -1196,7 +1197,7 @@ export const ReportsPage: React.FC = () => {
       max-width: 100%;
     }
 
-    tbody td.col-index {
+    .col-index {
       font-weight: 800;
       color: ${effectiveSettings.headerColor};
       font-variant-numeric: tabular-nums;
@@ -1219,7 +1220,7 @@ export const ReportsPage: React.FC = () => {
       font-weight: 600;
     }
 
-    tbody td.col-numeric {
+    .col-numeric {
       font-weight: 700;
       color: #1d4f73;
     }
@@ -1796,6 +1797,7 @@ export const ReportsPage: React.FC = () => {
                           <option value="Tahoma, Arial, sans-serif">Tahoma</option>
                           <option value="Arial, Tahoma, sans-serif">Arial</option>
                           <option value="'Segoe UI', Tahoma, Arial, sans-serif">Segoe UI</option>
+                          <option value={FANAN_FONT_FAMILY}>Fanan — فنان</option>
                         </select>
                       </div>
 
@@ -2191,7 +2193,18 @@ export const ReportsPage: React.FC = () => {
   };
 
   return (
-    <div className="relative mx-auto w-full min-w-0 space-y-5 p-0 sm:space-y-6 sm:p-2 md:p-4 lg:p-6">
+    <>
+      <style>{`
+        @font-face {
+          font-family: 'Fanan';
+          src: url('${fananFontUrl}') format('truetype');
+          font-style: normal;
+          font-weight: 400;
+          font-display: swap;
+        }
+      `}</style>
+
+      <div className="relative mx-auto w-full min-w-0 space-y-5 p-0 sm:space-y-6 sm:p-2 md:p-4 lg:p-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 overflow-hidden">
         <div className="mx-auto h-44 w-[22rem] rounded-full bg-[radial-gradient(circle,rgba(250,240,220,0.55),transparent_70%)] blur-3xl" />
       </div>
@@ -2701,5 +2714,6 @@ export const ReportsPage: React.FC = () => {
         </Card>
       </div>
     </div>
+    </>
   );
 };
