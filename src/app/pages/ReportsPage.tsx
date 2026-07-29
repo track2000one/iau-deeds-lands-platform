@@ -118,6 +118,9 @@ type PrintSettings = {
   fontFamily: string;
   fontSize: number;
   headerColor: string;
+  fontColor: string;
+  customFontName: string;
+  customFontDataUrl: string;
 };
 
 const emptyFilters: ReportFilters = {
@@ -141,6 +144,9 @@ const defaultPrintSettings: PrintSettings = {
   fontFamily: 'Tahoma, Arial, sans-serif',
   fontSize: 13,
   headerColor: '#1f4e79',
+  fontColor: '#172033',
+  customFontName: '',
+  customFontDataUrl: '',
 };
 
 export const ReportsPage: React.FC = () => {
@@ -452,6 +458,73 @@ export const ReportsPage: React.FC = () => {
         [key]: value,
       },
     }));
+  };
+
+  const uploadCustomFont = (
+    section: ReportSectionType,
+    file: File | undefined
+  ) => {
+    if (!file) return;
+
+    const allowedExtensions = ['ttf', 'otf', 'woff', 'woff2'];
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+
+    if (!allowedExtensions.includes(extension)) {
+      toast.error('نوع الخط غير مدعوم. استخدم TTF أو OTF أو WOFF أو WOFF2.');
+      return;
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      toast.error('حجم ملف الخط يجب ألا يتجاوز 5 ميجابايت.');
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        toast.error('تعذر قراءة ملف الخط.');
+        return;
+      }
+
+      const safeFontName = file.name
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[^a-zA-Z0-9\u0600-\u06FF_-]/g, '-');
+
+      setPrintSettingsBySection((prev) => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          customFontName: safeFontName || 'UploadedArabicFont',
+          customFontDataUrl: reader.result as string,
+          fontFamily: `'${safeFontName || 'UploadedArabicFont'}', Tahoma, Arial, sans-serif`,
+        },
+      }));
+
+      toast.success('تم رفع الخط وتفعيله لهذا التقرير.');
+    };
+
+    reader.onerror = () => {
+      toast.error('تعذر قراءة ملف الخط.');
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const removeCustomFont = (section: ReportSectionType) => {
+    setPrintSettingsBySection((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        customFontName: '',
+        customFontDataUrl: '',
+        fontFamily: defaultPrintSettings.fontFamily,
+      },
+    }));
+
+    toast.success('تم حذف الخط المرفوع واستعادة الخط الافتراضي.');
   };
 
   const resetPrintSettings = (section: ReportSectionType, title: string) => {
@@ -868,6 +941,16 @@ export const ReportsPage: React.FC = () => {
 
     const safeIntro = escapeHtml(effectiveSettings.introText).replaceAll('\n', '<br />');
     const safeFooter = escapeHtml(effectiveSettings.footerText).replaceAll('\n', '<br />');
+    const customFontFace =
+      effectiveSettings.customFontDataUrl && effectiveSettings.customFontName
+        ? `@font-face {
+            font-family: '${escapeHtml(effectiveSettings.customFontName)}';
+            src: url('${effectiveSettings.customFontDataUrl}');
+            font-style: normal;
+            font-weight: 100 900;
+            font-display: swap;
+          }`
+        : '';
 
     const activeFiltersHtml = filters
       ? [
@@ -948,6 +1031,8 @@ export const ReportsPage: React.FC = () => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(effectiveSettings.reportTitle)}</title>
   <style>
+    ${customFontFace}
+
     @page {
       size: A4 landscape;
       margin: 7mm;
@@ -965,7 +1050,7 @@ export const ReportsPage: React.FC = () => {
       padding: 0;
       direction: rtl;
       background: #ffffff;
-      color: #172033;
+      color: ${effectiveSettings.fontColor};
       font-family: ${effectiveSettings.fontFamily};
       font-size: ${Math.max(10, Number(effectiveSettings.fontSize || 13) - 1)}px;
       line-height: 1.45;
@@ -1149,7 +1234,7 @@ export const ReportsPage: React.FC = () => {
       padding: 5px 4px;
       text-align: center;
       vertical-align: middle;
-      color: #1f2937;
+      color: ${effectiveSettings.fontColor};
       font-size: 9.4px;
       line-height: 1.35;
       border-inline-start: 0.6px solid #e2e8ef;
@@ -1727,7 +1812,7 @@ export const ReportsPage: React.FC = () => {
                   </CardHeader>
 
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                       <div className="space-y-2">
                         <Label>اسم الجامعة</Label>
                         <input
@@ -1755,7 +1840,7 @@ export const ReportsPage: React.FC = () => {
                         />
                       </div>
 
-                      <div className="space-y-2 md:col-span-3">
+                      <div className="space-y-2 md:col-span-2 xl:col-span-4">
                         <Label>عبارة قبل الجدول</Label>
                         <textarea
                           className="w-full min-h-20 rounded-md border bg-background px-3 py-2 text-sm"
@@ -1765,7 +1850,7 @@ export const ReportsPage: React.FC = () => {
                         />
                       </div>
 
-                      <div className="space-y-2 md:col-span-3">
+                      <div className="space-y-2 md:col-span-2 xl:col-span-4">
                         <Label>عبارة أسفل التقرير</Label>
                         <textarea
                           className="w-full min-h-20 rounded-md border bg-background px-3 py-2 text-sm"
@@ -1804,12 +1889,85 @@ export const ReportsPage: React.FC = () => {
 
                       <div className="space-y-2">
                         <Label>لون رأس الجدول</Label>
-                        <input
-                          type="color"
-                          className="w-full h-10 rounded-md border bg-background px-2"
-                          value={printSettings.headerColor}
-                          onChange={(event) => updatePrintSetting(type, 'headerColor', event.target.value)}
-                        />
+                        <div className="flex h-10 items-center gap-2 rounded-md border bg-background px-2">
+                          <input
+                            type="color"
+                            className="h-8 w-12 cursor-pointer rounded border-0 bg-transparent p-0"
+                            value={printSettings.headerColor}
+                            onChange={(event) => updatePrintSetting(type, 'headerColor', event.target.value)}
+                          />
+                          <input
+                            className="min-w-0 flex-1 bg-transparent text-left font-mono text-xs outline-none"
+                            dir="ltr"
+                            value={printSettings.headerColor}
+                            onChange={(event) => updatePrintSetting(type, 'headerColor', event.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>لون خط التقرير</Label>
+                        <div className="flex h-10 items-center gap-2 rounded-md border bg-background px-2">
+                          <input
+                            type="color"
+                            className="h-8 w-12 cursor-pointer rounded border-0 bg-transparent p-0"
+                            value={printSettings.fontColor}
+                            onChange={(event) => updatePrintSetting(type, 'fontColor', event.target.value)}
+                          />
+                          <input
+                            className="min-w-0 flex-1 bg-transparent text-left font-mono text-xs outline-none"
+                            dir="ltr"
+                            value={printSettings.fontColor}
+                            onChange={(event) => updatePrintSetting(type, 'fontColor', event.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2 xl:col-span-4">
+                        <Label>رفع خط مخصص — اختياري</Label>
+                        <div className="rounded-xl border border-dashed bg-background/70 p-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                            <input
+                              type="file"
+                              accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2"
+                              className="block min-w-0 flex-1 text-sm file:ml-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-slate-200"
+                              onChange={(event) => {
+                                uploadCustomFont(type, event.target.files?.[0]);
+                                event.currentTarget.value = '';
+                              }}
+                            />
+
+                            {printSettings.customFontDataUrl && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => removeCustomFont(type)}
+                              >
+                                حذف الخط المرفوع
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span>الأنواع المدعومة: TTF، OTF، WOFF، WOFF2 — الحد الأقصى 5 MB.</span>
+                            <span>
+                              {printSettings.customFontName
+                                ? `الخط المفعّل: ${printSettings.customFontName}`
+                                : 'لا يوجد خط مرفوع'}
+                            </span>
+                          </div>
+
+                          <div
+                            className="mt-3 rounded-lg border bg-white px-3 py-3 text-center text-base"
+                            style={{
+                              fontFamily: printSettings.fontFamily,
+                              color: printSettings.fontColor,
+                            }}
+                          >
+                            معاينة الخط: جامعة الإمام عبدالرحمن بن فيصل — 123456
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -1943,7 +2101,7 @@ export const ReportsPage: React.FC = () => {
                     className="mx-auto overflow-x-auto rounded-[20px] border border-slate-200/70 bg-white/82 shadow-[0_8px_24px_rgba(15,23,42,0.035),inset_0_1px_0_rgba(255,255,255,0.95)]"
                     style={{ width: previewTableWidth }}
                   >
-                    <Table>
+                    <Table style={{ fontFamily: printSettings.fontFamily, color: printSettings.fontColor }}>
                       <TableHeader>
                         <TableRow className="bg-amber-700 hover:bg-amber-700">
                           <TableHead className="w-10 px-2 py-2 text-center text-white">#</TableHead>
