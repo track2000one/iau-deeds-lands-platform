@@ -8,6 +8,7 @@ import {
   Database,
   Edit,
   KeyRound,
+  Mail,
   Shield,
   Trash2,
   UserPlus,
@@ -96,6 +97,7 @@ export const AdminDashboardPage: React.FC = () => {
     createEmployee,
     deleteEmployee,
     refreshUsers,
+    resendActivationEmail,
     resetEmployeePassword,
     updateEmployee,
     users,
@@ -125,6 +127,9 @@ export const AdminDashboardPage: React.FC = () => {
   const [deleteUser, setDeleteUser] = useState<UserProfile | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
+
+  const [activationSendingUserId, setActivationSendingUserId] =
+    useState<string | null>(null);
 
   const sortedUsers = useMemo(() => {
     return [...users].sort((a, b) => {
@@ -249,6 +254,63 @@ export const AdminDashboardPage: React.FC = () => {
     } finally {
       setPasswordSaving(false);
     }
+  };
+
+  const handleResendActivation = async (user: UserProfile) => {
+    try {
+      setActivationSendingUserId(user.uid);
+      const message = await resendActivationEmail(user.uid);
+      toast.success(message || 'تم إرسال رابط تفعيل جديد');
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'تعذر إرسال رابط التفعيل'
+      );
+    } finally {
+      setActivationSendingUserId(null);
+    }
+  };
+
+  const getAccountStatus = (user: UserProfile) => {
+    if (user.isActive) {
+      return {
+        label: 'نشط',
+        variant: 'secondary' as const,
+        description: 'الحساب مفعّل ويمكنه تسجيل الدخول.',
+      };
+    }
+
+    if (user.activationPending) {
+      const expired = Boolean(
+        !user.activationExpires ||
+          user.activationExpires.getTime() <= Date.now()
+      );
+
+      if (expired) {
+        return {
+          label: 'انتهى رابط التفعيل',
+          variant: 'destructive' as const,
+          description:
+            'الحساب غير مفعّل، ويمكن للمسؤول إرسال رابط جديد أو تنشيطه مباشرة.',
+        };
+      }
+
+      return {
+        label: 'بانتظار التفعيل',
+        variant: 'outline' as const,
+        description: user.activationExpires
+          ? `الرابط صالح حتى ${user.activationExpires.toLocaleString('ar-SA')}`
+          : 'تم إرسال رابط التفعيل إلى المستخدم.',
+      };
+    }
+
+    return {
+      label: 'معطل إداريًا',
+      variant: 'destructive' as const,
+      description:
+        'تم تعطيل الحساب من المسؤول. يمكن تنشيطه مباشرة أو إرسال رابط تفعيل جديد.',
+    };
   };
 
   const confirmDeleteUser = async () => {
@@ -495,11 +557,20 @@ export const AdminDashboardPage: React.FC = () => {
                             <TableCell>{getRoleBadge(user.role)}</TableCell>
 
                             <TableCell>
-                              {user.isActive ? (
-                                <Badge variant="secondary">نشط</Badge>
-                              ) : (
-                                <Badge variant="destructive">معطل</Badge>
-                              )}
+                              {(() => {
+                                const status = getAccountStatus(user);
+
+                                return (
+                                  <div className="space-y-1">
+                                    <Badge variant={status.variant}>
+                                      {status.label}
+                                    </Badge>
+                                    <p className="max-w-[260px] text-xs text-muted-foreground">
+                                      {status.description}
+                                    </p>
+                                  </div>
+                                );
+                              })()}
                             </TableCell>
 
                             <TableCell>
@@ -529,6 +600,19 @@ export const AdminDashboardPage: React.FC = () => {
                                 >
                                   <KeyRound className="h-4 w-4" />
                                 </Button>
+
+                                {!user.isActive && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    title="إرسال رابط تفعيل جديد"
+                                    disabled={activationSendingUserId === user.uid}
+                                    onClick={() => handleResendActivation(user)}
+                                  >
+                                    <Mail className="h-4 w-4" />
+                                  </Button>
+                                )}
 
                                 <Button
                                   type="button"
@@ -689,6 +773,18 @@ export const AdminDashboardPage: React.FC = () => {
               </NativeSelect>
             </div>
           </div>
+
+          {editingUser?.activationPending && editForm.isActive && (
+            <Alert>
+              <Shield className="h-4 w-4" />
+              <AlertTitle>تنشيط مباشر بواسطة المسؤول</AlertTitle>
+              <AlertDescription>
+                عند حفظ الحالة «نشط» سيتم تفعيل الحساب مباشرة وإلغاء رابط
+                التفعيل القديم، ولن يعود الحساب إلى «معطل» عند انتهاء مدة
+                الرابط.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {editForm.role === 'employee' && (
             <PermissionMatrix
