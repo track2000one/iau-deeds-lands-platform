@@ -3,6 +3,7 @@ import fananFontUrl from '../../assets/fonts/Fanan.ttf?url';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useData } from '../../context/DataContext';
+import { useDeeds } from '../../context/DeedContext';
 import { usePermissions } from '../../context/PermissionsContext';
 import { formatFlexibleDate, getFlexibleDateType } from '../../utils/dateUtils';
 import {
@@ -157,8 +158,34 @@ export const ReportsPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { isAdmin, hasPermission } = usePermissions();
+
+  const canViewReports =
+    isAdmin ||
+    hasPermission('reports', 'canView') ||
+    hasPermission('reports', 'canPrint');
+
+  const canPrintReports =
+    isAdmin || hasPermission('reports', 'canPrint');
+
+  const canUseReportSection = (
+    module:
+      | 'deeds'
+      | 'allocated_lands'
+      | 'delivered_lands'
+      | 'leased_lands_out'
+      | 'leased_lands_in'
+      | 'leased_buildings_out'
+      | 'leased_buildings_in'
+  ) =>
+    isAdmin ||
+    hasPermission(module, 'canView') ||
+    hasPermission(module, 'canPrint');
+
   const canPrintInspections =
-    isAdmin || hasPermission('site_inspections', 'canPrint');
+    canPrintReports &&
+    (isAdmin || hasPermission('site_inspections', 'canPrint'));
+
+  const { deeds: authoritativeDeeds } = useDeeds();
 
   const deedsColumns = [
     { key: 'propertyDescription', label: 'وصف العقار', enabled: true },
@@ -259,7 +286,7 @@ export const ReportsPage: React.FC = () => {
   ];
 
   const {
-    deeds,
+    deeds: legacyReportDeeds,
     allocatedLands,
     deliveredLands,
     leasedLandsOut,
@@ -267,6 +294,11 @@ export const ReportsPage: React.FC = () => {
     leasedBuildingsOut,
     leasedBuildingsIn,
   } = useData();
+
+  const deeds =
+    authoritativeDeeds.length > 0
+      ? authoritativeDeeds
+      : legacyReportDeeds;
 
   const [siteInspections, setSiteInspections] = useState<SiteInspection[]>([]);
   const [inspectionReportTitle, setInspectionReportTitle] = useState('');
@@ -2640,6 +2672,21 @@ export const ReportsPage: React.FC = () => {
     );
   };
 
+  if (!canViewReports) {
+    return (
+      <div className="mx-auto max-w-xl p-6">
+        <Card className="rounded-3xl border bg-white/80 shadow-xl">
+          <CardHeader>
+            <CardTitle>لا توجد صلاحية لعرض التقارير</CardTitle>
+            <CardDescription>
+              يرجى التواصل مع مسؤول النظام لمنح صلاحية عرض التقارير أو طباعتها.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <>
       <style>{`
@@ -2879,62 +2926,72 @@ export const ReportsPage: React.FC = () => {
       </Card>
 
       <div className="space-y-4">
-        {renderReportSection(
-          'deeds',
-          'الصكوك',
-          deeds,
-          selectedColumns.deeds,
-          'deeds'
-        )}
+        {canUseReportSection('deeds') &&
+          renderReportSection(
+            'deeds',
+            'الصكوك',
+            deeds,
+            selectedColumns.deeds,
+            'deeds'
+          )}
 
-        {renderReportSection(
-          'allocated',
-          t('reports.allocatedLands') || 'الأراضي المخصصة',
-          allocatedLands,
-          selectedColumns.allocated,
-          'allocated'
-        )}
+        {canUseReportSection('allocated_lands') &&
+          renderReportSection(
+            'allocated',
+            t('reports.allocatedLands') || 'الأراضي المخصصة',
+            allocatedLands,
+            selectedColumns.allocated,
+            'allocated'
+          )}
 
-        {renderReportSection(
-          'delivered',
-          t('reports.deliveredLands') || 'الأراضي المسلمة',
-          deliveredLands,
-          selectedColumns.delivered,
-          'delivered'
-        )}
+        {canUseReportSection('delivered_lands') &&
+          renderReportSection(
+            'delivered',
+            t('reports.deliveredLands') || 'الأراضي المسلمة',
+            deliveredLands,
+            selectedColumns.delivered,
+            'delivered'
+          )}
 
-        {renderReportSection(
-          'leasedOut',
-          t('reports.leasedLandsOut') || 'الأراضي المؤجرة من الجامعة',
-          leasedLandsOut,
-          selectedColumns.leasedOut,
-          'leasedOut'
-        )}
+        {canUseReportSection('leased_lands_out') &&
+          renderReportSection(
+            'leasedOut',
+            t('reports.leasedLandsOut') || 'الأراضي المؤجرة من الجامعة',
+            leasedLandsOut,
+            selectedColumns.leasedOut,
+            'leasedOut'
+          )}
 
-        {renderReportSection(
-          'leasedIn',
-          t('reports.leasedLandsIn') || 'الأراضي المستأجرة للجامعة',
-          leasedLandsIn,
-          selectedColumns.leasedIn,
-          'leasedIn'
-        )}
+        {canUseReportSection('leased_lands_in') &&
+          renderReportSection(
+            'leasedIn',
+            t('reports.leasedLandsIn') || 'الأراضي المستأجرة للجامعة',
+            leasedLandsIn,
+            selectedColumns.leasedIn,
+            'leasedIn'
+          )}
 
-        {renderReportSection(
-          'buildingsOut',
-          t('reports.leasedBuildingsOut') || 'المباني المؤجرة من الجامعة',
-          leasedBuildingsOut,
-          selectedColumns.buildingsOut,
-          'buildingsOut'
-        )}
+        {canUseReportSection('leased_buildings_out') &&
+          renderReportSection(
+            'buildingsOut',
+            t('reports.leasedBuildingsOut') || 'المباني المؤجرة من الجامعة',
+            leasedBuildingsOut,
+            selectedColumns.buildingsOut,
+            'buildingsOut'
+          )}
 
-        {renderReportSection(
-          'buildingsIn',
-          t('reports.leasedBuildingsIn') || 'المباني المستأجرة للجامعة',
-          leasedBuildingsIn,
-          selectedColumns.buildingsIn,
-          'buildingsIn'
-        )}
+        {canUseReportSection('leased_buildings_in') &&
+          renderReportSection(
+            'buildingsIn',
+            t('reports.leasedBuildingsIn') || 'المباني المستأجرة للجامعة',
+            leasedBuildingsIn,
+            selectedColumns.buildingsIn,
+            'buildingsIn'
+          )}
 
+        {(isAdmin ||
+          hasPermission('site_inspections', 'canView') ||
+          hasPermission('site_inspections', 'canPrint')) && (
         <Card className="relative overflow-hidden rounded-[30px] border border-white/45 bg-white/60 shadow-[0_20px_60px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
           <CardHeader className="border-b border-white/50 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,239,231,0.74),rgba(236,231,223,0.58))]">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -3160,6 +3217,7 @@ export const ReportsPage: React.FC = () => {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
     </>

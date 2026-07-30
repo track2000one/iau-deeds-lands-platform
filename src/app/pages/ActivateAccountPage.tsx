@@ -139,18 +139,24 @@ export const ActivateAccountPage: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent p-4">
-      <Card className="w-full max-w-xl shadow-2xl">
-        <CardHeader className="text-center">
+    <div className="flex min-h-[100dvh] w-full items-center justify-center overflow-x-hidden bg-gradient-to-br from-primary via-secondary to-accent px-3 py-6 sm:px-5 sm:py-8">
+      <Card
+        className="w-full max-w-none overflow-hidden rounded-[28px] border border-white/60 bg-background/95 shadow-2xl backdrop-blur-xl"
+        style={{
+          width: 'min(100%, 560px)',
+          maxWidth: '560px',
+        }}
+      >
+        <CardHeader className="px-5 pb-4 pt-6 text-center sm:px-8 sm:pt-8">
           <div className="mb-2 flex justify-center">
             <img
               src={PLATFORM_LOGO_URL}
               alt="منصة إدارة الصكوك والأراضي"
-              className="h-24 w-24 object-contain"
+              className="h-20 w-20 object-contain sm:h-24 sm:w-24"
             />
           </div>
 
-          <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+          <CardTitle className="flex items-center justify-center gap-2 text-xl sm:text-2xl">
             <ShieldCheck className="h-6 w-6 text-primary" />
             تفعيل الحساب
           </CardTitle>
@@ -160,7 +166,7 @@ export const ActivateAccountPage: React.FC = () => {
           </CardDescription>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="px-5 pb-6 sm:px-8 sm:pb-8">
           {validating ? (
             <div className="flex items-center justify-center gap-3 py-12 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -253,11 +259,11 @@ export const ActivateAccountPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setKeepCurrentPassword(true)}
-                  className={`rounded-xl border p-4 text-right transition ${
+                  className={`min-h-[112px] rounded-2xl border p-4 text-right transition ${
                     keepCurrentPassword
                       ? 'border-primary bg-primary/5 ring-1 ring-primary'
                       : 'hover:border-primary/50'
@@ -275,7 +281,7 @@ export const ActivateAccountPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setKeepCurrentPassword(false)}
-                  className={`rounded-xl border p-4 text-right transition ${
+                  className={`min-h-[112px] rounded-2xl border p-4 text-right transition ${
                     !keepCurrentPassword
                       ? 'border-primary bg-primary/5 ring-1 ring-primary'
                       : 'hover:border-primary/50'
