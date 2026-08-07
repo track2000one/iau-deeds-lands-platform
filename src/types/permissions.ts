@@ -8,6 +8,7 @@ export type ModuleName =
   | 'leased_lands_in'
   | 'leased_buildings_out'
   | 'leased_buildings_in'
+  | 'assets'
   | 'archive'
   | 'site_inspections'
   | 'reports'
@@ -48,6 +49,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   leased_lands_in: 'الأراضي المستأجرة',
   leased_buildings_out: 'المباني المؤجرة',
   leased_buildings_in: 'المباني المستأجرة',
+  assets: 'وحدة الأصول',
   archive: 'الأرشفة',
   site_inspections: 'المعاينات الميدانية',
   reports: 'التقارير',
@@ -79,6 +81,7 @@ export const createEmptyPermissions = (): UserPermissions => ({
   leased_lands_in: { ...NONE },
   leased_buildings_out: { ...NONE },
   leased_buildings_in: { ...NONE },
+  assets: { ...NONE },
   archive: { ...NONE },
   site_inspections: { ...NONE },
   reports: { ...NONE },
@@ -94,6 +97,7 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   leased_lands_in: { ...FULL },
   leased_buildings_out: { ...FULL },
   leased_buildings_in: { ...FULL },
+  assets: { ...FULL },
   archive: { ...FULL },
   site_inspections: { ...FULL },
   reports: { ...FULL },
