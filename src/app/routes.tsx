@@ -29,12 +29,25 @@ import { AuditLogPage } from './pages/AuditLogPage';
 import { ArchivePage } from './pages/ArchivePage';
 import { AppearanceSettingsPage } from './pages/AppearanceSettingsPage';
 import { RequireAdmin } from './components/RequireAdmin';
+import { PermissionGuard } from './components/PermissionGuard';
 import { SiteInspectionsPage } from './pages/SiteInspectionsPage';
 import { SiteInspectionFormPage } from './pages/SiteInspectionFormPage';
 import { ViewSiteInspectionPage } from './pages/ViewSiteInspectionPage';
+import { AssetDashboardPage } from './pages/AssetDashboardPage';
+import { AssetsPage } from './pages/AssetsPage';
+import { AddAssetPage } from './pages/AddAssetPage';
 
 const adminOnly = (element: ReactNode) => (
   <RequireAdmin>{element}</RequireAdmin>
+);
+
+const assetPermission = (
+  element: ReactNode,
+  action: 'canView' | 'canAdd' | 'canEdit' | 'canDelete' | 'canPrint'
+) => (
+  <PermissionGuard module="assets" action={action}>
+    {element}
+  </PermissionGuard>
 );
 
 export const router = createHashRouter([
@@ -79,7 +92,23 @@ export const router = createHashRouter([
           },
         ],
       },
-
+      {
+        path: 'assets',
+        children: [
+          {
+            index: true,
+            element: assetPermission(<AssetDashboardPage />, 'canView'),
+          },
+          {
+            path: 'list',
+            element: assetPermission(<AssetsPage />, 'canView'),
+          },
+          {
+            path: 'new',
+            element: assetPermission(<AddAssetPage />, 'canAdd'),
+          },
+        ],
+      },
       {
         path: 'site-inspections',
         children: [
