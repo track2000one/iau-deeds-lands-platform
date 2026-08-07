@@ -23,12 +23,12 @@ const stats = [
 ];
 
 const quickActions = [
-  { label: 'جميع الأصول', description: 'استعراض سجل الأصول والبحث والتصفية', path: '/assets/list', icon: Boxes },
-  { label: 'إضافة أصل', description: 'تسجيل أصل جديد وربطه بموقعه وعهدته', path: '/assets/new', icon: PlusCircle },
-  { label: 'الجرد الميداني', description: 'مسح الباركود ومطابقة الأصل مع الموقع الفعلي', path: '/assets/inventory', icon: ScanLine },
-  { label: 'حركة الأصول', description: 'متابعة النقل وتغيير العهد والمواقع', path: '/assets/movements', icon: ArrowRightLeft },
-  { label: 'الصيانة', description: 'متابعة حالات الصيانة والإجراءات المنفذة', path: '/assets/maintenance', icon: Wrench },
-  { label: 'تقارير الأصول', description: 'تقارير إدارية قابلة للطباعة والتصدير', path: '/assets/reports', icon: BarChart3 },
+  { label: 'جميع الأصول', description: 'استعراض سجل الأصول والبحث والتصفية', path: '/assets/list', icon: Boxes, ready: true },
+  { label: 'إضافة أصل', description: 'تسجيل أصل جديد وربطه بموقعه وعهدته', path: '/assets/new', icon: PlusCircle, ready: true },
+  { label: 'الجرد الميداني', description: 'مسح الباركود ومطابقة الأصل مع الموقع الفعلي', path: '/assets/inventory', icon: ScanLine, ready: false },
+  { label: 'حركة الأصول', description: 'متابعة النقل وتغيير العهد والمواقع', path: '/assets/movements', icon: ArrowRightLeft, ready: false },
+  { label: 'الصيانة', description: 'متابعة حالات الصيانة والإجراءات المنفذة', path: '/assets/maintenance', icon: Wrench, ready: false },
+  { label: 'تقارير الأصول', description: 'تقارير إدارية قابلة للطباعة والتصدير', path: '/assets/reports', icon: BarChart3, ready: false },
 ];
 
 export const AssetDashboardPage: React.FC = () => {
@@ -91,22 +91,24 @@ export const AssetDashboardPage: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 sm:p-6">
-          {quickActions.map(({ label, description, path, icon: Icon }) => {
-            const disabled = path === '/assets/new' && !canAdd;
+          {quickActions.map(({ label, description, path, icon: Icon, ready }) => {
+            const disabled = !ready || (path === '/assets/new' && !canAdd);
 
             return (
               <button
                 key={path}
                 type="button"
                 disabled={disabled}
-                onClick={() => navigate(path)}
-                className="group rounded-[24px] border bg-white/72 p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-45"
+                onClick={() => ready && navigate(path)}
+                className="group rounded-[24px] border bg-white/72 p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-55"
               >
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="grid h-11 w-11 place-items-center rounded-2xl border bg-background/80 transition group-hover:scale-105">
                     <Icon className="h-5 w-5 text-primary" />
                   </div>
-                  <span className="text-xs text-muted-foreground">وحدة الأصول</span>
+                  <span className="rounded-full border bg-background/75 px-2 py-1 text-[11px] text-muted-foreground">
+                    {ready ? 'متاح' : 'المرحلة التالية'}
+                  </span>
                 </div>
                 <h2 className="text-base font-extrabold text-foreground">{label}</h2>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
