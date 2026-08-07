@@ -17,6 +17,7 @@ const MODULES: ModuleName[] = [
   'leased_lands_in',
   'leased_buildings_out',
   'leased_buildings_in',
+  'assets',
   'archive',
   'reports',
 ];
@@ -50,10 +51,7 @@ export const PermissionMatrix: React.FC<{
       },
     };
 
-    if (
-      action !== 'canView' &&
-      checked
-    ) {
+    if (action !== 'canView' && checked) {
       next[moduleName].canView = true;
     }
 
