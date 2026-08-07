@@ -23,7 +23,7 @@ const quickActions = [
   { label: 'الجرد الميداني', description: 'مسح الباركود ومطابقة الأصل مع الموقع الفعلي', path: '/assets/inventory', icon: ScanLine, ready: false },
   { label: 'حركة الأصول', description: 'متابعة النقل وتغيير العهد والمواقع', path: '/assets/movements', icon: ArrowRightLeft, ready: false },
   { label: 'الصيانة', description: 'متابعة حالات الصيانة والإجراءات المنفذة', path: '/assets/maintenance', icon: Wrench, ready: false },
-  { label: 'تقارير الأصول', description: 'تقارير إدارية قابلة للطباعة والتصدير', path: '/assets/reports', icon: BarChart3, ready: false },
+  { label: 'تقارير الأصول', description: 'تقارير إدارية قابلة للطباعة والتصدير', path: '/assets/reports', icon: BarChart3, ready: true },
 ];
 
 export const AssetDashboardPage: React.FC = () => {
@@ -149,7 +149,7 @@ export const AssetDashboardPage: React.FC = () => {
       </Card>
 
       <div className="rounded-2xl border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-        التسجيل وسجل الأصول والإحصاءات أصبحت مرتبطة فعليًا بالـBackend وقاعدة PostgreSQL. المرحلة التالية: العرض والتعديل والحذف والجرد والحركة والصيانة والتقارير.
+        التسجيل والعرض والتعديل والحذف والبحث وتقارير الأصول أصبحت مرتبطة فعليًا بالـBackend وقاعدة PostgreSQL. المراحل التالية: الجرد والحركة والصيانة.
       </div>
     </div>
   );
