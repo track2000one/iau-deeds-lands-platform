@@ -36,6 +36,9 @@ import { ViewSiteInspectionPage } from './pages/ViewSiteInspectionPage';
 import { AssetDashboardPage } from './pages/AssetDashboardPage';
 import { AssetsPage } from './pages/AssetsPage';
 import { AddAssetPage } from './pages/AddAssetPage';
+import { ViewAssetPage } from './pages/ViewAssetPage';
+import { EditAssetPage } from './pages/EditAssetPage';
+import { AssetReportsPage } from './pages/AssetReportsPage';
 
 const adminOnly = (element: ReactNode) => (
   <RequireAdmin>{element}</RequireAdmin>
@@ -51,175 +54,73 @@ const assetPermission = (
 );
 
 export const router = createHashRouter([
-  {
-    path: '/login',
-    element: <LoginPage />,
-  },
-  {
-    path: '/forgot-password',
-    element: <ForgotPasswordPage />,
-  },
-  {
-    path: '/reset-password',
-    element: <ResetPasswordPage />,
-  },
-  {
-    path: '/activate-account',
-    element: <ActivateAccountPage />,
-  },
+  { path: '/login', element: <LoginPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
+  { path: '/activate-account', element: <ActivateAccountPage /> },
   {
     path: '/',
     element: <Root />,
     children: [
-      {
-        index: true,
-        element: <HomePage />,
-      },
+      { index: true, element: <HomePage /> },
       {
         path: 'deeds',
         children: [
-          {
-            index: true,
-            element: <AllDeedsPage />,
-          },
-          {
-            path: 'new',
-            element: adminOnly(<AddDeedPage />),
-          },
-          {
-            path: ':deedId',
-            element: <ViewDeedPage />,
-          },
+          { index: true, element: <AllDeedsPage /> },
+          { path: 'new', element: adminOnly(<AddDeedPage />) },
+          { path: ':deedId', element: <ViewDeedPage /> },
         ],
       },
       {
         path: 'assets',
         children: [
-          {
-            index: true,
-            element: assetPermission(<AssetDashboardPage />, 'canView'),
-          },
-          {
-            path: 'list',
-            element: assetPermission(<AssetsPage />, 'canView'),
-          },
-          {
-            path: 'new',
-            element: assetPermission(<AddAssetPage />, 'canAdd'),
-          },
+          { index: true, element: assetPermission(<AssetDashboardPage />, 'canView') },
+          { path: 'list', element: assetPermission(<AssetsPage />, 'canView') },
+          { path: 'new', element: assetPermission(<AddAssetPage />, 'canAdd') },
+          { path: 'reports', element: assetPermission(<AssetReportsPage />, 'canView') },
+          { path: ':assetId', element: assetPermission(<ViewAssetPage />, 'canView') },
+          { path: ':assetId/edit', element: assetPermission(<EditAssetPage />, 'canEdit') },
         ],
       },
       {
         path: 'site-inspections',
         children: [
-          {
-            index: true,
-            element: <SiteInspectionsPage />,
-          },
-          {
-            path: 'new',
-            element: <SiteInspectionFormPage />,
-          },
-          {
-            path: ':inspectionId',
-            element: <ViewSiteInspectionPage />,
-          },
-          {
-            path: ':inspectionId/edit',
-            element: <SiteInspectionFormPage />,
-          },
+          { index: true, element: <SiteInspectionsPage /> },
+          { path: 'new', element: <SiteInspectionFormPage /> },
+          { path: ':inspectionId', element: <ViewSiteInspectionPage /> },
+          { path: ':inspectionId/edit', element: <SiteInspectionFormPage /> },
         ],
       },
-      {
-        path: 'reports',
-        element: <ReportsPage />,
-      },
-      {
-        path: 'archive',
-        element: <ArchivePage />,
-      },
-      {
-        path: 'settings',
-        element: <SettingsPage />,
-      },
-      {
-        path: 'appearance',
-        element: <AppearanceSettingsPage />,
-      },
-      {
-        path: 'search',
-        element: <UnifiedSearchPage />,
-      },
-      {
-        path: 'admin',
-        element: adminOnly(<AdminDashboardPage />),
-      },
-      {
-        path: 'audit',
-        element: adminOnly(<AuditLogPage />),
-      },
+      { path: 'reports', element: <ReportsPage /> },
+      { path: 'archive', element: <ArchivePage /> },
+      { path: 'settings', element: <SettingsPage /> },
+      { path: 'appearance', element: <AppearanceSettingsPage /> },
+      { path: 'search', element: <UnifiedSearchPage /> },
+      { path: 'admin', element: adminOnly(<AdminDashboardPage />) },
+      { path: 'audit', element: adminOnly(<AuditLogPage />) },
       {
         path: 'lands',
         children: [
-          {
-            path: 'allocated',
-            element: <AllocatedLandsPage />,
-          },
-          {
-            path: 'allocated/new',
-            element: adminOnly(<AddAllocatedLandPage />),
-          },
-          {
-            path: 'delivered',
-            element: <DeliveredLandsPage />,
-          },
-          {
-            path: 'delivered/new',
-            element: adminOnly(<AddDeliveredLandPage />),
-          },
-          {
-            path: 'leased-out',
-            element: <LeasedLandsOutPage />,
-          },
-          {
-            path: 'leased-out/new',
-            element: adminOnly(<AddLeasedLandOutPage />),
-          },
-          {
-            path: 'leased-in',
-            element: <LeasedLandsInPage />,
-          },
-          {
-            path: 'leased-in/new',
-            element: adminOnly(<AddLeasedLandInPage />),
-          },
+          { path: 'allocated', element: <AllocatedLandsPage /> },
+          { path: 'allocated/new', element: adminOnly(<AddAllocatedLandPage />) },
+          { path: 'delivered', element: <DeliveredLandsPage /> },
+          { path: 'delivered/new', element: adminOnly(<AddDeliveredLandPage />) },
+          { path: 'leased-out', element: <LeasedLandsOutPage /> },
+          { path: 'leased-out/new', element: adminOnly(<AddLeasedLandOutPage />) },
+          { path: 'leased-in', element: <LeasedLandsInPage /> },
+          { path: 'leased-in/new', element: adminOnly(<AddLeasedLandInPage />) },
         ],
       },
       {
         path: 'buildings',
         children: [
-          {
-            path: 'leased-out',
-            element: <LeasedBuildingsOutPage />,
-          },
-          {
-            path: 'leased-out/new',
-            element: adminOnly(<AddLeasedBuildingOutPage />),
-          },
-          {
-            path: 'leased-in',
-            element: <LeasedBuildingsInPage />,
-          },
-          {
-            path: 'leased-in/new',
-            element: adminOnly(<AddLeasedBuildingInPage />),
-          },
+          { path: 'leased-out', element: <LeasedBuildingsOutPage /> },
+          { path: 'leased-out/new', element: adminOnly(<AddLeasedBuildingOutPage />) },
+          { path: 'leased-in', element: <LeasedBuildingsInPage /> },
+          { path: 'leased-in/new', element: adminOnly(<AddLeasedBuildingInPage />) },
         ],
       },
-      {
-        path: '*',
-        element: <Navigate to="/" replace />,
-      },
+      { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
 ]);
