@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Archive,
@@ -14,13 +14,8 @@ import {
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { usePermissions } from '../../context/PermissionsContext';
-
-const stats = [
-  { label: 'إجمالي الأصول', value: '0', icon: Boxes },
-  { label: 'أصول بعهدة', value: '0', icon: Package },
-  { label: 'تحت الصيانة', value: '0', icon: Wrench },
-  { label: 'أصول مستبعدة', value: '0', icon: Archive },
-];
+import { getAssetStats } from '../api/assets';
+import type { AssetStats } from '../../types/asset';
 
 const quickActions = [
   { label: 'جميع الأصول', description: 'استعراض سجل الأصول والبحث والتصفية', path: '/assets/list', icon: Boxes, ready: true },
@@ -34,8 +29,46 @@ const quickActions = [
 export const AssetDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, hasPermission } = usePermissions();
+  const [stats, setStats] = useState<AssetStats>({
+    total: 0,
+    inCustody: 0,
+    maintenance: 0,
+    excluded: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
   const canAdd = isAdmin || hasPermission('assets', 'canAdd');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getAssetStats()
+      .then((result) => {
+        if (!cancelled) setStats(result);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStats({ total: 0, inCustody: 0, maintenance: 0, excluded: 0 });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const statsCards = useMemo(
+    () => [
+      { label: 'إجمالي الأصول', value: stats.total, icon: Boxes },
+      { label: 'أصول بعهدة', value: stats.inCustody, icon: Package },
+      { label: 'تحت الصيانة', value: stats.maintenance, icon: Wrench },
+      { label: 'أصول مستبعدة', value: stats.excluded, icon: Archive },
+    ],
+    [stats]
+  );
 
   return (
     <div className="mx-auto w-full max-w-[1700px] space-y-5 sm:space-y-6">
@@ -45,7 +78,7 @@ export const AssetDashboardPage: React.FC = () => {
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border bg-white/75 px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm">
               <ClipboardCheck className="h-4 w-4 text-emerald-600" />
-              وحدة الأصول — المرحلة الأولى
+              وحدة الأصول — متصلة بقاعدة البيانات
             </div>
             <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl lg:text-4xl">
               لوحة إدارة الأصول
@@ -56,10 +89,7 @@ export const AssetDashboardPage: React.FC = () => {
           </div>
 
           {canAdd && (
-            <Button
-              onClick={() => navigate('/assets/new')}
-              className="h-12 rounded-2xl px-5 shadow-lg"
-            >
+            <Button onClick={() => navigate('/assets/new')} className="h-12 rounded-2xl px-5 shadow-lg">
               <PlusCircle className="ml-2 h-5 w-5" />
               إضافة أصل جديد
             </Button>
@@ -68,12 +98,12 @@ export const AssetDashboardPage: React.FC = () => {
       </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map(({ label, value, icon: Icon }) => (
+        {statsCards.map(({ label, value, icon: Icon }) => (
           <Card key={label} className="rounded-[26px] border-white/50 bg-white/72 shadow-[0_14px_40px_rgba(15,23,42,0.07)] backdrop-blur-xl">
             <CardContent className="flex items-center justify-between p-5 sm:p-6">
               <div>
                 <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="mt-2 text-3xl font-black text-foreground">{value}</p>
+                <p className="mt-2 text-3xl font-black text-foreground">{loading ? '...' : value.toLocaleString('ar-SA')}</p>
               </div>
               <div className="grid h-12 w-12 place-items-center rounded-2xl border bg-background/80 shadow-inner">
                 <Icon className="h-6 w-6 text-primary" />
@@ -119,7 +149,7 @@ export const AssetDashboardPage: React.FC = () => {
       </Card>
 
       <div className="rounded-2xl border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-        هذه المرحلة تنشئ الهيكل التشغيلي للواجهة والصلاحيات. ربط قاعدة البيانات والباركود والعهد والجرد سيكون في المرحلة التالية.
+        التسجيل وسجل الأصول والإحصاءات أصبحت مرتبطة فعليًا بالـBackend وقاعدة PostgreSQL. المرحلة التالية: العرض والتعديل والحذف والجرد والحركة والصيانة والتقارير.
       </div>
     </div>
   );
