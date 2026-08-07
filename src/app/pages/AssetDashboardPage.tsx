@@ -1,0 +1,124 @@
+import React from 'react';
+import { useNavigate } from 'react-router';
+import {
+  Archive,
+  ArrowRightLeft,
+  BarChart3,
+  Boxes,
+  ClipboardCheck,
+  Package,
+  PlusCircle,
+  ScanLine,
+  Wrench,
+} from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { usePermissions } from '../../context/PermissionsContext';
+
+const stats = [
+  { label: 'إجمالي الأصول', value: '0', icon: Boxes },
+  { label: 'أصول بعهدة', value: '0', icon: Package },
+  { label: 'تحت الصيانة', value: '0', icon: Wrench },
+  { label: 'أصول مستبعدة', value: '0', icon: Archive },
+];
+
+const quickActions = [
+  { label: 'جميع الأصول', description: 'استعراض سجل الأصول والبحث والتصفية', path: '/assets/list', icon: Boxes },
+  { label: 'إضافة أصل', description: 'تسجيل أصل جديد وربطه بموقعه وعهدته', path: '/assets/new', icon: PlusCircle },
+  { label: 'الجرد الميداني', description: 'مسح الباركود ومطابقة الأصل مع الموقع الفعلي', path: '/assets/inventory', icon: ScanLine },
+  { label: 'حركة الأصول', description: 'متابعة النقل وتغيير العهد والمواقع', path: '/assets/movements', icon: ArrowRightLeft },
+  { label: 'الصيانة', description: 'متابعة حالات الصيانة والإجراءات المنفذة', path: '/assets/maintenance', icon: Wrench },
+  { label: 'تقارير الأصول', description: 'تقارير إدارية قابلة للطباعة والتصدير', path: '/assets/reports', icon: BarChart3 },
+];
+
+export const AssetDashboardPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { isAdmin, hasPermission } = usePermissions();
+
+  const canAdd = isAdmin || hasPermission('assets', 'canAdd');
+
+  return (
+    <div className="mx-auto w-full max-w-[1700px] space-y-5 sm:space-y-6">
+      <section className="relative overflow-hidden rounded-[30px] border border-white/55 bg-white/70 p-5 shadow-[0_18px_55px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl sm:p-7">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.07),transparent_30%)]" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border bg-white/75 px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm">
+              <ClipboardCheck className="h-4 w-4 text-emerald-600" />
+              وحدة الأصول — المرحلة الأولى
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl lg:text-4xl">
+              لوحة إدارة الأصول
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+              إدارة دورة حياة أصول الجامعة من التسجيل والموقع والعهدة إلى الجرد والصيانة والنقل والاستبعاد.
+            </p>
+          </div>
+
+          {canAdd && (
+            <Button
+              onClick={() => navigate('/assets/new')}
+              className="h-12 rounded-2xl px-5 shadow-lg"
+            >
+              <PlusCircle className="ml-2 h-5 w-5" />
+              إضافة أصل جديد
+            </Button>
+          )}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {stats.map(({ label, value, icon: Icon }) => (
+          <Card key={label} className="rounded-[26px] border-white/50 bg-white/72 shadow-[0_14px_40px_rgba(15,23,42,0.07)] backdrop-blur-xl">
+            <CardContent className="flex items-center justify-between p-5 sm:p-6">
+              <div>
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="mt-2 text-3xl font-black text-foreground">{value}</p>
+              </div>
+              <div className="grid h-12 w-12 place-items-center rounded-2xl border bg-background/80 shadow-inner">
+                <Icon className="h-6 w-6 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <Card className="overflow-hidden rounded-[30px] border-white/55 bg-white/68 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
+        <CardHeader className="border-b bg-white/45">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Package className="h-5 w-5 text-primary" />
+            العمليات الرئيسية
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 sm:p-6">
+          {quickActions.map(({ label, description, path, icon: Icon }) => {
+            const disabled = path === '/assets/new' && !canAdd;
+
+            return (
+              <button
+                key={path}
+                type="button"
+                disabled={disabled}
+                onClick={() => navigate(path)}
+                className="group rounded-[24px] border bg-white/72 p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl border bg-background/80 transition group-hover:scale-105">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <span className="text-xs text-muted-foreground">وحدة الأصول</span>
+                </div>
+                <h2 className="text-base font-extrabold text-foreground">{label}</h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+              </button>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <div className="rounded-2xl border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+        هذه المرحلة تنشئ الهيكل التشغيلي للواجهة والصلاحيات. ربط قاعدة البيانات والباركود والعهد والجرد سيكون في المرحلة التالية.
+      </div>
+    </div>
+  );
+};
