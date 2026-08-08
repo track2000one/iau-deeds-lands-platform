@@ -467,3 +467,27 @@ body,
 img.app-map-pin-icon {
   image-rendering: auto;
 }
+
+/* ===== Planned land control alignment ===== */
+label[for="isPlanned"] {
+  min-height: 2.5rem;
+  width: 100%;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  padding-inline: 0.15rem;
+  line-height: 1;
+}
+
+@media (min-width: 768px) {
+  label[for="isPlanned"] {
+    margin-top: 1.65rem;
+    align-items: center;
+  }
+}
+
+@media (max-width: 767px) {
+  label[for="isPlanned"] {
+    margin-top: 0.25rem;
+    min-height: 2.75rem;
+  }
+}
