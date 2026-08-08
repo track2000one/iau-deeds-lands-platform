@@ -14,20 +14,33 @@ function Switch({
       data-slot="switch"
       dir="ltr"
       className={cn(
-        "peer inline-flex h-6 w-11 shrink-0 items-center rounded-full border border-transparent shadow-sm transition-all duration-200 outline-none",
-        "data-[state=checked]:bg-emerald-600 data-[state=checked]:shadow-[0_0_0_3px_rgba(5,150,105,0.12)]",
-        "data-[state=unchecked]:bg-rose-600 data-[state=unchecked]:shadow-[0_0_0_3px_rgba(225,29,72,0.10)]",
-        "focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]",
+        "peer relative inline-flex h-8 w-[74px] shrink-0 items-center overflow-hidden rounded-xl border-2 bg-background p-0.5 shadow-[0_5px_14px_rgba(15,23,42,0.10)] transition-all duration-300 outline-none",
+        "data-[state=checked]:border-emerald-500/80 data-[state=checked]:bg-emerald-50",
+        "data-[state=unchecked]:border-rose-500/80 data-[state=unchecked]:bg-rose-50",
+        "focus-visible:ring-ring/35 focus-visible:ring-[4px]",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
     >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute inset-y-0 left-0 flex w-[42px] items-center justify-center text-[10px] font-bold tracking-tight transition-all duration-300",
+          "peer-data-[state=checked]:text-emerald-700 peer-data-[state=unchecked]:text-rose-700",
+        )}
+      >
+        <span className="peer-data-[state=checked]:hidden">لا</span>
+        <span className="hidden peer-data-[state=checked]:inline">نعم</span>
+      </span>
+
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         className={cn(
-          "pointer-events-none block size-5 rounded-full bg-white shadow-[0_2px_5px_rgba(15,23,42,0.22)] ring-0 transition-transform duration-200",
-          "data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0",
+          "pointer-events-none relative z-10 flex h-6 w-7 items-center justify-center rounded-lg bg-white shadow-[0_3px_8px_rgba(15,23,42,0.20)] ring-1 ring-black/5 transition-all duration-300 ease-out",
+          "before:block before:h-2 before:w-2 before:rounded-full before:transition-colors",
+          "data-[state=checked]:translate-x-[40px] data-[state=checked]:before:bg-emerald-500",
+          "data-[state=unchecked]:translate-x-0 data-[state=unchecked]:before:bg-rose-500",
         )}
       />
     </SwitchPrimitive.Root>
