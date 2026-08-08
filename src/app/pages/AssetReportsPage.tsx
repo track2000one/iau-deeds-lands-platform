@@ -162,18 +162,27 @@ export const AssetReportsPage: React.FC = () => {
 <meta charset="utf-8" />
 <title>تقرير الأصول</title>
 <style>
-@page { size: A4 landscape; margin: 10mm; }
-body { font-family: Tahoma, Arial, sans-serif; color: #172033; margin: 0; }
-.header { text-align:center; border-bottom:2px solid #1f4e79; padding-bottom:12px; margin-bottom:14px; }
-h1 { margin:0; font-size:22px; }
-.sub { color:#64748b; font-size:12px; margin-top:5px; }
-.summary { display:flex; gap:10px; margin-bottom:12px; }
-.summary div { flex:1; border:1px solid #dbe3ec; border-radius:10px; padding:8px; text-align:center; }
-table { width:100%; border-collapse:collapse; font-size:10px; }
-th { background:#1f4e79; color:white; padding:7px 5px; border:1px solid #d5dee8; }
-td { padding:6px 5px; border:1px solid #dbe3ec; text-align:center; }
+@page { size: A4 landscape; margin: 9mm; }
+* { box-sizing: border-box; }
+body { font-family: Tahoma, Arial, sans-serif; color: #172033; margin: 0; background: #fff; }
+.header { text-align:center; border-bottom:2px solid #1f4e79; padding:0 0 9px; margin:0 0 10px; }
+h1 { margin:0; font-size:20px; line-height:1.25; }
+.sub { color:#64748b; font-size:10px; margin-top:3px; line-height:1.35; }
+.report-content { width:95%; margin:0 auto; }
+.summary { display:flex; gap:8px; margin:0 auto 8px; }
+.summary div { flex:1; border:1px solid #dbe3ec; border-radius:8px; padding:5px 7px; text-align:center; line-height:1.35; }
+.summary strong { font-size:14px; }
+.table-shell { width:100%; margin:0 auto; overflow:hidden; border-radius:5px; }
+table { width:100%; border-collapse:collapse; border-spacing:0; font-size:8.7px; line-height:1.2; }
+th { background:#1f4e79; color:white; padding:4px 3px; border:1px solid #d5dee8; font-weight:700; white-space:normal; vertical-align:middle; }
+td { padding:4px 3px; border:1px solid #dbe3ec; text-align:center; white-space:normal; vertical-align:middle; }
 tbody tr:nth-child(even) { background:#f8fafc; }
-.footer { margin-top:14px; font-size:9px; color:#64748b; display:flex; justify-content:space-between; }
+.footer { width:95%; margin:9px auto 0; font-size:8px; color:#64748b; display:flex; justify-content:space-between; }
+@media print {
+  .report-content, .footer { break-inside:auto; }
+  thead { display:table-header-group; }
+  tr { break-inside:avoid; }
+}
 </style>
 </head>
 <body>
@@ -182,11 +191,15 @@ tbody tr:nth-child(even) { background:#f8fafc; }
   <div class="sub">الإدارة العامة للأصول والأملاك والأوقاف الجامعية</div>
   <div class="sub">تقرير الأصول</div>
 </div>
-<div class="summary">
-  <div>إجمالي الأصول<br><strong>${rows.length}</strong></div>
-  <div>إجمالي قيمة الشراء<br><strong>${rows.reduce((sum, asset) => sum + Number(asset.purchaseValue || 0), 0).toLocaleString('ar-SA')} ر.س</strong></div>
+<div class="report-content">
+  <div class="summary">
+    <div>إجمالي الأصول<br><strong>${rows.length}</strong></div>
+    <div>إجمالي قيمة الشراء<br><strong>${rows.reduce((sum, asset) => sum + Number(asset.purchaseValue || 0), 0).toLocaleString('ar-SA')} ر.س</strong></div>
+  </div>
+  <div class="table-shell">
+    <table><thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table>
+  </div>
 </div>
-<table><thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table>
 <div class="footer"><span>تاريخ التقرير: ${new Date().toLocaleString('ar-SA')}</span><span>وحدة الأصول</span></div>
 <script>window.onload = () => window.print();</script>
 </body></html>`;
@@ -264,16 +277,16 @@ tbody tr:nth-child(even) { background:#f8fafc; }
 
       <Card className="overflow-hidden rounded-[28px] border-white/55 bg-white/70 shadow-[0_16px_48px_rgba(15,23,42,0.07)] backdrop-blur-xl">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto px-3 pb-3 sm:px-4 sm:pb-4">
             <table className="w-full min-w-[1000px] border-collapse text-sm">
               <thead className="bg-primary text-primary-foreground">
-                <tr><th className="p-3">#</th>{selectedFields.map((key) => <th key={key} className="p-3">{printableFields.find(([field]) => field === key)?.[1]}</th>)}</tr>
+                <tr><th className="px-2 py-2.5">#</th>{selectedFields.map((key) => <th key={key} className="px-2 py-2.5">{printableFields.find(([field]) => field === key)?.[1]}</th>)}</tr>
               </thead>
               <tbody>
                 {rows.map((asset, index) => (
                   <tr key={asset.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                    <td className="p-3 text-center">{index + 1}</td>
-                    {selectedFields.map((key) => <td key={key} className="p-3 text-center">{String(valueFor(asset, key))}</td>)}
+                    <td className="px-2 py-2 text-center">{index + 1}</td>
+                    {selectedFields.map((key) => <td key={key} className="px-2 py-2 text-center">{String(valueFor(asset, key))}</td>)}
                   </tr>
                 ))}
               </tbody>
