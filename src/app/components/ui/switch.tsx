@@ -7,10 +7,70 @@ import { cn } from "./utils";
 
 function Switch({
   className,
+  id,
+  checked,
   ...props
 }: React.ComponentProps<typeof SwitchPrimitive.Root>) {
+  const isPlannedField = id === "isPlanned";
+
+  if (isPlannedField) {
+    return (
+      <>
+        <style>{`
+          label[for="isPlanned"] {
+            display: flex !important;
+            width: 100% !important;
+            min-height: 0 !important;
+            margin-top: 0 !important;
+            padding: 0 !important;
+            flex-direction: column-reverse !important;
+            align-items: stretch !important;
+            justify-content: flex-start !important;
+            gap: 0.4rem !important;
+            line-height: 1.25 !important;
+          }
+
+          label[for="isPlanned"] > span:last-child {
+            width: 100% !important;
+            text-align: right !important;
+            font-size: 0.875rem !important;
+            color: inherit !important;
+          }
+        `}</style>
+
+        <SwitchPrimitive.Root
+          id={id}
+          checked={checked}
+          data-slot="switch"
+          dir="rtl"
+          className={cn(
+            "group relative flex h-10 w-full shrink-0 items-center justify-between rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none transition-all duration-200",
+            "hover:border-primary/55 hover:bg-muted/20",
+            "focus-visible:border-ring focus-visible:ring-ring/35 focus-visible:ring-[3px]",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            className,
+          )}
+          {...props}
+        >
+          <span className="pointer-events-none font-medium text-foreground">
+            {checked ? "نعم" : "لا"}
+          </span>
+
+          <span
+            aria-hidden="true"
+            className="pointer-events-none flex h-5 w-5 items-center justify-center text-base leading-none text-muted-foreground transition-transform duration-200 group-data-[state=checked]:text-emerald-700"
+          >
+            ⌄
+          </span>
+        </SwitchPrimitive.Root>
+      </>
+    );
+  }
+
   return (
     <SwitchPrimitive.Root
+      id={id}
+      checked={checked}
       data-slot="switch"
       dir="ltr"
       className={cn(
