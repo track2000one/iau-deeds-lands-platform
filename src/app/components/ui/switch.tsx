@@ -44,21 +44,33 @@ function Switch({
           data-slot="switch"
           dir="rtl"
           className={cn(
-            "group relative flex h-10 w-full shrink-0 items-center justify-between rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none transition-all duration-200",
-            "hover:border-primary/55 hover:bg-muted/20",
-            "focus-visible:border-ring focus-visible:ring-ring/35 focus-visible:ring-[3px]",
+            "group relative flex h-10 w-full shrink-0 items-center justify-between rounded-md border px-3 text-sm font-semibold shadow-sm outline-none transition-all duration-200",
+            "data-[state=checked]:border-emerald-500 data-[state=checked]:bg-emerald-50 data-[state=checked]:text-emerald-800",
+            "data-[state=unchecked]:border-rose-500 data-[state=unchecked]:bg-rose-50 data-[state=unchecked]:text-rose-800",
+            "hover:shadow-md",
+            "focus-visible:ring-ring/35 focus-visible:ring-[3px]",
             "disabled:cursor-not-allowed disabled:opacity-50",
             className,
           )}
           {...props}
         >
-          <span className="pointer-events-none font-medium text-foreground">
-            {checked ? "نعم" : "لا"}
+          <span className="pointer-events-none flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className={cn(
+                "h-2.5 w-2.5 rounded-full shadow-sm transition-colors duration-200",
+                checked ? "bg-emerald-500" : "bg-rose-500",
+              )}
+            />
+            <span>{checked ? "نعم" : "لا"}</span>
           </span>
 
           <span
             aria-hidden="true"
-            className="pointer-events-none flex h-5 w-5 items-center justify-center text-base leading-none text-muted-foreground transition-transform duration-200 group-data-[state=checked]:text-emerald-700"
+            className={cn(
+              "pointer-events-none flex h-5 w-5 items-center justify-center text-base leading-none transition-colors duration-200",
+              checked ? "text-emerald-700" : "text-rose-700",
+            )}
           >
             ⌄
           </span>
