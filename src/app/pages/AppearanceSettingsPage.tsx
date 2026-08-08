@@ -1,12 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Check,
-  Moon,
   Palette,
   RotateCcw,
   Save,
   ShieldCheck,
-  Sparkles,
   Sun,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -56,25 +54,19 @@ const ThemeMiniPreview: React.FC<{
       className="absolute -right-10 -top-10 h-28 w-28 rounded-full blur-3xl"
       style={{ background: theme.visual.glow }}
     />
-    <div
-      className="absolute -bottom-12 -left-8 h-28 w-28 rounded-full blur-3xl"
-      style={{ background: theme.visual.glowSecondary }}
-    />
 
     <div
       className="relative rounded-2xl border px-3 py-2"
       style={{
         background: theme.visual.topbar,
         borderColor: theme.visual.border,
-        backdropFilter: 'blur(18px)',
       }}
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="h-2.5 w-24 rounded-full bg-primary/75" />
+        <div className="h-2.5 w-24 rounded-full bg-primary/70" />
         <div className="flex gap-1.5">
-          <div className="h-2.5 w-2.5 rounded-full bg-primary/80" />
-          <div className="h-2.5 w-2.5 rounded-full bg-secondary/80" />
-          <div className="h-2.5 w-2.5 rounded-full bg-accent/80" />
+          <div className="h-2.5 w-2.5 rounded-full bg-primary/75" />
+          <div className="h-2.5 w-2.5 rounded-full bg-secondary/70" />
         </div>
       </div>
     </div>
@@ -85,7 +77,6 @@ const ThemeMiniPreview: React.FC<{
         style={{
           background: theme.visual.sidebar,
           borderColor: theme.visual.border,
-          backdropFilter: 'blur(20px)',
         }}
       >
         <div className="space-y-2">
@@ -93,9 +84,10 @@ const ThemeMiniPreview: React.FC<{
             <div
               key={item}
               className={[
-                'h-7 rounded-xl',
-                item === 1 ? 'bg-primary/25' : 'bg-background/30',
+                'h-7 rounded-xl border',
+                item === 1 ? 'bg-primary/15' : 'bg-background/45',
               ].join(' ')}
+              style={{ borderColor: theme.visual.border }}
             />
           ))}
         </div>
@@ -113,11 +105,6 @@ const ThemeMiniPreview: React.FC<{
                     ? theme.visual.glassStrong
                     : theme.visual.glass,
                 borderColor: theme.visual.border,
-                backdropFilter: 'blur(24px)',
-                boxShadow:
-                  item === 1
-                    ? `0 0 24px ${theme.visual.glow}`
-                    : 'none',
               }}
             />
           ))}
@@ -128,8 +115,6 @@ const ThemeMiniPreview: React.FC<{
           style={{
             background: theme.visual.glassStrong,
             borderColor: theme.visual.border,
-            backdropFilter: 'blur(26px)',
-            boxShadow: `inset 0 1px 0 rgba(255,255,255,.28), 0 0 26px ${theme.visual.glowSecondary}`,
           }}
         >
           <div className="h-2.5 w-1/2 rounded-full bg-primary/70" />
@@ -202,7 +187,7 @@ export const AppearanceSettingsPage: React.FC = () => {
     savedThemeRef.current = theme.id;
     applyAppearanceTheme(theme.id);
 
-    toast.success('تمت استعادة المظهر الافتراضي');
+    toast.success('تمت استعادة المظهر الرسمي الافتراضي');
   };
 
   const selected = getThemeById(selectedTheme);
@@ -213,21 +198,21 @@ export const AppearanceSettingsPage: React.FC = () => {
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <Badge variant="secondary" className="mb-3">
-              <Sparkles className="ml-2 h-4 w-4" />
-              مكتبة المظهر الاحترافية
+              <ShieldCheck className="ml-2 h-4 w-4" />
+              المظاهر الرسمية المعتمدة للمنصة
             </Badge>
 
             <h1 className="text-3xl font-bold">إعدادات المظهر</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              اختر مظهرًا عصريًا ملائمًا للمنصة. تتضمن المجموعة بطاقات زجاجية
-              سميكة، وحواف مضيئة بنور هادئ، وخيارات رسمية وفاتحة وليلية.
+              تم حصر المظاهر في خيارات رسمية هادئة تناسب منصة إدارية جامعية،
+              مع وضوح مرتفع للنصوص والنماذج والجداول والتقارير.
             </p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button variant="outline" onClick={resetTheme}>
               <RotateCcw className="ml-2 h-4 w-4" />
-              استعادة الافتراضي
+              استعادة الرسمي
             </Button>
 
             <Button onClick={saveTheme} className="future-glow-button">
@@ -237,8 +222,13 @@ export const AppearanceSettingsPage: React.FC = () => {
           </div>
         </div>
 
+        <div className="mt-4 rounded-2xl border border-primary/15 bg-background/55 p-3 text-sm text-muted-foreground">
+          المظهر الافتراضي للمنصة هو «الكلاسيك الرسمي». يمكن للمستخدم اختيار
+          بديل رسمي آخر دون تغيير الهوية العامة للنظام.
+        </div>
+
         {selectedTheme !== savedTheme && (
-          <div className="mt-4 rounded-2xl border border-primary/25 bg-primary/10 p-3 text-sm">
+          <div className="mt-3 rounded-2xl border border-primary/25 bg-primary/10 p-3 text-sm">
             المظهر الحالي قيد المعاينة فقط. اضغط «حفظ لهذا المستخدم» لاعتماده.
           </div>
         )}
@@ -249,10 +239,11 @@ export const AppearanceSettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Palette className="h-5 w-5" />
-              اختر المظهر
+              اختر المظهر الرسمي
             </CardTitle>
             <CardDescription>
-              اضغط على أي مظهر لتطبيق معاينة مباشرة على كامل المنصة.
+              الخيارات التالية مصممة للاستخدام الإداري الرسمي، بدون مظاهر نيون
+              أو ألوان ترفيهية أو تباين منخفض.
             </CardDescription>
           </CardHeader>
 
@@ -297,8 +288,6 @@ export const AppearanceSettingsPage: React.FC = () => {
                     >
                       {isActive ? (
                         <Check className="h-5 w-5" />
-                      ) : theme.mode === 'dark' ? (
-                        <Moon className="h-4 w-4" />
                       ) : (
                         <Sun className="h-4 w-4" />
                       )}
@@ -335,7 +324,7 @@ export const AppearanceSettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5" />
-              معاينة مباشرة
+              معاينة المظهر
             </CardTitle>
             <CardDescription>{selected.name}</CardDescription>
           </CardHeader>
@@ -359,23 +348,18 @@ export const AppearanceSettingsPage: React.FC = () => {
 
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl border bg-background/35 p-3">
-                  <span className="text-xs text-muted-foreground">
-                    نوع السطح
-                  </span>
+                  <span className="text-xs text-muted-foreground">نوع السطح</span>
                   <p className="mt-1 font-semibold">{selected.glassLabel}</p>
                 </div>
 
                 <div className="rounded-xl border bg-background/35 p-3">
-                  <span className="text-xs text-muted-foreground">
-                    نوع الإضاءة
-                  </span>
+                  <span className="text-xs text-muted-foreground">الإضاءة</span>
                   <p className="mt-1 font-semibold">{selected.glowLabel}</p>
                 </div>
               </div>
 
               <p className="mt-4 text-xs text-muted-foreground">
-                يتم تطبيق المعاينة فورًا، ولا يعتمد المظهر إلا بعد الضغط على
-                زر الحفظ.
+                المعاينة فورية، ولا يتم اعتمادها لهذا المستخدم إلا بعد الحفظ.
               </p>
             </div>
           </CardContent>
