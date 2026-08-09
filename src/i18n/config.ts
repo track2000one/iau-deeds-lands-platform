@@ -5,22 +5,24 @@ import translationsEn from './locales/en.json';
 
 const resources = {
   ar: {
-    translation: translationsAr
+    translation: translationsAr,
   },
   en: {
-    translation: translationsEn
-  }
+    translation: translationsEn,
+  },
 };
 
 i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: 'ar', // default language (Arabic)
-    fallbackLng: 'ar',
+    lng: 'ar',
+    fallbackLng: false,
+    supportedLngs: ['ar', 'en'],
+    load: 'languageOnly',
     interpolation: {
-      escapeValue: false
-    }
+      escapeValue: false,
+    },
   });
 
 export default i18n;
