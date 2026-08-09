@@ -12,6 +12,7 @@ export type PreviewAttachment = {
   id?: string | null;
   title?: string | null;
   driveUrl?: string | null;
+  fileUrl?: string | null;
   driveFileId?: string | null;
   mimeType?: string | null;
   fileType?: string | null;
@@ -29,12 +30,15 @@ const getName = (attachment: PreviewAttachment) =>
 const getMimeType = (attachment: PreviewAttachment) =>
   attachment.mimeType || attachment.fileType || '';
 
+const getOriginalUrl = (attachment: PreviewAttachment) =>
+  String(attachment.driveUrl || attachment.fileUrl || '');
+
 const extractGoogleDriveFileId = (
   attachment: PreviewAttachment
 ): string | null => {
   if (attachment.driveFileId) return attachment.driveFileId;
 
-  const url = String(attachment.driveUrl || '');
+  const url = getOriginalUrl(attachment);
   const patterns = [
     /\/file\/d\/([^/]+)/,
     /[?&]id=([^&]+)/,
@@ -54,8 +58,14 @@ export const isPdfAttachment = (
 ): boolean => {
   const name = getName(attachment).toLowerCase();
   const mime = getMimeType(attachment).toLowerCase();
+  const url = getOriginalUrl(attachment).toLowerCase();
 
-  return mime === 'application/pdf' || name.endsWith('.pdf');
+  return (
+    mime === 'application/pdf' ||
+    mime.includes('pdf') ||
+    name.endsWith('.pdf') ||
+    /\.pdf(?:$|[?#])/i.test(url)
+  );
 };
 
 export const isImageAttachmentPreview = (
@@ -63,30 +73,34 @@ export const isImageAttachmentPreview = (
 ): boolean => {
   const name = getName(attachment).toLowerCase();
   const mime = getMimeType(attachment).toLowerCase();
+  const url = getOriginalUrl(attachment).toLowerCase();
 
   return (
     mime.startsWith('image/') ||
-    /\.(png|jpe?g|webp|gif|bmp|svg|heic|heif)$/i.test(name)
+    /\.(png|jpe?g|webp|gif|bmp|svg|heic|heif)$/i.test(name) ||
+    /\.(png|jpe?g|webp|gif|bmp|svg|heic|heif)(?:$|[?#])/i.test(url)
   );
 };
 
 export const getAttachmentPreviewUrl = (
   attachment: PreviewAttachment
 ): string => {
-  const originalUrl = String(attachment.driveUrl || '');
+  const originalUrl = getOriginalUrl(attachment);
   const fileId = extractGoogleDriveFileId(attachment);
 
-  if (!fileId) return originalUrl;
+  if (fileId) {
+    if (isPdfAttachment(attachment)) {
+      return `https://drive.google.com/file/d/${fileId}/preview`;
+    }
 
-  if (isPdfAttachment(attachment)) {
+    if (isImageAttachmentPreview(attachment)) {
+      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
+    }
+
     return `https://drive.google.com/file/d/${fileId}/preview`;
   }
 
-  if (isImageAttachmentPreview(attachment)) {
-    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
-  }
-
-  return `https://drive.google.com/file/d/${fileId}/preview`;
+  return originalUrl;
 };
 
 const getFileIcon = (attachment: PreviewAttachment) => {
@@ -115,16 +129,14 @@ export const AttachmentPreviewCard: React.FC<{
   compact?: boolean;
   onOpen?: () => void;
   actions?: React.ReactNode;
-}> = ({
-  attachment,
-  compact = false,
-  onOpen,
-  actions,
-}) => {
+}> = ({ attachment, compact = false, onOpen, actions }) => {
   const name = getName(attachment);
   const previewUrl = getAttachmentPreviewUrl(attachment);
-  const originalUrl = String(attachment.driveUrl || '');
+  const originalUrl = getOriginalUrl(attachment);
   const FileIcon = getFileIcon(attachment);
+  const isPdf = isPdfAttachment(attachment);
+  const isImage = isImageAttachmentPreview(attachment);
+  const previewHeight = compact ? 'h-44' : 'h-64';
 
   const open = () => {
     if (onOpen) {
@@ -138,40 +150,60 @@ export const AttachmentPreviewCard: React.FC<{
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-card transition hover:border-primary/70">
-      <button
-        type="button"
-        onClick={open}
-        className="block w-full bg-muted/25 text-right"
-        title={`فتح ${name}`}
-      >
-        {isPdfAttachment(attachment) ? (
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm transition hover:border-primary/70 hover:shadow-md">
+      <div className={`relative w-full ${previewHeight} overflow-hidden bg-muted/20`}>
+        {isPdf && previewUrl ? (
           <iframe
             src={previewUrl}
             title={name}
-            className={`${compact ? 'h-40' : 'h-56'} w-full bg-white pointer-events-none`}
-          />
-        ) : isImageAttachmentPreview(attachment) ? (
-          <img
-            src={previewUrl}
-            alt={name}
-            className={`${compact ? 'h-40' : 'h-56'} w-full bg-muted object-contain`}
             loading="lazy"
-            onError={(event) => {
-              if (event.currentTarget.src !== originalUrl && originalUrl) {
-                event.currentTarget.src = originalUrl;
-              }
-            }}
+            className="h-full w-full border-0 bg-white"
           />
+        ) : isImage && previewUrl ? (
+          <button
+            type="button"
+            onClick={open}
+            className="block h-full w-full cursor-zoom-in bg-muted/20"
+            title={`فتح ${name}`}
+          >
+            <img
+              src={previewUrl}
+              alt={name}
+              className="h-full w-full bg-muted object-contain"
+              loading="lazy"
+              onError={(event) => {
+                if (event.currentTarget.src !== originalUrl && originalUrl) {
+                  event.currentTarget.src = originalUrl;
+                }
+              }}
+            />
+          </button>
         ) : (
-          <div className={`${compact ? 'h-40' : 'h-56'} flex flex-col items-center justify-center gap-3`}>
-            <FileIcon className="h-12 w-12 text-muted-foreground" />
+          <button
+            type="button"
+            onClick={open}
+            className="flex h-full w-full flex-col items-center justify-center gap-3"
+            title={`فتح ${name}`}
+          >
+            <FileIcon className="h-14 w-14 text-muted-foreground" />
             <span className="px-3 text-center text-xs text-muted-foreground">
               معاينة الملف
             </span>
-          </div>
+          </button>
         )}
-      </button>
+
+        {(isPdf || isImage) && (
+          <button
+            type="button"
+            onClick={open}
+            className="absolute bottom-2 end-2 inline-flex items-center gap-1 rounded-lg border bg-background/90 px-2.5 py-1.5 text-xs font-medium shadow-sm backdrop-blur hover:bg-background"
+            title="فتح المرفق بالحجم الكامل"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            فتح
+          </button>
+        )}
+      </div>
 
       <div className="space-y-2 p-3">
         <div className="flex items-start justify-between gap-2">
@@ -180,9 +212,11 @@ export const AttachmentPreviewCard: React.FC<{
               {name}
             </p>
             <p className="mt-1 truncate text-xs text-muted-foreground">
-              {getMimeType(attachment) ||
-                attachment.attachmentType ||
-                'Google Drive'}
+              {isPdf
+                ? 'PDF'
+                : isImage
+                  ? 'صورة'
+                  : getMimeType(attachment) || attachment.attachmentType || 'ملف'}
             </p>
           </div>
 
@@ -206,11 +240,7 @@ export const AttachmentPreviewGrid: React.FC<{
   attachments: PreviewAttachment[];
   emptyText?: string;
   compact?: boolean;
-}> = ({
-  attachments,
-  emptyText = 'لا توجد مرفقات.',
-  compact = false,
-}) => {
+}> = ({ attachments, emptyText = 'لا توجد مرفقات.', compact = false }) => {
   if (!attachments.length) {
     return (
       <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -220,12 +250,13 @@ export const AttachmentPreviewGrid: React.FC<{
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {attachments.map((attachment, index) => (
         <AttachmentPreviewCard
           key={
             attachment.id ||
             attachment.driveUrl ||
+            attachment.fileUrl ||
             `${getName(attachment)}-${index}`
           }
           attachment={attachment}
