@@ -12,6 +12,7 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
+  X,
   Download,
   Settings,
   BarChart3,
@@ -443,6 +444,19 @@ export const ReportsPage: React.FC = () => {
     siteInspections: [],
   });
 
+  const [excludedRowKeysBySection, setExcludedRowKeysBySection] = useState<
+    Record<ReportSectionType, string[]>
+  >({
+    deeds: [],
+    allocated: [],
+    delivered: [],
+    leasedOut: [],
+    leasedIn: [],
+    buildingsOut: [],
+    buildingsIn: [],
+    siteInspections: [],
+  });
+
   const [printSettingsBySection, setPrintSettingsBySection] = useState<Record<ReportSectionType, PrintSettings>>({
     deeds: { ...defaultPrintSettings, reportTitle: 'تقرير الصكوك' },
     allocated: { ...defaultPrintSettings, reportTitle: 'تقرير الأراضي المخصصة' },
@@ -722,6 +736,25 @@ export const ReportsPage: React.FC = () => {
     return String(candidate ?? `row-${index}`);
   };
 
+  const excludeManualRow = (section: ReportSectionType, rowKey: string) => {
+    setExcludedRowKeysBySection((prev) => {
+      const current = prev[section] || [];
+      if (current.includes(rowKey)) return prev;
+
+      return {
+        ...prev,
+        [section]: [...current, rowKey],
+      };
+    });
+  };
+
+  const restoreExcludedRows = (section: ReportSectionType) => {
+    setExcludedRowKeysBySection((prev) => ({
+      ...prev,
+      [section]: [],
+    }));
+  };
+
   const applyManualRowOrder = (
     data: any[],
     section: ReportSectionType,
@@ -731,9 +764,13 @@ export const ReportsPage: React.FC = () => {
     }
 
     const manualOrder = manualRowOrderBySection[section] || [];
+    const excludedKeys = new Set(excludedRowKeysBySection[section] || []);
     const rank = new Map(manualOrder.map((key, index) => [key, index]));
+    const visibleData = data.filter((item, index) =>
+      !excludedKeys.has(getManualRowKey(item, index))
+    );
 
-    return [...data].sort((first, second) => {
+    return [...visibleData].sort((first, second) => {
       const firstIndex = data.indexOf(first);
       const secondIndex = data.indexOf(second);
       const firstKey = getManualRowKey(first, firstIndex);
@@ -758,6 +795,11 @@ export const ReportsPage: React.FC = () => {
       [section]: data.map((item, index) => getManualRowKey(item, index)),
     }));
 
+    setExcludedRowKeysBySection((prev) => ({
+      ...prev,
+      [section]: [],
+    }));
+
     setManualOrderEnabledBySection((prev) => ({
       ...prev,
       [section]: true,
@@ -771,6 +813,11 @@ export const ReportsPage: React.FC = () => {
     }));
 
     setManualRowOrderBySection((prev) => ({
+      ...prev,
+      [section]: [],
+    }));
+
+    setExcludedRowKeysBySection((prev) => ({
       ...prev,
       [section]: [],
     }));
@@ -811,6 +858,11 @@ export const ReportsPage: React.FC = () => {
     rowKey: string,
     requestedPosition: number,
   ) => {
+    if (requestedPosition <= 0) {
+      excludeManualRow(section, rowKey);
+      return;
+    }
+
     setManualRowOrderBySection((prev) => {
       const current = [...(prev[section] || [])];
       const currentIndex = current.indexOf(rowKey);
@@ -1846,6 +1898,7 @@ export const ReportsPage: React.FC = () => {
     const automaticallySortedData = sortReportData(safeData, sortSettings);
     const sortedData = applyManualRowOrder(automaticallySortedData, type);
     const manualOrderEnabled = manualOrderEnabledBySection[type];
+    const excludedCount = (excludedRowKeysBySection[type] || []).length;
     const enabledColumns = columns.filter((col) => col.enabled);
     const previewTableWidth =
       enabledColumns.length <= 5
@@ -2302,7 +2355,20 @@ export const ReportsPage: React.FC = () => {
 
                     {manualOrderEnabled && (
                       <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                        الترتيب اليدوي مفعّل. استخدم أدوات «ترتيب الصف» داخل الجدول لنقل كل سجل إلى الموضع المطلوب. هذا الترتيب يطبّق على Excel وPDF والطباعة.
+                        <span>
+                          الترتيب اليدوي مفعّل. استخدم الأسهم أو رقم الموضع لترتيب السجلات. اكتب 0 أو اضغط × لاستبعاد الصف من التقرير. الصفوف المستبعدة لا تظهر في Excel أو PDF أو الطباعة.
+                        </span>
+                        {excludedCount > 0 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mr-3 border-amber-300 bg-white/80"
+                            onClick={() => restoreExcludedRows(type)}
+                          >
+                            استعادة المستبعد ({excludedCount})
+                          </Button>
+                        )}
                       </div>
                     )}
 
@@ -2393,8 +2459,8 @@ export const ReportsPage: React.FC = () => {
                           ))}
 
                           {manualOrderEnabled && (
-                            <TableHead className="w-[170px] px-2 py-2 text-center text-white">
-                              ترتيب الصف
+                            <TableHead className="w-[210px] px-2 py-2 text-center text-white">
+                              ترتيب / استبعاد
                             </TableHead>
                           )}
                         </TableRow>
@@ -2451,7 +2517,7 @@ export const ReportsPage: React.FC = () => {
 
                                       <input
                                         type="number"
-                                        min={1}
+                                        min={0}
                                         max={sortedData.length}
                                         value={index + 1}
                                         onChange={(event) =>
@@ -2462,7 +2528,7 @@ export const ReportsPage: React.FC = () => {
                                           )
                                         }
                                         className="h-8 w-14 rounded-md border bg-background px-1 text-center text-xs"
-                                        title="رقم ترتيب الصف"
+                                        title="رقم ترتيب الصف — اكتب 0 للاستبعاد"
                                       />
 
                                       <Button
@@ -2475,6 +2541,17 @@ export const ReportsPage: React.FC = () => {
                                         title="تحريك الصف للأسفل"
                                       >
                                         <ChevronDown className="h-4 w-4" />
+                                      </Button>
+
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800"
+                                        onClick={() => excludeManualRow(type, rowKey)}
+                                        title="استبعاد الصف من التقرير"
+                                      >
+                                        <X className="h-4 w-4" />
                                       </Button>
                                     </div>
                                   </TableCell>
