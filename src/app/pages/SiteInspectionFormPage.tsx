@@ -87,12 +87,14 @@ export const SiteInspectionFormPage: React.FC = () => {
   const [loading, setLoading] = React.useState(isEdit);
   const [uploading, setUploading] = React.useState(false);
   const [showMap, setShowMap] = React.useState(true);
+  const [visitTime, setVisitTime] = React.useState(new Date().toTimeString().slice(0, 5));
 
   React.useEffect(() => {
     if (!inspectionId) return;
 
     getSiteInspection(inspectionId)
       .then((record) => {
+        setVisitTime(record.visitDate?.slice(11, 16) || '09:00');
         setForm({
           title: record.title,
           siteType: record.siteType,
@@ -216,10 +218,14 @@ export const SiteInspectionFormPage: React.FC = () => {
 
     try {
       setSaving(true);
+      const visitDateWithTime = form.visitDate
+        ? `${form.visitDate}${form.visitDateType === 'hijri' ? ' ' : 'T'}${visitTime || '00:00'}`
+        : form.visitDate;
+      const payload = { ...form, visitDate: visitDateWithTime };
       const saved =
         isEdit && inspectionId
-          ? await updateSiteInspection(inspectionId, form)
-          : await createSiteInspection(form);
+          ? await updateSiteInspection(inspectionId, payload)
+          : await createSiteInspection(payload);
 
       toast.success(isEdit ? 'تم تحديث المعاينة' : 'تم حفظ المعاينة');
       navigate(`/site-inspections/${saved.id}`);
@@ -281,6 +287,9 @@ export const SiteInspectionFormPage: React.FC = () => {
               helperText="اختر نوع التاريخ حسب محضر الزيارة أو المستند الرسمي."
             />
           </div>
+          <Field label="وقت الزيارة">
+            <Input type="time" value={visitTime} onChange={(e) => setVisitTime(e.target.value)} />
+          </Field>
           <Field label="القائم بالمعاينة">
             <Input value={form.inspectorName || ''} onChange={(e) => setField('inspectorName', e.target.value)} />
           </Field>
