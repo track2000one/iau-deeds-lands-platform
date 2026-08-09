@@ -1,0 +1,39 @@
+name: Attachment Preview Upgrade
+
+on:
+  push:
+    paths:
+      - 'scripts/upgrade-attachment-previews.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Apply attachment preview upgrade
+        run: node scripts/upgrade-attachment-previews.mjs
+
+      - name: Commit upgraded attachment previews
+        run: |
+          if git diff --quiet; then
+            echo "No attachment preview changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/ViewDeedPage.tsx
+          git commit -m "Show PDF and image previews in deed attachments"
+          git push
