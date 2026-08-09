@@ -39,7 +39,11 @@ const percent = (value: number, total: number) => {
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  const locale = isArabic ? 'ar-SA' : 'en-US';
+  const ui = (ar: string, en: string) => (isArabic ? ar : en);
+  const formatNumber = (value: number) => new Intl.NumberFormat(locale).format(value);
   const { deeds } = useDeeds();
   const { getStatistics } = useData();
   const dataStats = getStatistics();
@@ -54,9 +58,9 @@ export const HomePage: React.FC = () => {
       planned: plannedCount,
       unplanned: unplannedCount,
       totalArea,
-      totalAreaText: totalArea.toLocaleString(),
+      totalAreaText: new Intl.NumberFormat(i18n.language === 'ar' ? 'ar-SA' : 'en-US').format(totalArea),
     };
-  }, [deeds]);
+  }, [deeds, i18n.language]);
 
   const recentDeeds = React.useMemo(() => {
     return [...deeds]
@@ -67,27 +71,27 @@ export const HomePage: React.FC = () => {
   const topStats = [
     {
       label: t('home.totalDeeds'),
-      value: stats.total.toLocaleString(),
+      value: formatNumber(stats.total),
       sub: t('deed.title'),
       icon: FileText,
       accent: 'text-primary',
     },
     {
       label: t('home.plannedLands'),
-      value: stats.planned.toLocaleString(),
+      value: formatNumber(stats.planned),
       sub: `${percent(stats.planned, stats.total)}% ${t('deed.isPlanned')}`,
       icon: MapPin,
       accent: 'text-violet-500',
     },
     {
       label: t('home.unplannedLands'),
-      value: stats.unplanned.toLocaleString(),
-      sub: `${percent(stats.unplanned, stats.total)}% غير مخططة`,
+      value: formatNumber(stats.unplanned),
+      sub: `${percent(stats.unplanned, stats.total)}% ${ui('غير مخططة', 'Unplanned')}`, 
       icon: MapPinOff,
       accent: 'text-cyan-500',
     },
     {
-      label: 'إجمالي مساحة الصكوك',
+      label: ui('إجمالي مساحة الصكوك', 'Total Deed Area'),
       value: stats.totalAreaText,
       sub: t('deed.sqm'),
       icon: Ruler,
@@ -96,11 +100,11 @@ export const HomePage: React.FC = () => {
   ];
 
   const quickActions = [
-    { id: 'add-deed', path: '/deeds/new', icon: PlusCircle, label: 'إصدار صك جديد', sub: 'إضافة صك إلكتروني' },
-    { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: 'تسجيل أرض', sub: 'إضافة أرض جديدة' },
-    { id: 'archive', path: '/archive', icon: UploadCloud, label: 'رفع مستند', sub: 'حفظ الملفات والأرشفة' },
-    { id: 'search', path: '/search', icon: Search, label: 'بحث متقدم', sub: 'البحث في السجلات' },
-    { id: 'reports', path: '/reports', icon: BarChart3, label: 'التقارير', sub: 'إحصاءات وطباعة' },
+    { id: 'add-deed', path: '/deeds/new', icon: PlusCircle, label: ui('إصدار صك جديد', 'Create New Deed'), sub: ui('إضافة صك إلكتروني', 'Add an electronic deed') },
+    { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: ui('تسجيل أرض', 'Register Land'), sub: ui('إضافة أرض جديدة', 'Add new land') },
+    { id: 'archive', path: '/archive', icon: UploadCloud, label: ui('رفع مستند', 'Upload Document'), sub: ui('حفظ الملفات والأرشفة', 'Save files and archive') },
+    { id: 'search', path: '/search', icon: Search, label: ui('بحث متقدم', 'Advanced Search'), sub: ui('البحث في السجلات', 'Search records') },
+    { id: 'reports', path: '/reports', icon: BarChart3, label: ui('التقارير', 'Reports'), sub: ui('إحصاءات وطباعة', 'Statistics and printing') },
   ];
 
   return (
@@ -120,48 +124,48 @@ export const HomePage: React.FC = () => {
               </div>
 
               <div className="mt-5">
-                <h2 className="text-xl font-bold">مرحباً بك في </h2>
-                <h2 className="text-xl font-bold">إدارة أوقاف وأملاك الجامعة </h2>
+                <h2 className="text-xl font-bold">{ui('مرحباً بك في', 'Welcome to')}</h2>
+                <h2 className="text-xl font-bold">{ui('إدارة أوقاف وأملاك الجامعة', 'University Endowments and Properties Administration')}</h2>
               </div>
             </CardContent>
           </Card>
 
           <Card className="future-card overflow-hidden">
             <CardHeader>
-              <CardTitle>إجراء سريع</CardTitle>
-              <CardDescription>الوصول السريع لأهم العمليات</CardDescription>
+              <CardTitle>{ui('إجراء سريع', 'Quick Action')}</CardTitle>
+              <CardDescription>{ui('الوصول السريع لأهم العمليات', 'Quick access to key operations')}</CardDescription>
             </CardHeader>
             <CardContent>
               <Button className="w-full h-12 future-glow-button" onClick={() => navigate('/deeds/new')}>
                 <PlusCircle className="ml-2 h-5 w-5" />
-                إنشاء معاملة جديدة
+                {ui('إنشاء معاملة جديدة', 'Create New Transaction')}
               </Button>
             </CardContent>
           </Card>
 
           <Card className="future-card overflow-hidden">
             <CardHeader>
-              <CardTitle>معلومات النظام</CardTitle>
+              <CardTitle>{ui('معلومات النظام', 'System Information')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between rounded-xl border bg-background/40 p-3">
-                <span className="text-sm text-muted-foreground">إصدار المنصة</span>
+                <span className="text-sm text-muted-foreground">{ui('إصدار المنصة', 'Platform Version')}</span>
                 <span className="font-mono">v2060.1.0</span>
               </div>
               <div className="flex items-center justify-between rounded-xl border bg-background/40 p-3">
-                <span className="text-sm text-muted-foreground">وقت التشغيل</span>
-                <span className="font-mono">10.0 يوم</span>
+                <span className="text-sm text-muted-foreground">{ui('وقت التشغيل', 'Uptime')}</span>
+                <span className="font-mono">{ui('١٠٫٠ يوم', '10.0 days')}</span>
               </div>
               <div className="flex items-center justify-between rounded-xl border bg-background/40 p-3">
-                <span className="text-sm text-muted-foreground">حالة النظام</span>
-                <Badge variant="secondary">يعمل بكفاءة</Badge>
+                <span className="text-sm text-muted-foreground">{ui('حالة النظام', 'System Status')}</span>
+                <Badge variant="secondary">{ui('يعمل بكفاءة', 'Operational')}</Badge>
               </div>
             </CardContent>
           </Card>
         </div>
 
         <div className="min-w-0 space-y-5 2xl:order-1">
-          <div className="text-right">
+          <div className={isArabic ? 'text-right' : 'text-left'}>
             <h1 className="text-2xl md:text-3xl 2xl:text-4xl font-bold">{t('home.welcome')}</h1>
             <p className="text-muted-foreground mt-2">{t('app.subtitle')}</p>
           </div>
@@ -177,7 +181,7 @@ export const HomePage: React.FC = () => {
                       <div className="future-stat-icon h-12 w-12 bg-primary/10">
                         <Icon className={`h-6 w-6 ${item.accent}`} />
                       </div>
-                      <div className="text-right">
+                      <div className={isArabic ? 'text-right' : 'text-left'}>
                         <p className="text-sm text-muted-foreground">{item.label}</p>
                         <p className="mt-2 text-2xl 2xl:text-3xl font-bold tabular-nums">{item.value}</p>
                         <p className="text-xs text-muted-foreground mt-1">{item.sub}</p>
@@ -192,37 +196,37 @@ export const HomePage: React.FC = () => {
           <Card className="future-card overflow-hidden">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>نظرة عامة على المنصة</span>
+                <span>{ui('نظرة عامة على المنصة', 'Platform Overview')}</span>
                 <BarChart3 className="h-5 w-5 text-primary" />
               </CardTitle>
-              <CardDescription>ملخص شامل لأداء المنصة والعمليات الرئيسية</CardDescription>
+              <CardDescription>{ui('ملخص شامل لأداء المنصة والعمليات الرئيسية', 'A comprehensive summary of platform performance and core operations')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
                 <div className="text-center rounded-2xl border bg-background/40 p-4">
                   <Users className="h-7 w-7 mx-auto mb-3 text-primary" />
-                  <p className="text-2xl font-bold">{dataStats.totalRecords}</p>
-                  <p className="text-xs text-muted-foreground">إجمالي السجلات</p>
+                  <p className="text-2xl font-bold">{formatNumber(dataStats.totalRecords)}</p>
+                  <p className="text-xs text-muted-foreground">{ui('إجمالي السجلات', 'Total Records')}</p>
                 </div>
                 <div className="text-center rounded-2xl border bg-background/40 p-4">
                   <FileText className="h-7 w-7 mx-auto mb-3 text-primary" />
-                  <p className="text-2xl font-bold">{dataStats.totalDeeds}</p>
-                  <p className="text-xs text-muted-foreground">الصكوك</p>
+                  <p className="text-2xl font-bold">{formatNumber(dataStats.totalDeeds)}</p>
+                  <p className="text-xs text-muted-foreground">{ui('الصكوك', 'Deeds')}</p>
                 </div>
                 <div className="text-center rounded-2xl border bg-background/40 p-4">
                   <Map className="h-7 w-7 mx-auto mb-3 text-primary" />
                   <p className="text-2xl font-bold">
-                    {dataStats.totalAllocatedLands + dataStats.totalDeliveredLands +
-                      dataStats.totalLeasedLandsOut + dataStats.totalLeasedLandsIn}
+                    {formatNumber(dataStats.totalAllocatedLands + dataStats.totalDeliveredLands +
+                      dataStats.totalLeasedLandsOut + dataStats.totalLeasedLandsIn)}
                   </p>
-                  <p className="text-xs text-muted-foreground">الأراضي</p>
+                  <p className="text-xs text-muted-foreground">{ui('الأراضي', 'Lands')}</p>
                 </div>
                 <div className="text-center rounded-2xl border bg-background/40 p-4">
                   <Building className="h-7 w-7 mx-auto mb-3 text-primary" />
                   <p className="text-2xl font-bold">
-                    {dataStats.totalLeasedBuildingsOut + dataStats.totalLeasedBuildingsIn}
+                    {formatNumber(dataStats.totalLeasedBuildingsOut + dataStats.totalLeasedBuildingsIn)}
                   </p>
-                  <p className="text-xs text-muted-foreground">المباني</p>
+                  <p className="text-xs text-muted-foreground">{ui('المباني', 'Buildings')}</p>
                 </div>
               </div>
             </CardContent>
@@ -231,7 +235,7 @@ export const HomePage: React.FC = () => {
           <Card className="future-card overflow-hidden">
             <CardHeader>
               <CardTitle>{t('home.quickActions')}</CardTitle>
-              <CardDescription>العمليات الشائعة للوصول السريع</CardDescription>
+              <CardDescription>{ui('العمليات الشائعة للوصول السريع', 'Common operations for quick access')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 xl:grid-cols-5">
@@ -261,7 +265,7 @@ export const HomePage: React.FC = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <CardTitle>{t('home.recentDeeds')}</CardTitle>
-                    <CardDescription>آخر الصكوك المضافة للنظام</CardDescription>
+                    <CardDescription>{ui('آخر الصكوك المضافة للنظام', 'Latest deeds added to the system')}</CardDescription>
                   </div>
                   <Button variant="outline" onClick={() => navigate('/deeds')}>
                     {t('nav.allDeeds')}
@@ -272,7 +276,7 @@ export const HomePage: React.FC = () => {
                 {recentDeeds.length === 0 ? (
                   <div className="text-center py-10 text-muted-foreground">
                     <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>لا توجد صكوك</p>
+                    <p>{ui('لا توجد صكوك', 'No deeds found')}</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -289,7 +293,7 @@ export const HomePage: React.FC = () => {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className="font-bold truncate">{deed.deedNumber}</p>
-                                {deed.isPlanned && <Badge variant="secondary">مخططة</Badge>}
+                                {deed.isPlanned && <Badge variant="secondary">{ui('مخططة', 'Planned')}</Badge>}
                               </div>
                               <p className="text-sm text-muted-foreground truncate">
                                 {deed.city || '-'} - {deed.district || '-'}
@@ -298,9 +302,9 @@ export const HomePage: React.FC = () => {
                           </div>
 
                           <div className="flex shrink-0 items-center justify-between gap-3 text-right sm:block sm:text-left">
-                            <p className="font-bold">{safeNumber(deed.area).toLocaleString()} {t('deed.sqm')}</p>
+                            <p className="font-bold">{formatNumber(safeNumber(deed.area))} {t('deed.sqm')}</p>
                             <p className="text-xs text-muted-foreground">
-                              {deed.createdAt ? new Date(deed.createdAt).toLocaleDateString('ar-SA') : '-'}
+                              {deed.createdAt ? new Date(deed.createdAt).toLocaleDateString(locale) : '-'}
                             </p>
                           </div>
                         </div>
@@ -314,8 +318,8 @@ export const HomePage: React.FC = () => {
 
             <Card className="future-card overflow-hidden">
               <CardHeader>
-                <CardTitle>الأمان والموثوقية</CardTitle>
-                <CardDescription>مستوى أمان متقدم</CardDescription>
+                <CardTitle>{ui('الأمان والموثوقية', 'Security and Reliability')}</CardTitle>
+                <CardDescription>{ui('مستوى أمان متقدم', 'Advanced security level')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="future-hero-art min-h-[210px]">
@@ -325,7 +329,7 @@ export const HomePage: React.FC = () => {
                 </div>
                 <div className="mt-4 rounded-2xl border bg-background/35 p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">مستوى الأمان</p>
+                    <p className="text-sm text-muted-foreground">{ui('مستوى الأمان', 'Security Level')}</p>
                     <p className="text-2xl font-bold">99.9%</p>
                   </div>
                   <Shield className="h-10 w-10 text-primary" />
@@ -338,22 +342,22 @@ export const HomePage: React.FC = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="h-5 w-5 text-primary" />
-                التنبيهات والإشعارات
+                {ui('التنبيهات والإشعارات', 'Alerts and Notifications')}
               </CardTitle>
-              <CardDescription>آخر التحديثات المهمة على المنصة</CardDescription>
+              <CardDescription>{ui('آخر التحديثات المهمة على المنصة', 'Latest important platform updates')}</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="rounded-2xl border bg-background/35 p-4">
-                <p className="font-bold">تحديث جديد</p>
-                <p className="text-sm text-muted-foreground mt-1">تم تحسين واجهة المنصة المستقبلية.</p>
+                <p className="font-bold">{ui('تحديث جديد', 'New Update')}</p>
+                <p className="text-sm text-muted-foreground mt-1">{ui('تم تحسين واجهة المنصة المستقبلية.', 'The platform interface has been improved.')}</p>
               </div>
               <div className="rounded-2xl border bg-background/35 p-4">
-                <p className="font-bold">معاملة بحاجة لمراجعة</p>
-                <p className="text-sm text-muted-foreground mt-1">راجع السجلات الأخيرة عند الحاجة.</p>
+                <p className="font-bold">{ui('معاملة بحاجة لمراجعة', 'Transaction Requires Review')}</p>
+                <p className="text-sm text-muted-foreground mt-1">{ui('راجع السجلات الأخيرة عند الحاجة.', 'Review the latest records when needed.')}</p>
               </div>
               <div className="rounded-2xl border bg-background/35 p-4">
-                <p className="font-bold">رفع مخطط</p>
-                <p className="text-sm text-muted-foreground mt-1">يمكن رفع المخططات من صفحة الأرشفة.</p>
+                <p className="font-bold">{ui('رفع مخطط', 'Upload Plan')}</p>
+                <p className="text-sm text-muted-foreground mt-1">{ui('يمكن رفع المخططات من صفحة الأرشفة.', 'Plans can be uploaded from the Archive page.')}</p>
               </div>
             </CardContent>
           </Card>

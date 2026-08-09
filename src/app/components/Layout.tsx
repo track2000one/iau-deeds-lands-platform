@@ -60,6 +60,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [logoutDialogOpen, setLogoutDialogOpen] = React.useState(false);
 
   const isRTL = i18n.language === 'ar';
+  const ui = (ar: string, en: string) => (isRTL ? ar : en);
+  const locale = isRTL ? 'ar-SA' : 'en-US';
 
   React.useEffect(() => {
     if (!sidebarOpen || window.innerWidth >= 1024) return;
@@ -107,19 +109,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'all-deeds', path: '/deeds', icon: FileText, label: t('nav.allDeeds'), module: 'deeds', action: 'canView' },
     { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: t('nav.allocatedLands'), module: 'allocated_lands', action: 'canView' },
     { id: 'delivered-lands', path: '/lands/delivered', icon: MapPin, label: t('nav.deliveredLands'), module: 'delivered_lands', action: 'canView' },
-    { id: 'site-inspections', path: '/site-inspections', icon: ClipboardCheck, label: 'معاينة أرض أو موقع', module: 'site_inspections', action: 'canView' },
+    { id: 'site-inspections', path: '/site-inspections', icon: ClipboardCheck, label: ui('معاينة أرض أو موقع', 'Land or Site Inspection'), module: 'site_inspections', action: 'canView' },
     { id: 'leased-lands-out', path: '/lands/leased-out', icon: MapPin, label: t('nav.leasedLandsOut'), module: 'leased_lands_out', action: 'canView' },
     { id: 'leased-lands-in', path: '/lands/leased-in', icon: MapPin, label: t('nav.leasedLandsIn'), module: 'leased_lands_in', action: 'canView' },
     { id: 'leased-buildings-out', path: '/buildings/leased-out', icon: Building, label: t('nav.leasedBuildingsOut'), module: 'leased_buildings_out', action: 'canView' },
     { id: 'leased-buildings-in', path: '/buildings/leased-in', icon: Building, label: t('nav.leasedBuildingsIn'), module: 'leased_buildings_in', action: 'canView' },
-    { id: 'contracts-followup', path: '/contracts/follow-up', icon: FileClock, label: 'متابعة العقود', alwaysVisible: true },
-    { id: 'assets', path: '/assets', icon: Package, label: 'وحدة الأصول', module: 'assets', action: 'canView' },
+    { id: 'contracts-followup', path: '/contracts/follow-up', icon: FileClock, label: ui('متابعة العقود', 'Contract Follow-up'), alwaysVisible: true },
+    { id: 'assets', path: '/assets', icon: Package, label: ui('وحدة الأصول', 'Assets Unit'), module: 'assets', action: 'canView' },
     { id: 'search', path: '/search', icon: Search, label: t('nav.search'), alwaysVisible: true },
     { id: 'reports', path: '/reports', icon: BarChart3, label: t('nav.reports'), module: 'reports', action: 'canView' },
     { id: 'admin', path: '/admin', icon: Shield, label: t('nav.admin'), adminOnly: true },
-    { id: 'audit', path: '/audit', icon: History, label: 'سجل العمليات', adminOnly: true },
-    { id: 'archive', path: '/archive', icon: Archive, label: 'الأرشفة', module: 'archive', action: 'canView' },
-    { id: 'appearance', path: '/appearance', icon: Palette, label: 'المظهر', alwaysVisible: true },
+    { id: 'audit', path: '/audit', icon: History, label: ui('سجل العمليات', 'Audit Log'), adminOnly: true },
+    { id: 'archive', path: '/archive', icon: Archive, label: ui('الأرشفة', 'Archive'), module: 'archive', action: 'canView' },
+    { id: 'appearance', path: '/appearance', icon: Palette, label: ui('المظهر', 'Appearance'), alwaysVisible: true },
   ] as const;
 
   const getCurrentPage = () => {
@@ -168,17 +170,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Button>
 
             <div className="hidden md:flex items-center gap-2">
-              <Button title="الحساب" aria-label="الحساب" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button" onClick={() => navigate(isAdmin ? '/admin' : '/')}>
+              <Button title={ui('الحساب', 'Account')} aria-label={ui('الحساب', 'Account')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button" onClick={() => navigate(isAdmin ? '/admin' : '/')}>
                 <User className="h-4 w-4" />
               </Button>
-              <Button title="تنبيهات العقود" aria-label="تنبيهات العقود" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl relative" onClick={() => navigate('/contracts/follow-up')}>
+              <Button title={ui('تنبيهات العقود', 'Contract Alerts')} aria-label={ui('تنبيهات العقود', 'Contract Alerts')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl relative" onClick={() => navigate('/contracts/follow-up')}>
                 <Bell className="h-4 w-4" />
                 <span className="absolute top-2 end-2 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-background" />
               </Button>
-              <Button title="إنشاء رسالة بريد" aria-label="إنشاء رسالة بريد" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={() => { window.location.href = `mailto:?subject=${encodeURIComponent('منصة إدارة الأصول والأملاك والأوقاف الجامعية')}`; }}>
+              <Button title={ui('إنشاء رسالة بريد', 'Compose Email')} aria-label={ui('إنشاء رسالة بريد', 'Compose Email')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={() => { window.location.href = `mailto:?subject=${encodeURIComponent(ui('منصة إدارة الأصول والأملاك والأوقاف الجامعية', 'University Assets, Properties and Endowments Management Platform'))}`; }}>
                 <Mail className="h-4 w-4" />
               </Button>
-              <Button title="تبديل اللغة" aria-label="تبديل اللغة" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={toggleLanguage}>
+              <Button title={ui('تبديل اللغة', 'Switch Language')} aria-label={ui('تبديل اللغة', 'Switch Language')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={toggleLanguage}>
                 <Globe2 className="h-4 w-4" />
               </Button>
             </div>
@@ -190,15 +192,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               className="h-10 rounded-2xl px-3"
             >
               <Languages className="h-4 w-4 ml-2" />
-              {i18n.language === 'ar' ? 'EN' : 'ع'}
+              {i18n.language === 'ar' ? 'EN' : 'AR'}
             </Button>
 
             <div className="hidden xl:flex items-center gap-2 rounded-2xl border bg-background/50 px-4 py-2">
               <span className="font-mono text-sm">
-                {now.toLocaleDateString('ar-SA-u-nu-latn')}
+                {now.toLocaleDateString(locale)}
               </span>
               <span className="font-mono text-sm">
-                {now.toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' })}
+                {now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
               </span>
               <CalendarDays className="h-4 w-4 text-primary" />
             </div>
@@ -263,7 +265,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-bold truncate">{username}</p>
-                <p className="text-xs opacity-70">مستخدم المنصة</p>
+                <p className="text-xs opacity-70">{ui('مستخدم المنصة', 'Platform User')}</p>
               </div>
 
               <Button
