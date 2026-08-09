@@ -1,10 +1,11 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type {
   ModuleName,
   ModulePermissions,
   UserPermissions,
 } from '../../types/permissions';
-import { MODULE_LABELS } from '../../types/permissions';
+import { MODULE_LABELS, MODULE_LABELS_EN } from '../../types/permissions';
 import { Card } from './ui/card';
 import { Label } from './ui/label';
 
@@ -24,13 +25,14 @@ const MODULES: ModuleName[] = [
 
 const ACTIONS: Array<{
   key: keyof ModulePermissions;
-  label: string;
+  ar: string;
+  en: string;
 }> = [
-  { key: 'canView', label: 'عرض' },
-  { key: 'canAdd', label: 'إضافة' },
-  { key: 'canEdit', label: 'تعديل' },
-  { key: 'canDelete', label: 'حذف' },
-  { key: 'canPrint', label: 'طباعة' },
+  { key: 'canView', ar: 'عرض', en: 'View' },
+  { key: 'canAdd', ar: 'إضافة', en: 'Add' },
+  { key: 'canEdit', ar: 'تعديل', en: 'Edit' },
+  { key: 'canDelete', ar: 'حذف', en: 'Delete' },
+  { key: 'canPrint', ar: 'طباعة', en: 'Print' },
 ];
 
 export const PermissionMatrix: React.FC<{
@@ -38,6 +40,10 @@ export const PermissionMatrix: React.FC<{
   onChange: (value: UserPermissions) => void;
   disabled?: boolean;
 }> = ({ value, onChange, disabled = false }) => {
+  const { i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  const ui = (ar: string, en: string) => (isArabic ? ar : en);
+
   const setPermission = (
     moduleName: ModuleName,
     action: keyof ModulePermissions,
@@ -71,9 +77,9 @@ export const PermissionMatrix: React.FC<{
   return (
     <Card className="overflow-hidden">
       <div className="border-b p-4">
-        <h3 className="font-semibold">صلاحيات المستخدم التفصيلية</h3>
+        <h3 className="font-semibold">{ui('صلاحيات المستخدم التفصيلية', 'Detailed User Permissions')}</h3>
         <p className="text-sm text-muted-foreground">
-          الأقسام غير المفعلة ستختفي من القائمة الجانبية.
+          {ui('الأقسام غير المفعلة ستختفي من القائمة الجانبية.', 'Disabled sections will be hidden from the sidebar.')}
         </p>
       </div>
 
@@ -81,10 +87,10 @@ export const PermissionMatrix: React.FC<{
         <table className="w-full min-w-[760px] text-sm">
           <thead>
             <tr className="border-b bg-muted/40">
-              <th className="p-3 text-right">القسم</th>
+              <th className={`p-3 ${isArabic ? 'text-right' : 'text-left'}`}>{ui('القسم', 'Section')}</th>
               {ACTIONS.map((action) => (
                 <th key={action.key} className="p-3 text-center">
-                  {action.label}
+                  {isArabic ? action.ar : action.en}
                 </th>
               ))}
             </tr>
@@ -94,7 +100,7 @@ export const PermissionMatrix: React.FC<{
             {MODULES.map((moduleName) => (
               <tr key={moduleName} className="border-b last:border-0">
                 <td className="p-3 font-medium">
-                  {MODULE_LABELS[moduleName]}
+                  {isArabic ? MODULE_LABELS[moduleName] : MODULE_LABELS_EN[moduleName]}
                 </td>
 
                 {ACTIONS.map((action) => (
