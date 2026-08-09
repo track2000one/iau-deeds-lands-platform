@@ -1,8 +1,6 @@
 name: Audit hardcoded Arabic UI strings
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -19,9 +17,7 @@ jobs:
 
           root = Path('src')
           arabic = re.compile(r'[\u0600-\u06FF]')
-          allowed = {
-              Path('src/i18n/locales/ar.json'),
-          }
+          allowed = {Path('src/i18n/locales/ar.json')}
           exts = {'.ts', '.tsx', '.js', '.jsx', '.json'}
           rows = []
           for p in sorted(root.rglob('*')):
