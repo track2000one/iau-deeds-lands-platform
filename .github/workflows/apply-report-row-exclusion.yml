@@ -26,82 +26,164 @@ jobs:
           path = Path('src/app/pages/ReportsPage.tsx')
           text = path.read_text(encoding='utf-8')
 
-          def replace_once(old: str, new: str, label: str):
+          def once(old: str, new: str, label: str):
               global text
               count = text.count(old)
               if count != 1:
                   raise SystemExit(f'{label}: expected 1 occurrence, found {count}')
               text = text.replace(old, new, 1)
 
-          replace_once(
-          """  ChevronDown,\n  ChevronUp,\n  Download,""",
-          """  ChevronDown,\n  ChevronUp,\n  X,\n  Download,""",
-          'import X'
+          once(
+              "  ChevronDown,\n  ChevronUp,\n  Download,",
+              "  ChevronDown,\n  ChevronUp,\n  X,\n  Download,",
+              'import X',
           )
 
-          replace_once(
-          """  const [manualRowOrderBySection, setManualRowOrderBySection] = useState<\n    Record<ReportSectionType, string[]>\n  >({\n    deeds: [],\n    allocated: [],\n    delivered: [],\n    leasedOut: [],\n    leasedIn: [],\n    buildingsOut: [],\n    buildingsIn: [],\n    siteInspections: [],\n  });\n\n  const [printSettingsBySection,""",
-          """  const [manualRowOrderBySection, setManualRowOrderBySection] = useState<\n    Record<ReportSectionType, string[]>\n  >({\n    deeds: [],\n    allocated: [],\n    delivered: [],\n    leasedOut: [],\n    leasedIn: [],\n    buildingsOut: [],\n    buildingsIn: [],\n    siteInspections: [],\n  });\n\n  const [excludedRowKeysBySection, setExcludedRowKeysBySection] = useState<\n    Record<ReportSectionType, string[]>\n  >({\n    deeds: [],\n    allocated: [],\n    delivered: [],\n    leasedOut: [],\n    leasedIn: [],\n    buildingsOut: [],\n    buildingsIn: [],\n    siteInspections: [],\n  });\n\n  const [printSettingsBySection,""",
-          'excluded row state'
+          anchor = """  const [printSettingsBySection, setPrintSettingsBySection] = useState<Record<ReportSectionType, PrintSettings>>({"""
+          block = """  const [excludedRowKeysBySection, setExcludedRowKeysBySection] = useState<
+    Record<ReportSectionType, string[]>
+  >({
+    deeds: [],
+    allocated: [],
+    delivered: [],
+    leasedOut: [],
+    leasedIn: [],
+    buildingsOut: [],
+    buildingsIn: [],
+    siteInspections: [],
+  });
+
+"""
+          once(anchor, block + anchor, 'state')
+
+          old_apply = """  const applyManualRowOrder = (
+    data: any[],
+    section: ReportSectionType,
+  ): any[] => {
+    if (!manualOrderEnabledBySection[section]) {
+      return data;
+    }
+
+    const manualOrder = manualRowOrderBySection[section] || [];
+    const rank = new Map(manualOrder.map((key, index) => [key, index]));
+
+    return [...data].sort((first, second) => {"""
+          new_apply = """  const excludeManualRow = (section: ReportSectionType, rowKey: string) => {
+    setExcludedRowKeysBySection((prev) => {
+      const current = prev[section] || [];
+      if (current.includes(rowKey)) return prev;
+      return { ...prev, [section]: [...current, rowKey] };
+    });
+  };
+
+  const applyManualRowOrder = (
+    data: any[],
+    section: ReportSectionType,
+  ): any[] => {
+    if (!manualOrderEnabledBySection[section]) {
+      return data;
+    }
+
+    const manualOrder = manualRowOrderBySection[section] || [];
+    const excludedKeys = new Set(excludedRowKeysBySection[section] || []);
+    const rank = new Map(manualOrder.map((key, index) => [key, index]));
+    const visibleData = data.filter((item, index) =>
+      !excludedKeys.has(getManualRowKey(item, index))
+    );
+
+    return [...visibleData].sort((first, second) => {"""
+          once(old_apply, new_apply, 'apply')
+
+          once(
+              """  const moveManualRowToPosition = (
+    section: ReportSectionType,
+    rowKey: string,
+    requestedPosition: number,
+  ) => {
+    setManualRowOrderBySection((prev) => {""",
+              """  const moveManualRowToPosition = (
+    section: ReportSectionType,
+    rowKey: string,
+    requestedPosition: number,
+  ) => {
+    if (requestedPosition <= 0) {
+      excludeManualRow(section, rowKey);
+      return;
+    }
+
+    setManualRowOrderBySection((prev) => {""",
+              'zero excludes',
           )
 
-          replace_once(
-          """  const applyManualRowOrder = (\n    data: any[],\n    section: ReportSectionType,\n  ): any[] => {\n    if (!manualOrderEnabledBySection[section]) {\n      return data;\n    }\n\n    const manualOrder = manualRowOrderBySection[section] || [];\n    const rank = new Map(manualOrder.map((key, index) => [key, index]));\n\n    return [...data].sort((first, second) => {""",
-          """  const excludeManualRow = (section: ReportSectionType, rowKey: string) => {\n    setExcludedRowKeysBySection((prev) => {\n      const current = prev[section] || [];\n      if (current.includes(rowKey)) return prev;\n\n      return {\n        ...prev,\n        [section]: [...current, rowKey],\n      };\n    });\n  };\n\n  const restoreExcludedRows = (section: ReportSectionType) => {\n    setExcludedRowKeysBySection((prev) => ({\n      ...prev,\n      [section]: [],\n    }));\n  };\n\n  const applyManualRowOrder = (\n    data: any[],\n    section: ReportSectionType,\n  ): any[] => {\n    if (!manualOrderEnabledBySection[section]) {\n      return data;\n    }\n\n    const manualOrder = manualRowOrderBySection[section] || [];\n    const excludedKeys = new Set(excludedRowKeysBySection[section] || []);\n    const rank = new Map(manualOrder.map((key, index) => [key, index]));\n    const visibleData = data.filter((item, index) =>\n      !excludedKeys.has(getManualRowKey(item, index))\n    );\n\n    return [...visibleData].sort((first, second) => {""",
-          'manual row filtering'
+          once(
+              '<TableHead className="w-[170px] px-2 py-2 text-center text-white">\n                              ترتيب الصف\n                            </TableHead>',
+              '<TableHead className="w-[210px] px-2 py-2 text-center text-white">\n                              ترتيب / استبعاد\n                            </TableHead>',
+              'header',
           )
 
-          replace_once(
-          """  const enableManualRowOrder = (\n    section: ReportSectionType,\n    data: any[],\n  ) => {\n    setManualRowOrderBySection((prev) => ({\n      ...prev,\n      [section]: data.map((item, index) => getManualRowKey(item, index)),\n    }));\n\n    setManualOrderEnabledBySection((prev) => ({""",
-          """  const enableManualRowOrder = (\n    section: ReportSectionType,\n    data: any[],\n  ) => {\n    setManualRowOrderBySection((prev) => ({\n      ...prev,\n      [section]: data.map((item, index) => getManualRowKey(item, index)),\n    }));\n\n    setExcludedRowKeysBySection((prev) => ({\n      ...prev,\n      [section]: [],\n    }));\n\n    setManualOrderEnabledBySection((prev) => ({""",
-          'reset exclusions on enable'
-          )
+          once('                                        min={1}\n', '                                        min={0}\n', 'min')
+          once('                                        title="رقم ترتيب الصف"\n', '                                        title="رقم ترتيب الصف — اكتب 0 للاستبعاد"\n', 'title')
 
-          replace_once(
-          """    setManualRowOrderBySection((prev) => ({\n      ...prev,\n      [section]: [],\n    }));\n  };\n\n  const moveManualRow = (""",
-          """    setManualRowOrderBySection((prev) => ({\n      ...prev,\n      [section]: [],\n    }));\n\n    setExcludedRowKeysBySection((prev) => ({\n      ...prev,\n      [section]: [],\n    }));\n  };\n\n  const moveManualRow = (""",
-          'reset exclusions on disable'
-          )
+          down = """                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        disabled={index === sortedData.length - 1}
+                                        onClick={() => moveManualRow(type, rowKey, 'down')}
+                                        title="تحريك الصف للأسفل"
+                                      >
+                                        <ChevronDown className="h-4 w-4" />
+                                      </Button>"""
+          xbutton = down + """
 
-          replace_once(
-          """  const moveManualRowToPosition = (\n    section: ReportSectionType,\n    rowKey: string,\n    requestedPosition: number,\n  ) => {\n    setManualRowOrderBySection((prev) => {""",
-          """  const moveManualRowToPosition = (\n    section: ReportSectionType,\n    rowKey: string,\n    requestedPosition: number,\n  ) => {\n    if (requestedPosition <= 0) {\n      excludeManualRow(section, rowKey);\n      return;\n    }\n\n    setManualRowOrderBySection((prev) => {""",
-          'zero excludes row'
-          )
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800"
+                                        onClick={() => excludeManualRow(type, rowKey)}
+                                        title="استبعاد الصف من التقرير"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>"""
+          once(down, xbutton, 'x button')
 
-          replace_once(
-          """    const sortedData = applyManualRowOrder(automaticallySortedData, type);\n    const manualOrderEnabled = manualOrderEnabledBySection[type];\n    const enabledColumns = columns.filter((col) => col.enabled);""",
-          """    const sortedData = applyManualRowOrder(automaticallySortedData, type);\n    const manualOrderEnabled = manualOrderEnabledBySection[type];\n    const excludedCount = (excludedRowKeysBySection[type] || []).length;\n    const enabledColumns = columns.filter((col) => col.enabled);""",
-          'excluded count'
-          )
+          # Keep exclusions scoped to the active manual editing session.
+          once(
+              """    setManualRowOrderBySection((prev) => ({
+      ...prev,
+      [section]: [],
+    }));
+  };
 
-          replace_once(
-          """                          الترتيب اليدوي مفعّل. استخدم أدوات «ترتيب الصف» داخل الجدول لنقل كل سجل إلى الموضع المطلوب. هذا الترتيب يطبّق على Excel وPDF والطباعة.\n                      </div>\n                    )}""",
-          """                          الترتيب اليدوي مفعّل. استخدم الأسهم أو رقم الموضع لترتيب السجلات. اكتب 0 أو اضغط × لاستبعاد الصف من التقرير. الصفوف المستبعدة لا تظهر في Excel أو PDF أو الطباعة.\n                          {excludedCount > 0 && (\n                            <Button\n                              type=\"button\"\n                              variant=\"outline\"\n                              size=\"sm\"\n                              className=\"mr-3 border-amber-300 bg-white/80\"\n                              onClick={() => restoreExcludedRows(type)}\n                            >\n                              استعادة المستبعد ({excludedCount})\n                            </Button>\n                          )}\n                      </div>\n                    )}""",
-          'manual order notice'
-          )
+  const moveManualRow = (""",
+              """    setManualRowOrderBySection((prev) => ({
+      ...prev,
+      [section]: [],
+    }));
 
-          replace_once(
-          """                            <TableHead className=\"w-[170px] px-2 py-2 text-center text-white\">\n                              ترتيب الصف\n                            </TableHead>""",
-          """                            <TableHead className=\"w-[210px] px-2 py-2 text-center text-white\">\n                              ترتيب / استبعاد\n                            </TableHead>""",
-          'manual order header'
-          )
+    setExcludedRowKeysBySection((prev) => ({
+      ...prev,
+      [section]: [],
+    }));
+  };
 
-          replace_once(
-          """                                        min={1}\n                                        max={sortedData.length}\n                                        value={index + 1}\n                                        onChange={(event) =>\n                                          moveManualRowToPosition(\n                                            type,\n                                            rowKey,\n                                            Number(event.target.value),\n                                          )\n                                        }\n                                        className=\"h-8 w-14 rounded-md border bg-background px-1 text-center text-xs\"\n                                        title=\"رقم ترتيب الصف\"\n                                      />\n\n                                      <Button\n                                        type=\"button\"\n                                        variant=\"outline\"\n                                        size=\"icon\"\n                                        className=\"h-8 w-8\"\n                                        disabled={index === sortedData.length - 1}\n                                        onClick={() => moveManualRow(type, rowKey, 'down')}\n                                        title=\"تحريك الصف للأسفل\"\n                                      >\n                                        <ChevronDown className=\"h-4 w-4\" />\n                                      </Button>""",
-          """                                        min={0}\n                                        max={sortedData.length}\n                                        value={index + 1}\n                                        onChange={(event) =>\n                                          moveManualRowToPosition(\n                                            type,\n                                            rowKey,\n                                            Number(event.target.value),\n                                          )\n                                        }\n                                        className=\"h-8 w-14 rounded-md border bg-background px-1 text-center text-xs\"\n                                        title=\"رقم ترتيب الصف — اكتب 0 للاستبعاد\"\n                                      />\n\n                                      <Button\n                                        type=\"button\"\n                                        variant=\"outline\"\n                                        size=\"icon\"\n                                        className=\"h-8 w-8\"\n                                        disabled={index === sortedData.length - 1}\n                                        onClick={() => moveManualRow(type, rowKey, 'down')}\n                                        title=\"تحريك الصف للأسفل\"\n                                      >\n                                        <ChevronDown className=\"h-4 w-4\" />\n                                      </Button>\n\n                                      <Button\n                                        type=\"button\"\n                                        variant=\"outline\"\n                                        size=\"icon\"\n                                        className=\"h-8 w-8 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800\"\n                                        onClick={() => excludeManualRow(type, rowKey)}\n                                        title=\"استبعاد الصف من التقرير\"\n                                      >\n                                        <X className=\"h-4 w-4\" />\n                                      </Button>""",
-          'row exclusion control'
+  const moveManualRow = (""",
+              'reset exclusions',
           )
 
           path.write_text(text, encoding='utf-8')
           PY
 
-      - name: Verify patch
+      - name: Verify and build
         shell: bash
         run: |
           grep -q "excludedRowKeysBySection" src/app/pages/ReportsPage.tsx
           grep -q "اكتب 0 للاستبعاد" src/app/pages/ReportsPage.tsx
           grep -q "استبعاد الصف من التقرير" src/app/pages/ReportsPage.tsx
+          npm ci
+          npm run build
 
       - name: Commit patch
         shell: bash
@@ -109,5 +191,5 @@ jobs:
           git config user.name "OpenAI Platform Assistant"
           git config user.email "actions@users.noreply.github.com"
           git add src/app/pages/ReportsPage.tsx
-          git commit -m "Add professional row exclusion to reports"
+          git commit -m "Add row exclusion to report ordering"
           git push origin HEAD:main
