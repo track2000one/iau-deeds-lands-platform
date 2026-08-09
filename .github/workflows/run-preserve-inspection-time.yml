@@ -1,0 +1,31 @@
+name: Preserve inspection time
+
+on:
+  push:
+    paths:
+      - '.github/scripts/preserve_inspection_time.py'
+      - '.github/workflows/run-preserve-inspection-time.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: python .github/scripts/preserve_inspection_time.py
+      - run: npm ci && npm run build
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/scripts/preserve_inspection_time.py .github/workflows/run-preserve-inspection-time.yml
+          git add src/app/pages/SiteInspectionFormPage.tsx
+          git commit -m "Preserve inspection visit time with flexible calendars"
+          git push
