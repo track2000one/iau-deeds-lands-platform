@@ -57,6 +57,22 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   audit: 'سجل العمليات',
 };
 
+export const MODULE_LABELS_EN: Record<ModuleName, string> = {
+  deeds: 'Deeds',
+  allocated_lands: 'Allocated Lands',
+  delivered_lands: 'Delivered Lands',
+  leased_lands_out: 'Leased Lands (Out)',
+  leased_lands_in: 'Leased Lands (In)',
+  leased_buildings_out: 'Leased Buildings (Out)',
+  leased_buildings_in: 'Leased Buildings (In)',
+  assets: 'Assets Unit',
+  archive: 'Archive',
+  site_inspections: 'Field Inspections',
+  reports: 'Reports',
+  admin: 'Admin Dashboard',
+  audit: 'Audit Log',
+};
+
 const FULL: ModulePermissions = {
   canView: true,
   canAdd: true,
