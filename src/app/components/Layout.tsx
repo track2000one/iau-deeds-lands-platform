@@ -168,16 +168,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Button>
 
             <div className="hidden md:flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button">
+              <Button title="الحساب" aria-label="الحساب" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button" onClick={() => navigate(isAdmin ? '/admin' : '/')}>
                 <User className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl">
+              <Button title="تنبيهات العقود" aria-label="تنبيهات العقود" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl relative" onClick={() => navigate('/contracts/follow-up')}>
                 <Bell className="h-4 w-4" />
+                <span className="absolute top-2 end-2 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-background" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl">
+              <Button title="إنشاء رسالة بريد" aria-label="إنشاء رسالة بريد" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={() => { window.location.href = `mailto:?subject=${encodeURIComponent('منصة إدارة الأصول والأملاك والأوقاف الجامعية')}`; }}>
                 <Mail className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl">
+              <Button title="تبديل اللغة" aria-label="تبديل اللغة" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={toggleLanguage}>
                 <Globe2 className="h-4 w-4" />
               </Button>
             </div>

@@ -13,6 +13,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { ContractDateRangeFields, type ContractDateRangeValue } from '../components/ContractDateRangeFields';
 import { toast } from 'sonner';
 import type { LeasedLandOut } from '../../types/models';
 
@@ -54,12 +55,28 @@ export const AddLeasedLandOutPage: React.FC = () => {
   const [contractFiles, setContractFiles] = useState<File[]>([]);
   const [planFiles, setPlanFiles] = useState<File[]>([]);
   const [siteFiles, setSiteFiles] = useState<File[]>([]);
+  const [contractDates, setContractDates] = useState<ContractDateRangeValue>({
+    startDate: '',
+    startDateType: 'gregorian',
+    endDate: '',
+    endDateType: 'gregorian',
+  });
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
 
   const onSubmit = (data: FormData) => {
     if (!currentUser) {
       toast.error('يجب تسجيل الدخول أولاً');
+      return;
+    }
+
+    if (!contractDates.startDate || !contractDates.endDate) {
+      toast.error('تاريخ بداية العقد وتاريخ نهاية العقد مطلوبان');
+      return;
+    }
+
+    if (contractDates.startDateType === contractDates.endDateType && contractDates.endDate < contractDates.startDate) {
+      toast.error('تاريخ نهاية العقد يجب أن يكون بعد تاريخ بداية العقد');
       return;
     }
 
@@ -73,10 +90,15 @@ export const AddLeasedLandOutPage: React.FC = () => {
         nationality: data.tenant.nationality,
         mobileNumber: data.tenant.mobileNumber,
       },
-      contractStartDate: new Date(data.contractStartDate),
       area: Number(data.area),
       rentAmount: data.rentAmount ? Number(data.rentAmount) : undefined,
       coordinates: coordinates || undefined,
+      contractStartDate: contractDates.startDate,
+      contractStartDateOriginal: contractDates.startDate,
+      contractStartDateType: contractDates.startDateType,
+      contractEndDate: contractDates.endDate,
+      contractEndDateOriginal: contractDates.endDate,
+      contractEndDateType: contractDates.endDateType,
       createdBy: currentUser.uid
     });
 
@@ -161,10 +183,10 @@ export const AddLeasedLandOutPage: React.FC = () => {
                     <Label>رقم العقد *</Label>
                     <Input {...register('contractNumber', { required: 'مطلوب' })} placeholder="رقم العقد" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>تاريخ بداية العقد *</Label>
-                    <Input type="date" {...register('contractStartDate', { required: 'مطلوب' })} />
-                  </div>
+                  <ContractDateRangeFields
+                    {...contractDates}
+                    onChange={setContractDates}
+                  />
                   <div className="space-y-2">
                     <Label>مدة العقد *</Label>
                     <Input {...register('contractDuration', { required: 'مطلوب' })} placeholder="مثال: 3 سنوات" />

@@ -13,6 +13,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { ContractDateRangeFields, type ContractDateRangeValue } from '../components/ContractDateRangeFields';
 import { toast } from 'sonner';
 import type { LeasedBuildingOut } from '../../types/models';
 
@@ -54,12 +55,28 @@ export const AddLeasedBuildingOutPage: React.FC = () => {
   const [contractFiles, setContractFiles] = useState<File[]>([]);
   const [planFiles, setPlanFiles] = useState<File[]>([]);
   const [siteFiles, setSiteFiles] = useState<File[]>([]);
+  const [contractDates, setContractDates] = useState<ContractDateRangeValue>({
+    startDate: '',
+    startDateType: 'gregorian',
+    endDate: '',
+    endDateType: 'gregorian',
+  });
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
 
   const onSubmit = (data: FormData) => {
     if (!currentUser) {
       toast.error('يجب تسجيل الدخول أولاً');
+      return;
+    }
+
+    if (!contractDates.startDate || !contractDates.endDate) {
+      toast.error('تاريخ بداية العقد وتاريخ نهاية العقد مطلوبان');
+      return;
+    }
+
+    if (contractDates.startDateType === contractDates.endDateType && contractDates.endDate < contractDates.startDate) {
+      toast.error('تاريخ نهاية العقد يجب أن يكون بعد تاريخ بداية العقد');
       return;
     }
 
@@ -76,6 +93,12 @@ export const AddLeasedBuildingOutPage: React.FC = () => {
       area: Number(data.area),
       rentAmount: data.rentAmount ? Number(data.rentAmount) : undefined,
       coordinates: coordinates || undefined,
+      contractStartDate: contractDates.startDate,
+      contractStartDateOriginal: contractDates.startDate,
+      contractStartDateType: contractDates.startDateType,
+      contractEndDate: contractDates.endDate,
+      contractEndDateOriginal: contractDates.endDate,
+      contractEndDateType: contractDates.endDateType,
       createdBy: currentUser.uid
     });
 
