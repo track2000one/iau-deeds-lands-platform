@@ -30,6 +30,7 @@ export interface AssetRecord {
   room?: string | null;
   custodian?: string | null;
   purchaseDate?: string | null;
+  purchaseDateType?: 'gregorian' | 'hijri';
   purchaseValue?: number | null;
   notes?: string | null;
   createdBy?: string | null;
@@ -52,6 +53,7 @@ export type AssetInput = {
   room?: string | null;
   custodian?: string | null;
   purchaseDate?: string | null;
+  purchaseDateType?: 'gregorian' | 'hijri';
   purchaseValue?: number | null;
   notes?: string | null;
   attachments?: AssetAttachment[];

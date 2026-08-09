@@ -7,6 +7,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { AppDateField } from '../components/AppDateField';
+import { normalizeFlexibleDateForInput } from '../../utils/dateUtils';
 import { getAsset, updateAsset, uploadAssetFile } from '../api/assets';
 import type { AssetAttachment, AssetInput, AssetStatus } from '../../types/asset';
 
@@ -22,7 +24,7 @@ const sections: Array<{ key: UploadCategory; label: string; accept: string }> = 
 
 const emptyInput: AssetInput = {
   barcode: '', name: '', category: '', brand: '', model: '', serialNumber: '', status: 'active',
-  department: '', building: '', floor: '', room: '', custodian: '', purchaseDate: '', purchaseValue: null, notes: '', attachments: [],
+  department: '', building: '', floor: '', room: '', custodian: '', purchaseDate: '', purchaseDateType: 'gregorian', purchaseValue: null, notes: '', attachments: [],
 };
 
 export const EditAssetPage: React.FC = () => {
@@ -51,7 +53,7 @@ export const EditAssetPage: React.FC = () => {
           barcode: asset.barcode || '', name: asset.name, category: asset.category, brand: asset.brand || '', model: asset.model || '',
           serialNumber: asset.serialNumber || '', status: asset.status, department: asset.department || '', building: asset.building || '',
           floor: asset.floor || '', room: asset.room || '', custodian: asset.custodian || '',
-          purchaseDate: asset.purchaseDate ? asset.purchaseDate.slice(0, 10) : '', purchaseValue: asset.purchaseValue ?? null,
+          purchaseDate: normalizeFlexibleDateForInput(asset.purchaseDate, asset.purchaseDateType || 'gregorian'), purchaseDateType: asset.purchaseDateType || 'gregorian', purchaseValue: asset.purchaseValue ?? null,
           notes: asset.notes || '', attachments: asset.attachments || [],
         });
       })
@@ -147,7 +149,7 @@ export const EditAssetPage: React.FC = () => {
       <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-md">
         <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />بيانات إضافية</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
-          <div><Label>تاريخ الشراء</Label><Input type="date" value={String(form.purchaseDate || '')} onChange={(e) => setField('purchaseDate', e.target.value)} /></div>
+          <div><AppDateField id="asset-purchase-date-edit" label="تاريخ الشراء" value={String(form.purchaseDate || '')} dateType={form.purchaseDateType || 'gregorian'} onValueChange={(value) => setField('purchaseDate', value)} onDateTypeChange={(value) => setField('purchaseDateType', value)} /></div>
           <div><Label>قيمة الشراء</Label><Input type="number" min="0" step="0.01" value={form.purchaseValue ?? ''} onChange={(e) => setField('purchaseValue', e.target.value === '' ? null : Number(e.target.value))} /></div>
           <div className="md:col-span-2"><Label>ملاحظات</Label><Textarea rows={4} value={form.notes || ''} onChange={(e) => setField('notes', e.target.value)} /></div>
         </CardContent>

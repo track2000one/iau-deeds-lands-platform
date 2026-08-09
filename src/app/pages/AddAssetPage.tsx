@@ -20,6 +20,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { AppDateField } from '../components/AppDateField';
 import { createAsset, uploadAssetFile } from '../api/assets';
 import type { AssetInput, AssetStatus } from '../../types/asset';
 
@@ -104,6 +105,7 @@ const emptyForm: AssetInput = {
   room: '',
   custodian: '',
   purchaseDate: '',
+  purchaseDateType: 'gregorian',
   purchaseValue: null,
   notes: '',
   attachments: [],
@@ -355,9 +357,15 @@ export const AddAssetPage: React.FC = () => {
           <CardTitle className="text-lg">بيانات إضافية</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-5 p-5 sm:p-6 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>تاريخ الشراء</Label>
-            <Input type="date" value={form.purchaseDate || ''} onChange={(e) => setField('purchaseDate', e.target.value)} />
+          <div className="md:col-span-2">
+            <AppDateField
+              id="asset-purchase-date"
+              label="تاريخ الشراء"
+              value={String(form.purchaseDate || '')}
+              dateType={form.purchaseDateType || 'gregorian'}
+              onValueChange={(value) => setField('purchaseDate', value)}
+              onDateTypeChange={(value) => setField('purchaseDateType', value)}
+            />
           </div>
           <div className="space-y-2">
             <Label>قيمة الشراء</Label>

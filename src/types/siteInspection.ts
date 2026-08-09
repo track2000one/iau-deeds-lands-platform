@@ -22,6 +22,7 @@ export type SiteInspection = {
   siteType: string;
   siteName: string;
   visitDate: string;
+  visitDateType?: 'gregorian' | 'hijri';
   visitPurpose?: string | null;
   inspectorName?: string | null;
   accompanyingEntity?: string | null;
@@ -42,6 +43,7 @@ export type SiteInspection = {
   recommendedAction?: string | null;
   referredEntity?: string | null;
   followUpDate?: string | null;
+  followUpDateType?: 'gregorian' | 'hijri';
   workflowStatus: string;
   createdBy?: string | null;
   createdAt: string;

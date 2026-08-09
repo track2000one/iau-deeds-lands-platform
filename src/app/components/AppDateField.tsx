@@ -3,7 +3,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
 import type { DateType } from '../../utils/dateUtils';
-import { formatFlexibleDate, normalizeHijriInput } from '../../utils/dateUtils';
+import { formatFlexibleDate, isValidFlexibleDate, normalizeHijriInput } from '../../utils/dateUtils';
 
 type AppDateFieldProps = {
   label: string;
@@ -29,6 +29,7 @@ export const AppDateField: React.FC<AppDateFieldProps> = ({
   helperText,
 }) => {
   const inputId = id || label.replace(/\s+/g, '-');
+  const isValid = isValidFlexibleDate(value, dateType);
 
   return (
     <div className="space-y-2">
@@ -63,6 +64,8 @@ export const AppDateField: React.FC<AppDateFieldProps> = ({
               value={value}
               onChange={(event) => onValueChange(event.target.value)}
               disabled={disabled}
+              aria-invalid={!isValid}
+              className={!isValid ? 'border-destructive focus-visible:ring-destructive' : undefined}
             />
           ) : (
             <Input
@@ -72,13 +75,19 @@ export const AppDateField: React.FC<AppDateFieldProps> = ({
               placeholder="مثال: 1447/07/18"
               dir="ltr"
               disabled={disabled}
+              aria-invalid={!isValid}
+              className={!isValid ? 'border-destructive focus-visible:ring-destructive' : undefined}
             />
           )}
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {helperText || 'يمكن ترك التاريخ فارغًا، أو اختيار ميلادي/هجري حسب المستند.'}
+      <p className={`text-xs ${isValid ? 'text-muted-foreground' : 'text-destructive font-medium'}`}>
+        {!isValid
+          ? dateType === 'hijri'
+            ? 'أدخل التاريخ الهجري بصيغة صحيحة مثل 1447/07/18.'
+            : 'أدخل تاريخًا ميلاديًا صحيحًا.'
+          : helperText || 'يمكن ترك التاريخ فارغًا، أو اختيار ميلادي/هجري حسب المستند.'}
       </p>
 
       {value ? (

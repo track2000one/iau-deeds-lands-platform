@@ -36,7 +36,7 @@ import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { LocationMapPreview } from '../components/LocationMapPreview';
 import { AttachmentPreviewGrid } from '../components/AttachmentPreview';
 import { AppDateField } from '../components/AppDateField';
-import { formatFlexibleDate } from '../../utils/dateUtils';
+import { formatFlexibleDate, normalizeFlexibleDateForInput } from '../../utils/dateUtils';
 import type { DateType } from '../../utils/dateUtils';
 import { Separator } from '../components/ui/separator';
 import {
@@ -362,7 +362,10 @@ export const DeliveredLandsPage: React.FC = () => {
     setForm({
       receiptNumber:
         land.receiptNumber || land.deliveryMinutesNumber || '',
-      receiptDate: land.receiptDate || land.deliveryDate || '',
+      receiptDate: normalizeFlexibleDateForInput(
+        land.receiptDate || land.deliveryDate || '',
+        land.receiptDateType || land.deliveryDateType || 'gregorian'
+      ),
       receiptDateType:
         land.receiptDateType || land.deliveryDateType || 'gregorian',
       deliveringEntity: land.deliveringEntity || '',

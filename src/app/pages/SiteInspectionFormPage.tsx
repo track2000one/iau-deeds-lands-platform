@@ -22,6 +22,8 @@ import {
   uploadInspectionImage,
 } from '../api/siteInspections';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { AppDateField } from '../components/AppDateField';
+import { normalizeFlexibleDateForInput } from '../../utils/dateUtils';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -48,7 +50,8 @@ const emptyInput: SiteInspectionInput = {
   title: '',
   siteType: 'land',
   siteName: '',
-  visitDate: new Date().toISOString().slice(0, 16),
+  visitDate: new Date().toISOString().slice(0, 10),
+  visitDateType: 'gregorian',
   visitPurpose: '',
   inspectorName: '',
   accompanyingEntity: '',
@@ -69,6 +72,7 @@ const emptyInput: SiteInspectionInput = {
   recommendedAction: '',
   referredEntity: '',
   followUpDate: null,
+  followUpDateType: 'gregorian',
   workflowStatus: 'new',
   items: [],
   attachments: [],
@@ -93,7 +97,8 @@ export const SiteInspectionFormPage: React.FC = () => {
           title: record.title,
           siteType: record.siteType,
           siteName: record.siteName,
-          visitDate: record.visitDate.slice(0, 16),
+          visitDate: normalizeFlexibleDateForInput(record.visitDate, record.visitDateType || 'gregorian'),
+          visitDateType: record.visitDateType || 'gregorian',
           visitPurpose: record.visitPurpose || '',
           inspectorName: record.inspectorName || '',
           accompanyingEntity: record.accompanyingEntity || '',
@@ -113,7 +118,8 @@ export const SiteInspectionFormPage: React.FC = () => {
           observations: record.observations || '',
           recommendedAction: record.recommendedAction || '',
           referredEntity: record.referredEntity || '',
-          followUpDate: record.followUpDate?.slice(0, 10) || null,
+          followUpDate: record.followUpDate ? normalizeFlexibleDateForInput(record.followUpDate, record.followUpDateType || 'gregorian') : null,
+          followUpDateType: record.followUpDateType || 'gregorian',
           workflowStatus: record.workflowStatus,
           items: record.items || [],
           attachments: record.attachments || [],
@@ -263,9 +269,18 @@ export const SiteInspectionFormPage: React.FC = () => {
           <Field label="اسم الأرض أو الموقع *">
             <Input value={form.siteName} onChange={(e) => setField('siteName', e.target.value)} />
           </Field>
-          <Field label="تاريخ ووقت الزيارة *">
-            <Input type="datetime-local" value={form.visitDate} onChange={(e) => setField('visitDate', e.target.value)} />
-          </Field>
+          <div className="md:col-span-2">
+            <AppDateField
+              id="inspection-visit-date"
+              label="تاريخ الزيارة"
+              required
+              value={form.visitDate}
+              dateType={form.visitDateType || 'gregorian'}
+              onValueChange={(value) => setField('visitDate', value)}
+              onDateTypeChange={(value) => setField('visitDateType', value)}
+              helperText="اختر نوع التاريخ حسب محضر الزيارة أو المستند الرسمي."
+            />
+          </div>
           <Field label="القائم بالمعاينة">
             <Input value={form.inspectorName || ''} onChange={(e) => setField('inspectorName', e.target.value)} />
           </Field>
@@ -414,9 +429,16 @@ export const SiteInspectionFormPage: React.FC = () => {
           <Field label="الجهة المطلوب التنسيق معها">
             <Input value={form.referredEntity || ''} onChange={(e) => setField('referredEntity', e.target.value)} />
           </Field>
-          <Field label="تاريخ المتابعة">
-            <Input type="date" value={form.followUpDate || ''} onChange={(e) => setField('followUpDate', e.target.value || null)} />
-          </Field>
+          <div className="md:col-span-2">
+              <AppDateField
+                id="inspection-followup-date"
+                label="تاريخ المتابعة"
+                value={form.followUpDate || ''}
+                dateType={form.followUpDateType || 'gregorian'}
+                onValueChange={(value) => setField('followUpDate', value || null)}
+                onDateTypeChange={(value) => setField('followUpDateType', value)}
+              />
+            </div>
         </CardContent>
       </Card>
 

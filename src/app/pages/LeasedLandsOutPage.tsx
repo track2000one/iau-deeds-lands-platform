@@ -51,7 +51,7 @@ import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { LocationMapPreview } from '../components/LocationMapPreview';
 import { AttachmentPreviewGrid } from '../components/AttachmentPreview';
 import { AppDateField } from '../components/AppDateField';
-import { formatFlexibleDate } from '../../utils/dateUtils';
+import { formatFlexibleDate, normalizeFlexibleDateForInput } from '../../utils/dateUtils';
 import type { DateType } from '../../utils/dateUtils';
 import { toast } from 'sonner';
 import type { LeasedLandOut, LeasedLandIn } from '../../types/models';
@@ -330,7 +330,10 @@ export const LeasedLandsOutPage: React.FC = () => {
         mobileNumber: record.tenant?.mobileNumber || '',
       },
       contractNumber: record.contractNumber || '',
-      contractStartDate: record.contractStartDate || '',
+      contractStartDate: normalizeFlexibleDateForInput(
+        record.contractStartDate || '',
+        record.contractStartDateType || 'gregorian'
+      ),
       contractStartDateType: record.contractStartDateType || 'gregorian',
       contractDuration: record.contractDuration || '',
       plotNumber: record.plotNumber || '',
