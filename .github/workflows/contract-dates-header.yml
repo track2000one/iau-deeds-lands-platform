@@ -1,0 +1,114 @@
+name: Contract dates and header tools
+
+on:
+  push:
+    paths:
+      - '.github/workflows/contract-dates-header.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Patch contract forms, types, and header actions
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          models = Path('src/types/models.ts')
+          text = models.read_text(encoding='utf-8')
+          for model in ['LeasedLandOut','LeasedLandIn','LeasedBuildingOut','LeasedBuildingIn']:
+              start = text.index(f'export interface {model} {{')
+              end = text.index('\n}', start)
+              block = text[start:end]
+              anchor = '  contractNumber: string;'
+              additions = '''\n  contractStartDate?: string | Date;\n  contractStartDateOriginal?: string;\n  contractStartDateType?: 'gregorian' | 'hijri';\n  contractEndDate?: string | Date;\n  contractEndDateOriginal?: string;\n  contractEndDateType?: 'gregorian' | 'hijri';'''
+              if 'contractEndDate?:' not in block:
+                  pos = text.index(anchor, start, end) + len(anchor)
+                  text = text[:pos] + additions + text[pos:]
+          models.write_text(text, encoding='utf-8')
+
+          pages = [
+            'src/app/pages/AddLeasedLandOutPage.tsx',
+            'src/app/pages/AddLeasedLandInPage.tsx',
+            'src/app/pages/AddLeasedBuildingOutPage.tsx',
+            'src/app/pages/AddLeasedBuildingInPage.tsx',
+          ]
+          for file_name in pages:
+              p = Path(file_name)
+              s = p.read_text(encoding='utf-8')
+              if "ContractDateRangeFields" not in s:
+                  s = s.replace(
+                    "import { MapCoordinatePicker } from '../components/MapCoordinatePicker';",
+                    "import { MapCoordinatePicker } from '../components/MapCoordinatePicker';\nimport { ContractDateRangeFields, type ContractDateRangeValue } from '../components/ContractDateRangeFields';"
+                  )
+
+              state_anchor = "  const [siteFiles, setSiteFiles] = useState<File[]>([]);"
+              if 'const [contractDates, setContractDates]' not in s:
+                  s = s.replace(state_anchor, state_anchor + "\n  const [contractDates, setContractDates] = useState<ContractDateRangeValue>({\n    startDate: '',\n    startDateType: 'gregorian',\n    endDate: '',\n    endDateType: 'gregorian',\n  });")
+
+              submit_anchor = "    if (!currentUser) {\n      toast.error('يجب تسجيل الدخول أولاً');\n      return;\n    }"
+              validation = submit_anchor + "\n\n    if (!contractDates.startDate || !contractDates.endDate) {\n      toast.error('تاريخ بداية العقد وتاريخ نهاية العقد مطلوبان');\n      return;\n    }\n\n    if (contractDates.startDateType === contractDates.endDateType && contractDates.endDate < contractDates.startDate) {\n      toast.error('تاريخ نهاية العقد يجب أن يكون بعد تاريخ بداية العقد');\n      return;\n    }"
+              if "تاريخ بداية العقد وتاريخ نهاية العقد مطلوبان" not in s:
+                  s = s.replace(submit_anchor, validation)
+
+              s = re.sub(r"\n\s*contractStartDate:\s*new Date\(data\.contractStartDate\),", "", s)
+              created_anchor = "      createdBy: currentUser.uid"
+              payload = "      contractStartDate: contractDates.startDate,\n      contractStartDateOriginal: contractDates.startDate,\n      contractStartDateType: contractDates.startDateType,\n      contractEndDate: contractDates.endDate,\n      contractEndDateOriginal: contractDates.endDate,\n      contractEndDateType: contractDates.endDateType,\n      createdBy: currentUser.uid"
+              if 'contractEndDateOriginal: contractDates.endDate' not in s:
+                  s = s.replace(created_anchor, payload)
+
+              # Remove the old single Gregorian start-date field where present.
+              s = re.sub(
+                r'''\s*<div className="space-y-2">\s*<Label>تاريخ بداية العقد \*</Label>\s*<Input type="date" \{\.\.\.register\('contractStartDate', \{ required: 'مطلوب' \}\)\} />\s*</div>''',
+                '', s
+              )
+
+              duration_marker = '''                  <div className="space-y-2">\n                    <Label>مدة العقد *</Label>'''
+              date_component = '''                  <ContractDateRangeFields\n                    {...contractDates}\n                    onChange={setContractDates}\n                  />\n'''
+              if '<ContractDateRangeFields' not in s:
+                  s = s.replace(duration_marker, date_component + duration_marker)
+
+              p.write_text(s, encoding='utf-8')
+
+          layout = Path('src/app/components/Layout.tsx')
+          s = layout.read_text(encoding='utf-8')
+          s = s.replace(
+            '<Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button">\n                <User className="h-4 w-4" />\n              </Button>',
+            '<Button title="الحساب" aria-label="الحساب" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button" onClick={() => navigate(isAdmin ? \'/admin\' : \'/\')}>\n                <User className="h-4 w-4" />\n              </Button>'
+          )
+          s = s.replace(
+            '<Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl">\n                <Bell className="h-4 w-4" />\n              </Button>',
+            '<Button title="تنبيهات العقود" aria-label="تنبيهات العقود" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl relative" onClick={() => navigate(\'/contracts/follow-up\')}>\n                <Bell className="h-4 w-4" />\n                <span className="absolute top-2 end-2 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-background" />\n              </Button>'
+          )
+          s = s.replace(
+            '<Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl">\n                <Mail className="h-4 w-4" />\n              </Button>',
+            '<Button title="إنشاء رسالة بريد" aria-label="إنشاء رسالة بريد" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={() => { window.location.href = `mailto:?subject=${encodeURIComponent(\'منصة إدارة الأصول والأملاك والأوقاف الجامعية\')}`; }}>\n                <Mail className="h-4 w-4" />\n              </Button>'
+          )
+          s = s.replace(
+            '<Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl">\n                <Globe2 className="h-4 w-4" />\n              </Button>',
+            '<Button title="تبديل اللغة" aria-label="تبديل اللغة" variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={toggleLanguage}>\n                <Globe2 className="h-4 w-4" />\n              </Button>'
+          )
+          layout.write_text(s, encoding='utf-8')
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Commit changes
+        run: |
+          git config user.name "OpenAI Codex"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/contract-dates-header.yml
+          git add src/types/models.ts src/app/pages/AddLeasedLandOutPage.tsx src/app/pages/AddLeasedLandInPage.tsx src/app/pages/AddLeasedBuildingOutPage.tsx src/app/pages/AddLeasedBuildingInPage.tsx src/app/components/Layout.tsx src/app/components/ContractDateRangeFields.tsx
+          git commit -m "Add contract date ranges and activate header tools"
+          git push
