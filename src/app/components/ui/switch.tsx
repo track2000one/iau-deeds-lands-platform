@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "./utils";
 
@@ -11,6 +12,10 @@ function Switch({
   checked,
   ...props
 }: React.ComponentProps<typeof SwitchPrimitive.Root>) {
+  const { i18n } = useTranslation();
+  const isArabic = i18n.language === "ar";
+  const yesLabel = isArabic ? "نعم" : "Yes";
+  const noLabel = isArabic ? "لا" : "No";
   const isPlannedField = id === "isPlanned";
 
   if (isPlannedField) {
@@ -32,7 +37,7 @@ function Switch({
 
           label[for="isPlanned"] > span:last-child {
             width: 100% !important;
-            text-align: right !important;
+            text-align: ${isArabic ? "right" : "left"} !important;
             font-size: 0.875rem !important;
             color: inherit !important;
           }
@@ -42,7 +47,7 @@ function Switch({
           id={id}
           checked={checked}
           data-slot="switch"
-          dir="rtl"
+          dir={isArabic ? "rtl" : "ltr"}
           className={cn(
             "group relative flex h-10 w-full shrink-0 items-center justify-between rounded-md border px-3 text-sm font-semibold shadow-sm outline-none transition-all duration-200",
             "data-[state=checked]:border-emerald-500 data-[state=checked]:bg-emerald-50 data-[state=checked]:text-emerald-800",
@@ -62,7 +67,7 @@ function Switch({
                 checked ? "bg-emerald-500" : "bg-rose-500",
               )}
             />
-            <span>{checked ? "نعم" : "لا"}</span>
+            <span>{checked ? yesLabel : noLabel}</span>
           </span>
 
           <span
@@ -102,8 +107,8 @@ function Switch({
           "peer-data-[state=checked]:text-emerald-700 peer-data-[state=unchecked]:text-rose-700",
         )}
       >
-        <span className="peer-data-[state=checked]:hidden">لا</span>
-        <span className="hidden peer-data-[state=checked]:inline">نعم</span>
+        <span className="peer-data-[state=checked]:hidden">{noLabel}</span>
+        <span className="hidden peer-data-[state=checked]:inline">{yesLabel}</span>
       </span>
 
       <SwitchPrimitive.Thumb
