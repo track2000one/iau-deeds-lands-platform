@@ -28,6 +28,7 @@ import { Textarea } from '../components/ui/textarea';
 import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { AppDateField } from '../components/AppDateField';
+import { AttachmentPreviewCard } from '../components/AttachmentPreview';
 import { formatFlexibleDate } from '../../utils/dateUtils';
 import type { DateType } from '../../utils/dateUtils';
 import {
@@ -862,97 +863,80 @@ export const ViewDeedPage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
-            {attachments.map((att: any, index: number) => (
-              <div
-                key={att.id || getAttachmentUrl(att) || `${getAttachmentName(att)}-${index}`}
-                className="border rounded-lg p-2 md:p-3 hover:border-primary transition-colors"
-              >
-                {isImageAttachment(att) ? (
-                  <div
-                    className="aspect-square bg-muted rounded-md mb-2 overflow-hidden cursor-pointer"
-                    onClick={() => openAttachment(att)}
-                  >
-                    <img
-                      src={getGoogleDrivePreviewUrl(att)}
-                      alt={getAttachmentName(att)}
-                      className="w-full h-full object-cover"
-                      onError={(event) => {
-                        event.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="aspect-square bg-muted rounded-md mb-2 flex items-center justify-center cursor-pointer"
-                    onClick={() => openAttachment(att)}
-                  >
-                    <FileText className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground" />
-                  </div>
-                )}
+            {attachments.map((att: any, index: number) => {
+              const normalizedAttachment = {
+                ...att,
+                title: getAttachmentName(att),
+                driveUrl: getAttachmentUrl(att),
+                fileUrl: att?.fileUrl || undefined,
+                mimeType: getAttachmentMimeType(att),
+                driveFileId: extractGoogleDriveFileId(att) || undefined,
+              };
 
-                <p className="text-xs font-medium truncate mb-1">
-                  {getAttachmentName(att)}
-                </p>
+              return (
+                <AttachmentPreviewCard
+                  key={att.id || getAttachmentUrl(att) || `${getAttachmentName(att)}-${index}`}
+                  attachment={normalizedAttachment}
+                  compact
+                  onOpen={() => openAttachment(att)}
+                  actions={
+                    <div className="grid grid-cols-3 gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        onClick={() => openAttachment(att)}
+                        title="معاينة / فتح"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
 
-                <p className="text-xs text-muted-foreground mb-2">
-                  {att.fileSize ? formatFileSize(att.fileSize) : getAttachmentMimeType(att) || 'Google Drive'}
-                </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        onClick={() => downloadAttachment(att)}
+                        title="تنزيل الملف"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
 
-                <div className="grid grid-cols-3 gap-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={() => openAttachment(att)}
-                    title="معاينة / فتح"
-                  >
-                    <Eye className="h-3 w-3" />
-                  </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs text-destructive hover:text-destructive"
+                        onClick={async () => {
+                          try {
+                            if (API_BASE_URL && att.id) {
+                              const response = await authenticatedFetch(`/api/attachments/${att.id}`, {
+                                method: 'DELETE',
+                              });
 
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={() => downloadAttachment(att)}
-                    title="تنزيل الملف"
-                  >
-                    <Download className="h-3 w-3" />
-                  </Button>
+                              if (!response.ok) {
+                                const body = await response.json().catch(() => ({}));
+                                throw new Error(body?.message || 'فشل في حذف المرفق');
+                              }
 
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs text-destructive hover:text-destructive"
-                    onClick={async () => {
-                      try {
-                        if (API_BASE_URL && att.id) {
-                          const response = await authenticatedFetch(`/api/attachments/${att.id}`, {
-                            method: 'DELETE',
-                          });
+                              setBackendAttachments((prev) => prev.filter((item) => item.id !== att.id));
+                            } else {
+                              await deleteAttachment(deedId, att.id);
+                            }
 
-                          if (!response.ok) {
-                            const body = await response.json().catch(() => ({}));
-                            throw new Error(body?.message || 'فشل في حذف المرفق');
+                            toast.success('تم حذف المرفق');
+                          } catch (error) {
+                            console.error('Delete attachment error:', error);
+                            toast.error(error instanceof Error ? error.message : 'فشل في حذف المرفق');
                           }
-
-                          setBackendAttachments((prev) => prev.filter((item) => item.id !== att.id));
-                        } else {
-                          await deleteAttachment(deedId, att.id);
-                        }
-
-                        toast.success('تم حذف المرفق');
-                      } catch (error) {
-                        console.error('Delete attachment error:', error);
-                        toast.error(error instanceof Error ? error.message : 'فشل في حذف المرفق');
-                      }
-                    }}
-                    title="حذف المرفق"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+                        }}
+                        title="حذف المرفق"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  }
+                />
+              );
+            })}
           </div>
         )}
       </div>
