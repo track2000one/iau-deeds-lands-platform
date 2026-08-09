@@ -12,15 +12,6 @@ export const normalizeHijriInput = (value: string) => {
     .slice(0, 10);
 };
 
-/**
- * Returns the calendar date exactly as a form field expects it.
- *
- * Important: historical Hijri values may have been persisted by the backend in
- * a DateTime column, producing values such as `1445-05-19T00:00:00.000Z`.
- * When the accompanying *DateType is `hijri`, the year/month/day components are
- * therefore treated as the original Hijri document date and MUST NOT be passed
- * through JavaScript Date conversion.
- */
 export const normalizeFlexibleDateForInput = (
   value?: string | Date | null,
   type: DateType = 'gregorian'
@@ -56,7 +47,8 @@ export const normalizeFlexibleDateForInput = (
 
 export const formatFlexibleDate = (
   value?: string | Date | null,
-  type: DateType = 'gregorian'
+  type: DateType = 'gregorian',
+  language: 'ar' | 'en' = 'ar'
 ) => {
   if (!value) return '-';
 
@@ -65,12 +57,11 @@ export const formatFlexibleDate = (
 
   if (type === 'hijri') {
     const normalized = normalizeFlexibleDateForInput(rawValue, 'hijri');
-    return normalized ? `${normalized}هـ` : '-';
+    if (!normalized) return '-';
+    return language === 'en' ? `${normalized} AH` : `${normalized}هـ`;
   }
 
   try {
-    // Extract the document date first instead of allowing the local timezone to
-    // move a UTC-midnight value to another calendar day.
     const normalized = normalizeFlexibleDateForInput(rawValue, 'gregorian');
     const match = normalized.match(GREGORIAN_DATE_PATTERN);
 
@@ -81,14 +72,15 @@ export const formatFlexibleDate = (
 
     if (Number.isNaN(date.getTime())) return rawValue;
 
-    const formatted = new Intl.DateTimeFormat('ar-SA-u-ca-gregory', {
+    const locale = language === 'en' ? 'en-GB-u-ca-gregory-nu-latn' : 'ar-SA-u-ca-gregory';
+    const formatted = new Intl.DateTimeFormat(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       timeZone: 'UTC',
     }).format(date);
 
-    return `${formatted}م`;
+    return language === 'en' ? formatted : `${formatted}م`;
   } catch {
     return rawValue;
   }
@@ -130,14 +122,6 @@ export const isValidFlexibleDate = (value: string, type: DateType = 'gregorian')
   );
 };
 
-/**
- * Determines the calendar stored for a field.
- *
- * Legacy records may not have a reliable *DateType value because the old
- * database schema stored Hijri document dates in DateTime columns. A year in
- * the 1200-1700 range is therefore treated as Hijri even if the old row was
- * backfilled with the Gregorian default during a schema update.
- */
 export const getFlexibleDateType = (record: any, key: string): DateType => {
   const typeKey = `${key}Type`;
   const declaredType = record?.[typeKey];
