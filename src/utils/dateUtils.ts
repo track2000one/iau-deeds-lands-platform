@@ -81,40 +81,79 @@ export const formatFlexibleDate = (
 
     if (Number.isNaN(date.getTime())) return rawValue;
 
-    return new Intl.DateTimeFormat('ar-SA-u-ca-gregory', {
+    const formatted = new Intl.DateTimeFormat('ar-SA-u-ca-gregory', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       timeZone: 'UTC',
     }).format(date);
+
+    return `${formatted}م`;
   } catch {
     return rawValue;
   }
 };
 
-
 export const isValidFlexibleDate = (value: string, type: DateType = 'gregorian') => {
   if (!value) return true;
+
   if (type === 'hijri') {
     const match = value.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
     if (!match) return false;
+
     const year = Number(match[1]);
     const month = Number(match[2]);
     const day = Number(match[3]);
-    return year >= 1200 && year <= 1700 && month >= 1 && month <= 12 && day >= 1 && day <= 30;
+
+    return (
+      year >= 1200 &&
+      year <= 1700 &&
+      month >= 1 &&
+      month <= 12 &&
+      day >= 1 &&
+      day <= 30
+    );
   }
+
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return false;
+
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
   const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() == year && date.getUTCMonth() == month - 1 && date.getUTCDate() == day;
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
 };
 
+/**
+ * Determines the calendar stored for a field.
+ *
+ * Legacy records may not have a reliable *DateType value because the old
+ * database schema stored Hijri document dates in DateTime columns. A year in
+ * the 1200-1700 range is therefore treated as Hijri even if the old row was
+ * backfilled with the Gregorian default during a schema update.
+ */
 export const getFlexibleDateType = (record: any, key: string): DateType => {
   const typeKey = `${key}Type`;
-  const value = record?.[typeKey];
+  const declaredType = record?.[typeKey];
+  const rawValue = record?.[key];
 
-  return value === 'hijri' ? 'hijri' : 'gregorian';
+  if (declaredType === 'hijri') return 'hijri';
+
+  if (rawValue) {
+    const raw = rawValue instanceof Date ? rawValue.toISOString() : String(rawValue).trim();
+    const match = raw.match(/^(\d{4})[-/]/);
+    const year = match ? Number(match[1]) : NaN;
+
+    if (Number.isFinite(year) && year >= 1200 && year <= 1700) {
+      return 'hijri';
+    }
+  }
+
+  return 'gregorian';
 };
