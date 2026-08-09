@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   MapContainer,
   TileLayer,
@@ -20,7 +21,6 @@ type MapCoordinatePickerProps = {
 };
 
 const DEFAULT_POSITION: [number, number] = [26.3927, 50.1906];
-
 
 const MapClickHandler: React.FC<{
   onChange: (coordinates: Coordinates) => void;
@@ -56,6 +56,9 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
   coordinates,
   onChange,
 }) => {
+  const { i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  const ui = (ar: string, en: string) => (isArabic ? ar : en);
   const hasCoordinates =
     typeof coordinates?.latitude === 'number' &&
     !Number.isNaN(coordinates.latitude) &&
@@ -70,7 +73,7 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
 
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert('المتصفح لا يدعم تحديد الموقع الحالي.');
+      alert(ui('المتصفح لا يدعم تحديد الموقع الحالي.', 'Your browser does not support current location detection.'));
       return;
     }
 
@@ -82,7 +85,7 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
         });
       },
       () => {
-        alert('تعذر تحديد موقعك الحالي. تأكد من السماح للمتصفح باستخدام الموقع الجغرافي.');
+        alert(ui('تعذر تحديد موقعك الحالي. تأكد من السماح للمتصفح باستخدام الموقع الجغرافي.', 'Unable to determine your current location. Make sure location access is allowed in the browser.'));
       },
       {
         enableHighAccuracy: true,
@@ -138,10 +141,10 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h4 className="font-semibold text-sm md:text-base">
-              الخريطة — اختر النقطة
+              {ui('الخريطة — اختر النقطة', 'Map — Select Location')}
             </h4>
             <p className="text-xs md:text-sm text-muted-foreground">
-              اضغط على الخريطة لتعبئة الإحداثيات تلقائيًا.
+              {ui('اضغط على الخريطة لتعبئة الإحداثيات تلقائيًا.', 'Click the map to fill the coordinates automatically.')}
             </p>
           </div>
 
@@ -150,7 +153,7 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
             onClick={useCurrentLocation}
             className="rounded-md border px-3 py-2 text-xs md:text-sm hover:bg-muted"
           >
-            استخدام موقعي الحالي
+            {ui('استخدام موقعي الحالي', 'Use My Current Location')}
           </button>
         </div>
 
@@ -176,7 +179,7 @@ export const MapCoordinatePicker: React.FC<MapCoordinatePickerProps> = ({
               <Marker
                 position={position}
                 icon={customMapMarkerIcon}
-                title="الموقع المحدد"
+                title={ui('الموقع المحدد', 'Selected Location')}
                 zIndexOffset={1000}
                 riseOnHover
               />
