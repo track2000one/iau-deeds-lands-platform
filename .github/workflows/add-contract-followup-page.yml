@@ -1,0 +1,64 @@
+name: Wire contract follow-up dashboard
+
+on:
+  push:
+    paths:
+      - '.github/workflows/add-contract-followup-page.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Patch routes and navigation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          routes = Path('src/app/routes.tsx')
+          text = routes.read_text(encoding='utf-8')
+          if "import { ContractsFollowUpPage } from './pages/ContractsFollowUpPage';" not in text:
+              text = text.replace(
+                  "import { AssetReportsPage } from './pages/AssetReportsPage';",
+                  "import { AssetReportsPage } from './pages/AssetReportsPage';\nimport { ContractsFollowUpPage } from './pages/ContractsFollowUpPage';"
+              )
+          if "path: 'contracts/follow-up'" not in text:
+              text = text.replace(
+                  "      { path: 'reports', element: <ReportsPage /> },",
+                  "      { path: 'contracts/follow-up', element: <ContractsFollowUpPage /> },\n      { path: 'reports', element: <ReportsPage /> },"
+              )
+          routes.write_text(text, encoding='utf-8')
+
+          layout = Path('src/app/components/Layout.tsx')
+          text = layout.read_text(encoding='utf-8')
+          if 'FileClock,' not in text:
+              text = text.replace('  Package,\n', '  Package,\n  FileClock,\n')
+          if "id: 'contracts-followup'" not in text:
+              anchor = "    { id: 'assets', path: '/assets', icon: Package, label: 'وحدة الأصول', module: 'assets', action: 'canView' },"
+              item = "    { id: 'contracts-followup', path: '/contracts/follow-up', icon: FileClock, label: 'متابعة العقود', alwaysVisible: true },\n"
+              text = text.replace(anchor, item + anchor)
+          if "path.startsWith('/contracts/follow-up')" not in text:
+              text = text.replace(
+                  "    if (path.startsWith('/assets')) return 'assets';",
+                  "    if (path.startsWith('/contracts/follow-up')) return 'contracts-followup';\n    if (path.startsWith('/assets')) return 'assets';"
+              )
+          layout.write_text(text, encoding='utf-8')
+      - name: Build
+        run: npm ci && npm run build
+      - name: Commit changes
+        run: |
+          git config user.name "OpenAI Codex"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/add-contract-followup-page.yml
+          git add src
+          git commit -m "Add six-month contract follow-up dashboard"
+          git push
