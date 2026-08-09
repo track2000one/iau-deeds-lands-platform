@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 
@@ -7,6 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { i18n } = useTranslation();
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
@@ -14,7 +16,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground">جاري التحميل...</p>
+          <p className="text-muted-foreground">
+            {i18n.language === 'ar' ? 'جاري التحميل...' : 'Loading...'}
+          </p>
         </div>
       </div>
     );
