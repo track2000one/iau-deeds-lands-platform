@@ -1,0 +1,73 @@
+name: Audit hardcoded Arabic UI strings
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan source files for Arabic literals outside locale files
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          root = Path('src')
+          arabic = re.compile(r'[\u0600-\u06FF]')
+          allowed = {
+              Path('src/i18n/locales/ar.json'),
+          }
+          exts = {'.ts', '.tsx', '.js', '.jsx', '.json'}
+          rows = []
+          for p in sorted(root.rglob('*')):
+              if not p.is_file() or p.suffix not in exts or p in allowed:
+                  continue
+              try:
+                  text = p.read_text(encoding='utf-8')
+              except Exception:
+                  continue
+              hits = []
+              for i, line in enumerate(text.splitlines(), 1):
+                  if arabic.search(line):
+                      clean = line.strip()
+                      if len(clean) > 220:
+                          clean = clean[:217] + '...'
+                      hits.append((i, clean))
+              if hits:
+                  rows.append((p, hits))
+
+          total_lines = sum(len(h) for _, h in rows)
+          print(f'FILES_WITH_ARABIC={len(rows)}')
+          print(f'ARABIC_LINES={total_lines}')
+          print('--- TOP FILES ---')
+          for p, hits in sorted(rows, key=lambda x: len(x[1]), reverse=True):
+              print(f'{len(hits):4d}  {p}')
+          print('--- DETAILS ---')
+          for p, hits in rows:
+              print(f'\n### {p} ({len(hits)} lines)')
+              for line_no, text in hits[:40]:
+                  print(f'{line_no}: {text}')
+              if len(hits) > 40:
+                  print(f'... {len(hits)-40} more lines')
+
+          report = Path('i18n-arabic-audit.txt')
+          with report.open('w', encoding='utf-8') as f:
+              f.write(f'FILES_WITH_ARABIC={len(rows)}\nARABIC_LINES={total_lines}\n\n')
+              for p, hits in sorted(rows, key=lambda x: len(x[1]), reverse=True):
+                  f.write(f'{len(hits):4d}  {p}\n')
+              f.write('\n--- DETAILS ---\n')
+              for p, hits in rows:
+                  f.write(f'\n### {p} ({len(hits)} lines)\n')
+                  for line_no, text in hits:
+                      f.write(f'{line_no}: {text}\n')
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: i18n-arabic-audit
+          path: i18n-arabic-audit.txt
