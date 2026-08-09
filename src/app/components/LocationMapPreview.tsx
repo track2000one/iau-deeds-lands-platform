@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { customMapMarkerIcon } from '../../lib/leafletIconFix';
@@ -83,14 +84,18 @@ export const LocationMapPreview: React.FC<LocationMapPreviewProps> = ({
   coordinates,
   latitude,
   longitude,
-  title = 'الموقع على الخريطة',
+  title,
   height = 320,
 }) => {
+  const { i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  const ui = (ar: string, en: string) => (isArabic ? ar : en);
   const parsed = parseCoordinates(coordinates, latitude, longitude);
 
   if (!parsed) return null;
 
   const position: [number, number] = [parsed.latitude, parsed.longitude];
+  const resolvedTitle = title || ui('الموقع على الخريطة', 'Location on Map');
 
   return (
     <div className="w-full min-w-0 space-y-3 rounded-2xl border bg-card p-3 sm:p-4">
@@ -98,7 +103,7 @@ export const LocationMapPreview: React.FC<LocationMapPreviewProps> = ({
         <div>
           <h3 className="flex items-center gap-2 font-semibold">
             <MapPin className="h-4 w-4" />
-            {title}
+            {resolvedTitle}
           </h3>
           <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
             {parsed.latitude.toFixed(6)}, {parsed.longitude.toFixed(6)}
@@ -118,8 +123,8 @@ export const LocationMapPreview: React.FC<LocationMapPreviewProps> = ({
           }
           className="w-full sm:w-auto"
         >
-          <MapPin className="ml-2 h-4 w-4" />
-          فتح في Google Maps
+          <MapPin className={`${isArabic ? 'ml-2' : 'mr-2'} h-4 w-4`} />
+          {ui('فتح في Google Maps', 'Open in Google Maps')}
         </Button>
       </div>
 
@@ -139,7 +144,7 @@ export const LocationMapPreview: React.FC<LocationMapPreviewProps> = ({
             position={position}
             icon={customMapMarkerIcon}
             zIndexOffset={1000}
-            title="الموقع المحدد"
+            title={ui('الموقع المحدد', 'Selected Location')}
           />
         </MapContainer>
       </div>
