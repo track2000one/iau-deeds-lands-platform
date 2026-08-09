@@ -29,6 +29,7 @@ import {
   History,
   ClipboardCheck,
   Package,
+  FileClock,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -111,6 +112,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'leased-lands-in', path: '/lands/leased-in', icon: MapPin, label: t('nav.leasedLandsIn'), module: 'leased_lands_in', action: 'canView' },
     { id: 'leased-buildings-out', path: '/buildings/leased-out', icon: Building, label: t('nav.leasedBuildingsOut'), module: 'leased_buildings_out', action: 'canView' },
     { id: 'leased-buildings-in', path: '/buildings/leased-in', icon: Building, label: t('nav.leasedBuildingsIn'), module: 'leased_buildings_in', action: 'canView' },
+    { id: 'contracts-followup', path: '/contracts/follow-up', icon: FileClock, label: 'متابعة العقود', alwaysVisible: true },
     { id: 'assets', path: '/assets', icon: Package, label: 'وحدة الأصول', module: 'assets', action: 'canView' },
     { id: 'search', path: '/search', icon: Search, label: t('nav.search'), alwaysVisible: true },
     { id: 'reports', path: '/reports', icon: BarChart3, label: t('nav.reports'), module: 'reports', action: 'canView' },
@@ -133,6 +135,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/lands/leased-in')) return 'leased-lands-in';
     if (path.startsWith('/buildings/leased-out')) return 'leased-buildings-out';
     if (path.startsWith('/buildings/leased-in')) return 'leased-buildings-in';
+    if (path.startsWith('/contracts/follow-up')) return 'contracts-followup';
     if (path.startsWith('/assets')) return 'assets';
     if (path.startsWith('/search')) return 'search';
     if (path.startsWith('/reports')) return 'reports';

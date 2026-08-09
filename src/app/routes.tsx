@@ -39,6 +39,7 @@ import { AddAssetPage } from './pages/AddAssetPage';
 import { ViewAssetPage } from './pages/ViewAssetPage';
 import { EditAssetPage } from './pages/EditAssetPage';
 import { AssetReportsPage } from './pages/AssetReportsPage';
+import { ContractsFollowUpPage } from './pages/ContractsFollowUpPage';
 
 const adminOnly = (element: ReactNode) => (
   <RequireAdmin>{element}</RequireAdmin>
@@ -91,6 +92,7 @@ export const router = createHashRouter([
           { path: ':inspectionId/edit', element: <SiteInspectionFormPage /> },
         ],
       },
+      { path: 'contracts/follow-up', element: <ContractsFollowUpPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'archive', element: <ArchivePage /> },
       { path: 'settings', element: <SettingsPage /> },
