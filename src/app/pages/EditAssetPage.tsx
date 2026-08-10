@@ -23,6 +23,7 @@ const sections: Array<{ key: UploadCategory; label: string; accept: string }> = 
 ];
 
 const emptyInput: AssetInput = {
+  itemNumber: '',
   barcode: '', name: '', category: '', brand: '', model: '', serialNumber: '', status: 'active',
   department: '', building: '', floor: '', room: '', custodian: '', purchaseDate: '', purchaseDateType: 'gregorian', purchaseValue: null, notes: '', attachments: [],
 };
@@ -50,7 +51,7 @@ export const EditAssetPage: React.FC = () => {
         setAssetNumber(asset.assetNumber);
         setExistingAttachments(asset.attachments || []);
         setForm({
-          barcode: asset.barcode || '', name: asset.name, category: asset.category, brand: asset.brand || '', model: asset.model || '',
+          itemNumber: asset.itemNumber || asset.assetNumber || '', barcode: asset.barcode || '', name: asset.name, category: asset.category, brand: asset.brand || '', model: asset.model || '',
           serialNumber: asset.serialNumber || '', status: asset.status, department: asset.department || '', building: asset.building || '',
           floor: asset.floor || '', room: asset.room || '', custodian: asset.custodian || '',
           purchaseDate: normalizeFlexibleDateForInput(asset.purchaseDate, asset.purchaseDateType || 'gregorian'), purchaseDateType: asset.purchaseDateType || 'gregorian', purchaseValue: asset.purchaseValue ?? null,
@@ -67,7 +68,7 @@ export const EditAssetPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!assetId) return;
-    if (!String(form.name || '').trim() || !String(form.category || '').trim()) {
+    if (!String(form.itemNumber || '').trim() || !String(form.name || '').trim() || !String(form.category || '').trim()) {
       setError('اسم الأصل والتصنيف حقول مطلوبة.');
       return;
     }
@@ -83,6 +84,7 @@ export const EditAssetPage: React.FC = () => {
 
       const payload: AssetInput = {
         ...form,
+        itemNumber: String(form.itemNumber || '').trim(),
         barcode: String(form.barcode || '').trim() || null,
         name: String(form.name || '').trim(),
         category: String(form.category || '').trim(),
@@ -124,7 +126,7 @@ export const EditAssetPage: React.FC = () => {
       <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-md">
         <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><Barcode className="h-5 w-5" />البيانات الأساسية</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
-          <div><Label>رقم الأصل</Label><Input value={assetNumber} disabled /></div>
+          <div><Label>رقم الصنف *</Label><Input value={form.itemNumber || ''} onChange={(e) => setField('itemNumber', e.target.value)} /></div>
           <div><Label>الباركود</Label><Input value={form.barcode || ''} onChange={(e) => setField('barcode', e.target.value)} /></div>
           <div><Label>اسم الأصل *</Label><Input value={form.name} onChange={(e) => setField('name', e.target.value)} /></div>
           <div><Label>التصنيف *</Label><Select value={form.category} onValueChange={(v) => setField('category', v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="it">تقنية معلومات</SelectItem><SelectItem value="furniture">أثاث</SelectItem><SelectItem value="equipment">أجهزة ومعدات</SelectItem><SelectItem value="vehicle">مركبات</SelectItem><SelectItem value="other">أخرى</SelectItem></SelectContent></Select></div>

@@ -92,6 +92,7 @@ const formatFileSize = (size: number) => {
 };
 
 const emptyForm: AssetInput = {
+  itemNumber: '',
   barcode: '',
   name: '',
   category: '',
@@ -160,6 +161,8 @@ export const AddAssetPage: React.FC = () => {
   const handleSubmit = async () => {
     setError('');
 
+    if (!String(form.itemNumber || '').trim()) { setError('رقم الصنف مطلوب.'); return; }
+
     if (!String(form.name || '').trim()) {
       setError('اسم الأصل مطلوب.');
       return;
@@ -196,6 +199,7 @@ export const AddAssetPage: React.FC = () => {
 
       const created = await createAsset({
         ...form,
+        itemNumber: String(form.itemNumber || '').trim(),
         barcode: String(form.barcode || '').trim() || null,
         name: String(form.name || '').trim(),
         category: String(form.category || '').trim(),
@@ -263,8 +267,8 @@ export const AddAssetPage: React.FC = () => {
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-5 p-5 sm:p-6 md:grid-cols-2 xl:grid-cols-3">
           <div className="space-y-2">
-            <Label>رقم الأصل الداخلي</Label>
-            <Input placeholder="يُنشأ تلقائيًا مثل AST-2026-000001" disabled />
+            <Label>رقم الصنف *</Label>
+            <Input value={form.itemNumber || ''} onChange={(e) => setField('itemNumber', e.target.value)} placeholder="أدخل رقم الصنف الفريد" />
           </div>
           <div className="space-y-2">
             <Label>رقم الباركود / ملصق الأصل</Label>
