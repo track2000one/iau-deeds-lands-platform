@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   ArrowRight,
@@ -10,6 +10,7 @@ import {
   PackagePlus,
   Paperclip,
   Save,
+  ScanBarcode,
   Upload,
   UserRound,
   X,
@@ -120,6 +121,11 @@ export const AddAssetPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [uploadProgress, setUploadProgress] = useState('');
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerMessage, setScannerMessage] = useState('');
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const scannerStreamRef = useRef<MediaStream | null>(null);
+  const scannerFrameRef = useRef<number | null>(null);
 
   const totalAttachments = useMemo(
     () => Object.values(attachments).reduce((total, files) => total + files.length, 0),
@@ -158,6 +164,99 @@ export const AddAssetPage: React.FC = () => {
       [category]: current[category].filter((_, fileIndex) => fileIndex !== index),
     }));
   };
+
+  useEffect(() => {
+    if (!scannerOpen) return;
+
+    let active = true;
+
+    const stopScanner = () => {
+      active = false;
+      if (scannerFrameRef.current !== null) {
+        window.cancelAnimationFrame(scannerFrameRef.current);
+        scannerFrameRef.current = null;
+      }
+      scannerStreamRef.current?.getTracks().forEach((track) => track.stop());
+      scannerStreamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
+
+    const startScanner = async () => {
+      setScannerMessage('');
+
+      const BarcodeDetectorCtor = (window as any).BarcodeDetector;
+      if (!BarcodeDetectorCtor) {
+        setScannerMessage('قارئ الباركود بالكاميرا غير مدعوم في هذا المتصفح. جرّب متصفحًا حديثًا على الجوال أو أدخل الرقم يدويًا.');
+        setScannerOpen(false);
+        return;
+      }
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setScannerMessage('تعذر الوصول إلى كاميرا الجهاز من هذا المتصفح.');
+        setScannerOpen(false);
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+
+        if (!active) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        scannerStreamRef.current = stream;
+        const video = videoRef.current;
+        if (!video) return;
+
+        video.srcObject = stream;
+        await video.play();
+
+        const detector = new BarcodeDetectorCtor();
+
+        const scanFrame = async () => {
+          if (!active || !videoRef.current) return;
+
+          try {
+            if (videoRef.current.readyState >= 2) {
+              const results = await detector.detect(videoRef.current);
+              const value = results?.[0]?.rawValue;
+              if (value) {
+                setField('barcode', String(value));
+                setScannerMessage(`تمت قراءة الباركود بنجاح: ${String(value)}`);
+                setScannerOpen(false);
+                return;
+              }
+            }
+          } catch {
+            // Continue scanning; transient frame detection errors are expected.
+          }
+
+          scannerFrameRef.current = window.requestAnimationFrame(scanFrame);
+        };
+
+        scannerFrameRef.current = window.requestAnimationFrame(scanFrame);
+      } catch (cameraError: any) {
+        const permissionDenied = cameraError?.name === 'NotAllowedError' || cameraError?.name === 'PermissionDeniedError';
+        setScannerMessage(
+          permissionDenied
+            ? 'لم يتم السماح باستخدام الكاميرا. اسمح للمتصفح بالوصول إلى الكاميرا ثم حاول مرة أخرى.'
+            : 'تعذر تشغيل كاميرا الجوال لقراءة الباركود.'
+        );
+        setScannerOpen(false);
+      }
+    };
+
+    void startScanner();
+    return stopScanner;
+  }, [scannerOpen]);
 
   const handleSubmit = async () => {
     setError('');
@@ -272,8 +371,14 @@ export const AddAssetPage: React.FC = () => {
           </div>
           <div className="space-y-2">
             <Label>رقم الباركود / ملصق الأصل</Label>
-            <Input value={form.barcode || ''} onChange={(e) => setField('barcode', e.target.value)} placeholder="اتركه فارغًا ليُنشأ تلقائيًا من وحدة الأصول" />
-            <p className="text-xs text-muted-foreground">سيُنشئ النظام رقم باركود فريدًا تلقائيًا عند الحفظ.</p>
+            <div className="flex gap-2">
+              <Input value={form.barcode || ''} onChange={(e) => setField('barcode', e.target.value)} placeholder="اتركه فارغًا ليُنشأ تلقائيًا من وحدة الأصول" />
+              <Button type="button" variant="outline" onClick={() => setScannerOpen(true)} className="h-10 shrink-0 rounded-xl px-3">
+                <ScanBarcode className="ml-2 h-4 w-4 text-blue-600" />
+                <span className="hidden sm:inline">مسح بالجوال</span>
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">يمكن قراءة باركود الأصل مباشرة بكاميرا الجوال، أو ترك الحقل فارغًا ليُنشأ تلقائيًا.</p>
           </div>
           <div className="space-y-2">
             <Label>اسم الأصل *</Label>
@@ -391,11 +496,37 @@ export const AddAssetPage: React.FC = () => {
                 يمكن رفع عدة ملفات في كل خانة، وسيتم رفعها إلى Google Drive وربطها تلقائيًا بالأصل.
               </p>
             </div>
-            <div className="w-fit rounded-full border bg-background/80 px-3 py-1 text-xs font-semibold">
-              {totalAttachments} مرفق
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" onClick={() => setScannerOpen(true)} className="h-9 rounded-xl px-3 text-xs">
+                <ScanBarcode className="ml-2 h-4 w-4 text-blue-600" />
+                قارئ الباركود
+              </Button>
+              <label className="inline-flex h-9 cursor-pointer items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100">
+                <Camera className="ml-2 h-4 w-4" />
+                تصوير مباشر
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(event) => {
+                    addFiles('asset_images', event.target.files);
+                    event.currentTarget.value = '';
+                  }}
+                />
+              </label>
+              <div className="w-fit rounded-full border bg-background/80 px-3 py-1 text-xs font-semibold">
+                {totalAttachments} مرفق
+              </div>
             </div>
           </div>
         </CardHeader>
+
+        {scannerMessage && (
+          <div className="mx-5 mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-medium text-blue-800 sm:mx-6">
+            {scannerMessage}
+          </div>
+        )}
 
         <CardContent className="grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-2">
           {ATTACHMENT_SECTIONS.map((section) => {
@@ -465,6 +596,38 @@ export const AddAssetPage: React.FC = () => {
           {isSaving ? 'جارٍ الحفظ...' : 'حفظ الأصل'}
         </Button>
       </div>
+      {scannerOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="قارئ الباركود">
+          <div className="w-full max-w-lg overflow-hidden rounded-[28px] border border-white/15 bg-slate-950 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-white">
+              <div className="flex items-center gap-2">
+                <ScanBarcode className="h-5 w-5 text-cyan-300" />
+                <div>
+                  <h3 className="font-bold">قارئ باركود الأصل</h3>
+                  <p className="mt-0.5 text-[11px] text-slate-300">وجّه الكاميرا الخلفية نحو الباركود حتى تتم القراءة تلقائيًا.</p>
+                </div>
+              </div>
+              <Button type="button" variant="ghost" size="icon" onClick={() => setScannerOpen(false)} className="text-white hover:bg-white/10 hover:text-white">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="relative aspect-[4/3] overflow-hidden bg-black">
+              <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="relative h-36 w-[82%] max-w-sm rounded-2xl border-2 border-cyan-300/90 shadow-[0_0_0_999px_rgba(2,6,23,0.38),0_0_30px_rgba(34,211,238,0.28)]">
+                  <div className="absolute left-3 right-3 top-1/2 h-px bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.9)]" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 px-4 py-3 text-xs text-slate-300">
+              <span>تعمل الكاميرا الخلفية تلقائيًا على الجوال.</span>
+              <Button type="button" variant="outline" onClick={() => setScannerOpen(false)} className="h-9 border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white">إلغاء</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
