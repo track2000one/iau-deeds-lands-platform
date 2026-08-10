@@ -172,5 +172,14 @@ if (!source.includes('const visual = resolveGroupVisual(group);') || !source.inc
   throw new Error('Expected group visual rendering is not present in AssetsPage.tsx');
 }
 
+const coloredCardStyle = "style={{ borderColor: visual.border, background: visual.cardBackground, boxShadow: visual.cardShadow }}";
+const neutralCardStyle = "style={{ borderColor: 'rgba(148,163,184,0.28)', background: 'linear-gradient(135deg, rgba(255,255,255,0.97), rgba(248,250,252,0.94))', boxShadow: '0 10px 28px rgba(15,23,42,0.055), inset 0 1px 0 rgba(255,255,255,0.96)' }}";
+
+if (source.includes(coloredCardStyle)) {
+  source = source.replaceAll(coloredCardStyle, neutralCardStyle);
+} else if (!source.includes(neutralCardStyle)) {
+  throw new Error('Could not locate asset group card frame styling');
+}
+
 fs.writeFileSync(filePath, source, 'utf8');
-console.log('Distinct asset group icons applied with fixed blue, green and yellow palettes.');
+console.log('Asset group cards now use neutral frames while icons keep their category colors.');
