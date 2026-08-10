@@ -67,3 +67,4 @@ if (!edit.includes("<AssetOfficialTemplateFields value={form}")) {
 fs.writeFileSync(editPath, edit);
 
 console.log('Official Excel asset fields applied to add/edit forms.');
+// trigger 2026-08-10T13:50+03:00
