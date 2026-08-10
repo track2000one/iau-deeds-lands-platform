@@ -6,6 +6,7 @@ import {
   BarChart3,
   Boxes,
   ClipboardCheck,
+  FileSpreadsheet,
   Package,
   PlusCircle,
   ScanLine,
@@ -21,6 +22,7 @@ import type { AssetStats } from '../../types/asset';
 const quickActions = [
   { label: 'جميع الأصول', description: 'استعراض سجل الأصول والبحث والتصفية', path: '/assets/list', icon: Boxes, ready: true },
   { label: 'إضافة أصل', description: 'تسجيل أصل جديد وربطه بموقعه الإداري', path: '/assets/new', icon: PlusCircle, ready: true },
+  { label: 'استيراد Excel', description: 'استيراد بيانات نماذج الأصول المعتمدة إلى قاعدة البيانات للاختبار', path: '/assets/import', icon: FileSpreadsheet, ready: true },
   { label: 'الجرد الميداني', description: 'مسح الباركود ومطابقة الأصل مع الموقع الفعلي', path: '/assets/inventory', icon: ScanLine, ready: false },
   { label: 'حركة الأصول', description: 'متابعة نقل الأصول بين الإدارات والمواقع', path: '/assets/movements', icon: ArrowRightLeft, ready: false },
   { label: 'الصيانة', description: 'متابعة حالات الصيانة والإجراءات المنفذة', path: '/assets/maintenance', icon: Wrench, ready: false },
@@ -111,10 +113,16 @@ export const AssetDashboardPage: React.FC = () => {
           </div>
 
           {canAdd && (
-            <Button onClick={() => navigate('/assets/new')} className="h-12 rounded-2xl px-5 shadow-lg">
-              <PlusCircle className="ml-2 h-5 w-5" />
-              إضافة أصل جديد
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => navigate('/assets/import')} className="h-12 rounded-2xl px-5">
+                <FileSpreadsheet className="ml-2 h-5 w-5 text-emerald-600" />
+                استيراد Excel
+              </Button>
+              <Button onClick={() => navigate('/assets/new')} className="h-12 rounded-2xl px-5 shadow-lg">
+                <PlusCircle className="ml-2 h-5 w-5" />
+                إضافة أصل جديد
+              </Button>
+            </div>
           )}
         </div>
       </section>
@@ -146,7 +154,8 @@ export const AssetDashboardPage: React.FC = () => {
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 sm:p-6">
           {quickActions.map(({ label, description, path, icon: Icon, ready }) => {
-            const disabled = !ready || (path === '/assets/new' && !canAdd);
+            const requiresAdd = path === '/assets/new' || path === '/assets/import';
+            const disabled = !ready || (requiresAdd && !canAdd);
 
             return (
               <button
@@ -173,7 +182,7 @@ export const AssetDashboardPage: React.FC = () => {
       </Card>
 
       <div className="rounded-2xl border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-        التسجيل والعرض والتعديل والحذف والبحث وتقارير الأصول مرتبطة فعليًا بالـBackend وقاعدة PostgreSQL. المراحل التالية: الجرد والحركة والصيانة.
+        التسجيل والعرض والتعديل والحذف والبحث وتقارير الأصول مرتبطة فعليًا بالـBackend وقاعدة PostgreSQL. ويمكن الآن استيراد بيانات نماذج Excel المعتمدة مباشرة للاختبار مع تجاوز السجلات المكررة.
       </div>
     </div>
   );
