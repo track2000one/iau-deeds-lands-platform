@@ -1,33 +1,26 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useDeeds } from '../../context/DeedContext';
 import { usePermissions } from '../../context/PermissionsContext';
 import {
-  Search,
-  Filter,
-  Eye,
+  Building2,
   Edit,
-  Trash2,
-  MapPin,
+  Eye,
   FileText,
-  Download,
-  X
+  Filter,
+  Map,
+  MapPin,
+  Ruler,
+  Search,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import { Separator } from '../components/ui/separator';
 import { NativeSelect } from '../components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +38,7 @@ export const AllDeedsPage: React.FC = () => {
   const { t } = useTranslation();
   const { deeds, deleteDeed } = useDeeds();
   const { isAdmin } = usePermissions();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterPlanned, setFilterPlanned] = useState<'all' | 'planned' | 'unplanned'>('all');
@@ -54,42 +48,37 @@ export const AllDeedsPage: React.FC = () => {
   const filteredDeeds = useMemo(() => {
     let result = [...deeds];
 
-    // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(deed =>
-        deed.deedNumber.toLowerCase().includes(query) ||
-        deed.city.toLowerCase().includes(query) ||
-        deed.district.toLowerCase().includes(query) ||
-        deed.propertyDescription.toLowerCase().includes(query)
+      result = result.filter((deed) =>
+        [deed.deedNumber, deed.city, deed.district, deed.propertyDescription]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query))
       );
     }
 
-    // City filter
-    if (filterCity) {
-      result = result.filter(deed => deed.city === filterCity);
-    }
-
-    // Planned filter
-    if (filterPlanned === 'planned') {
-      result = result.filter(deed => deed.isPlanned);
-    } else if (filterPlanned === 'unplanned') {
-      result = result.filter(deed => !deed.isPlanned);
-    }
+    if (filterCity) result = result.filter((deed) => deed.city === filterCity);
+    if (filterPlanned === 'planned') result = result.filter((deed) => deed.isPlanned);
+    if (filterPlanned === 'unplanned') result = result.filter((deed) => !deed.isPlanned);
 
     return result;
   }, [deeds, searchQuery, filterCity, filterPlanned]);
 
-  const cities = useMemo(() => {
-    return Array.from(new Set(deeds.map(d => d.city))).sort();
-  }, [deeds]);
+  const cities = useMemo(
+    () => Array.from(new Set(deeds.map((deed) => deed.city).filter(Boolean))).sort(),
+    [deeds]
+  );
+
+  const totalArea = useMemo(
+    () => filteredDeeds.reduce((sum, deed) => sum + (Number(deed.area) || 0), 0),
+    [filteredDeeds]
+  );
 
   const handleDelete = (id: string) => {
     if (!isAdmin) {
       toast.error('ليس لديك صلاحية حذف الصكوك');
       return;
     }
-
     setDeedToDelete(id);
     setDeleteDialogOpen(true);
   };
@@ -104,272 +93,179 @@ export const AllDeedsPage: React.FC = () => {
   };
 
   return (
-    <div className="mobile-full-width w-full min-w-0 space-y-4 rounded-2xl border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-3 sm:p-4 md:p-6 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
+    <div className="mobile-full-width w-full min-w-0 space-y-5 rounded-2xl border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-3 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl sm:p-4 md:p-6">
+      <section className="flex flex-col gap-4 rounded-[26px] border border-white/60 bg-white/75 p-4 shadow-sm backdrop-blur-xl sm:p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-800 truncate">{t('nav.allDeeds')}</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
-            {t('search.foundResults', { count: filteredDeeds.length })}
-          </p>
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary">
+            <FileText className="h-4 w-4" />
+            إدارة الصكوك
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-slate-800 md:text-3xl">{t('nav.allDeeds')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">عرض الصكوك كبطاقات واضحة وسريعة للوصول إلى بيانات كل صك.</p>
         </div>
+
         {isAdmin && (
-          <Button onClick={() => navigate('/deeds/new')} className="bg-gradient-to-l from-sky-600 to-blue-700 text-white shadow-[0_12px_35px_rgba(37,99,235,0.22)] hover:from-sky-500 hover:to-blue-600 w-full sm:w-auto text-sm md:text-base">
-            <FileText className="h-4 w-4 mr-2" />
+          <Button
+            onClick={() => navigate('/deeds/new')}
+            className="h-11 w-full bg-gradient-to-l from-sky-600 to-blue-700 text-white shadow-[0_12px_35px_rgba(37,99,235,0.22)] hover:from-sky-500 hover:to-blue-600 sm:w-auto"
+          >
+            <FileText className="ml-2 h-4 w-4" />
             {t('deed.addNew')}
           </Button>
         )}
-      </div>
+      </section>
 
-      {/* Filters */}
       <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-        <CardHeader className="pb-3 md:pb-4 border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Filter className="h-4 w-4 md:h-5 md:w-5" />
+        <CardHeader className="border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75 pb-4">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Filter className="h-5 w-5" />
             {t('app.filter')}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-            {/* Search */}
-            <div className="sm:col-span-2 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+        <CardContent className="p-4 sm:p-5">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+            <div className="relative lg:col-span-2">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder={t('search.placeholder')}
+                placeholder="ابحث عن صك، مدينة، حي أو بيان العقار..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 md:pl-10 h-9 md:h-10 text-sm md:text-base"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="h-11 rounded-xl pr-10"
               />
               {searchQuery && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+                  className="absolute left-1 top-1/2 h-8 w-8 -translate-y-1/2"
                   onClick={() => setSearchQuery('')}
                 >
-                  <X className="h-3 w-3 md:h-4 md:w-4" />
+                  <X className="h-4 w-4" />
                 </Button>
               )}
             </div>
 
-            {/* City Filter */}
-            <div>
-              <NativeSelect
-                value={filterCity}
-                onChange={(e) => setFilterCity(e.target.value)}
-                className="h-9 md:h-10 text-sm md:text-base"
-              >
-                <option value="">جميع المدن</option>
-                {cities.map(city => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </NativeSelect>
-            </div>
+            <NativeSelect value={filterCity} onChange={(event) => setFilterCity(event.target.value)} className="h-11 rounded-xl">
+              <option value="">جميع المدن</option>
+              {cities.map((city) => <option key={city} value={city}>{city}</option>)}
+            </NativeSelect>
 
-            {/* Planned Filter */}
-            <div>
-              <NativeSelect
-                value={filterPlanned}
-                onChange={(e) => setFilterPlanned(e.target.value as any)}
-                className="h-9 md:h-10 text-sm md:text-base"
-              >
-                <option value="all">جميع الأراضي</option>
-                <option value="planned">مخططة فقط</option>
-                <option value="unplanned">غير مخططة فقط</option>
-              </NativeSelect>
-            </div>
+            <NativeSelect
+              value={filterPlanned}
+              onChange={(event) => setFilterPlanned(event.target.value as 'all' | 'planned' | 'unplanned')}
+              className="h-11 rounded-xl"
+            >
+              <option value="all">جميع الأراضي</option>
+              <option value="planned">مخططة فقط</option>
+              <option value="unplanned">غير مخططة فقط</option>
+            </NativeSelect>
           </div>
         </CardContent>
       </Card>
 
-      {/* Table - Desktop View */}
-      <Card className="hidden md:block overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-sky-100/80">
-                  <TableHead className="w-[120px]">{t('deed.deedNumber')}</TableHead>
-                  <TableHead>{t('deed.propertyDescription')}</TableHead>
-                  <TableHead>{t('deed.city')}</TableHead>
-                  <TableHead>{t('deed.district')}</TableHead>
-                  <TableHead className="text-center">{t('deed.area')}</TableHead>
-                  <TableHead className="text-center">{t('deed.isPlanned')}</TableHead>
-                  <TableHead className="text-center">{t('deed.coordinates')}</TableHead>
-                  <TableHead className="text-left w-[180px]">الإجراءات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDeeds.length === 0 ? (
-                  <TableRow className="border-sky-100/80">
-                    <TableCell colSpan={8} className="text-center py-12">
-                      <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                      <p className="text-muted-foreground">{t('search.noResults')}</p>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredDeeds.map((deed) => (
-                    <TableRow key={deed.id} className="hover:bg-muted/30">
-                      <TableCell className="font-medium">{deed.deedNumber}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        {deed.propertyDescription}
-                      </TableCell>
-                      <TableCell>{deed.city}</TableCell>
-                      <TableCell>{deed.district}</TableCell>
-                      <TableCell className="text-center">
-                        {deed.area.toLocaleString()} {t('deed.sqm')}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {deed.isPlanned ? (
-                          <Badge variant="secondary" className="text-xs">نعم</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs">لا</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {deed.coordinates ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => navigate(`/maps/${deed.id}`)}
-                            title={t('maps.viewOnMap')}
-                          >
-                            <MapPin className="h-4 w-4 text-primary" />
-                          </Button>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => navigate(`/deeds/${deed.id}`)}
-                            title={t('app.view')}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {isAdmin && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => navigate(`/deeds/${deed.id}`)}
-                                title={t('app.edit')}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                onClick={() => handleDelete(deed.id)}
-                                title={t('app.delete')}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-sky-200/70 bg-white/80 p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">إجمالي الصكوك الظاهرة</p>
+          <p className="mt-1 text-2xl font-black">{filteredDeeds.length.toLocaleString('ar-SA')}</p>
+        </div>
+        <div className="rounded-2xl border border-sky-200/70 bg-white/80 p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">الأراضي المخططة</p>
+          <p className="mt-1 text-2xl font-black">{filteredDeeds.filter((deed) => deed.isPlanned).length.toLocaleString('ar-SA')}</p>
+        </div>
+        <div className="rounded-2xl border border-sky-200/70 bg-white/80 p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">إجمالي المساحة</p>
+          <p className="mt-1 text-2xl font-black">{totalArea.toLocaleString('ar-SA', { maximumFractionDigits: 2 })} م²</p>
+        </div>
+      </section>
+
+      {filteredDeeds.length === 0 ? (
+        <Card className="border-sky-200/70 bg-white/85 shadow-sm">
+          <CardContent className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center">
+            <div className="grid h-20 w-20 place-items-center rounded-[28px] border bg-background/80 shadow-inner">
+              <FileText className="h-10 w-10 text-primary/45" />
+            </div>
+            <h2 className="mt-5 text-xl font-black">لا توجد صكوك مطابقة</h2>
+            <p className="mt-2 text-sm text-muted-foreground">غيّر كلمة البحث أو خيارات التصفية.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredDeeds.map((deed) => (
+            <article
+              key={deed.id}
+              className="rounded-[24px] border border-slate-300/80 bg-white/90 p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md sm:p-5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">رقم الصك</p>
+                  <h2 className="mt-1 truncate text-lg font-black text-slate-800">{deed.deedNumber}</h2>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={deed.isPlanned
+                    ? 'shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700'
+                    : 'shrink-0 border-red-300 bg-red-50 text-red-700'}
+                >
+                  {deed.isPlanned ? 'مخططة' : 'غير مخططة'}
+                </Badge>
+              </div>
+
+              <div className="mt-4 rounded-2xl border bg-slate-50/65 p-3">
+                <p className="text-xs text-muted-foreground">بيان العقار</p>
+                <p className="mt-1 min-h-[42px] text-sm font-semibold leading-6 text-slate-700">{deed.propertyDescription || '-'}</p>
+              </div>
+
+              <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <dt className="flex items-center gap-1 text-xs text-muted-foreground"><Building2 className="h-3.5 w-3.5" />المدينة</dt>
+                  <dd className="mt-1 font-semibold">{deed.city || '-'}</dd>
+                </div>
+                <div>
+                  <dt className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5" />الحي</dt>
+                  <dd className="mt-1 font-semibold">{deed.district || '-'}</dd>
+                </div>
+                <div>
+                  <dt className="flex items-center gap-1 text-xs text-muted-foreground"><Ruler className="h-3.5 w-3.5" />المساحة</dt>
+                  <dd className="mt-1 font-semibold">{Number(deed.area || 0).toLocaleString('ar-SA', { maximumFractionDigits: 2 })} م²</dd>
+                </div>
+                <div>
+                  <dt className="flex items-center gap-1 text-xs text-muted-foreground"><Map className="h-3.5 w-3.5" />الإحداثيات</dt>
+                  <dd className="mt-1 font-semibold">{deed.coordinates ? 'متوفرة' : 'غير متوفرة'}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <Button variant="outline" size="sm" className="h-10" onClick={() => navigate(`/deeds/${deed.id}`)}>
+                  <Eye className="ml-1 h-4 w-4" />عرض
+                </Button>
+
+                {deed.coordinates && (
+                  <Button variant="outline" size="sm" className="h-10" onClick={() => navigate(`/maps/${deed.id}`)}>
+                    <MapPin className="ml-1 h-4 w-4" />الخريطة
+                  </Button>
                 )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Cards View - Mobile */}
-      <div className="space-y-3 md:hidden">
-        {filteredDeeds.length === 0 ? (
-          <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-            <CardContent className="py-12 text-center">
-              <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="text-sm text-muted-foreground">{t('search.noResults')}</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredDeeds.map((deed) => (
-            <Card key={deed.id} className="overflow-hidden border-sky-200/70 bg-white/90 shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-base truncate">{deed.deedNumber}</span>
-                      {deed.isPlanned && (
-                        <Badge variant="secondary" className="text-xs shrink-0">مخططة</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">{deed.city} - {deed.district}</p>
-                  </div>
-                  {deed.coordinates && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0"
-                      onClick={() => navigate(`/maps/${deed.id}`)}
-                    >
-                      <MapPin className="h-4 w-4 text-primary" />
-                    </Button>
-                  )}
-                </div>
+                {isAdmin && (
+                  <Button variant="outline" size="sm" className="h-10" onClick={() => navigate(`/deeds/${deed.id}`)}>
+                    <Edit className="ml-1 h-4 w-4" />تعديل
+                  </Button>
+                )}
 
-                <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-                  {deed.propertyDescription}
-                </p>
-
-                <div className="flex items-center justify-between text-xs mb-3">
-                  <span className="text-muted-foreground">{t('deed.area')}:</span>
-                  <span className="font-medium">{deed.area.toLocaleString()} {t('deed.sqm')}</span>
-                </div>
-
-                <Separator className="mb-3" />
-
-                <div className="mobile-actions-grid">
+                {isAdmin && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-10 flex-1 text-xs"
-                    onClick={() => navigate(`/deeds/${deed.id}`)}
+                    className="h-10 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                    onClick={() => handleDelete(deed.id)}
                   >
-                    <Eye className="h-3 w-3 mr-1" />
-                    {t('app.view')}
+                    <Trash2 className="ml-1 h-4 w-4" />حذف
                   </Button>
-                  {isAdmin && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-10 flex-1 text-xs"
-                        onClick={() => navigate(`/deeds/${deed.id}`)}
-                      >
-                        <Edit className="h-3 w-3 mr-1" />
-                        {t('app.edit')}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="col-span-2 h-10 w-full text-xs text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(deed.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+                )}
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -382,10 +278,7 @@ export const AllDeedsPage: React.FC = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('app.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {t('app.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
