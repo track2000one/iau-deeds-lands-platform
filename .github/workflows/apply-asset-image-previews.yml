@@ -1,0 +1,38 @@
+name: Apply Asset Image Previews
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-asset-image-previews.mjs'
+      - '.github/workflows/apply-asset-image-previews.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-asset-image-previews.mjs
+      - run: npm run build
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/AddAssetPage.tsx
+          git commit -m "Show asset image previews immediately"
+          git push
