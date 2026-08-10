@@ -60,3 +60,4 @@ if (!report.includes('نموذج Excel الرسمي المعتمد')) {
 
 fs.writeFileSync(reportPath, report);
 console.log('Official asset Excel export UI applied.');
+// trigger 2026-08-10T14:12+03:00
