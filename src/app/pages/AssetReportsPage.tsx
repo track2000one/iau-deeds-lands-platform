@@ -6,8 +6,11 @@ import {
   Image as ImageIcon,
   Printer,
   Search,
+  UploadCloud,
+  Download,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -17,7 +20,14 @@ import {
   isImageAttachmentPreview,
 } from '../components/AttachmentPreview';
 import { usePermissions } from '../../context/PermissionsContext';
-import { getAssets } from '../api/assets';
+import {
+  getAssets,
+  getOfficialAssetExcelTemplate,
+  uploadOfficialAssetExcelTemplate,
+  downloadOfficialAssetExcelTemplate,
+  type AssetExcelTemplateMeta,
+} from '../api/assets';
+import { buildOfficialAssetExcel } from '../../utils/officialAssetExcel';
 import type { AssetAttachment, AssetRecord } from '../../types/asset';
 import { ASSET_STATUS_LABELS } from '../../types/asset';
 
@@ -404,6 +414,11 @@ export const AssetReportsPage: React.FC = () => {
   const [selectedFields, setSelectedFields] = useState<FieldKey[]>(
     printableFields.map(([key]) => key)
   );
+  const [officialTemplate, setOfficialTemplate] = useState<AssetExcelTemplateMeta | null>(null);
+  const [templateLoading, setTemplateLoading] = useState(true);
+  const [templateUploading, setTemplateUploading] = useState(false);
+  const [officialExporting, setOfficialExporting] = useState(false);
+  const [officialExcelMessage, setOfficialExcelMessage] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -417,6 +432,16 @@ export const AssetReportsPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTemplateLoading(true);
+    getOfficialAssetExcelTemplate()
+      .then((template) => { if (!cancelled) setOfficialTemplate(template); })
+      .catch(() => { if (!cancelled) setOfficialTemplate(null); })
+      .finally(() => { if (!cancelled) setTemplateLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const rows = useMemo(() => {
@@ -462,6 +487,46 @@ export const AssetReportsPage: React.FC = () => {
         ? current.filter((item) => item !== key)
         : [...current, key]
     );
+  };
+
+  const handleOfficialTemplateUpload = async (file: File | null) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      setOfficialExcelMessage('القالب الرسمي يجب أن يكون بصيغة XLSX.');
+      return;
+    }
+    try {
+      setTemplateUploading(true);
+      setOfficialExcelMessage('جارٍ رفع القالب الرسمي واعتماده...');
+      const uploaded = await uploadOfficialAssetExcelTemplate(file);
+      setOfficialTemplate(uploaded);
+      setOfficialExcelMessage('تم اعتماد قالب Excel الرسمي بنجاح.');
+    } catch (error: any) {
+      setOfficialExcelMessage(error?.message || 'تعذر رفع قالب Excel الرسمي.');
+    } finally {
+      setTemplateUploading(false);
+    }
+  };
+
+  const exportOfficialExcel = async () => {
+    if (!officialTemplate || rows.length === 0) return;
+    try {
+      setOfficialExporting(true);
+      setOfficialExcelMessage('جارٍ تجهيز نموذج Excel الرسمي بنفس التصميم المعتمد...');
+      const templateBuffer = await downloadOfficialAssetExcelTemplate();
+      const result = await buildOfficialAssetExcel(templateBuffer, rows);
+      const stamp = new Date().toISOString().slice(0, 10);
+      saveAs(result.blob, `نموذج-الأصول-الرسمي-${stamp}.xlsx`);
+      setOfficialExcelMessage(
+        result.skippedCount > 0
+          ? `تم تجهيز ${result.exportedCount} سجل في ورقة الآلات والمعدات. تم استبعاد ${result.skippedCount} سجل من أنواع أخرى لأن الأوراق الأخرى محفوظة دون تغيير حسب الاعتماد.`
+          : `تم تجهيز ${result.exportedCount} سجل في نموذج Excel الرسمي مع الحفاظ على القالب والأوراق الأخرى.`
+      );
+    } catch (error: any) {
+      setOfficialExcelMessage(error?.message || 'تعذر تجهيز نموذج Excel الرسمي.');
+    } finally {
+      setOfficialExporting(false);
+    }
   };
 
   const exportExcel = () => {
@@ -650,6 +715,59 @@ tbody tr:nth-child(even) { background:#f8fafc; }
               <span>{label}</span>
             </label>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[26px] border-emerald-200/70 bg-emerald-50/35 shadow-sm">
+        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2 font-black text-slate-900">
+              <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+              نموذج Excel الرسمي المعتمد
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              يتم تنزيل نفس القالب الرسمي دون تغيير الأوراق أو التصميم، وتعبئة الحقول المعتمدة في ورقة هـ- الآلات والمعدات من نتائج التقرير الحالية.
+            </p>
+            <p className="mt-2 text-xs font-medium text-slate-600">
+              {templateLoading
+                ? 'جارٍ التحقق من القالب...'
+                : officialTemplate
+                  ? `القالب المعتمد: ${officialTemplate.fileName}`
+                  : 'لم يتم رفع القالب الرسمي إلى المنصة بعد.'}
+            </p>
+            {officialExcelMessage && (
+              <p className="mt-2 text-xs font-semibold text-emerald-800">{officialExcelMessage}</p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {isAdmin && (
+              <label className={`inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold shadow-sm transition hover:bg-slate-50 ${templateUploading ? 'pointer-events-none opacity-60' : ''}`}>
+                <UploadCloud className="ml-2 h-4 w-4" />
+                {templateUploading ? 'جارٍ رفع القالب...' : officialTemplate ? 'استبدال القالب الرسمي' : 'رفع القالب الرسمي'}
+                <input
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    void handleOfficialTemplateUpload(file);
+                    event.currentTarget.value = '';
+                  }}
+                />
+              </label>
+            )}
+            {canPrint && (
+              <Button
+                type="button"
+                onClick={() => void exportOfficialExcel()}
+                disabled={templateLoading || officialExporting || !officialTemplate || loading || rows.length === 0}
+                className="bg-emerald-700 text-white hover:bg-emerald-800"
+              >
+                <Download className="ml-2 h-4 w-4" />
+                {officialExporting ? 'جارٍ تجهيز Excel...' : 'تنزيل Excel الرسمي'}
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 

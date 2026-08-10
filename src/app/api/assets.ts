@@ -66,3 +66,42 @@ export const uploadAssetFile = async (
     notes: category,
   };
 };
+
+
+export type AssetExcelTemplateMeta = {
+  id: string;
+  templateKey: string;
+  title: string;
+  fileName: string;
+  driveFileId: string;
+  driveUrl: string;
+  mimeType?: string | null;
+  fileSize?: number | null;
+  uploadedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const getOfficialAssetExcelTemplate = () =>
+  apiJson<AssetExcelTemplateMeta | null>('/api/assets/excel-template');
+
+export const uploadOfficialAssetExcelTemplate = async (file: File) => {
+  const body = new FormData();
+  body.append('file', file);
+  const response = await authenticatedFetch('/api/assets/excel-template', {
+    method: 'POST',
+    body,
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(String(result?.message || result?.error || 'تعذر رفع قالب Excel الرسمي.'));
+  return result as AssetExcelTemplateMeta;
+};
+
+export const downloadOfficialAssetExcelTemplate = async () => {
+  const response = await authenticatedFetch('/api/assets/excel-template/file');
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(String(result?.message || result?.error || 'تعذر تنزيل قالب Excel الرسمي.'));
+  }
+  return response.arrayBuffer();
+};
