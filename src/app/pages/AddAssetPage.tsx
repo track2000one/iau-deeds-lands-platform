@@ -93,6 +93,38 @@ const formatFileSize = (size: number) => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const AttachmentImagePreview: React.FC<{ file: File }> = ({ file }) => {
+  const [previewUrl, setPreviewUrl] = useState('');
+  const isImage = file.type.startsWith('image/');
+
+  useEffect(() => {
+    if (!isImage) {
+      setPreviewUrl('');
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file, isImage]);
+
+  if (!isImage || !previewUrl) return null;
+
+  return (
+    <div className="relative overflow-hidden border-b bg-slate-100">
+      <img
+        src={previewUrl}
+        alt={`معاينة ${file.name}`}
+        className="h-44 w-full bg-slate-100 object-contain sm:h-52"
+      />
+      <div className="absolute bottom-2 right-2 rounded-lg bg-slate-950/70 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+        معاينة الصورة
+      </div>
+    </div>
+  );
+};
+
 const emptyForm: AssetInput = {
   itemNumber: '',
   barcode: '',
@@ -565,14 +597,17 @@ export const AddAssetPage: React.FC = () => {
                   {files.length > 0 && (
                     <div className="space-y-2">
                       {files.map((file, index) => (
-                        <div key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border bg-background/80 px-3 py-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                        <div key={`${file.name}-${file.lastModified}-${index}`} className="overflow-hidden rounded-xl border bg-background/80 shadow-sm">
+                          <AttachmentImagePreview file={file} />
+                          <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{file.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                            </div>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(section.key, index)} className="h-8 w-8 shrink-0">
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(section.key, index)} className="h-8 w-8 shrink-0">
-                            <X className="h-4 w-4" />
-                          </Button>
                         </div>
                       ))}
                     </div>
