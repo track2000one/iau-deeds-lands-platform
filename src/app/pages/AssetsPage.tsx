@@ -40,44 +40,55 @@ const normalizeAssetText = (value: unknown) =>
     .replace(/[أإآ]/g, 'ا')
     .replace(/ة/g, 'ه')
     .replace(/ى/g, 'ي')
+    .replace(/[ـ]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 
-const ASSET_GROUP_RULES: Array<{ label: string; patterns: RegExp[] }> = [
-  { label: 'الكراسي', patterns: [/كرسي/, /كراسي/, /chair/] },
-  { label: 'الطاولات والمكاتب', patterns: [/طاول/, /طاوله/, /مكتب/, /desk/, /table/] },
-  { label: 'الخزائن والكبائن', patterns: [/خزان/, /خزانه/, /كبين/, /كابينه/, /كابينه/, /cabinet/, /locker/] },
-  { label: 'الطابعات وأجهزة النسخ', patterns: [/طابع/, /طباعه/, /ناسخ/, /ماكينه تصوير/, /printer/, /copier/] },
-  { label: 'أجهزة الحاسب والشاشات', patterns: [/حاسب/, /كمبيوتر/, /شاشه/, /monitor/, /computer/, /desktop/, /laptop/] },
-  { label: 'أجهزة الشبكات والاتصالات', patterns: [/سويتش/, /راوتر/, /شبك/, /هاتف/, /سنترال/, /router/, /switch/, /network/, /telephone/] },
+type AssetGroupRule = {
+  label: string;
+  patterns: RegExp[];
+};
+
+/*
+ * مهم: قواعد التجميع تعمل أولاً على اسم/وصف الأصل نفسه فقط.
+ * لا نستخدم مستويات التصنيف في القرار الأول لأنها عامة وقد تحتوي كلمات
+ * مثل "مكتبي" أو "أجهزة" وتسبب خلط الطاولات بالطابعات أو أجهزة UPS.
+ */
+const PRIMARY_ASSET_GROUP_RULES: AssetGroupRule[] = [
+  { label: 'أجهزة UPS والطاقة الاحتياطية', patterns: [/\bups\b/i, /uninterruptible/, /مزود طاقه غير منقطع/, /طاقه احتياطيه/] },
+  { label: 'الطابعات وأجهزة النسخ', patterns: [/طابع/, /برنتر/, /ناسخ/, /ماكينه تصوير/, /اله تصوير/, /printer/, /copier/, /plotter/] },
+  { label: 'الكراسي', patterns: [/كرسي/, /كراسي/, /chair/, /stool/] },
+  { label: 'الطاولات', patterns: [/طاول/, /طاوله/, /ترابيز/, /table/] },
+  { label: 'المكاتب', patterns: [/مكتب اداري/, /مكتب خشب/, /مكتب موظف/, /desk/] },
+  { label: 'الخزائن والكبائن', patterns: [/خزان/, /خزانه/, /كبين/, /كابينه/, /cabinet/, /locker/, /cupboard/] },
+  { label: 'أجهزة الحاسب', patterns: [/حاسب/, /كمبيوتر/, /computer/, /desktop/, /laptop/, /workstation/] },
+  { label: 'الشاشات وأجهزة العرض', patterns: [/شاشه/, /بروجكتر/, /جهاز عرض/, /monitor/, /projector/, /display/] },
+  { label: 'أجهزة الشبكات والاتصالات', patterns: [/سويتش/, /راوتر/, /نقطه وصول/, /هاتف/, /سنترال/, /router/, /switch/, /access point/, /telephone/, /network/] },
   { label: 'أجهزة التكييف والتبريد', patterns: [/تكييف/, /مكيف/, /تبريد/, /ثلاج/, /air condition/, /refriger/] },
-  { label: 'الأجهزة الكهربائية والإلكترونية', patterns: [/جهاز/, /اجهزه/, /الكترون/, /كهرب/, /electronic/, /device/] },
+  { label: 'المولدات والطاقة', patterns: [/مولد/, /generator/, /محول كهرب/, /transformer/] },
+  { label: 'الأجهزة الطبية والمخبرية', patterns: [/جهاز طبي/, /مختبر/, /معمل/, /microscope/, /analyzer/, /centrifuge/] },
   { label: 'المركبات ووسائل النقل', patterns: [/سيار/, /مركب/, /حافل/, /شاحن/, /vehicle/, /car/, /bus/, /truck/] },
-  { label: 'الأراضي', patterns: [/ارض/, /اراضي/, /land/] },
-  { label: 'الأصول غير الملموسة', patterns: [/برنامج/, /رخصه/, /نظام/, /software/, /license/, /intangible/] },
+  { label: 'الأراضي', patterns: [/\bارض\b/, /اراضي/, /land/] },
+  { label: 'الأصول غير الملموسة', patterns: [/برنامج/, /رخصه/, /software/, /license/, /intangible/] },
   { label: 'البنية التحتية', patterns: [/بنيه تحتيه/, /شبكه مياه/, /شبكه صرف/, /طريق/, /رصيف/, /infrastructure/] },
 ];
 
-const getAssetGroupLabel = (asset: AssetRecord) => {
-  const haystack = normalizeAssetText(
-    [
-      asset.name,
-      asset.assetDescription,
-      asset.category,
-      asset.brand,
-      asset.model,
-      asset.classification1,
-      asset.classification2,
-      asset.classification3,
-    ]
+const getPrimaryAssetText = (asset: AssetRecord) =>
+  normalizeAssetText(
+    [asset.name, asset.assetDescription, asset.brand, asset.model]
       .filter(Boolean)
       .join(' ')
   );
 
-  for (const rule of ASSET_GROUP_RULES) {
-    if (rule.patterns.some((pattern) => pattern.test(haystack))) return rule.label;
+const getAssetGroupLabel = (asset: AssetRecord) => {
+  const primaryText = getPrimaryAssetText(asset);
+
+  for (const rule of PRIMARY_ASSET_GROUP_RULES) {
+    if (rule.patterns.some((pattern) => pattern.test(primaryText))) return rule.label;
   }
 
+  // عند عدم وجود تطابق صريح نرجع للتصنيف الرئيسي فقط، بدون تحليل
+  // مستويات التصنيف العامة حتى لا تختلط أنواع مختلفة في مجموعة واحدة.
   return CATEGORY_LABELS[asset.category] || asset.category || 'أصول أخرى';
 };
 
@@ -113,7 +124,7 @@ export const AssetsPage: React.FC = () => {
   }, []);
 
   const filteredAssets = useMemo(() => {
-    const value = query.trim().toLowerCase();
+    const value = normalizeAssetText(query);
     if (!value) return assets;
 
     return assets.filter((asset) =>
@@ -137,7 +148,7 @@ export const AssetsPage: React.FC = () => {
         getAssetGroupLabel(asset),
       ]
         .filter(Boolean)
-        .some((item) => String(item).toLowerCase().includes(value))
+        .some((item) => normalizeAssetText(item).includes(value))
     );
   }, [assets, query]);
 
@@ -190,7 +201,7 @@ export const AssetsPage: React.FC = () => {
         <div>
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary"><Boxes className="h-4 w-4" />وحدة الأصول</div>
           <h1 className="text-2xl font-black sm:text-3xl">جميع الأصول</h1>
-          <p className="mt-2 text-sm text-muted-foreground">عرض الأصول في مجموعات تشغيلية واضحة مثل الكراسي والطاولات والطابعات والأجهزة، مع إمكانية فتح كل مجموعة عند الحاجة.</p>
+          <p className="mt-2 text-sm text-muted-foreground">عرض الأصول في مجموعات دقيقة اعتمادًا على اسم ووصف الأصل الفعلي، مع فصل الكراسي والطاولات والطابعات وأجهزة UPS وغيرها.</p>
         </div>
         {canAdd && (
           <div className="flex flex-wrap gap-2">
@@ -256,8 +267,8 @@ export const AssetsPage: React.FC = () => {
                                 <div><dt className="text-xs text-muted-foreground">الحالة الفنية</dt><dd className="mt-1 font-medium">{asset.technicalCondition || '-'}</dd></div>
                                 <div><dt className="text-xs text-muted-foreground">الجهة / الإدارة</dt><dd className="mt-1 font-medium">{asset.responsibleDepartment || asset.department || asset.entityName || '-'}</dd></div>
                                 <div><dt className="text-xs text-muted-foreground">الموقع</dt><dd className="mt-1 font-medium">{[asset.building, asset.floor, asset.room].filter(Boolean).join(' / ') || '-'}</dd></div>
-                                <div><dt className="text-xs text-muted-foreground">الكمية</dt><dd className="mt-1 font-medium">{Number.isFinite(Number(asset.quantity)) ? Number(asset.quantity).toLocaleString('ar-SA') : '1'}</dd></div>
                                 <div><dt className="text-xs text-muted-foreground">رمز الأصل المحاسبي</dt><dd className="mt-1 font-medium">{asset.assetCode || '-'}</dd></div>
+                                <div><dt className="text-xs text-muted-foreground">الكمية</dt><dd className="mt-1 font-medium">{Number.isFinite(Number(asset.quantity)) ? Number(asset.quantity).toLocaleString('ar-SA') : '1'}</dd></div>
                               </dl>
                               <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
                                 <Button variant="outline" size="sm" onClick={() => navigate(`/assets/${asset.id}`)}><Eye className="ml-1 h-4 w-4" />عرض</Button>
