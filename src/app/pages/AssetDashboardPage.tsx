@@ -9,6 +9,7 @@ import {
   Package,
   PlusCircle,
   ScanLine,
+  TriangleAlert,
   Wrench,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -19,22 +20,32 @@ import type { AssetStats } from '../../types/asset';
 
 const quickActions = [
   { label: 'جميع الأصول', description: 'استعراض سجل الأصول والبحث والتصفية', path: '/assets/list', icon: Boxes, ready: true },
-  { label: 'إضافة أصل', description: 'تسجيل أصل جديد وربطه بموقعه وعهدته', path: '/assets/new', icon: PlusCircle, ready: true },
+  { label: 'إضافة أصل', description: 'تسجيل أصل جديد وربطه بموقعه الإداري', path: '/assets/new', icon: PlusCircle, ready: true },
   { label: 'الجرد الميداني', description: 'مسح الباركود ومطابقة الأصل مع الموقع الفعلي', path: '/assets/inventory', icon: ScanLine, ready: false },
-  { label: 'حركة الأصول', description: 'متابعة النقل وتغيير العهد والمواقع', path: '/assets/movements', icon: ArrowRightLeft, ready: false },
+  { label: 'حركة الأصول', description: 'متابعة نقل الأصول بين الإدارات والمواقع', path: '/assets/movements', icon: ArrowRightLeft, ready: false },
   { label: 'الصيانة', description: 'متابعة حالات الصيانة والإجراءات المنفذة', path: '/assets/maintenance', icon: Wrench, ready: false },
   { label: 'تقارير الأصول', description: 'تقارير إدارية قابلة للطباعة والتصدير', path: '/assets/reports', icon: BarChart3, ready: true },
 ];
 
+const EMPTY_STATS: AssetStats = {
+  total: 0,
+  available: 0,
+  inUse: 0,
+  maintenance: 0,
+  lost: 0,
+  disposed: 0,
+  inventoryCount: 0,
+};
+
+const safeNumber = (value: unknown) => {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export const AssetDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, hasPermission } = usePermissions();
-  const [stats, setStats] = useState<AssetStats>({
-    total: 0,
-    inCustody: 0,
-    maintenance: 0,
-    excluded: 0,
-  });
+  const [stats, setStats] = useState<AssetStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
 
   const canAdd = isAdmin || hasPermission('assets', 'canAdd');
@@ -44,12 +55,20 @@ export const AssetDashboardPage: React.FC = () => {
 
     getAssetStats()
       .then((result) => {
-        if (!cancelled) setStats(result);
+        if (!cancelled) {
+          setStats({
+            total: safeNumber(result?.total),
+            available: safeNumber(result?.available),
+            inUse: safeNumber(result?.inUse),
+            maintenance: safeNumber(result?.maintenance),
+            lost: safeNumber(result?.lost),
+            disposed: safeNumber(result?.disposed),
+            inventoryCount: safeNumber(result?.inventoryCount),
+          });
+        }
       })
       .catch(() => {
-        if (!cancelled) {
-          setStats({ total: 0, inCustody: 0, maintenance: 0, excluded: 0 });
-        }
+        if (!cancelled) setStats(EMPTY_STATS);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -62,10 +81,13 @@ export const AssetDashboardPage: React.FC = () => {
 
   const statsCards = useMemo(
     () => [
-      { label: 'إجمالي الأصول', value: stats.total, icon: Boxes },
-      { label: 'أصول بعهدة', value: stats.inCustody, icon: Package },
-      { label: 'تحت الصيانة', value: stats.maintenance, icon: Wrench },
-      { label: 'أصول مستبعدة', value: stats.excluded, icon: Archive },
+      { label: 'إجمالي الأصول', value: safeNumber(stats.total), icon: Boxes },
+      { label: 'الأصول المتاحة', value: safeNumber(stats.available), icon: Package },
+      { label: 'قيد الاستخدام', value: safeNumber(stats.inUse), icon: ClipboardCheck },
+      { label: 'تحت الصيانة', value: safeNumber(stats.maintenance), icon: Wrench },
+      { label: 'مفقود / عجز / تالف', value: safeNumber(stats.lost), icon: TriangleAlert },
+      { label: 'أصول مستبعدة', value: safeNumber(stats.disposed), icon: Archive },
+      { label: 'عمليات الجرد', value: safeNumber(stats.inventoryCount), icon: ScanLine },
     ],
     [stats]
   );
@@ -84,7 +106,7 @@ export const AssetDashboardPage: React.FC = () => {
               لوحة إدارة الأصول
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-              إدارة دورة حياة أصول الجامعة من التسجيل والموقع والعهدة إلى الجرد والصيانة والنقل والاستبعاد.
+              إدارة دورة حياة أصول الجامعة من التسجيل والموقع الإداري إلى الجرد والصيانة والنقل والاستبعاد.
             </p>
           </div>
 
@@ -103,7 +125,9 @@ export const AssetDashboardPage: React.FC = () => {
             <CardContent className="flex items-center justify-between p-5 sm:p-6">
               <div>
                 <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="mt-2 text-3xl font-black text-foreground">{loading ? '...' : value.toLocaleString('ar-SA')}</p>
+                <p className="mt-2 text-3xl font-black text-foreground">
+                  {loading ? '...' : safeNumber(value).toLocaleString('ar-SA')}
+                </p>
               </div>
               <div className="grid h-12 w-12 place-items-center rounded-2xl border bg-background/80 shadow-inner">
                 <Icon className="h-6 w-6 text-primary" />
@@ -149,7 +173,7 @@ export const AssetDashboardPage: React.FC = () => {
       </Card>
 
       <div className="rounded-2xl border border-dashed bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-        التسجيل والعرض والتعديل والحذف والبحث وتقارير الأصول أصبحت مرتبطة فعليًا بالـBackend وقاعدة PostgreSQL. المراحل التالية: الجرد والحركة والصيانة.
+        التسجيل والعرض والتعديل والحذف والبحث وتقارير الأصول مرتبطة فعليًا بالـBackend وقاعدة PostgreSQL. المراحل التالية: الجرد والحركة والصيانة.
       </div>
     </div>
   );
