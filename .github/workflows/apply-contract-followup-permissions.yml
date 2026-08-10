@@ -1,0 +1,36 @@
+name: Apply Contract Follow-up Permissions
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-contract-followup-permissions.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-contract-followup-permissions.mjs
+      - run: npm run build
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/types/permissions.ts src/app/components/PermissionMatrix.tsx src/app/components/Layout.tsx src/app/routes.tsx src/app/pages/ContractsFollowUpPage.tsx
+          git commit -m "Restrict contract follow-up by user permissions"
+          git push origin main
