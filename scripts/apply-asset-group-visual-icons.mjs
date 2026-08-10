@@ -94,7 +94,7 @@ const helper = `const GROUP_VISUAL_PALETTES = [
 const FALLBACK_GROUP_ICONS = [Boxes, Archive, Building2, Cloud, Cog, Printer] as const;
 
 const resolveGroupVisual = (group: AssetGroupSummary) => {
-  const text = \`${group.label} ${group.key}\`.toLowerCase();
+  const text = String(group.label + ' ' + group.key).toLowerCase();
 
   if (/النقل العام|public transport|bus/.test(text)) {
     return { ...GROUP_VISUAL_PALETTES[3], icon: BusFront };
