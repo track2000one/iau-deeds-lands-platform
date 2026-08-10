@@ -1,4 +1,4 @@
-import { apiJson } from './http';
+import { apiJson, authenticatedFetch } from './http';
 
 export const isApiEnabled = Boolean(
   import.meta.env.VITE_API_URL?.replace(/\/$/, '')
@@ -15,10 +15,34 @@ type RecordResource =
 const recordPath = (resource: RecordResource, id?: string) =>
   `/api/records/${resource}${id ? `/${id}` : ''}`;
 
+/**
+ * Collection reads are intentionally tolerant of 403 responses.
+ *
+ * A limited user may be allowed to view only a subset of platform modules.
+ * DataContext loads the collections together, so allowing a forbidden collection
+ * to reject would prevent authorized collections from being displayed as well.
+ * Returning an empty array for 403 keeps the backend permission boundary intact
+ * while allowing the user's permitted modules and reports to load normally.
+ */
+const getReadableCollection = async <T,>(path: string): Promise<T[]> => {
+  const response = await authenticatedFetch(path);
+  const body = await response.json().catch(() => ({}));
+
+  if (response.status === 403) {
+    return [];
+  }
+
+  if (!response.ok) {
+    throw new Error(body?.message || 'تعذر تحميل البيانات من الخادم');
+  }
+
+  return Array.isArray(body) ? (body as T[]) : [];
+};
+
 export const api = {
   getHealth: () => apiJson('/api/health'),
 
-  getDeeds: <T>() => apiJson<T[]>('/api/deeds'),
+  getDeeds: <T>() => getReadableCollection<T>('/api/deeds'),
   addDeed: <T>(data: Partial<T>) =>
     apiJson<T>('/api/deeds', {
       method: 'POST',
@@ -35,7 +59,7 @@ export const api = {
     }),
 
   getRecords: <T>(resource: RecordResource) =>
-    apiJson<T[]>(recordPath(resource)),
+    getReadableCollection<T>(recordPath(resource)),
   addRecord: <T>(resource: RecordResource, data: Partial<T>) =>
     apiJson<T>(recordPath(resource), {
       method: 'POST',
