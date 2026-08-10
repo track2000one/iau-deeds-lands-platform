@@ -155,6 +155,9 @@ export const AddAssetPage: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannerMessage, setScannerMessage] = useState('');
+  const [hardwareScannerActive, setHardwareScannerActive] = useState(false);
+  const [hardwareScannerMessage, setHardwareScannerMessage] = useState('');
+  const barcodeInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerStreamRef = useRef<MediaStream | null>(null);
   const scannerFrameRef = useRef<number | null>(null);
@@ -195,6 +198,50 @@ export const AddAssetPage: React.FC = () => {
       ...current,
       [category]: current[category].filter((_, fileIndex) => fileIndex !== index),
     }));
+  };
+
+  const startHardwareBarcodeReader = () => {
+    setHardwareScannerMessage('');
+    setHardwareScannerActive(true);
+    setField('barcode', '');
+    window.requestAnimationFrame(() => {
+      barcodeInputRef.current?.focus();
+    });
+  };
+
+  const finishHardwareBarcodeReader = (rawValue?: string) => {
+    const value = String(rawValue ?? barcodeInputRef.current?.value ?? form.barcode ?? '').trim();
+    if (!value) {
+      setHardwareScannerMessage('لم يتم استلام باركود بعد. مرّر الملصق أمام القارئ المتصل ثم حاول مرة أخرى.');
+      barcodeInputRef.current?.focus();
+      return;
+    }
+
+    setField('barcode', value);
+    setHardwareScannerActive(false);
+    setHardwareScannerMessage(`تمت قراءة الباركود من القارئ المتصل بنجاح: ${value}`);
+    barcodeInputRef.current?.blur();
+  };
+
+  const cancelHardwareBarcodeReader = () => {
+    setHardwareScannerActive(false);
+    setHardwareScannerMessage('تم إلغاء وضع القراءة من القارئ المتصل.');
+    barcodeInputRef.current?.blur();
+  };
+
+  const handleHardwareScannerKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!hardwareScannerActive) return;
+
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      event.preventDefault();
+      finishHardwareBarcodeReader(event.currentTarget.value);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelHardwareBarcodeReader();
+    }
   };
 
   useEffect(() => {
@@ -403,14 +450,42 @@ export const AddAssetPage: React.FC = () => {
           </div>
           <div className="space-y-2">
             <Label>رقم الباركود / ملصق الأصل</Label>
-            <div className="flex gap-2">
-              <Input value={form.barcode || ''} onChange={(e) => setField('barcode', e.target.value)} placeholder="اتركه فارغًا ليُنشأ تلقائيًا من وحدة الأصول" />
+            <div className="flex flex-wrap gap-2">
+              <Input
+                ref={barcodeInputRef}
+                value={form.barcode || ''}
+                onChange={(e) => setField('barcode', e.target.value)}
+                onKeyDown={handleHardwareScannerKeyDown}
+                autoComplete="off"
+                className={hardwareScannerActive ? 'min-w-[220px] flex-1 border-emerald-400 ring-2 ring-emerald-100' : 'min-w-[220px] flex-1'}
+                placeholder={hardwareScannerActive ? 'جاهز للقراءة... مرّر الباركود أمام القارئ' : 'اتركه فارغًا ليُنشأ تلقائيًا من وحدة الأصول'}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => hardwareScannerActive ? finishHardwareBarcodeReader(barcodeInputRef.current?.value) : startHardwareBarcodeReader()}
+                className={hardwareScannerActive ? 'h-10 shrink-0 rounded-xl border-emerald-300 bg-emerald-50 px-3 text-emerald-700 hover:bg-emerald-100' : 'h-10 shrink-0 rounded-xl px-3'}
+                title="قراءة الباركود من قارئ USB أو القارئ اللاسلكي المتصل بالكمبيوتر"
+              >
+                <Barcode className="ml-2 h-4 w-4 text-emerald-600" />
+                <span>{hardwareScannerActive ? 'إنهاء القراءة' : 'قارئ USB'}</span>
+              </Button>
               <Button type="button" variant="outline" onClick={() => setScannerOpen(true)} className="h-10 shrink-0 rounded-xl px-3">
                 <ScanBarcode className="ml-2 h-4 w-4 text-blue-600" />
-                <span className="hidden sm:inline">مسح بالجوال</span>
+                <span className="hidden sm:inline">كاميرا الجوال</span>
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">يمكن قراءة باركود الأصل مباشرة بكاميرا الجوال، أو ترك الحقل فارغًا ليُنشأ تلقائيًا.</p>
+            <p className="text-xs text-muted-foreground">يدعم قارئ الباركود المتصل بالكمبيوتر عبر USB أو اللاسلكي بوضع لوحة المفاتيح، وكذلك القراءة بكاميرا الجوال.</p>
+            {hardwareScannerActive && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                القارئ جاهز الآن: مرّر الباركود أمام الجهاز المتصل. تُعتمد القراءة تلقائيًا عند إرسال Enter أو Tab من القارئ، ويمكن الضغط على «إنهاء القراءة» يدويًا.
+              </div>
+            )}
+            {hardwareScannerMessage && !hardwareScannerActive && (
+              <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+                {hardwareScannerMessage}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label>اسم الأصل *</Label>
