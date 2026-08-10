@@ -39,6 +39,7 @@ import { AddAssetPage } from './pages/AddAssetPage';
 import { ViewAssetPage } from './pages/ViewAssetPage';
 import { EditAssetPage } from './pages/EditAssetPage';
 import { AssetReportsPage } from './pages/AssetReportsPage';
+import { AssetExcelImportPage } from './pages/AssetExcelImportPage';
 import { ContractsFollowUpPage } from './pages/ContractsFollowUpPage';
 
 const adminOnly = (element: ReactNode) => (
@@ -78,6 +79,7 @@ export const router = createHashRouter([
           { index: true, element: assetPermission(<AssetDashboardPage />, 'canView') },
           { path: 'list', element: assetPermission(<AssetsPage />, 'canView') },
           { path: 'new', element: assetPermission(<AddAssetPage />, 'canAdd') },
+          { path: 'import', element: assetPermission(<AssetExcelImportPage />, 'canAdd') },
           { path: 'reports', element: assetPermission(<AssetReportsPage />, 'canView') },
           { path: ':assetId', element: assetPermission(<ViewAssetPage />, 'canView') },
           { path: ':assetId/edit', element: assetPermission(<EditAssetPage />, 'canEdit') },
