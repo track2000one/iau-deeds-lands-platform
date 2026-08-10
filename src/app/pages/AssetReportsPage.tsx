@@ -74,6 +74,25 @@ type FieldKey = (typeof printableFields)[number][0];
 
 type ReportAsset = AssetRecord & { attachmentsCount?: number };
 
+const SCREEN_COLUMN_WEIGHTS: Record<FieldKey, number> = {
+  itemNumber: 8,
+  barcode: 10,
+  name: 15,
+  category: 8,
+  brand: 7,
+  model: 7,
+  serialNumber: 10,
+  status: 7,
+  department: 15,
+  building: 7,
+  floor: 5,
+  room: 9,
+  cardNumber: 8,
+  purchaseDate: 8,
+  purchaseValue: 9,
+  attachments: 6,
+};
+
 const valueFor = (asset: ReportAsset, key: FieldKey) => {
   if (key === 'category') return CATEGORY_LABELS[asset.category] || asset.category || '-';
   if (key === 'status') return ASSET_STATUS_LABELS[asset.status] || asset.status || '-';
@@ -362,6 +381,8 @@ export const AssetReportsPage: React.FC = () => {
     }
   };
 
+  const tableColumnWeightTotal = 4 + selectedFields.reduce((sum, key) => sum + (SCREEN_COLUMN_WEIGHTS[key] || 7), 0) + (canPrint ? 9 : 0);
+
   return (
     <div className="mx-auto w-full max-w-[1700px] space-y-5 sm:space-y-6">
       <section className="flex flex-col gap-4 rounded-[30px] border border-white/55 bg-white/72 p-5 shadow-[0_18px_55px_rgba(15,23,42,0.09)] backdrop-blur-xl sm:p-7 lg:flex-row lg:items-center lg:justify-between">
@@ -407,7 +428,7 @@ export const AssetReportsPage: React.FC = () => {
 
       <div className="flex flex-wrap items-center gap-2"><Button variant="outline" onClick={()=>void exportExcel()} disabled={exporting||!total}><FileSpreadsheet className="ml-2 h-4 w-4"/>Excel</Button>{canPrint&&<><Button variant="outline" onClick={()=>void printReport()} disabled={exporting||!total||!selectedFields.length}><Printer className="ml-2 h-4 w-4"/>التقرير الجدولي / PDF</Button><Button onClick={()=>void printCurrentPageImages()} disabled={exporting||!rows.length}><ImageIcon className="ml-2 h-4 w-4"/>تقارير بالصور للصفحة الحالية</Button></>}<Badge variant="outline" className="rounded-full px-4 py-2">{total.toLocaleString('ar-SA')} سجل</Badge><div className="mr-auto flex items-center gap-2"><span className="text-xs text-muted-foreground">حجم الصفحة</span><NativeSelect value={String(pageSize)} onChange={(e)=>setPageSize(Number(e.target.value))} className="w-[100px]"><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></NativeSelect></div></div>
 
-      <Card className="overflow-hidden rounded-[28px] border-white/55 bg-white/70 shadow-[0_16px_48px_rgba(15,23,42,0.07)] backdrop-blur-xl"><CardContent className="p-0">{loading?<div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">جارٍ تحميل نتائج التقرير...</div>:!rows.length?<div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">لا توجد سجلات مطابقة للتصفية الحالية.</div>:<div className="overflow-x-auto px-3 pb-3 sm:px-4 sm:pb-4"><table className="w-full min-w-[1080px] border-collapse text-sm"><thead className="bg-primary text-primary-foreground"><tr><th className="px-2 py-2.5">#</th>{selectedFields.map((key)=><th key={key} className="px-2 py-2.5">{printableFields.find(([field])=>field===key)?.[1]}</th>)}{canPrint&&<th className="px-2 py-2.5">التقرير</th>}</tr></thead><tbody>{rows.map((asset,index)=><tr key={asset.id} className="border-b last:border-b-0 hover:bg-muted/30"><td className="px-2 py-2 text-center">{(page-1)*pageSize+index+1}</td>{selectedFields.map((key)=><td key={key} className="px-2 py-2 text-center">{String(valueFor(asset,key))}</td>)}{canPrint&&<td className="px-2 py-2 text-center"><Button type="button" variant="outline" size="sm" onClick={()=>void printSingleAsset(asset)}><Printer className="ml-2 h-4 w-4"/>تقرير الأصل</Button></td>}</tr>)}</tbody></table></div>}</CardContent></Card>
+      <Card className="overflow-hidden rounded-[20px] border-white/55 bg-white/70 shadow-[0_12px_36px_rgba(15,23,42,0.06)] backdrop-blur-xl"><CardContent className="p-0">{loading?<div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">جارٍ تحميل نتائج التقرير...</div>:!rows.length?<div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">لا توجد سجلات مطابقة للتصفية الحالية.</div>:<div className="overflow-x-auto p-1.5 sm:p-2"><table className="w-full table-fixed border-collapse text-[10px] leading-tight sm:text-[11px] lg:text-xs"><colgroup><col style={{width:((4/tableColumnWeightTotal)*100).toFixed(3)+'%'}}/>{selectedFields.map((key)=><col key={key} style={{width:(((SCREEN_COLUMN_WEIGHTS[key]||7)/tableColumnWeightTotal)*100).toFixed(3)+'%'}}/>)}{canPrint&&<col style={{width:((9/tableColumnWeightTotal)*100).toFixed(3)+'%'}}/>}</colgroup><thead className="bg-primary text-primary-foreground"><tr><th className="border border-primary-foreground/15 px-1 py-1.5 text-center font-extrabold leading-tight">#</th>{selectedFields.map((key)=><th key={key} className="border border-primary-foreground/15 px-1 py-1.5 text-center font-extrabold leading-tight whitespace-normal break-words [overflow-wrap:anywhere]">{printableFields.find(([field])=>field===key)?.[1]}</th>)}{canPrint&&<th className="border border-primary-foreground/15 px-1 py-1.5 text-center font-extrabold leading-tight">التقرير</th>}</tr></thead><tbody>{rows.map((asset,index)=><tr key={asset.id} className="odd:bg-white/25 even:bg-muted/20 hover:bg-primary/5"><td className="border border-border/60 px-1 py-1.5 text-center align-middle font-bold">{(page-1)*pageSize+index+1}</td>{selectedFields.map((key)=><td key={key} title={String(valueFor(asset,key))} className="border border-border/60 px-1 py-1.5 text-center align-middle font-medium leading-tight whitespace-normal break-words [overflow-wrap:anywhere]">{String(valueFor(asset,key))}</td>)}{canPrint&&<td className="border border-border/60 px-1 py-1.5 text-center align-middle"><Button type="button" variant="outline" size="sm" className="h-7 max-w-full gap-1 px-1.5 text-[10px]" title="تقرير الأصل" onClick={()=>void printSingleAsset(asset)}><Printer className="h-3.5 w-3.5 shrink-0"/><span>تقرير</span></Button></td>}</tr>)}</tbody></table></div>}</CardContent></Card>
 
       {totalPages>1&&<div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border bg-white/65 p-3"><Button variant="outline" disabled={page<=1||loading} onClick={()=>setPage((p)=>Math.max(1,p-1))}><ChevronRight className="ml-2 h-4 w-4"/>السابق</Button><span className="rounded-full border bg-background px-4 py-2 text-sm font-bold">الصفحة {page.toLocaleString('ar-SA')} من {totalPages.toLocaleString('ar-SA')}</span><Button variant="outline" disabled={page>=totalPages||loading} onClick={()=>setPage((p)=>Math.min(totalPages,p+1))}>التالي<ChevronLeft className="mr-2 h-4 w-4"/></Button></div>}
     </div>
