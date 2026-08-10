@@ -1,0 +1,23 @@
+name: Compact asset report print
+on:
+  push:
+    paths:
+      - 'scripts/compact-asset-report-print.mjs'
+      - '.github/workflows/compact-asset-report-print.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/compact-asset-report-print.mjs
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/AssetReportsPage.tsx
+          git diff --cached --quiet || git commit -m "Compact asset report print layout"
+          git push
