@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock3, FileWarning, RefreshCcw, Save } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { usePermissions } from '../../context/PermissionsContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -87,6 +88,8 @@ const urgency = (days: number | null) => {
 
 export const ContractsFollowUpPage: React.FC = () => {
   const { leasedLandsOut, leasedLandsIn, leasedBuildingsOut, leasedBuildingsIn, loading } = useData();
+  const { isAdmin, hasPermission } = usePermissions();
+  const canEdit = isAdmin || hasPermission('contracts_follow_up', 'canEdit');
   const [followUps, setFollowUps] = React.useState<Record<string, ContractFollowUpRecord>>({});
   const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
   const [filter, setFilter] = React.useState<'all' | 'followup' | 'expired' | 'missing'>('followup');
@@ -156,6 +159,10 @@ export const ContractsFollowUpPage: React.FC = () => {
 
   const save = async () => {
     if (!selected) return;
+    if (!canEdit) {
+      toast.error('ليس لديك صلاحية لتعديل متابعة العقود.');
+      return;
+    }
     try {
       setSaving(true);
       const saved = await saveContractFollowUp(selected.key, form);
@@ -230,12 +237,12 @@ export const ContractsFollowUpPage: React.FC = () => {
         <Card id="contract-followup-form" className="rounded-[28px] border-primary/20 bg-white/80 shadow-lg">
           <CardHeader className="border-b"><CardTitle>إجراء متابعة — عقد {selected.contractNumber}</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
-            <div><Label>حالة المتابعة</Label><NativeSelect value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as ContractFollowUpStatus }))}><option value="not_started">لم تبدأ المتابعة</option><option value="in_progress">تحت الإجراء</option><option value="renewed">تم التجديد</option><option value="not_renewing">عدم التجديد</option><option value="closed">مغلق</option></NativeSelect></div>
-            <div><Label>المسؤول عن المتابعة</Label><Input value={form.assignedTo || ''} onChange={(e) => setForm((p) => ({ ...p, assignedTo: e.target.value }))} placeholder="اسم الموظف أو الجهة" /></div>
-            <div><Label>الإجراء المطلوب</Label><Input value={form.action || ''} onChange={(e) => setForm((p) => ({ ...p, action: e.target.value }))} placeholder="مثال: مخاطبة المستأجر بشأن التجديد" /></div>
-            <div><Label>موعد المتابعة القادم</Label><Input type="date" value={form.nextFollowUpDate || ''} onChange={(e) => setForm((p) => ({ ...p, nextFollowUpDate: e.target.value }))} /></div>
-            <div className="md:col-span-2"><Label>ملاحظات المتابعة</Label><Textarea rows={4} value={form.notes || ''} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="سجل آخر تواصل، ما تم اتخاذه، والقرار المتوقع..." /></div>
-            <div className="md:col-span-2 flex flex-wrap gap-2"><Button onClick={save} disabled={saving}><Save className="ml-2 h-4 w-4" />{saving ? 'جارٍ الحفظ...' : 'حفظ إجراء المتابعة'}</Button><Button variant="outline" onClick={() => setSelectedKey(null)}>إغلاق</Button></div>
+            <div><Label>حالة المتابعة</Label><NativeSelect disabled={!canEdit} value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as ContractFollowUpStatus }))}><option value="not_started">لم تبدأ المتابعة</option><option value="in_progress">تحت الإجراء</option><option value="renewed">تم التجديد</option><option value="not_renewing">عدم التجديد</option><option value="closed">مغلق</option></NativeSelect></div>
+            <div><Label>المسؤول عن المتابعة</Label><Input disabled={!canEdit} value={form.assignedTo || ''} onChange={(e) => setForm((p) => ({ ...p, assignedTo: e.target.value }))} placeholder="اسم الموظف أو الجهة" /></div>
+            <div><Label>الإجراء المطلوب</Label><Input disabled={!canEdit} value={form.action || ''} onChange={(e) => setForm((p) => ({ ...p, action: e.target.value }))} placeholder="مثال: مخاطبة المستأجر بشأن التجديد" /></div>
+            <div><Label>موعد المتابعة القادم</Label><Input disabled={!canEdit} type="date" value={form.nextFollowUpDate || ''} onChange={(e) => setForm((p) => ({ ...p, nextFollowUpDate: e.target.value }))} /></div>
+            <div className="md:col-span-2"><Label>ملاحظات المتابعة</Label><Textarea disabled={!canEdit} rows={4} value={form.notes || ''} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="سجل آخر تواصل، ما تم اتخاذه، والقرار المتوقع..." /></div>
+            <div className="md:col-span-2 flex flex-wrap gap-2"><Button onClick={save} disabled={saving || !canEdit}><Save className="ml-2 h-4 w-4" />{saving ? 'جارٍ الحفظ...' : canEdit ? 'حفظ إجراء المتابعة' : 'عرض فقط'}</Button><Button variant="outline" onClick={() => setSelectedKey(null)}>إغلاق</Button></div>
           </CardContent>
         </Card>
       )}

@@ -92,7 +92,7 @@ export const router = createHashRouter([
           { path: ':inspectionId/edit', element: page(<SiteInspectionFormPage />) },
         ],
       },
-      { path: 'contracts/follow-up', element: page(<ContractsFollowUpPage />) },
+      { path: 'contracts/follow-up', element: <PermissionGuard module="contracts_follow_up" action="canView">{page(<ContractsFollowUpPage />)}</PermissionGuard> },
       { path: 'reports', element: page(<ReportsPage />) },
       { path: 'archive', element: page(<ArchivePage />) },
       { path: 'settings', element: page(<SettingsPage />) },

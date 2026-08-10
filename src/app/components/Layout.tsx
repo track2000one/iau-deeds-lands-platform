@@ -114,7 +114,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'leased-lands-in', path: '/lands/leased-in', icon: MapPin, label: t('nav.leasedLandsIn'), module: 'leased_lands_in', action: 'canView' },
     { id: 'leased-buildings-out', path: '/buildings/leased-out', icon: Building, label: t('nav.leasedBuildingsOut'), module: 'leased_buildings_out', action: 'canView' },
     { id: 'leased-buildings-in', path: '/buildings/leased-in', icon: Building, label: t('nav.leasedBuildingsIn'), module: 'leased_buildings_in', action: 'canView' },
-    { id: 'contracts-followup', path: '/contracts/follow-up', icon: FileClock, label: ui('متابعة العقود', 'Contract Follow-up'), alwaysVisible: true },
+    { id: 'contracts-followup', path: '/contracts/follow-up', icon: FileClock, label: ui('متابعة العقود', 'Contract Follow-up'), module: 'contracts_follow_up', action: 'canView' },
     { id: 'assets', path: '/assets', icon: Package, label: ui('وحدة الأصول', 'Assets Unit'), module: 'assets', action: 'canView' },
     { id: 'search', path: '/search', icon: Search, label: t('nav.search'), alwaysVisible: true },
     { id: 'reports', path: '/reports', icon: BarChart3, label: t('nav.reports'), module: 'reports', action: 'canView' },
@@ -173,10 +173,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Button title={ui('الحساب', 'Account')} aria-label={ui('الحساب', 'Account')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button" onClick={() => navigate(isAdmin ? '/admin' : '/')}>
                 <User className="h-4 w-4" />
               </Button>
-              <Button title={ui('تنبيهات العقود', 'Contract Alerts')} aria-label={ui('تنبيهات العقود', 'Contract Alerts')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl relative" onClick={() => navigate('/contracts/follow-up')}>
-                <Bell className="h-4 w-4" />
-                <span className="absolute top-2 end-2 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-background" />
-              </Button>
+              {(isAdmin || hasPermission('contracts_follow_up', 'canView')) && (
+                <Button title={ui('تنبيهات العقود', 'Contract Alerts')} aria-label={ui('تنبيهات العقود', 'Contract Alerts')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl relative" onClick={() => navigate('/contracts/follow-up')}>
+                  <Bell className="h-4 w-4" />
+                  <span className="absolute top-2 end-2 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-background" />
+                </Button>
+              )}
               <Button title={ui('إنشاء رسالة بريد', 'Compose Email')} aria-label={ui('إنشاء رسالة بريد', 'Compose Email')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={() => { window.location.href = `mailto:?subject=${encodeURIComponent(ui('منصة إدارة الأصول والأملاك والأوقاف الجامعية', 'University Assets, Properties and Endowments Management Platform'))}`; }}>
                 <Mail className="h-4 w-4" />
               </Button>
