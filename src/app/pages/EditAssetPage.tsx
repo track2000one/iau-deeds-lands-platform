@@ -24,8 +24,8 @@ const sections: Array<{ key: UploadCategory; label: string; accept: string }> = 
 
 const emptyInput: AssetInput = {
   itemNumber: '',
-  barcode: '', name: '', category: '', brand: '', model: '', serialNumber: '', status: 'active',
-  department: '', building: '', floor: '', room: '', custodian: '', purchaseDate: '', purchaseDateType: 'gregorian', purchaseValue: null, notes: '', attachments: [],
+  barcode: '', name: '', category: '', brand: '', model: '', serialNumber: '', status: 'available',
+  department: '', building: '', floor: '', room: '', purchaseDate: '', purchaseDateType: 'gregorian', purchaseValue: null, notes: '', attachments: [],
 };
 
 export const EditAssetPage: React.FC = () => {
@@ -53,7 +53,7 @@ export const EditAssetPage: React.FC = () => {
         setForm({
           itemNumber: asset.itemNumber || asset.assetNumber || '', barcode: asset.barcode || '', name: asset.name, category: asset.category, brand: asset.brand || '', model: asset.model || '',
           serialNumber: asset.serialNumber || '', status: asset.status, department: asset.department || '', building: asset.building || '',
-          floor: asset.floor || '', room: asset.room || '', custodian: asset.custodian || '',
+          floor: asset.floor || '', room: asset.room || '',
           purchaseDate: normalizeFlexibleDateForInput(asset.purchaseDate, asset.purchaseDateType || 'gregorian'), purchaseDateType: asset.purchaseDateType || 'gregorian', purchaseValue: asset.purchaseValue ?? null,
           notes: asset.notes || '', attachments: asset.attachments || [],
         });
@@ -95,7 +95,6 @@ export const EditAssetPage: React.FC = () => {
         building: String(form.building || '').trim() || null,
         floor: String(form.floor || '').trim() || null,
         room: String(form.room || '').trim() || null,
-        custodian: String(form.custodian || '').trim() || null,
         purchaseDate: form.purchaseDate || null,
         purchaseValue: form.purchaseValue === null || form.purchaseValue === undefined ? null : Number(form.purchaseValue),
         notes: String(form.notes || '').trim() || null,
@@ -127,10 +126,10 @@ export const EditAssetPage: React.FC = () => {
         <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><Barcode className="h-5 w-5" />البيانات الأساسية</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
           <div><Label>رقم الصنف *</Label><Input value={form.itemNumber || ''} onChange={(e) => setField('itemNumber', e.target.value)} /></div>
-          <div><Label>الباركود</Label><Input value={form.barcode || ''} onChange={(e) => setField('barcode', e.target.value)} /></div>
+          <div><Label>الباركود</Label><Input value={form.barcode || ''} onChange={(e) => setField('barcode', e.target.value)} placeholder="يُنشأ تلقائيًا إذا تُرك فارغًا" /></div>
           <div><Label>اسم الأصل *</Label><Input value={form.name} onChange={(e) => setField('name', e.target.value)} /></div>
           <div><Label>التصنيف *</Label><Select value={form.category} onValueChange={(v) => setField('category', v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="it">تقنية معلومات</SelectItem><SelectItem value="furniture">أثاث</SelectItem><SelectItem value="equipment">أجهزة ومعدات</SelectItem><SelectItem value="vehicle">مركبات</SelectItem><SelectItem value="other">أخرى</SelectItem></SelectContent></Select></div>
-          <div><Label>الحالة</Label><Select value={form.status} onValueChange={(v) => setField('status', v as AssetStatus)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">نشط</SelectItem><SelectItem value="assigned">بعهدة</SelectItem><SelectItem value="maintenance">تحت الصيانة</SelectItem><SelectItem value="stored">بالمستودع</SelectItem><SelectItem value="disposed">مستبعد</SelectItem></SelectContent></Select></div>
+          <div><Label>الحالة</Label><Select value={form.status} onValueChange={(v) => setField('status', v as AssetStatus)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="available">متاح</SelectItem><SelectItem value="in_use">قيد الاستخدام</SelectItem><SelectItem value="maintenance">تحت الصيانة</SelectItem><SelectItem value="damaged">تالف</SelectItem><SelectItem value="lost">مفقود / عجز</SelectItem><SelectItem value="disposed">مستبعد</SelectItem></SelectContent></Select></div>
           <div><Label>الماركة</Label><Input value={form.brand || ''} onChange={(e) => setField('brand', e.target.value)} /></div>
           <div><Label>الموديل</Label><Input value={form.model || ''} onChange={(e) => setField('model', e.target.value)} /></div>
           <div className="md:col-span-2"><Label>الرقم التسلسلي</Label><Input value={form.serialNumber || ''} onChange={(e) => setField('serialNumber', e.target.value)} /></div>
@@ -138,13 +137,12 @@ export const EditAssetPage: React.FC = () => {
       </Card>
 
       <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-md">
-        <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />الموقع والعهدة</CardTitle></CardHeader>
+        <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />الموقع الإداري</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
           <div><Label>الجهة / الإدارة</Label><Input value={form.department || ''} onChange={(e) => setField('department', e.target.value)} /></div>
           <div><Label>المبنى</Label><div className="relative"><Building2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pr-9" value={form.building || ''} onChange={(e) => setField('building', e.target.value)} /></div></div>
           <div><Label>الدور</Label><Input value={form.floor || ''} onChange={(e) => setField('floor', e.target.value)} /></div>
           <div><Label>الغرفة / الموقع التفصيلي</Label><Input value={form.room || ''} onChange={(e) => setField('room', e.target.value)} /></div>
-          <div className="md:col-span-2"><Label>صاحب العهدة</Label><div className="relative"><UserRound className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pr-9" value={form.custodian || ''} onChange={(e) => setField('custodian', e.target.value)} /></div></div>
         </CardContent>
       </Card>
 

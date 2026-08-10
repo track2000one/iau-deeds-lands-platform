@@ -99,12 +99,11 @@ const emptyForm: AssetInput = {
   brand: '',
   model: '',
   serialNumber: '',
-  status: 'active',
+  status: 'available',
   department: '',
   building: '',
   floor: '',
   room: '',
-  custodian: '',
   purchaseDate: '',
   purchaseDateType: 'gregorian',
   purchaseValue: null,
@@ -210,7 +209,6 @@ export const AddAssetPage: React.FC = () => {
         building: String(form.building || '').trim() || null,
         floor: String(form.floor || '').trim() || null,
         room: String(form.room || '').trim() || null,
-        custodian: String(form.custodian || '').trim() || null,
         purchaseDate: form.purchaseDate || null,
         purchaseValue:
           form.purchaseValue === null || form.purchaseValue === undefined || form.purchaseValue === ('' as any)
@@ -242,7 +240,7 @@ export const AddAssetPage: React.FC = () => {
           </div>
           <h1 className="text-2xl font-black sm:text-3xl">إضافة أصل جديد</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            تسجيل الأصل وربطه بالموقع والعهدة والمرفقات مباشرة بقاعدة البيانات.
+            تسجيل الأصل وربطه بالموقع الإداري والمرفقات مباشرة بقاعدة البيانات.
           </p>
         </div>
 
@@ -272,7 +270,8 @@ export const AddAssetPage: React.FC = () => {
           </div>
           <div className="space-y-2">
             <Label>رقم الباركود / ملصق الأصل</Label>
-            <Input value={form.barcode || ''} onChange={(e) => setField('barcode', e.target.value)} placeholder="امسح الباركود أو أدخل الرقم يدويًا" />
+            <Input value={form.barcode || ''} onChange={(e) => setField('barcode', e.target.value)} placeholder="اتركه فارغًا ليُنشأ تلقائيًا من وحدة الأصول" />
+            <p className="text-xs text-muted-foreground">سيُنشئ النظام رقم باركود فريدًا تلقائيًا عند الحفظ.</p>
           </div>
           <div className="space-y-2">
             <Label>اسم الأصل *</Label>
@@ -296,10 +295,11 @@ export const AddAssetPage: React.FC = () => {
             <Select value={form.status} onValueChange={(value) => setField('status', value as AssetStatus)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">نشط</SelectItem>
-                <SelectItem value="assigned">بعهدة</SelectItem>
+                <SelectItem value="available">متاح</SelectItem>
+                <SelectItem value="in_use">قيد الاستخدام</SelectItem>
                 <SelectItem value="maintenance">تحت الصيانة</SelectItem>
-                <SelectItem value="stored">بالمستودع</SelectItem>
+                <SelectItem value="damaged">تالف</SelectItem>
+                <SelectItem value="lost">مفقود / عجز</SelectItem>
                 <SelectItem value="disposed">مستبعد</SelectItem>
               </SelectContent>
             </Select>
@@ -345,13 +345,6 @@ export const AddAssetPage: React.FC = () => {
           <div className="space-y-2">
             <Label>الغرفة / الموقع التفصيلي</Label>
             <Input value={form.room || ''} onChange={(e) => setField('room', e.target.value)} placeholder="رقم الغرفة أو وصف الموقع" />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label>صاحب العهدة</Label>
-            <div className="relative">
-              <UserRound className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={form.custodian || ''} onChange={(e) => setField('custodian', e.target.value)} className="pr-9" placeholder="اسم الموظف أو الرقم الوظيفي" />
-            </div>
           </div>
         </CardContent>
       </Card>
