@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, FileSpreadsheet, Loader2, UploadCloud, XCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2, UploadCloud, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -99,14 +99,26 @@ export const AssetExcelImportPage: React.FC = () => {
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [limitPerFile, setLimitPerFile] = useState<number>(25);
+  const [batchIndex, setBatchIndex] = useState(0);
   const [message, setMessage] = useState('');
   const [result, setResult] = useState<ImportResult | null>(null);
 
-  const importRows = useMemo(() => {
-    return files.flatMap((file) =>
-      limitPerFile === 0 ? file.rows : file.rows.slice(0, limitPerFile)
-    );
+  const maxBatch = useMemo(() => {
+    if (limitPerFile === 0 || files.length === 0) return 1;
+    const largestFile = Math.max(...files.map((file) => file.rows.length), 0);
+    return Math.max(1, Math.ceil(largestFile / limitPerFile));
   }, [files, limitPerFile]);
+
+  const importRows = useMemo(() => {
+    if (limitPerFile === 0) return files.flatMap((file) => file.rows);
+    const start = batchIndex * limitPerFile;
+    const end = start + limitPerFile;
+    return files.flatMap((file) => file.rows.slice(start, end));
+  }, [files, limitPerFile, batchIndex]);
+
+  const batchLabel = limitPerFile === 0
+    ? 'كل السجلات'
+    : `الدفعة ${Math.min(batchIndex + 1, maxBatch).toLocaleString('ar-SA')} من ${maxBatch.toLocaleString('ar-SA')}`;
 
   const handleFiles = async (selected: FileList | null) => {
     if (!selected?.length) return;
@@ -117,6 +129,7 @@ export const AssetExcelImportPage: React.FC = () => {
     }
 
     setParsing(true);
+    setBatchIndex(0);
     setResult(null);
     setMessage('جارٍ قراءة ملفات Excel والتعرف على بنية كل نموذج...');
     try {
@@ -139,14 +152,14 @@ export const AssetExcelImportPage: React.FC = () => {
     if (!importRows.length || importing) return;
 
     const confirmed = window.confirm(
-      `سيتم استيراد ${importRows.length.toLocaleString('ar-SA')} سجل إلى وحدة الأصول للاختبار.\n\n` +
+      `سيتم استيراد ${importRows.length.toLocaleString('ar-SA')} سجل من ${batchLabel} إلى وحدة الأصول للاختبار.\n\n` +
       'سيتم الحفاظ على رقم الصنف كحقل فريد، واستخدام أفضل رقم تعريفي متاح من ملف Excel عند وجود أرقام مكررة. السجلات التي سبق استيراد نفس صفها سيتم تجاوزها تلقائيًا. هل ترغب بالمتابعة؟'
     );
     if (!confirmed) return;
 
     setImporting(true);
     setResult(null);
-    setMessage('جارٍ مطابقة السجلات الحالية وتجهيز أرقام الأصناف الفريدة...');
+    setMessage(`جارٍ مطابقة ${batchLabel} مع السجلات الحالية وتجهيز أرقام الأصناف الفريدة...`);
 
     const state: ImportResult = {
       total: importRows.length,
@@ -221,10 +234,13 @@ export const AssetExcelImportPage: React.FC = () => {
 
       await Promise.all([worker(), worker(), worker()]);
       setResult({ ...state, errors: [...state.errors] });
+      const nextHint = state.created === 0 && state.failed === 0 && state.skipped === state.total && limitPerFile !== 0 && batchIndex + 1 < maxBatch
+        ? ' هذه الدفعة سبق استيرادها بالكامل؛ استخدم «الدفعة التالية» لاستيراد سجلات جديدة.'
+        : '';
       setMessage(
         `اكتمل الاستيراد: ${state.created.toLocaleString('ar-SA')} جديد، ` +
         `${state.skipped.toLocaleString('ar-SA')} مكرر/سبق استيراده، ` +
-        `${state.failed.toLocaleString('ar-SA')} تعذر استيراده.`
+        `${state.failed.toLocaleString('ar-SA')} تعذر استيراده.${nextHint}`
       );
     } catch (error: any) {
       state.failed += 1;
@@ -313,27 +329,71 @@ export const AssetExcelImportPage: React.FC = () => {
               <div>
                 <h2 className="font-black">حجم الاستيراد التجريبي</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  يفضل البدء بعدد محدود من كل ملف للتأكد من شكل البيانات في المنصة، ثم اختيار «كل السجلات» بعد اعتماد النتيجة.
+                  يفضل البدء بعدد محدود من كل ملف للتأكد من شكل البيانات في المنصة، ثم الانتقال بين الدفعات حتى اعتماد النتيجة، وبعدها يمكن اختيار «كل السجلات».
                 </p>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(260px,420px)_1fr] lg:items-end">
+              <div className="grid gap-4 lg:grid-cols-3 lg:items-end">
                 <div>
                   <label className="mb-2 block text-xs font-bold">عدد السجلات من كل ملف</label>
-                  <NativeSelect value={String(limitPerFile)} onChange={(e) => setLimitPerFile(Number(e.target.value))} disabled={importing}>
+                  <NativeSelect
+                    value={String(limitPerFile)}
+                    onChange={(e) => {
+                      setLimitPerFile(Number(e.target.value));
+                      setBatchIndex(0);
+                      setResult(null);
+                    }}
+                    disabled={importing}
+                  >
                     {IMPORT_LIMIT_OPTIONS.map((value) => (
                       <option key={value} value={value}>{value === 0 ? 'كل السجلات' : `${value} سجل`}</option>
                     ))}
                   </NativeSelect>
                 </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-bold">الدفعة الحالية</label>
+                  <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 px-0"
+                      disabled={importing || limitPerFile === 0 || batchIndex <= 0}
+                      onClick={() => {
+                        setBatchIndex((value) => Math.max(0, value - 1));
+                        setResult(null);
+                      }}
+                      title="الدفعة السابقة"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <div className="flex h-10 items-center justify-center rounded-xl border bg-white/80 px-3 text-sm font-bold">
+                      {batchLabel}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 px-0"
+                      disabled={importing || limitPerFile === 0 || batchIndex + 1 >= maxBatch}
+                      onClick={() => {
+                        setBatchIndex((value) => Math.min(maxBatch - 1, value + 1));
+                        setResult(null);
+                      }}
+                      title="الدفعة التالية"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="rounded-2xl border bg-white/75 px-4 py-3 text-sm">
-                  إجمالي ما سيتم إدخاله الآن: <strong>{importRows.length.toLocaleString('ar-SA')} سجل</strong>
+                  إجمالي ما سيتم إدخاله في {batchLabel}: <strong>{importRows.length.toLocaleString('ar-SA')} سجل</strong>
                 </div>
               </div>
 
               <Button className="h-12 w-full rounded-2xl" onClick={() => void importSelectedRows()} disabled={importing || importRows.length === 0}>
                 {importing ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <UploadCloud className="ml-2 h-5 w-5" />}
-                {importing ? 'جارٍ استيراد البيانات...' : 'استيراد البيانات إلى وحدة الأصول'}
+                {importing ? 'جارٍ استيراد البيانات...' : `استيراد ${batchLabel} إلى وحدة الأصول`}
               </Button>
             </CardContent>
           </Card>
@@ -347,7 +407,7 @@ export const AssetExcelImportPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <div className="rounded-2xl border p-4"><div className="text-xs text-muted-foreground">الإجمالي</div><div className="mt-2 text-2xl font-black">{result.total.toLocaleString('ar-SA')}</div></div>
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><div className="text-xs text-emerald-700">تمت الإضافة</div><div className="mt-2 flex items-center gap-2 text-2xl font-black text-emerald-700"><CheckCircle2 className="h-5 w-5" />{result.created.toLocaleString('ar-SA')}</div></div>
-              <div className="rounded-2xl border p-4"><div className="text-xs text-muted-foreground">مكرر / متجاوز</div><div className="mt-2 text-2xl font-black">{result.skipped.toLocaleString('ar-SA')}</div></div>
+              <div className="rounded-2xl border p-4"><div className="text-xs text-muted-foreground">مكرر / سبق استيراده</div><div className="mt-2 text-2xl font-black">{result.skipped.toLocaleString('ar-SA')}</div></div>
               <div className="rounded-2xl border border-red-200 bg-red-50/60 p-4"><div className="text-xs text-red-700">تعذر</div><div className="mt-2 flex items-center gap-2 text-2xl font-black text-red-700"><XCircle className="h-5 w-5" />{result.failed.toLocaleString('ar-SA')}</div></div>
             </div>
 
@@ -358,6 +418,21 @@ export const AssetExcelImportPage: React.FC = () => {
                   {result.errors.map((error, index) => <li key={`${error}-${index}`}>• {error}</li>)}
                 </ul>
               </div>
+            )}
+
+            {limitPerFile !== 0 && batchIndex + 1 < maxBatch && (
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => {
+                  setBatchIndex((value) => Math.min(maxBatch - 1, value + 1));
+                  setResult(null);
+                  setMessage('تم الانتقال إلى الدفعة التالية. راجع العدد ثم ابدأ الاستيراد.');
+                }}
+              >
+                الانتقال إلى الدفعة التالية
+                <ChevronLeft className="mr-2 h-4 w-4" />
+              </Button>
             )}
 
             <Button variant="outline" className="w-full" onClick={() => navigate('/assets/list')}>عرض الأصول المستوردة</Button>
