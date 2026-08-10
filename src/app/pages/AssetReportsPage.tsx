@@ -93,6 +93,28 @@ const SCREEN_COLUMN_WEIGHTS: Record<FieldKey, number> = {
   attachments: 6,
 };
 
+const ASSET_REPORT_SETTINGS_STORAGE_KEY = 'iau-asset-report-settings';
+
+type AssetReportSettings = {
+  universityName: string;
+  departmentName: string;
+  reportTitle: string;
+  statementTitle: string;
+};
+
+const DEFAULT_ASSET_REPORT_SETTINGS: AssetReportSettings = {
+  universityName: 'جامعة الإمام عبدالرحمن بن فيصل',
+  departmentName: 'الإدارة العامة للأصول والأملاك والأوقاف الجامعية',
+  reportTitle: 'تقرير الأصول',
+  statementTitle: 'بيان الأصول',
+};
+
+const safeSheetName = (value: string) => {
+  const invalid = ['\\', '/', '?', '*', '[', ']', ':'];
+  const sanitized = invalid.reduce((name, char) => name.split(char).join('-'), value.trim());
+  return (sanitized || 'الأصول').slice(0, 31);
+};
+
 const valueFor = (asset: ReportAsset, key: FieldKey) => {
   if (key === 'category') return CATEGORY_LABELS[asset.category] || asset.category || '-';
   if (key === 'status') return ASSET_STATUS_LABELS[asset.status] || asset.status || '-';
@@ -187,6 +209,24 @@ export const AssetReportsPage: React.FC = () => {
   const [officialExporting, setOfficialExporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [officialExcelMessage, setOfficialExcelMessage] = useState('');
+  const [reportSettings, setReportSettings] = useState<AssetReportSettings>(() => {
+    try {
+      const raw = window.localStorage.getItem(ASSET_REPORT_SETTINGS_STORAGE_KEY);
+      if (!raw) return { ...DEFAULT_ASSET_REPORT_SETTINGS };
+      const saved = JSON.parse(raw) as Partial<AssetReportSettings>;
+      return { ...DEFAULT_ASSET_REPORT_SETTINGS, ...saved };
+    } catch {
+      return { ...DEFAULT_ASSET_REPORT_SETTINGS };
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ASSET_REPORT_SETTINGS_STORAGE_KEY, JSON.stringify(reportSettings));
+    } catch {
+      // Ignore storage restrictions; report controls still work for the current session.
+    }
+  }, [reportSettings]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 320);
@@ -330,7 +370,7 @@ export const AssetReportsPage: React.FC = () => {
       });
       const sheet = XLSX.utils.json_to_sheet(data);
       const book = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(book, sheet, activeGroup?.label?.slice(0, 31) || 'الأصول');
+      XLSX.utils.book_append_sheet(book, sheet, safeSheetName(reportSettings.statementTitle || activeGroup?.label || 'الأصول'));
       XLSX.writeFile(book, `assets-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
     } finally {
       setExporting(false);
@@ -348,11 +388,12 @@ export const AssetReportsPage: React.FC = () => {
       const colgroup = `<colgroup><col style="width:${(3 / weightTotal * 100).toFixed(3)}%">${selectedFields.map((key) => `<col style="width:${((printWeights[key] || 7) / weightTotal * 100).toFixed(3)}%">`).join('')}</colgroup>`;
       const body = allRows.map((asset, index) => `<tr><td>${index + 1}</td>${selectedFields.map((key) => `<td>${escapeHtml(valueFor(asset, key))}</td>`).join('')}</tr>`).join('');
       const groupLabel = activeGroup?.label || 'جميع المجموعات';
-      openPrintHtml(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>تقرير الأصول</title><style>
-      @page{size:A4 landscape;margin:0}*{box-sizing:border-box}html,body{width:100%;margin:0!important;padding:0!important}body{font-family:Tahoma,Arial,sans-serif;color:#172033}.header{text-align:center;border-bottom:1px solid #1f4e79;padding:0;margin:0}.header h1{font-size:14px;line-height:1;margin:0;font-weight:800}.sub{font-size:8px;line-height:1;color:#64748b;margin:0}.filters{margin:0;padding:1px 2px;border:1px solid #dbe3ec;border-radius:0;font-size:8.5px;line-height:1}.summary{display:flex;gap:0;margin:0}.summary div{flex:1;border:1px solid #dbe3ec;border-radius:0;padding:1px 2px;text-align:center;line-height:1;font-size:9px}.summary strong{font-size:12px}table{width:100%;margin:0;border-collapse:collapse;border-spacing:0;table-layout:fixed;font-size:11px;line-height:1.02}th{background:#1f4e79;color:#fff;padding:.6px 1px;border:.45px solid #dbe3ec;font-size:11px;font-weight:800;vertical-align:middle;white-space:normal;overflow-wrap:anywhere}td{padding:.45px 1px;border:.45px solid #dbe3ec;font-size:11px;text-align:center;vertical-align:middle;white-space:normal;overflow-wrap:anywhere;word-break:break-word}tbody tr:nth-child(even){background:#f8fafc}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}.footer{margin-top:0;padding:0 1px;font-size:7px;line-height:1;color:#64748b;display:flex;justify-content:space-between}</style></head><body>
-      <div class="header"><h1>جامعة الإمام عبدالرحمن بن فيصل</h1><div class="sub">الإدارة العامة للأصول والأملاك والأوقاف الجامعية</div><div class="sub">تقرير الأصول — ${escapeHtml(groupLabel)}</div></div>
+      openPrintHtml(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>${escapeHtml(reportSettings.reportTitle || 'تقرير الأصول')}</title><style>
+      @page{size:A4 landscape;margin:0}*{box-sizing:border-box}html,body{width:100%;margin:0!important;padding:0!important}body{font-family:Tahoma,Arial,sans-serif;color:#172033}.header{text-align:center;border-bottom:1px solid #1f4e79;padding:0;margin:0}.header h1{font-size:14px;line-height:1;margin:0;font-weight:800}.sub{font-size:8px;line-height:1;color:#64748b;margin:0}.filters{margin:0;padding:1px 2px;border:1px solid #dbe3ec;border-radius:0;font-size:8.5px;line-height:1}.summary{display:flex;gap:0;margin:0}.summary div{flex:1;border:1px solid #dbe3ec;border-radius:0;padding:1px 2px;text-align:center;line-height:1;font-size:9px}.summary strong{font-size:12px}.statement-title{text-align:center;padding:2px 4px;border-right:1px solid #dbe3ec;border-left:1px solid #dbe3ec;font-size:11px;font-weight:800;line-height:1.1;color:#172033;background:#fff}table{width:100%;margin:0;border-collapse:collapse;border-spacing:0;table-layout:fixed;font-size:11px;line-height:1.02}th{background:#1f4e79;color:#fff;padding:.6px 1px;border:.45px solid #dbe3ec;font-size:11px;font-weight:800;vertical-align:middle;white-space:normal;overflow-wrap:anywhere}td{padding:.45px 1px;border:.45px solid #dbe3ec;font-size:11px;text-align:center;vertical-align:middle;white-space:normal;overflow-wrap:anywhere;word-break:break-word}tbody tr:nth-child(even){background:#f8fafc}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}.footer{margin-top:0;padding:0 1px;font-size:7px;line-height:1;color:#64748b;display:flex;justify-content:space-between}</style></head><body>
+      <div class="header"><h1>${escapeHtml(reportSettings.universityName || DEFAULT_ASSET_REPORT_SETTINGS.universityName)}</h1><div class="sub">${escapeHtml(reportSettings.departmentName || DEFAULT_ASSET_REPORT_SETTINGS.departmentName)}</div><div class="sub">${escapeHtml(reportSettings.reportTitle || DEFAULT_ASSET_REPORT_SETTINGS.reportTitle)}</div></div>
       <div class="filters">التصنيف: ${escapeHtml(category === 'all' ? 'الكل' : CATEGORY_LABELS[category] || category)} | الحالة: ${escapeHtml(status === 'all' ? 'الكل' : ASSET_STATUS_LABELS[status] || status)} | المجموعة: ${escapeHtml(groupLabel)}${debouncedQuery ? ` | البحث: ${escapeHtml(debouncedQuery)}` : ''}</div>
       <div class="summary"><div>إجمالي السجلات<br><strong>${allRows.length.toLocaleString('ar-SA')}</strong></div><div>إجمالي قيمة الشراء<br><strong>${allRows.reduce((sum,a)=>sum+Number(a.purchaseValue||0),0).toLocaleString('ar-SA')} ر.س</strong></div></div>
+      <div class="statement-title">${escapeHtml(reportSettings.statementTitle.trim() || DEFAULT_ASSET_REPORT_SETTINGS.statementTitle)}</div>
       <table>${colgroup}<thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table><div class="footer"><span>تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</span><span>وحدة الأصول</span></div><script>window.onload=()=>window.print()</script></body></html>`);
     } finally {
       setExporting(false);
@@ -422,13 +463,29 @@ export const AssetReportsPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 border-b bg-white/40">
+          <div>
+            <CardTitle>إعدادات عنوان التقرير والبيان</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">تحكم يدوي بمسمى التقرير واسم البيان أو الجدول، على غرار إعدادات تقارير الصكوك.</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={()=>setReportSettings({ ...DEFAULT_ASSET_REPORT_SETTINGS })}>استعادة الإعدادات</Button>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
+          <label className="space-y-1.5"><span className="text-xs font-bold text-muted-foreground">عنوان التقرير</span><Input value={reportSettings.reportTitle} onChange={(e)=>setReportSettings((current)=>({ ...current, reportTitle:e.target.value }))} placeholder="مثال: تقرير الأصول"/></label>
+          <label className="space-y-1.5"><span className="text-xs font-bold text-muted-foreground">اسم البيان / الجدول</span><Input value={reportSettings.statementTitle} onChange={(e)=>setReportSettings((current)=>({ ...current, statementTitle:e.target.value }))} placeholder="مثال: بيان الأصول والأثاث"/></label>
+          <label className="space-y-1.5"><span className="text-xs font-bold text-muted-foreground">اسم الجامعة</span><Input value={reportSettings.universityName} onChange={(e)=>setReportSettings((current)=>({ ...current, universityName:e.target.value }))}/></label>
+          <label className="space-y-1.5"><span className="text-xs font-bold text-muted-foreground">اسم الجهة</span><Input value={reportSettings.departmentName} onChange={(e)=>setReportSettings((current)=>({ ...current, departmentName:e.target.value }))}/></label>
+        </CardContent>
+      </Card>
+
       <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-sm"><CardHeader className="border-b bg-white/40"><CardTitle>اختيار أعمدة التقرير</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-2 p-5 md:grid-cols-4 xl:grid-cols-6 sm:p-6">{printableFields.map(([key,label])=><label key={key} className="flex items-center gap-2 rounded-xl border bg-background/60 p-3 text-sm"><input type="checkbox" checked={selectedFields.includes(key)} onChange={()=>toggleField(key)}/><span>{label}</span></label>)}</CardContent></Card>
 
       <Card className="rounded-[26px] border-emerald-200/70 bg-emerald-50/35 shadow-sm"><CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex items-center gap-2 font-black"><FileSpreadsheet className="h-5 w-5 text-emerald-600"/>نموذج Excel الرسمي المعتمد</div><p className="mt-1 text-sm text-muted-foreground">يتم تطبيق التصفية الحالية على القالب الرسمي، وتوزيع السجلات على الأوراق المناسبة حسب نوع الأصل مع الحفاظ على تصميم الملف.</p><p className="mt-2 text-xs font-medium">{templateLoading?'جارٍ التحقق من القالب...':officialTemplate?`القالب المعتمد: ${officialTemplate.fileName}`:'لم يتم رفع القالب الرسمي إلى المنصة بعد.'}</p>{officialExcelMessage&&<p className="mt-2 text-xs font-semibold text-emerald-800">{officialExcelMessage}</p>}</div><div className="flex flex-wrap gap-2">{isAdmin&&<label className={`inline-flex h-10 cursor-pointer items-center justify-center rounded-md border bg-white px-4 text-sm font-semibold ${templateUploading?'pointer-events-none opacity-60':''}`}><UploadCloud className="ml-2 h-4 w-4"/>{templateUploading?'جارٍ رفع القالب...':officialTemplate?'استبدال القالب الرسمي':'رفع القالب الرسمي'}<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event)=>{const file=event.target.files?.[0]||null;void handleOfficialTemplateUpload(file);event.currentTarget.value='';}}/></label>}{canPrint&&<Button onClick={()=>void exportOfficialExcel()} disabled={templateLoading||officialExporting||!officialTemplate||!total} className="bg-emerald-700 text-white hover:bg-emerald-800"><Download className="ml-2 h-4 w-4"/>{officialExporting?'جارٍ تجهيز Excel...':'تنزيل Excel الرسمي'}</Button>}</div></CardContent></Card>
 
       <div className="flex flex-wrap items-center gap-2"><Button variant="outline" onClick={()=>void exportExcel()} disabled={exporting||!total}><FileSpreadsheet className="ml-2 h-4 w-4"/>Excel</Button>{canPrint&&<><Button variant="outline" onClick={()=>void printReport()} disabled={exporting||!total||!selectedFields.length}><Printer className="ml-2 h-4 w-4"/>التقرير الجدولي / PDF</Button><Button onClick={()=>void printCurrentPageImages()} disabled={exporting||!rows.length}><ImageIcon className="ml-2 h-4 w-4"/>تقارير بالصور للصفحة الحالية</Button></>}<Badge variant="outline" className="rounded-full px-4 py-2">{total.toLocaleString('ar-SA')} سجل</Badge><div className="mr-auto flex items-center gap-2"><span className="text-xs text-muted-foreground">حجم الصفحة</span><NativeSelect value={String(pageSize)} onChange={(e)=>setPageSize(Number(e.target.value))} className="w-[100px]"><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></NativeSelect></div></div>
 
-      <Card className="overflow-hidden rounded-[20px] border-white/55 bg-white/70 shadow-[0_12px_36px_rgba(15,23,42,0.06)] backdrop-blur-xl"><CardContent className="p-0">{loading?<div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">جارٍ تحميل نتائج التقرير...</div>:!rows.length?<div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">لا توجد سجلات مطابقة للتصفية الحالية.</div>:<div className="overflow-x-auto p-1.5 sm:p-2"><table className="w-full table-fixed border-collapse text-[10px] leading-tight sm:text-[11px] lg:text-xs"><colgroup><col style={{width:((4/tableColumnWeightTotal)*100).toFixed(3)+'%'}}/>{selectedFields.map((key)=><col key={key} style={{width:(((SCREEN_COLUMN_WEIGHTS[key]||7)/tableColumnWeightTotal)*100).toFixed(3)+'%'}}/>)}{canPrint&&<col style={{width:((9/tableColumnWeightTotal)*100).toFixed(3)+'%'}}/>}</colgroup><thead className="bg-primary text-primary-foreground"><tr><th className="border border-primary-foreground/15 px-1 py-1.5 text-center font-extrabold leading-tight">#</th>{selectedFields.map((key)=><th key={key} className="border border-primary-foreground/15 px-1 py-1.5 text-center font-extrabold leading-tight whitespace-normal break-words [overflow-wrap:anywhere]">{printableFields.find(([field])=>field===key)?.[1]}</th>)}{canPrint&&<th className="border border-primary-foreground/15 px-1 py-1.5 text-center font-extrabold leading-tight">التقرير</th>}</tr></thead><tbody>{rows.map((asset,index)=><tr key={asset.id} className="odd:bg-white/25 even:bg-muted/20 hover:bg-primary/5"><td className="border border-border/60 px-1 py-1.5 text-center align-middle font-bold">{(page-1)*pageSize+index+1}</td>{selectedFields.map((key)=><td key={key} title={String(valueFor(asset,key))} className="border border-border/60 px-1 py-1.5 text-center align-middle font-medium leading-tight whitespace-normal break-words [overflow-wrap:anywhere]">{String(valueFor(asset,key))}</td>)}{canPrint&&<td className="border border-border/60 px-1 py-1.5 text-center align-middle"><Button type="button" variant="outline" size="sm" className="h-7 max-w-full gap-1 px-1.5 text-[10px]" title="تقرير الأصل" onClick={()=>void printSingleAsset(asset)}><Printer className="h-3.5 w-3.5 shrink-0"/><span>تقرير</span></Button></td>}</tr>)}</tbody></table></div>}</CardContent></Card>
+      <Card className="overflow-hidden rounded-[20px] border-white/55 bg-white/70 shadow-[0_12px_36px_rgba(15,23,42,0.06)] backdrop-blur-xl"><CardContent className="p-0"><div className="border-b bg-white/45 px-3 py-2 text-center text-sm font-black">{reportSettings.statementTitle.trim() || DEFAULT_ASSET_REPORT_SETTINGS.statementTitle}</div>{loading?<div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">جارٍ تحميل نتائج التقرير...</div>:!rows.length?<div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">لا توجد سجلات مطابقة للتصفية الحالية.</div>:<div className="overflow-x-auto p-1.5 sm:p-2"><table className="w-full table-fixed border-collapse text-[10px] leading-tight sm:text-[11px] lg:text-xs"><colgroup><col style={{width:((4/tableColumnWeightTotal)*100).toFixed(3)+'%'}}/>{selectedFields.map((key)=><col key={key} style={{width:(((SCREEN_COLUMN_WEIGHTS[key]||7)/tableColumnWeightTotal)*100).toFixed(3)+'%'}}/>)}{canPrint&&<col style={{width:((9/tableColumnWeightTotal)*100).toFixed(3)+'%'}}/>}</colgroup><thead className="bg-primary text-primary-foreground"><tr><th className="border border-primary-foreground/15 px-1 py-1.5 text-center font-extrabold leading-tight">#</th>{selectedFields.map((key)=><th key={key} className="border border-primary-foreground/15 px-1 py-1.5 text-center font-extrabold leading-tight whitespace-normal break-words [overflow-wrap:anywhere]">{printableFields.find(([field])=>field===key)?.[1]}</th>)}{canPrint&&<th className="border border-primary-foreground/15 px-1 py-1.5 text-center font-extrabold leading-tight">التقرير</th>}</tr></thead><tbody>{rows.map((asset,index)=><tr key={asset.id} className="odd:bg-white/25 even:bg-muted/20 hover:bg-primary/5"><td className="border border-border/60 px-1 py-1.5 text-center align-middle font-bold">{(page-1)*pageSize+index+1}</td>{selectedFields.map((key)=><td key={key} title={String(valueFor(asset,key))} className="border border-border/60 px-1 py-1.5 text-center align-middle font-medium leading-tight whitespace-normal break-words [overflow-wrap:anywhere]">{String(valueFor(asset,key))}</td>)}{canPrint&&<td className="border border-border/60 px-1 py-1.5 text-center align-middle"><Button type="button" variant="outline" size="sm" className="h-7 max-w-full gap-1 px-1.5 text-[10px]" title="تقرير الأصل" onClick={()=>void printSingleAsset(asset)}><Printer className="h-3.5 w-3.5 shrink-0"/><span>تقرير</span></Button></td>}</tr>)}</tbody></table></div>}</CardContent></Card>
 
       {totalPages>1&&<div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border bg-white/65 p-3"><Button variant="outline" disabled={page<=1||loading} onClick={()=>setPage((p)=>Math.max(1,p-1))}><ChevronRight className="ml-2 h-4 w-4"/>السابق</Button><span className="rounded-full border bg-background px-4 py-2 text-sm font-bold">الصفحة {page.toLocaleString('ar-SA')} من {totalPages.toLocaleString('ar-SA')}</span><Button variant="outline" disabled={page>=totalPages||loading} onClick={()=>setPage((p)=>Math.min(totalPages,p+1))}>التالي<ChevronLeft className="mr-2 h-4 w-4"/></Button></div>}
     </div>
