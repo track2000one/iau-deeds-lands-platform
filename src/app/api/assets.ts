@@ -19,8 +19,31 @@ export type AssetListPage = {
   totalPages: number;
 };
 
-export const getAssetGroups = () =>
-  apiJson<AssetGroupSummary[]>('/api/assets-fast/groups');
+export type AssetReportQuery = {
+  group?: string;
+  search?: string;
+  category?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+  sortKey?: string;
+  sortDirection?: 'asc' | 'desc';
+  all?: boolean;
+};
+
+const appendAssetFilters = (params: URLSearchParams, query: AssetReportQuery) => {
+  if (query.group && query.group !== 'all') params.set('group', query.group);
+  if (query.search) params.set('search', query.search);
+  if (query.category && query.category !== 'all') params.set('category', query.category);
+  if (query.status && query.status !== 'all') params.set('status', query.status);
+};
+
+export const getAssetGroups = (filters: Pick<AssetReportQuery, 'search' | 'category' | 'status'> = {}) => {
+  const params = new URLSearchParams();
+  appendAssetFilters(params, filters);
+  const suffix = params.toString();
+  return apiJson<AssetGroupSummary[]>(`/api/assets-fast/groups${suffix ? `?${suffix}` : ''}`);
+};
 
 export const getAssetListPage = ({
   group = '',
@@ -39,6 +62,17 @@ export const getAssetListPage = ({
   params.set('page', String(page));
   params.set('limit', String(limit));
   return apiJson<AssetListPage>(`/api/assets-fast/list?${params.toString()}`);
+};
+
+export const getAssetReportPage = (query: AssetReportQuery = {}) => {
+  const params = new URLSearchParams();
+  appendAssetFilters(params, query);
+  params.set('page', String(query.page || 1));
+  params.set('limit', String(query.limit || 50));
+  if (query.sortKey) params.set('sortKey', query.sortKey);
+  if (query.sortDirection) params.set('sortDirection', query.sortDirection);
+  if (query.all) params.set('all', '1');
+  return apiJson<AssetListPage>(`/api/assets-fast/report?${params.toString()}`);
 };
 
 export const getAssetStats = () => apiJson<AssetStats>('/api/assets/stats');
