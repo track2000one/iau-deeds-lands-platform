@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { NativeSelect } from '../components/ui/native-select';
-import { createAsset } from '../api/assets';
+import { createAsset, getAssets } from '../api/assets';
 import {
   ASSET_EXCEL_KIND_LABELS,
   parseOfficialAssetExcel,
@@ -23,7 +23,75 @@ type ImportResult = {
 };
 
 const isDuplicateError = (message: string) =>
-  /unique|duplicate|مكرر|موجود مسبق|itemNumber|assetNumber|serialNumber/i.test(message);
+  /unique|duplicate|مكرر|موجود مسبق|مستخدم مسبق|فريد|رقم الصنف|itemNumber|assetNumber|serialNumber/i.test(message);
+
+const cleanIdentifier = (value: unknown) => {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  if (/^(?:-|--|0|غير متوفر|غير متاح|لا يوجد|n\/?a|null|undefined)$/i.test(text)) return '';
+  return text;
+};
+
+const readPayloadValue = (row: ParsedAssetExcelRow, ...keys: string[]) => {
+  const payload = (row.input.excelPayload || {}) as Record<string, unknown>;
+  for (const key of keys) {
+    const value = cleanIdentifier(payload[key]);
+    if (value) return value;
+  }
+  return '';
+};
+
+const sourceKey = (row: ParsedAssetExcelRow) =>
+  `${row.sourceFile}::${row.sourceSheet}::${row.sourceRow}`;
+
+const existingSourceKey = (asset: any) => {
+  const payload = asset?.excelPayload as Record<string, unknown> | null | undefined;
+  if (!payload) return '';
+  const file = String(payload.__sourceFile ?? '').trim();
+  const sheet = String(payload.__sourceSheet ?? '').trim();
+  const row = String(payload.__sourceRow ?? '').trim();
+  return file && sheet && row ? `${file}::${sheet}::${row}` : '';
+};
+
+const preferredImportedIdentifier = (row: ParsedAssetExcelRow) => {
+  const serial = cleanIdentifier(row.input.serialNumber);
+  const card = cleanIdentifier(row.input.cardNumber);
+  const mof = readPayloadValue(
+    row,
+    'رقم الأصل الفريد في نظام وزارة المالية (الرقم التعريفي)',
+    'Unique Asset Number in MoF system'
+  );
+  const entityUnique = readPayloadValue(
+    row,
+    'رقم الأصل الفريد بالجهة (الرقم المستخدم حاليا للأصل او الرقم تسلسلي)',
+    'Unique Asset Number in the entity'
+  );
+  const existing = cleanIdentifier(row.input.itemNumber);
+
+  // ملفات Excel المعتمدة تحتوي أحيانًا رقماً متكرراً في حقل "رقم الأصل الفريد بالجهة".
+  // لذلك نفضّل الرقم التسلسلي/البطاقة/رقم وزارة المالية قبل استخدام ذلك الحقل.
+  return serial || card || mof || entityUnique || existing || `XLS-${row.kind.toUpperCase()}-${row.sourceRow}`;
+};
+
+const makeUniqueIdentifier = (baseValue: string, row: ParsedAssetExcelRow, used: Set<string>) => {
+  const base = cleanIdentifier(baseValue) || `XLS-${row.kind.toUpperCase()}-${row.sourceRow}`;
+  if (!used.has(base)) {
+    used.add(base);
+    return base;
+  }
+
+  const deterministic = `${base}-${row.sourceRow}`;
+  if (!used.has(deterministic)) {
+    used.add(deterministic);
+    return deterministic;
+  }
+
+  let sequence = 2;
+  while (used.has(`${deterministic}-${sequence}`)) sequence += 1;
+  const value = `${deterministic}-${sequence}`;
+  used.add(value);
+  return value;
+};
 
 export const AssetExcelImportPage: React.FC = () => {
   const navigate = useNavigate();
@@ -72,13 +140,13 @@ export const AssetExcelImportPage: React.FC = () => {
 
     const confirmed = window.confirm(
       `سيتم استيراد ${importRows.length.toLocaleString('ar-SA')} سجل إلى وحدة الأصول للاختبار.\n\n` +
-      'السجلات المكررة سيتم تجاوزها تلقائيًا. هل ترغب بالمتابعة؟'
+      'سيتم الحفاظ على رقم الصنف كحقل فريد، واستخدام أفضل رقم تعريفي متاح من ملف Excel عند وجود أرقام مكررة. السجلات التي سبق استيراد نفس صفها سيتم تجاوزها تلقائيًا. هل ترغب بالمتابعة؟'
     );
     if (!confirmed) return;
 
     setImporting(true);
     setResult(null);
-    setMessage('بدأ استيراد البيانات إلى قاعدة البيانات...');
+    setMessage('جارٍ مطابقة السجلات الحالية وتجهيز أرقام الأصناف الفريدة...');
 
     const state: ImportResult = {
       total: importRows.length,
@@ -88,38 +156,81 @@ export const AssetExcelImportPage: React.FC = () => {
       errors: [],
     };
 
-    // Controlled concurrency to avoid overloading Railway/API when importing large files.
-    const queue = [...importRows];
-    const worker = async () => {
-      while (queue.length) {
-        const row = queue.shift() as ParsedAssetExcelRow | undefined;
-        if (!row) return;
-        try {
-          await createAsset(row.input);
-          state.created += 1;
-        } catch (error: any) {
-          const raw = String(error?.message || error || 'خطأ غير معروف');
-          if (isDuplicateError(raw)) {
-            state.skipped += 1;
-          } else {
-            state.failed += 1;
-            if (state.errors.length < 20) {
-              state.errors.push(`${row.sourceFile} / صف ${row.sourceRow}: ${raw}`);
+    try {
+      const existingAssets = await getAssets();
+      const existingList = Array.isArray(existingAssets) ? existingAssets : [];
+      const importedSourceKeys = new Set(existingList.map(existingSourceKey).filter(Boolean));
+      const usedIdentifiers = new Set<string>();
+
+      existingList.forEach((asset: any) => {
+        [asset?.itemNumber, asset?.assetNumber, asset?.serialNumber, asset?.cardNumber]
+          .map(cleanIdentifier)
+          .filter(Boolean)
+          .forEach((value) => usedIdentifiers.add(value));
+      });
+
+      const queue: ParsedAssetExcelRow[] = [];
+      for (const row of importRows) {
+        if (importedSourceKeys.has(sourceKey(row))) {
+          state.skipped += 1;
+          continue;
+        }
+
+        const preferred = preferredImportedIdentifier(row);
+        const uniqueItemNumber = makeUniqueIdentifier(preferred, row, usedIdentifiers);
+        const excelPayload = {
+          ...((row.input.excelPayload || {}) as Record<string, unknown>),
+          __platformImportedItemNumber: uniqueItemNumber,
+          __sourcePreferredIdentifier: preferred,
+        };
+
+        queue.push({
+          ...row,
+          input: {
+            ...row.input,
+            itemNumber: uniqueItemNumber,
+            excelPayload,
+          },
+        });
+      }
+
+      setResult({ ...state, errors: [...state.errors] });
+      setMessage(`تمت المطابقة. سيتم إنشاء ${queue.length.toLocaleString('ar-SA')} سجل جديد، وتجاوز ${state.skipped.toLocaleString('ar-SA')} سجل سبق استيراده.`);
+
+      const worker = async () => {
+        while (queue.length) {
+          const row = queue.shift();
+          if (!row) return;
+          try {
+            await createAsset(row.input);
+            state.created += 1;
+          } catch (error: any) {
+            const raw = String(error?.message || error || 'خطأ غير معروف');
+            if (isDuplicateError(raw)) {
+              state.skipped += 1;
+            } else {
+              state.failed += 1;
+              if (state.errors.length < 20) {
+                state.errors.push(`${row.sourceFile} / صف ${row.sourceRow}: ${raw}`);
+              }
             }
           }
+          setResult({ ...state, errors: [...state.errors] });
         }
-        setResult({ ...state, errors: [...state.errors] });
-      }
-    };
+      };
 
-    try {
       await Promise.all([worker(), worker(), worker()]);
       setResult({ ...state, errors: [...state.errors] });
       setMessage(
         `اكتمل الاستيراد: ${state.created.toLocaleString('ar-SA')} جديد، ` +
-        `${state.skipped.toLocaleString('ar-SA')} مكرر تم تجاوزه، ` +
+        `${state.skipped.toLocaleString('ar-SA')} مكرر/سبق استيراده، ` +
         `${state.failed.toLocaleString('ar-SA')} تعذر استيراده.`
       );
+    } catch (error: any) {
+      state.failed += 1;
+      if (state.errors.length < 20) state.errors.push(String(error?.message || error || 'تعذر تجهيز الاستيراد.'));
+      setResult({ ...state, errors: [...state.errors] });
+      setMessage('تعذر تجهيز عملية الاستيراد. راجع الملاحظات أدناه.');
     } finally {
       setImporting(false);
     }
