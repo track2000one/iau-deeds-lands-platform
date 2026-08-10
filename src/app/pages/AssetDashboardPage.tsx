@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Activity,
@@ -12,7 +12,6 @@ import {
   ClipboardCheck,
   Database,
   FileSpreadsheet,
-  PackagePlus,
   PlusCircle,
   ScanBarcode,
   ScanLine,
@@ -129,8 +128,17 @@ const actionTone: Record<string, { icon: string; box: string; glow: string }> = 
   },
 };
 
-const glassPanel =
-  'border border-white/20 bg-white/[0.075] shadow-[inset_0_1px_0_rgba(255,255,255,.28),0_20px_50px_rgba(2,8,23,.28)] backdrop-blur-2xl';
+const glassPanelStyle: CSSProperties = {
+  background: 'var(--asset-dashboard-panel, rgba(255,255,255,.075))',
+  borderColor: 'var(--asset-dashboard-border, rgba(255,255,255,.20))',
+  boxShadow:
+    'var(--asset-dashboard-shadow, inset 0 1px 0 rgba(255,255,255,.28), 0 20px 50px rgba(2,8,23,.28))',
+};
+
+const glassStrongStyle: CSSProperties = {
+  background: 'var(--asset-dashboard-panel-strong, rgba(255,255,255,.105))',
+  borderColor: 'var(--asset-dashboard-border, rgba(255,255,255,.20))',
+};
 
 export const AssetDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -185,28 +193,32 @@ export const AssetDashboardPage: React.FC = () => {
         value: total,
         icon: Boxes,
         iconClass: 'text-blue-100',
-        iconBg: 'border-blue-300/30 bg-blue-400/15 shadow-[0_0_30px_rgba(96,165,250,.25)]',
+        iconBg:
+          'border-blue-300/30 bg-blue-400/15 shadow-[0_0_30px_rgba(96,165,250,.25)]',
       },
       {
         label: 'الأصول النشطة',
         value: active,
         icon: ClipboardCheck,
         iconClass: 'text-amber-100',
-        iconBg: 'border-amber-300/30 bg-amber-300/15 shadow-[0_0_30px_rgba(251,191,36,.22)]',
+        iconBg:
+          'border-amber-300/30 bg-amber-300/15 shadow-[0_0_30px_rgba(251,191,36,.22)]',
       },
       {
         label: 'تحت الصيانة',
         value: maintenance,
         icon: Wrench,
         iconClass: 'text-emerald-100',
-        iconBg: 'border-emerald-300/30 bg-emerald-300/15 shadow-[0_0_30px_rgba(52,211,153,.22)]',
+        iconBg:
+          'border-emerald-300/30 bg-emerald-300/15 shadow-[0_0_30px_rgba(52,211,153,.22)]',
       },
       {
         label: 'مفقود / عجز',
         value: lost,
         icon: TriangleAlert,
         iconClass: 'text-rose-100',
-        iconBg: 'border-rose-300/30 bg-rose-300/15 shadow-[0_0_30px_rgba(251,113,133,.2)]',
+        iconBg:
+          'border-rose-300/30 bg-rose-300/15 shadow-[0_0_30px_rgba(251,113,133,.2)]',
       },
     ],
     [active, lost, maintenance, total]
@@ -214,10 +226,30 @@ export const AssetDashboardPage: React.FC = () => {
 
   const analytics = useMemo(
     () => [
-      { label: 'متاح', value: available, percent: percentage(available, total), bar: 'from-emerald-300 via-teal-300 to-cyan-300' },
-      { label: 'قيد الاستخدام', value: inUse, percent: percentage(inUse, total), bar: 'from-blue-400 via-cyan-300 to-sky-200' },
-      { label: 'تحت الصيانة', value: maintenance, percent: percentage(maintenance, total), bar: 'from-amber-300 via-yellow-200 to-orange-200' },
-      { label: 'مستبعد', value: disposed, percent: percentage(disposed, total), bar: 'from-slate-300 via-slate-200 to-white/70' },
+      {
+        label: 'متاح',
+        value: available,
+        percent: percentage(available, total),
+        bar: 'from-emerald-300 via-teal-300 to-cyan-300',
+      },
+      {
+        label: 'قيد الاستخدام',
+        value: inUse,
+        percent: percentage(inUse, total),
+        bar: 'from-blue-400 via-cyan-300 to-sky-200',
+      },
+      {
+        label: 'تحت الصيانة',
+        value: maintenance,
+        percent: percentage(maintenance, total),
+        bar: 'from-amber-300 via-yellow-200 to-orange-200',
+      },
+      {
+        label: 'مستبعد',
+        value: disposed,
+        percent: percentage(disposed, total),
+        bar: 'from-slate-300 via-slate-200 to-white/70',
+      },
     ],
     [available, disposed, inUse, maintenance, total]
   );
@@ -254,11 +286,37 @@ export const AssetDashboardPage: React.FC = () => {
 
   return (
     <div className="mx-auto w-full max-w-[1780px] pb-5">
-      <div className="relative overflow-hidden rounded-[36px] border border-slate-700/50 bg-[#10243b] text-white shadow-[0_34px_90px_rgba(2,8,23,.32)]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_2%,rgba(148,163,184,.32),transparent_25%),radial-gradient(circle_at_18%_14%,rgba(226,232,240,.18),transparent_28%),radial-gradient(circle_at_64%_64%,rgba(56,189,248,.08),transparent_28%),linear-gradient(135deg,#23364a_0%,#122941_44%,#0a1f36_100%)]" />
-        <div className="pointer-events-none absolute -left-24 top-24 h-64 w-64 rounded-full border border-white/10 bg-white/5 blur-sm" />
-        <div className="pointer-events-none absolute right-[22%] -top-24 h-48 w-72 rotate-6 rounded-[38px] border border-white/15 bg-white/10 shadow-[0_24px_50px_rgba(2,8,23,.28)] backdrop-blur-xl" />
-        <div className="pointer-events-none absolute bottom-20 right-16 h-44 w-44 rounded-full bg-blue-400/10 blur-3xl" />
+      <div
+        className="relative overflow-hidden rounded-[36px] border text-white transition-[background,box-shadow] duration-500"
+        style={{
+          background: 'var(--asset-dashboard-base, #10243b)',
+          borderColor: 'var(--asset-dashboard-border, rgba(148,163,184,.35))',
+          boxShadow:
+            '0 34px 90px color-mix(in srgb, var(--asset-dashboard-base, #10243b) 58%, transparent)',
+        }}
+      >
+        <div
+          className="pointer-events-none absolute inset-0 transition-[background] duration-500"
+          style={{
+            background:
+              'var(--asset-dashboard-overlay, radial-gradient(circle at 82% 2%,rgba(148,163,184,.32),transparent 25%),linear-gradient(135deg,#23364a 0%,#122941 44%,#0a1f36 100%))',
+          }}
+        />
+        <div
+          className="pointer-events-none absolute -left-24 top-24 h-64 w-64 rounded-full border blur-sm"
+          style={{
+            borderColor: 'var(--asset-dashboard-border, rgba(255,255,255,.12))',
+            background: 'var(--asset-dashboard-panel, rgba(255,255,255,.05))',
+          }}
+        />
+        <div
+          className="pointer-events-none absolute right-[22%] -top-24 h-48 w-72 rotate-6 rounded-[38px] border backdrop-blur-xl"
+          style={glassStrongStyle}
+        />
+        <div
+          className="pointer-events-none absolute bottom-20 right-16 h-44 w-44 rounded-full blur-3xl"
+          style={{ background: 'var(--asset-dashboard-glow, rgba(96,165,250,.18))' }}
+        />
 
         <div className="relative space-y-5 p-4 sm:p-6 lg:p-8">
           <section className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
@@ -292,7 +350,8 @@ export const AssetDashboardPage: React.FC = () => {
               {canAdd && (
                 <Button
                   onClick={() => navigate('/assets/new')}
-                  className="h-11 rounded-2xl border border-blue-300/25 bg-[#123d73] px-5 text-white shadow-[0_12px_28px_rgba(3,105,161,.28)] hover:bg-[#164b87]"
+                  className="h-11 rounded-2xl border border-white/15 px-5 text-white shadow-[0_12px_28px_rgba(2,8,23,.22)] transition hover:brightness-110"
+                  style={{ background: 'var(--asset-dashboard-button, #123d73)' }}
                 >
                   <PlusCircle className="ml-2 h-4 w-4" />
                   إضافة أصل سريع
@@ -301,12 +360,16 @@ export const AssetDashboardPage: React.FC = () => {
             </div>
           </section>
 
-          <section className={`overflow-hidden rounded-[28px] p-2 ${glassPanel}`}>
+          <section
+            className="overflow-hidden rounded-[28px] border p-2 backdrop-blur-2xl"
+            style={glassPanelStyle}
+          >
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {heroStats.map(({ label, value, icon: Icon, iconClass, iconBg }) => (
                 <div
                   key={label}
-                  className="flex min-h-[112px] items-center justify-between gap-4 rounded-[22px] border border-white/10 bg-slate-900/20 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,.16)] backdrop-blur-xl sm:px-6"
+                  className="flex min-h-[112px] items-center justify-between gap-4 rounded-[22px] border border-white/10 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,.16)] backdrop-blur-xl sm:px-6"
+                  style={{ background: 'var(--asset-dashboard-panel-strong, rgba(15,23,42,.20))' }}
                 >
                   <div>
                     <p className="text-sm font-bold text-white/90">{label}</p>
@@ -324,7 +387,10 @@ export const AssetDashboardPage: React.FC = () => {
 
           <section className="grid gap-5 xl:grid-cols-[0.78fr_1.62fr]">
             <aside className="space-y-5">
-              <div className={`rounded-[28px] p-5 sm:p-6 ${glassPanel}`}>
+              <div
+                className="rounded-[28px] border p-5 backdrop-blur-2xl sm:p-6"
+                style={glassPanelStyle}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-black text-white">ملخص التحليلات</h2>
@@ -355,7 +421,10 @@ export const AssetDashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className={`rounded-[28px] p-5 sm:p-6 ${glassPanel}`}>
+              <div
+                className="rounded-[28px] border p-5 backdrop-blur-2xl sm:p-6"
+                style={glassPanelStyle}
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-black text-white">التنبيهات</h2>
@@ -368,7 +437,11 @@ export const AssetDashboardPage: React.FC = () => {
 
                 <div className="mt-4 space-y-3">
                   {alerts.map(({ title, value, hint, icon: Icon, iconClass, iconBg }) => (
-                    <div key={title} className="rounded-[20px] border border-white/10 bg-slate-950/18 p-3.5 shadow-inner backdrop-blur-xl">
+                    <div
+                      key={title}
+                      className="rounded-[20px] border border-white/10 p-3.5 shadow-inner backdrop-blur-xl"
+                      style={{ background: 'var(--asset-dashboard-panel-strong, rgba(15,23,42,.18))' }}
+                    >
                       <div className="flex items-start gap-3">
                         <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border ${iconBg}`}>
                           <Icon className={`h-5 w-5 ${iconClass}`} />
@@ -376,7 +449,9 @@ export const AssetDashboardPage: React.FC = () => {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-3">
                             <h3 className="truncate text-sm font-black text-white">{title}</h3>
-                            <span className="text-lg font-black text-white">{loading ? '...' : value.toLocaleString('ar-SA')}</span>
+                            <span className="text-lg font-black text-white">
+                              {loading ? '...' : value.toLocaleString('ar-SA')}
+                            </span>
                           </div>
                           <p className="mt-1 text-[11px] leading-5 text-slate-200/60">{hint}</p>
                         </div>
@@ -387,7 +462,10 @@ export const AssetDashboardPage: React.FC = () => {
               </div>
             </aside>
 
-            <div className={`overflow-hidden rounded-[30px] ${glassPanel}`}>
+            <div
+              className="overflow-hidden rounded-[30px] border backdrop-blur-2xl"
+              style={glassPanelStyle}
+            >
               <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                 <div>
                   <div className="flex items-center gap-2 text-lg font-black text-white">
@@ -418,14 +496,21 @@ export const AssetDashboardPage: React.FC = () => {
                       type="button"
                       disabled={disabled}
                       onClick={() => ready && !disabled && navigate(path)}
-                      className={`group relative min-h-[156px] overflow-hidden rounded-[22px] border border-white/12 bg-white/[0.055] p-4 text-right shadow-[inset_0_1px_0_rgba(255,255,255,.15),0_12px_28px_rgba(2,8,23,.18)] backdrop-blur-2xl transition duration-200 hover:-translate-y-0.5 hover:bg-white/[0.085] hover:shadow-[inset_0_1px_0_rgba(255,255,255,.2),0_18px_34px_rgba(2,8,23,.24)] disabled:cursor-not-allowed disabled:opacity-50 ${toneStyle.glow}`}
+                      className={`group relative min-h-[156px] overflow-hidden rounded-[22px] border p-4 text-right shadow-[inset_0_1px_0_rgba(255,255,255,.15),0_12px_28px_rgba(2,8,23,.18)] backdrop-blur-2xl transition duration-200 hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${toneStyle.glow}`}
+                      style={glassStrongStyle}
                     >
                       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/55 to-transparent" />
                       <div className="flex items-start justify-between gap-3">
                         <div className={`grid h-11 w-11 place-items-center rounded-2xl border ${toneStyle.box}`}>
                           <Icon className={`h-5 w-5 ${toneStyle.icon}`} />
                         </div>
-                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${ready ? 'border-emerald-200/20 bg-emerald-300/12 text-emerald-100' : 'border-slate-300/15 bg-slate-200/8 text-slate-200/65'}`}>
+                        <span
+                          className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${
+                            ready
+                              ? 'border-emerald-200/20 bg-emerald-300/12 text-emerald-100'
+                              : 'border-slate-300/15 bg-slate-200/8 text-slate-200/65'
+                          }`}
+                        >
                           {ready ? 'متاح' : 'قريبًا'}
                         </span>
                       </div>
@@ -437,39 +522,48 @@ export const AssetDashboardPage: React.FC = () => {
               </div>
 
               <div className="grid gap-3 border-t border-white/10 p-4 sm:grid-cols-3 sm:p-5">
-                <div className="rounded-[20px] border border-white/10 bg-slate-950/15 p-4">
+                <div className="rounded-[20px] border border-white/10 p-4" style={glassStrongStyle}>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-bold text-slate-200/70">الأصول النشطة</span>
                     <CheckCircle2 className="h-4 w-4 text-emerald-200" />
                   </div>
-                  <p className="mt-2 text-2xl font-black text-white">{loading ? '...' : active.toLocaleString('ar-SA')}</p>
+                  <p className="mt-2 text-2xl font-black text-white">
+                    {loading ? '...' : active.toLocaleString('ar-SA')}
+                  </p>
                 </div>
-                <div className="rounded-[20px] border border-white/10 bg-slate-950/15 p-4">
+                <div className="rounded-[20px] border border-white/10 p-4" style={glassStrongStyle}>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-bold text-slate-200/70">عمليات الجرد</span>
                     <ScanLine className="h-4 w-4 text-cyan-200" />
                   </div>
-                  <p className="mt-2 text-2xl font-black text-white">{loading ? '...' : inventoryCount.toLocaleString('ar-SA')}</p>
+                  <p className="mt-2 text-2xl font-black text-white">
+                    {loading ? '...' : inventoryCount.toLocaleString('ar-SA')}
+                  </p>
                 </div>
-                <div className="rounded-[20px] border border-white/10 bg-slate-950/15 p-4">
+                <div className="rounded-[20px] border border-white/10 p-4" style={glassStrongStyle}>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-bold text-slate-200/70">الأصول المستبعدة</span>
                     <AlertTriangle className="h-4 w-4 text-amber-200" />
                   </div>
-                  <p className="mt-2 text-2xl font-black text-white">{loading ? '...' : disposed.toLocaleString('ar-SA')}</p>
+                  <p className="mt-2 text-2xl font-black text-white">
+                    {loading ? '...' : disposed.toLocaleString('ar-SA')}
+                  </p>
                 </div>
               </div>
             </div>
           </section>
 
-          <section className={`flex flex-col gap-3 rounded-[24px] px-4 py-4 text-xs text-slate-200/70 sm:flex-row sm:items-center sm:justify-between sm:px-5 ${glassPanel}`}>
+          <section
+            className="flex flex-col gap-3 rounded-[24px] border px-4 py-4 text-xs text-slate-200/70 backdrop-blur-2xl sm:flex-row sm:items-center sm:justify-between sm:px-5"
+            style={glassPanelStyle}
+          >
             <div className="flex items-center gap-2">
               <Database className="h-4 w-4 text-emerald-200" />
               البيانات والإحصاءات مرتبطة بقاعدة بيانات النظام الحالية.
             </div>
-            <div className="flex items-center gap-2 text-slate-200/55">
+            <div className="flex items-center gap-2 text-slate-200/60">
               <Sparkles className="h-4 w-4 text-blue-200" />
-              واجهة زجاجية داكنة مستوحاة من التصميم المرفق مع الحفاظ على وظائف المنصة.
+              يمكنك تغيير لون الواجهة الزجاجية من صفحة «المظهر».
             </div>
           </section>
         </div>
