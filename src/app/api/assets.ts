@@ -4,6 +4,43 @@ import type { AssetAttachment, AssetInput, AssetRecord, AssetStats } from '../..
 export const getAssets = (search = '') =>
   apiJson<AssetRecord[]>(`/api/assets${search ? `?search=${encodeURIComponent(search)}` : ''}`);
 
+export type AssetGroupSummary = {
+  key: string;
+  label: string;
+  count: number;
+  quantity: number;
+};
+
+export type AssetListPage = {
+  items: Array<AssetRecord & { attachmentsCount?: number }>;
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export const getAssetGroups = () =>
+  apiJson<AssetGroupSummary[]>('/api/assets-fast/groups');
+
+export const getAssetListPage = ({
+  group = '',
+  search = '',
+  page = 1,
+  limit = 36,
+}: {
+  group?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}) => {
+  const params = new URLSearchParams();
+  if (group) params.set('group', group);
+  if (search) params.set('search', search);
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+  return apiJson<AssetListPage>(`/api/assets-fast/list?${params.toString()}`);
+};
+
 export const getAssetStats = () => apiJson<AssetStats>('/api/assets/stats');
 
 export const getAsset = (id: string) => apiJson<AssetRecord>(`/api/assets/${id}`);
@@ -66,7 +103,6 @@ export const uploadAssetFile = async (
     notes: category,
   };
 };
-
 
 export type AssetExcelTemplateMeta = {
   id: string;
