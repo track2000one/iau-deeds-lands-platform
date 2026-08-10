@@ -4,9 +4,10 @@ import { DeedProvider } from '../context/DeedContext';
 import { DataProvider } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Layout } from './components/Layout';
+import { applyAppearanceTheme, getThemeById } from './theme/appearanceThemes';
 
 export const Root = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, username } = useAuth();
 
   useEffect(() => {
     document.documentElement.dir = 'rtl';
@@ -21,6 +22,16 @@ export const Root = () => {
       );
     }
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const safeUser = username?.trim() || 'guest';
+    const storedTheme = localStorage.getItem(`iau-appearance-theme:${safeUser}`);
+    const theme = getThemeById(storedTheme);
+
+    applyAppearanceTheme(theme.id);
+  }, [isAuthenticated, username]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
