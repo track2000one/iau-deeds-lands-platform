@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { AppDateField } from '../components/AppDateField';
+import { AssetOfficialTemplateFields } from '../components/AssetOfficialTemplateFields';
 import { normalizeFlexibleDateForInput } from '../../utils/dateUtils';
 import { getAsset, updateAsset, uploadAssetFile } from '../api/assets';
 import type { AssetAttachment, AssetInput, AssetStatus } from '../../types/asset';
@@ -25,7 +26,7 @@ const sections: Array<{ key: UploadCategory; label: string; accept: string }> = 
 const emptyInput: AssetInput = {
   itemNumber: '',
   barcode: '', name: '', category: '', brand: '', model: '', serialNumber: '', status: 'available',
-  department: '', building: '', floor: '', room: '', purchaseDate: '', purchaseDateType: 'gregorian', purchaseValue: null, notes: '', attachments: [],
+  department: '', building: '', floor: '', room: '', purchaseDate: '', purchaseDateType: 'gregorian', purchaseValue: null, notes: '', attachments: [], excelPayload: { templateType: 'ppe' },
 };
 
 export const EditAssetPage: React.FC = () => {
@@ -52,9 +53,16 @@ export const EditAssetPage: React.FC = () => {
         setExistingAttachments(asset.attachments || []);
         setForm({
           itemNumber: asset.itemNumber || asset.assetNumber || '', barcode: asset.barcode || '', name: asset.name, category: asset.category, brand: asset.brand || '', model: asset.model || '',
-          serialNumber: asset.serialNumber || '', status: asset.status, department: asset.department || '', building: asset.building || '',
-          floor: asset.floor || '', room: asset.room || '',
+          serialNumber: asset.serialNumber || '', status: asset.status, technicalCondition: asset.technicalCondition || '', department: asset.department || '', building: asset.building || '',
+          floor: asset.floor || '', room: asset.room || '', entityName: asset.entityName || '', entityCode: asset.entityCode || '', assetDescription: asset.assetDescription || '', cardNumber: asset.cardNumber || '',
+          responsibleDepartment: asset.responsibleDepartment || asset.department || '', region: asset.region || '', city: asset.city || '', buildingNumber: asset.buildingNumber || asset.building || '', coordinates: asset.coordinates || '',
+          classification1: asset.classification1 || '', classification2: asset.classification2 || '', classification3: asset.classification3 || '', classification4: asset.classification4 || '', classification5: asset.classification5 || '', classification6: asset.classification6 || '',
+          accountingGroup: asset.accountingGroup || '', accountingGroupCode: asset.accountingGroupCode || '', assetCode: asset.assetCode || '', remainingLife: asset.remainingLife ?? null, usefulLife: asset.usefulLife ?? null,
           purchaseDate: normalizeFlexibleDateForInput(asset.purchaseDate, asset.purchaseDateType || 'gregorian'), purchaseDateType: asset.purchaseDateType || 'gregorian', purchaseValue: asset.purchaseValue ?? null,
+          serviceDate: normalizeFlexibleDateForInput(asset.serviceDate, asset.serviceDateType || 'gregorian'), serviceDateType: asset.serviceDateType || 'gregorian', acquisitionCost: asset.acquisitionCost ?? asset.purchaseValue ?? null,
+          supportingCostDocument: asset.supportingCostDocument || '', archiveDocumentNumber: asset.archiveDocumentNumber || '', manufacturer: asset.manufacturer || '',
+          lastInventoryDate: normalizeFlexibleDateForInput(asset.lastInventoryDate, asset.lastInventoryDateType || 'gregorian'), lastInventoryDateType: asset.lastInventoryDateType || 'gregorian',
+          unitOfMeasure: asset.unitOfMeasure || '', quantity: asset.quantity ?? 1, excelPayload: asset.excelPayload || { templateType: 'ppe' },
           notes: asset.notes || '', attachments: asset.attachments || [],
         });
       })
@@ -154,6 +162,8 @@ export const EditAssetPage: React.FC = () => {
           <div className="md:col-span-2"><Label>ملاحظات</Label><Textarea rows={4} value={form.notes || ''} onChange={(e) => setField('notes', e.target.value)} /></div>
         </CardContent>
       </Card>
+
+      <AssetOfficialTemplateFields value={form} onChange={setForm} />
 
       <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-md">
         <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><Paperclip className="h-5 w-5" />المرفقات والوثائق</CardTitle></CardHeader>

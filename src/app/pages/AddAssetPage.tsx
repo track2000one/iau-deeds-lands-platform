@@ -21,6 +21,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { AppDateField } from '../components/AppDateField';
+import { AssetOfficialTemplateFields } from '../components/AssetOfficialTemplateFields';
 import { createAsset, uploadAssetFile } from '../api/assets';
 import type { AssetInput, AssetStatus } from '../../types/asset';
 
@@ -109,6 +110,7 @@ const emptyForm: AssetInput = {
   purchaseValue: null,
   notes: '',
   attachments: [],
+  excelPayload: { templateType: 'ppe' },
 };
 
 export const AddAssetPage: React.FC = () => {
@@ -374,6 +376,8 @@ export const AddAssetPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      <AssetOfficialTemplateFields value={form} onChange={setForm} />
 
       <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-[0_16px_48px_rgba(15,23,42,0.07)] backdrop-blur-xl">
         <CardHeader className="border-b bg-white/40">
