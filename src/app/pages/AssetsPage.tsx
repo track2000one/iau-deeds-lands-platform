@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Boxes, Eye, PackageSearch, Pencil, PlusCircle, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Boxes, Eye, FileSpreadsheet, PackageSearch, Pencil, PlusCircle, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -12,9 +12,12 @@ import { ASSET_STATUS_LABELS } from '../../types/asset';
 
 const CATEGORY_LABELS: Record<string, string> = {
   it: 'تقنية معلومات',
-  furniture: 'أثاث',
-  equipment: 'أجهزة ومعدات',
-  vehicle: 'مركبات',
+  furniture: 'الأثاث',
+  equipment: 'الآلات والمعدات',
+  vehicle: 'أصول النقل العام',
+  infrastructure: 'البنية التحتية',
+  intangible: 'الأصول غير الملموسة',
+  land: 'الأراضي',
   other: 'أخرى',
 };
 
@@ -53,7 +56,24 @@ export const AssetsPage: React.FC = () => {
     if (!value) return assets;
 
     return assets.filter((asset) =>
-      [asset.assetNumber, asset.barcode, asset.name, asset.category, asset.brand, asset.model, asset.serialNumber, asset.department, asset.building, asset.floor, asset.room, asset.custodian]
+      [
+        asset.itemNumber,
+        asset.assetNumber,
+        asset.barcode,
+        asset.name,
+        asset.category,
+        asset.brand,
+        asset.model,
+        asset.serialNumber,
+        asset.department,
+        asset.responsibleDepartment,
+        asset.entityName,
+        asset.building,
+        asset.floor,
+        asset.room,
+        asset.cardNumber,
+        asset.assetCode,
+      ]
         .filter(Boolean)
         .some((item) => String(item).toLowerCase().includes(value))
     );
@@ -61,7 +81,8 @@ export const AssetsPage: React.FC = () => {
 
   const handleDelete = async (asset: AssetRecord) => {
     if (!canDelete) return;
-    const confirmed = window.confirm(`هل تريد حذف الأصل ${asset.assetNumber} - ${asset.name}؟`);
+    const identifier = asset.itemNumber || asset.assetNumber || asset.barcode || '';
+    const confirmed = window.confirm(`هل تريد حذف الأصل ${identifier} - ${asset.name}؟`);
     if (!confirmed) return;
 
     try {
@@ -81,14 +102,19 @@ export const AssetsPage: React.FC = () => {
         <div>
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary"><Boxes className="h-4 w-4" />وحدة الأصول</div>
           <h1 className="text-2xl font-black sm:text-3xl">جميع الأصول</h1>
-          <p className="mt-2 text-sm text-muted-foreground">سجل موحد للأصول والباركود والمواقع والعهد والحالة التشغيلية.</p>
+          <p className="mt-2 text-sm text-muted-foreground">سجل موحد لرقم الصنف والباركود والتصنيف والموقع الإداري والحالة التشغيلية والفنية.</p>
         </div>
-        {canAdd && <Button onClick={() => navigate('/assets/new')} className="h-11 rounded-2xl px-5"><PlusCircle className="ml-2 h-5 w-5" />إضافة أصل</Button>}
+        {canAdd && (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => navigate('/assets/import')} className="h-11 rounded-2xl px-5"><FileSpreadsheet className="ml-2 h-5 w-5 text-emerald-600" />استيراد Excel</Button>
+            <Button onClick={() => navigate('/assets/new')} className="h-11 rounded-2xl px-5"><PlusCircle className="ml-2 h-5 w-5" />إضافة أصل</Button>
+          </div>
+        )}
       </section>
 
       <Card className="rounded-[26px] border-white/55 bg-white/68 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
         <CardHeader className="border-b bg-white/40"><CardTitle className="flex items-center gap-2 text-lg"><SlidersHorizontal className="h-5 w-5 text-primary" />البحث والتصفية</CardTitle></CardHeader>
-        <CardContent className="p-5 sm:p-6"><div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث برقم الأصل، الباركود، اسم الأصل، الرقم التسلسلي أو صاحب العهدة..." className="h-11 rounded-xl pr-10" /></div></CardContent>
+        <CardContent className="p-5 sm:p-6"><div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث برقم الصنف، الباركود، اسم الأصل، البطاقة، التصنيف، الإدارة أو الرقم التسلسلي..." className="h-11 rounded-xl pr-10" /></div></CardContent>
       </Card>
 
       {error && <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div>}
@@ -98,18 +124,20 @@ export const AssetsPage: React.FC = () => {
           {loading ? (
             <div className="flex min-h-[260px] items-center justify-center text-sm text-muted-foreground">جارٍ تحميل الأصول...</div>
           ) : filteredAssets.length === 0 ? (
-            <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center"><div className="grid h-20 w-20 place-items-center rounded-[28px] border bg-background/80 shadow-inner"><PackageSearch className="h-10 w-10 text-primary" /></div><h2 className="mt-5 text-xl font-black">لا توجد أصول مطابقة</h2><p className="mt-2 text-sm text-muted-foreground">{query ? 'غيّر كلمة البحث أو امسح التصفية.' : 'ابدأ بإضافة أول أصل إلى سجل الوحدة.'}</p></div>
+            <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center"><div className="grid h-20 w-20 place-items-center rounded-[28px] border bg-background/80 shadow-inner"><PackageSearch className="h-10 w-10 text-primary" /></div><h2 className="mt-5 text-xl font-black">لا توجد أصول مطابقة</h2><p className="mt-2 text-sm text-muted-foreground">{query ? 'غيّر كلمة البحث أو امسح التصفية.' : 'ابدأ بإضافة أصل أو استيراد بيانات Excel المعتمدة.'}</p></div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {filteredAssets.map((asset) => (
                 <article key={asset.id} className="rounded-[24px] border bg-white/75 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                  <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-muted-foreground">{asset.assetNumber}</p><h2 className="mt-1 truncate text-lg font-black">{asset.name}</h2></div><Badge variant="outline">{ASSET_STATUS_LABELS[asset.status] || asset.status}</Badge></div>
+                  <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-muted-foreground">رقم الصنف: {asset.itemNumber || asset.assetNumber || '-'}</p><h2 className="mt-1 truncate text-lg font-black">{asset.name}</h2></div><Badge variant="outline">{ASSET_STATUS_LABELS[asset.status] || asset.status}</Badge></div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <div><dt className="text-xs text-muted-foreground">التصنيف</dt><dd className="mt-1 font-medium">{CATEGORY_LABELS[asset.category] || asset.category}</dd></div>
+                    <div><dt className="text-xs text-muted-foreground">رقم البطاقة</dt><dd className="mt-1 font-medium">{asset.cardNumber || '-'}</dd></div>
                     <div><dt className="text-xs text-muted-foreground">الباركود</dt><dd className="mt-1 font-medium">{asset.barcode || '-'}</dd></div>
-                    <div><dt className="text-xs text-muted-foreground">الجهة</dt><dd className="mt-1 font-medium">{asset.department || '-'}</dd></div>
-                    <div><dt className="text-xs text-muted-foreground">المبنى</dt><dd className="mt-1 font-medium">{asset.building || '-'}</dd></div>
-                    <div><dt className="text-xs text-muted-foreground">العهدة</dt><dd className="mt-1 font-medium">{asset.custodian || '-'}</dd></div>
+                    <div><dt className="text-xs text-muted-foreground">الحالة الفنية</dt><dd className="mt-1 font-medium">{asset.technicalCondition || '-'}</dd></div>
+                    <div><dt className="text-xs text-muted-foreground">الجهة / الإدارة</dt><dd className="mt-1 font-medium">{asset.responsibleDepartment || asset.department || asset.entityName || '-'}</dd></div>
+                    <div><dt className="text-xs text-muted-foreground">الموقع</dt><dd className="mt-1 font-medium">{[asset.building, asset.floor, asset.room].filter(Boolean).join(' / ') || '-'}</dd></div>
+                    <div><dt className="text-xs text-muted-foreground">رمز الأصل المحاسبي</dt><dd className="mt-1 font-medium">{asset.assetCode || '-'}</dd></div>
                     <div><dt className="text-xs text-muted-foreground">المرفقات</dt><dd className="mt-1 font-medium">{asset.attachments?.length || 0}</dd></div>
                   </dl>
                   <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
