@@ -34,5 +34,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/app/pages/AssetsPage.tsx
-          git commit -m "Style asset groups with category icons and soft glow"
+          git commit -m "Use neutral asset group card frames"
           git push
