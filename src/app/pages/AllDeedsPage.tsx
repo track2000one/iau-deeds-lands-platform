@@ -192,7 +192,7 @@ export const AllDeedsPage: React.FC = () => {
           {filteredDeeds.map((deed) => (
             <article
               key={deed.id}
-              className="rounded-[24px] border border-slate-300/80 bg-white/90 p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md sm:p-5"
+              className="platform-record-card flex h-full flex-col p-4 sm:p-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -209,7 +209,7 @@ export const AllDeedsPage: React.FC = () => {
                 </Badge>
               </div>
 
-              <div className="mt-4 rounded-2xl border bg-slate-50/65 p-3">
+              <div className="platform-record-metric mt-4 p-3">
                 <p className="text-xs text-muted-foreground">بيان العقار</p>
                 <p className="mt-1 min-h-[42px] text-sm font-semibold leading-6 text-slate-700">{deed.propertyDescription || '-'}</p>
               </div>
@@ -233,7 +233,7 @@ export const AllDeedsPage: React.FC = () => {
                 </div>
               </dl>
 
-              <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="platform-record-actions mt-5">
                 <Button variant="outline" size="sm" className="h-10" onClick={() => navigate(`/deeds/${deed.id}`)}>
                   <Eye className="ml-1 h-4 w-4" />عرض
                 </Button>
@@ -254,7 +254,7 @@ export const AllDeedsPage: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-10 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                    className="platform-record-danger h-10"
                     onClick={() => handleDelete(deed.id)}
                   >
                     <Trash2 className="ml-1 h-4 w-4" />حذف

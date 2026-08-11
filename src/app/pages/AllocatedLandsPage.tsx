@@ -615,7 +615,7 @@ export const AllocatedLandsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card className="hidden md:block">
+      <Card className="hidden">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
@@ -735,7 +735,7 @@ export const AllocatedLandsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <div className="space-y-3 md:hidden">
+      <div className="platform-record-grid">
         {filteredLands.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -744,7 +744,7 @@ export const AllocatedLandsPage: React.FC = () => {
           </Card>
         ) : (
           filteredLands.map((land: any) => (
-            <Card key={land.id} className="w-full overflow-hidden">
+            <Card key={land.id} className="platform-record-card w-full overflow-hidden">
               <CardContent className="space-y-4 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -773,7 +773,7 @@ export const AllocatedLandsPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="mobile-actions-grid">
+                <div className="platform-record-actions">
                   <Button variant="outline" onClick={() => openDetails(land)}>
                     <Eye className="ml-2 h-4 w-4" />
                     عرض
@@ -796,7 +796,7 @@ export const AllocatedLandsPage: React.FC = () => {
                   {hasPermission('allocated_lands', 'canDelete') && (
                     <Button
                       variant="outline"
-                      className="text-destructive"
+                      className="platform-record-danger text-destructive"
                       onClick={() => requestDelete(land)}
                     >
                       <Trash2 className="ml-2 h-4 w-4" />

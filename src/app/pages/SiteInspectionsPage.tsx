@@ -132,9 +132,9 @@ export const SiteInspectionsPage: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="platform-record-grid">
           {filtered.map((item) => (
-            <Card key={item.id} className="overflow-hidden">
+            <Card key={item.id} className="platform-record-card overflow-hidden">
               <CardHeader className="border-b pb-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -179,13 +179,13 @@ export const SiteInspectionsPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 border-t pt-3">
+                <div className="platform-record-actions mt-auto">
                   <Button onClick={() => navigate(`/site-inspections/${item.id}`)}>
                     <Eye className="ml-2 h-4 w-4" />
                     عرض
                   </Button>
                   {canDelete && (
-                    <Button variant="destructive" onClick={() => remove(item)}>
+                    <Button variant="destructive" className="platform-record-danger" onClick={() => remove(item)}>
                       <Trash2 className="ml-2 h-4 w-4" />
                       حذف
                     </Button>

@@ -579,6 +579,137 @@ const injectAppearanceStyles = () => {
       overflow: hidden;
     }
 
+
+    /* ===== Platform record cards 3D ===== */
+    .platform-record-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    @media (min-width: 768px) {
+      .platform-record-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (min-width: 1280px) {
+      .platform-record-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    html:not([data-appearance-mode="dark"]) .platform-record-card {
+      position: relative;
+      isolation: isolate;
+      height: 100%;
+      overflow: hidden;
+      border: 1px solid rgba(30, 67, 102, .66) !important;
+      border-radius: 19px !important;
+      background: linear-gradient(145deg, #ffffff 0%, #fbfdff 50%, #f2f7fb 100%) !important;
+      box-shadow:
+        0 6px 0 rgba(30, 67, 102, .14),
+        0 15px 28px rgba(15, 42, 70, .12),
+        inset 0 2px 0 rgba(255, 255, 255, 1),
+        inset 0 -2px 6px rgba(38, 76, 112, .055) !important;
+      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease !important;
+    }
+
+    html:not([data-appearance-mode="dark"]) .platform-record-card::before {
+      content: '';
+      position: absolute;
+      z-index: 2;
+      inset-inline: 8px;
+      top: 0;
+      height: 4px;
+      border-radius: 0 0 999px 999px;
+      background: linear-gradient(90deg, #355872 0%, #5e92b8 45%, #9cd5ff 100%);
+      box-shadow: 0 2px 5px rgba(41, 89, 128, .22);
+      pointer-events: none;
+    }
+
+    html:not([data-appearance-mode="dark"]) .platform-record-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(35, 92, 139, .82) !important;
+      box-shadow:
+        0 9px 0 rgba(30, 67, 102, .15),
+        0 22px 38px rgba(15, 42, 70, .16),
+        inset 0 2px 0 rgba(255, 255, 255, 1),
+        inset 0 -2px 7px rgba(38, 76, 112, .06) !important;
+    }
+
+    .platform-record-card[data-slot="card"] {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .platform-record-card[data-slot="card"] > [data-slot="card-content"] {
+      flex: 1 1 auto;
+    }
+
+    html:not([data-appearance-mode="dark"]) .platform-record-metric {
+      border: 1px solid rgba(91, 119, 145, .24) !important;
+      border-radius: 13px !important;
+      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(239,246,251,.84)) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,1),
+        0 3px 0 rgba(44,79,111,.07),
+        0 7px 12px rgba(15,42,70,.055) !important;
+    }
+
+    .platform-record-actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid rgba(66, 96, 124, .11);
+    }
+
+    html:not([data-appearance-mode="dark"]) .platform-record-actions [data-slot="button"] {
+      min-height: 40px;
+      border: 1px solid rgba(38, 75, 111, .72) !important;
+      border-radius: 10px !important;
+      color: #17395f;
+      background: linear-gradient(180deg, #ffffff 0%, #f7fbfe 58%, #e8f1f7 100%) !important;
+      box-shadow:
+        0 4px 0 rgba(38, 75, 111, .19),
+        0 8px 12px rgba(15, 42, 70, .10),
+        inset 0 1px 0 rgba(255,255,255,1) !important;
+      filter: none !important;
+      transform: translateY(0);
+    }
+
+    html:not([data-appearance-mode="dark"]) .platform-record-actions [data-slot="button"]:hover {
+      transform: translateY(-1px);
+      background: linear-gradient(180deg, #ffffff 0%, #eff8fd 58%, #dcecf6 100%) !important;
+      box-shadow:
+        0 5px 0 rgba(38, 75, 111, .20),
+        0 10px 15px rgba(15, 42, 70, .12),
+        inset 0 1px 0 rgba(255,255,255,1) !important;
+    }
+
+    html:not([data-appearance-mode="dark"]) .platform-record-actions [data-slot="button"]:active {
+      transform: translateY(3px) !important;
+      box-shadow:
+        0 1px 0 rgba(38, 75, 111, .16),
+        0 3px 5px rgba(15, 42, 70, .08),
+        inset 0 1px 2px rgba(22,55,86,.06) !important;
+    }
+
+    html:not([data-appearance-mode="dark"]) .platform-record-actions .platform-record-danger {
+      border-color: rgba(239, 68, 68, .66) !important;
+      color: #dc2626 !important;
+      background: linear-gradient(180deg, #fffefe 0%, #fff5f5 58%, #ffe8e8 100%) !important;
+      box-shadow:
+        0 4px 0 rgba(220, 38, 38, .17),
+        0 8px 12px rgba(185, 28, 28, .08),
+        inset 0 1px 0 rgba(255,255,255,1) !important;
+    }
+
+    html[data-appearance-mode="dark"] .platform-record-card {
+      border-color: rgba(125, 165, 201, .48) !important;
+      background: linear-gradient(145deg, rgba(15,31,49,.98), rgba(20,42,64,.98)) !important;
+      box-shadow: 0 6px 0 rgba(4,12,22,.55), 0 18px 34px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.07) !important;
+    }
+
     /*
      * Dark-theme compatibility layer
      * يعالج الصفحات القديمة التي تستخدم خلفيات فاتحة ثابتة مع النص الداكن.

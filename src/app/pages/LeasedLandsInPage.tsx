@@ -620,92 +620,62 @@ export const LeasedLandsInPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <h2 className="flex items-center gap-2 text-base font-black text-slate-800">
             <BarChart3 className="h-5 w-5" />
-            قائمة الأراضي المؤجرة ({filteredRecords.length})
-          </CardTitle>
-        </CardHeader>
+            بطاقات العرض
+          </h2>
+          <Badge variant="secondary">{filteredRecords.length} سجل</Badge>
+        </div>
 
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>المالك</TableHead>
-                  <TableHead>رقم العقد</TableHead>
-                  <TableHead>بداية العقد</TableHead>
-                  <TableHead>القطعة / المخطط</TableHead>
-                  <TableHead>المساحة</TableHead>
-                  <TableHead>قيمة الإيجار</TableHead>
-                  <TableHead>المرفقات</TableHead>
-                  <TableHead className="text-center">الإجراءات</TableHead>
-                </TableRow>
-              </TableHeader>
+        {filteredRecords.length === 0 ? (
+          <Card className="platform-record-card">
+            <CardContent className="flex min-h-56 flex-col items-center justify-center text-center text-muted-foreground">
+              <FileText className="mb-3 h-12 w-12 opacity-30" />
+              لا توجد سجلات مطابقة للبحث.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="platform-record-grid">
+            {filteredRecords.map((record: any) => (
+              <Card key={record.id} className="platform-record-card overflow-hidden">
+                <CardContent className="flex h-full flex-col space-y-4 p-4 sm:p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold text-muted-foreground">رقم العقد: {record.contractNumber || '-'}</p>
+                      <h3 className="mt-1 break-words text-lg font-black text-slate-800">{record.owner?.name || 'أرض مستأجرة'}</h3>
+                    </div>
+                    <Badge variant="outline" className="shrink-0 border-sky-300 bg-sky-50 text-sky-700">مستأجرة</Badge>
+                  </div>
 
-              <TableBody>
-                {filteredRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
-                      <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                      لا توجد أراضٍ مستأجرة مطابقة للبحث.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRecords.map((record: any) => (
-                    <TableRow key={record.id}>
-                      <TableCell className="font-medium">{record.owner?.name || '-'}</TableCell>
-                      <TableCell>{record.contractNumber || '-'}</TableCell>
-                      <TableCell>{formatDate(record.contractStartDate, record.contractStartDateType || 'gregorian')}</TableCell>
-                      <TableCell>
-                        <div>
-                          <p>قطعة: {record.plotNumber || '-'}</p>
-                          <p className="text-xs text-muted-foreground">مخطط: {record.planNumber || '-'}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{Number(record.area || 0).toLocaleString()} م²</TableCell>
-                      <TableCell>
-                        {record.rentAmount ? (
-                          <Badge>{Number(record.rentAmount).toLocaleString()} ريال</Badge>
-                        ) : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{getRecordAttachments(record).length}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1">
-                          <Button variant="ghost" size="icon" title="عرض" onClick={() => openDetails(record)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                  <div className="platform-record-metric grid grid-cols-2 gap-x-4 gap-y-3 p-3 text-sm">
+                    <InfoItem label="القطعة" value={record.plotNumber || '-'} />
+                    <InfoItem label="المخطط" value={record.planNumber || '-'} />
+                    <InfoItem label="المساحة" value={`${Number(record.area || 0).toLocaleString()} م²`} />
+                    <InfoItem label="بداية العقد" value={formatDate(record.contractStartDate, record.contractStartDateType || 'gregorian')} />
+                    <InfoItem label="الإيجار" value={record.rentAmount ? `${Number(record.rentAmount).toLocaleString()} ريال` : '-'} />
+                    <InfoItem label="المرفقات" value={getRecordAttachments(record).length} />
+                  </div>
 
-                          {hasPermission('leased_lands_in', 'canEdit') && (
-                            <Button variant="ghost" size="icon" title="تعديل" onClick={() => openEditForm(record)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          )}
-
-                          {record.coordinates && (
-                            <Button variant="ghost" size="icon" title="فتح الخريطة" onClick={() => openMap(record)}>
-                              <MapPin className="h-4 w-4 text-primary" />
-                            </Button>
-                          )}
-
-                          {hasPermission('leased_lands_in', 'canDelete') && (
-                            <Button variant="ghost" size="icon" title="حذف" onClick={() => requestDelete(record)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  <div className="platform-record-actions">
+                    <Button variant="outline" onClick={() => openDetails(record)}><Eye className="ml-2 h-4 w-4" />عرض</Button>
+                    {hasPermission('leased_lands_in', 'canEdit') && (
+                      <Button variant="outline" onClick={() => openEditForm(record)}><Edit className="ml-2 h-4 w-4" />تعديل</Button>
+                    )}
+                    {record.coordinates && (
+                      <Button variant="outline" onClick={() => openMap(record)}><MapPin className="ml-2 h-4 w-4" />الخريطة</Button>
+                    )}
+                    {hasPermission('leased_lands_in', 'canDelete') && (
+                      <Button variant="outline" className="platform-record-danger" onClick={() => requestDelete(record)}><Trash2 className="ml-2 h-4 w-4" />حذف</Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </section>
 
       {formOpen && (
         <LeasedLandInForm
