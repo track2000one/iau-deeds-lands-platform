@@ -29,6 +29,8 @@ export type AssetReportQuery = {
   sortKey?: string;
   sortDirection?: 'asc' | 'desc';
   all?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 const appendAssetFilters = (params: URLSearchParams, query: AssetReportQuery) => {
@@ -36,9 +38,11 @@ const appendAssetFilters = (params: URLSearchParams, query: AssetReportQuery) =>
   if (query.search) params.set('search', query.search);
   if (query.category && query.category !== 'all') params.set('category', query.category);
   if (query.status && query.status !== 'all') params.set('status', query.status);
+  if (query.dateFrom) params.set('dateFrom', query.dateFrom);
+  if (query.dateTo) params.set('dateTo', query.dateTo);
 };
 
-export const getAssetGroups = (filters: Pick<AssetReportQuery, 'search' | 'category' | 'status'> = {}) => {
+export const getAssetGroups = (filters: Pick<AssetReportQuery, 'search' | 'category' | 'status' | 'dateFrom' | 'dateTo'> = {}) => {
   const params = new URLSearchParams();
   appendAssetFilters(params, filters);
   const suffix = params.toString();

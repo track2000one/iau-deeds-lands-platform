@@ -67,6 +67,7 @@ const printableFields = [
   ['cardNumber', 'رقم البطاقة'],
   ['purchaseDate', 'تاريخ الشراء'],
   ['purchaseValue', 'قيمة الشراء'],
+  ['createdAt', 'تاريخ الإدخال'],
   ['attachments', 'عدد المرفقات'],
 ] as const;
 
@@ -90,6 +91,7 @@ const SCREEN_COLUMN_WEIGHTS: Record<FieldKey, number> = {
   cardNumber: 8,
   purchaseDate: 8,
   purchaseValue: 9,
+  createdAt: 10,
   attachments: 6,
 };
 
@@ -120,6 +122,9 @@ const valueFor = (asset: ReportAsset, key: FieldKey) => {
   if (key === 'status') return ASSET_STATUS_LABELS[asset.status] || asset.status || '-';
   if (key === 'purchaseDate') {
     return asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('ar-SA') : '-';
+  }
+  if (key === 'createdAt') {
+    return asset.createdAt ? new Date(asset.createdAt).toLocaleString('ar-SA') : '-';
   }
   if (key === 'purchaseValue') {
     return asset.purchaseValue != null ? Number(asset.purchaseValue).toLocaleString('ar-SA') : '-';
@@ -172,6 +177,7 @@ const buildSingleAssetHtml = (asset: AssetRecord) => {
     ['الرقم التسلسلي', asset.serialNumber],
     ['رقم البطاقة', asset.cardNumber],
     ['قيمة الشراء', asset.purchaseValue != null ? `${Number(asset.purchaseValue).toLocaleString('ar-SA')} ر.س` : '-'],
+    ['تاريخ إدخال البيانات', asset.createdAt ? new Date(asset.createdAt).toLocaleString('ar-SA') : '-'],
   ];
 
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>تقرير أصل</title><style>
@@ -192,6 +198,8 @@ export const AssetReportsPage: React.FC = () => {
   const [status, setStatus] = useState('all');
   const [category, setCategory] = useState('all');
   const [group, setGroup] = useState('all');
+  const [entryDateFrom, setEntryDateFrom] = useState('');
+  const [entryDateTo, setEntryDateTo] = useState('');
   const [sortKey, setSortKey] = useState<FieldKey>('itemNumber');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
@@ -235,7 +243,7 @@ export const AssetReportsPage: React.FC = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedQuery, status, category, group, sortKey, sortDirection, pageSize]);
+  }, [debouncedQuery, status, category, group, entryDateFrom, entryDateTo, sortKey, sortDirection, pageSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,6 +253,8 @@ export const AssetReportsPage: React.FC = () => {
       status,
       category,
       group,
+      dateFrom: entryDateFrom || undefined,
+      dateTo: entryDateTo || undefined,
       page,
       limit: pageSize,
       sortKey,
@@ -264,12 +274,12 @@ export const AssetReportsPage: React.FC = () => {
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [debouncedQuery, status, category, group, page, pageSize, sortKey, sortDirection]);
+  }, [debouncedQuery, status, category, group, entryDateFrom, entryDateTo, page, pageSize, sortKey, sortDirection]);
 
   useEffect(() => {
     let cancelled = false;
     setGroupsLoading(true);
-    getAssetGroups({ search: debouncedQuery, category, status })
+    getAssetGroups({ search: debouncedQuery, category, status, dateFrom: entryDateFrom || undefined, dateTo: entryDateTo || undefined })
       .then((result) => {
         if (cancelled) return;
         setGroups(Array.isArray(result) ? result : []);
@@ -278,7 +288,7 @@ export const AssetReportsPage: React.FC = () => {
       .catch(() => { if (!cancelled) setGroups([]); })
       .finally(() => { if (!cancelled) setGroupsLoading(false); });
     return () => { cancelled = true; };
-  }, [debouncedQuery, category, status]);
+  }, [debouncedQuery, category, status, entryDateFrom, entryDateTo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -299,6 +309,8 @@ export const AssetReportsPage: React.FC = () => {
       status,
       category,
       group,
+      dateFrom: entryDateFrom || undefined,
+      dateTo: entryDateTo || undefined,
       sortKey,
       sortDirection,
       all: true,
@@ -312,6 +324,8 @@ export const AssetReportsPage: React.FC = () => {
     setStatus('all');
     setCategory('all');
     setGroup('all');
+    setEntryDateFrom('');
+    setEntryDateTo('');
     setSortKey('itemNumber');
     setSortDirection('asc');
     setPage(1);
@@ -383,15 +397,18 @@ export const AssetReportsPage: React.FC = () => {
       setExporting(true);
       const allRows = await fetchAllFilteredRows();
       const headers = selectedFields.map((key) => printableFields.find(([field]) => field === key)?.[1] || key).map((label) => `<th>${escapeHtml(label)}</th>`).join('');
-      const printWeights: Record<FieldKey, number> = { itemNumber: 8, barcode: 10, name: 14, category: 7, brand: 6, model: 7, serialNumber: 9, status: 6, department: 13, building: 6, floor: 4, room: 8, cardNumber: 8, purchaseDate: 7, purchaseValue: 8, attachments: 5 };
+      const printWeights: Record<FieldKey, number> = { itemNumber: 8, barcode: 10, name: 14, category: 7, brand: 6, model: 7, serialNumber: 9, status: 6, department: 13, building: 6, floor: 4, room: 8, cardNumber: 8, purchaseDate: 7, purchaseValue: 8, createdAt: 9, attachments: 5 };
       const weightTotal = 3 + selectedFields.reduce((sum, key) => sum + (printWeights[key] || 7), 0);
       const colgroup = `<colgroup><col style="width:${(3 / weightTotal * 100).toFixed(3)}%">${selectedFields.map((key) => `<col style="width:${((printWeights[key] || 7) / weightTotal * 100).toFixed(3)}%">`).join('')}</colgroup>`;
       const body = allRows.map((asset, index) => `<tr><td>${index + 1}</td>${selectedFields.map((key) => `<td>${escapeHtml(valueFor(asset, key))}</td>`).join('')}</tr>`).join('');
       const groupLabel = activeGroup?.label || 'جميع المجموعات';
+      const operationDateLabel = entryDateFrom || entryDateTo
+        ? ' | تاريخ إدخال البيانات: ' + (entryDateFrom ? 'من ' + new Date(entryDateFrom + 'T12:00:00').toLocaleDateString('ar-SA') : 'من البداية') + ' ' + (entryDateTo ? 'إلى ' + new Date(entryDateTo + 'T12:00:00').toLocaleDateString('ar-SA') : 'حتى الآن')
+        : '';
       openPrintHtml(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>${escapeHtml(reportSettings.reportTitle || 'تقرير الأصول')}</title><style>
       @page{size:A4 landscape;margin:5mm 3mm 4mm}*{box-sizing:border-box}html,body{width:100%;margin:0!important;padding:0!important}body{font-family:Tahoma,Arial,sans-serif;color:#172033;background:#fff}.header{text-align:center;border-bottom:1px solid #1f4e79;padding:2.5mm 3mm 2mm;margin:0 0 2.5mm}.header h1{font-size:15px;line-height:1.2;margin:0 0 .8mm;font-weight:800}.sub{font-size:8px;line-height:1.25;color:#64748b;margin:.45mm 0 0}.filters{margin:0 0 2mm;padding:1.5mm 2mm;border:1px solid #dbe3ec;border-radius:1.5mm;font-size:8.5px;line-height:1.25;background:#fbfdff}.summary{display:flex;gap:1.5mm;margin:0 0 2mm}.summary div{flex:1;border:1px solid #dbe3ec;border-radius:1.5mm;padding:1.4mm 2mm;text-align:center;line-height:1.15;font-size:9px;background:#fff}.summary strong{font-size:12px;display:inline-block;margin-top:.6mm}.statement-title{text-align:center;margin:1mm 0 2.2mm;padding:1.6mm 4mm;border:1px solid #cbd8e5;border-radius:1.5mm;font-size:12px;font-weight:800;line-height:1.2;color:#172033;background:#f8fafc}table{width:100%;margin:0;border-collapse:collapse;border-spacing:0;table-layout:fixed;font-size:11px;line-height:1.08}th{background:#1f4e79;color:#fff;padding:.6px 1px;border:.45px solid #dbe3ec;font-size:11px;font-weight:800;vertical-align:middle;white-space:normal;overflow-wrap:anywhere}td{padding:.45px 1px;border:.45px solid #dbe3ec;font-size:11px;text-align:center;vertical-align:middle;white-space:normal;overflow-wrap:anywhere;word-break:break-word}tbody tr:nth-child(even){background:#f8fafc}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}.footer{margin-top:1.5mm;padding:.8mm 1mm 0;font-size:7px;line-height:1.15;color:#64748b;display:flex;justify-content:space-between;border-top:1px solid #eef2f6}</style></head><body>
       <div class="header"><h1>${escapeHtml(reportSettings.universityName || DEFAULT_ASSET_REPORT_SETTINGS.universityName)}</h1><div class="sub">${escapeHtml(reportSettings.departmentName || DEFAULT_ASSET_REPORT_SETTINGS.departmentName)}</div><div class="sub">${escapeHtml(reportSettings.reportTitle || DEFAULT_ASSET_REPORT_SETTINGS.reportTitle)}</div></div>
-      <div class="filters">التصنيف: ${escapeHtml(category === 'all' ? 'الكل' : CATEGORY_LABELS[category] || category)} | الحالة: ${escapeHtml(status === 'all' ? 'الكل' : ASSET_STATUS_LABELS[status] || status)} | المجموعة: ${escapeHtml(groupLabel)}${debouncedQuery ? ` | البحث: ${escapeHtml(debouncedQuery)}` : ''}</div>
+      <div class="filters">التصنيف: ${escapeHtml(category === 'all' ? 'الكل' : CATEGORY_LABELS[category] || category)} | الحالة: ${escapeHtml(status === 'all' ? 'الكل' : ASSET_STATUS_LABELS[status] || status)} | المجموعة: ${escapeHtml(groupLabel)}${debouncedQuery ? ` | البحث: ${escapeHtml(debouncedQuery)}` : ''}${escapeHtml(operationDateLabel)}</div>
       <div class="summary"><div>إجمالي السجلات<br><strong>${allRows.length.toLocaleString('ar-SA')}</strong></div><div>إجمالي قيمة الشراء<br><strong>${allRows.reduce((sum,a)=>sum+Number(a.purchaseValue||0),0).toLocaleString('ar-SA')} ر.س</strong></div></div>
       <div class="statement-title">${escapeHtml(reportSettings.statementTitle.trim() || DEFAULT_ASSET_REPORT_SETTINGS.statementTitle)}</div>
       <table>${colgroup}<thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table><div class="footer"><span>تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</span><span>وحدة الأصول</span></div><script>window.onload=()=>window.print()</script></body></html>`);
@@ -430,7 +447,7 @@ export const AssetReportsPage: React.FC = () => {
         <div>
           <p className="text-sm font-semibold text-primary">وحدة الأصول</p>
           <h1 className="mt-1 text-2xl font-black sm:text-3xl">تقارير الأصول</h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">تصفية مرنة حسب نوع الأصل والمجموعة والحالة والبحث، مع تحميل النتائج على دفعات سريعة وتطبيق نفس التصفية على Excel وPDF والقالب الرسمي.</p>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">تصفية مرنة حسب نوع الأصل والمجموعة والحالة والبحث وتاريخ إدخال البيانات، مع تطبيق نفس التصفية على الجدول وExcel وPDF والقالب الرسمي.</p>
         </div>
         <Button variant="outline" onClick={() => navigate('/assets')}><ArrowRight className="ml-2 h-4 w-4" />لوحة الأصول</Button>
       </section>
@@ -444,6 +461,17 @@ export const AssetReportsPage: React.FC = () => {
             <NativeSelect value={status} onChange={(e)=>setStatus(e.target.value)}><option value="all">جميع الحالات</option>{Object.entries(ASSET_STATUS_LABELS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</NativeSelect>
             <NativeSelect value={group} onChange={(e)=>setGroup(e.target.value)}><option value="all">جميع مجموعات الأصول</option>{groups.map((item)=><option key={item.key} value={item.key}>{item.label} ({item.count.toLocaleString('ar-SA')})</option>)}</NativeSelect>
             <Button variant="outline" onClick={resetFilters}><RotateCcw className="ml-2 h-4 w-4"/>إعادة ضبط</Button>
+          </div>
+
+          <div className="rounded-2xl border bg-background/55 p-4">
+            <div className="mb-3">
+              <div className="font-black">حصر تاريخ عمليات إدخال البيانات</div>
+              <p className="mt-1 text-xs text-muted-foreground">حدد فترة الإدخال لعرض الأصول التي تم تسجيلها خلال هذه المدة فقط. تطبق الفترة نفسها على الجدول وExcel وPDF.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="space-y-1.5"><span className="text-xs font-bold text-muted-foreground">من تاريخ الإدخال</span><Input type="date" value={entryDateFrom} max={entryDateTo || undefined} onChange={(e)=>setEntryDateFrom(e.target.value)} dir="ltr"/></label>
+              <label className="space-y-1.5"><span className="text-xs font-bold text-muted-foreground">إلى تاريخ الإدخال</span><Input type="date" value={entryDateTo} min={entryDateFrom || undefined} onChange={(e)=>setEntryDateTo(e.target.value)} dir="ltr"/></label>
+            </div>
           </div>
 
           <div className="rounded-2xl border bg-background/55 p-4">
