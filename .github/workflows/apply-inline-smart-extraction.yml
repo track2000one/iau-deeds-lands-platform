@@ -3,7 +3,7 @@ name: Apply Inline Smart Extraction
 on:
   push:
     paths:
-      - 'scripts/add-inline-smart-extraction.cjs'
+      - 'scripts/add-inline-smart-extraction-v2.cjs'
       - '.github/workflows/apply-inline-smart-extraction.yml'
 
 permissions:
@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 20
       - name: Apply inline smart extraction
-        run: node scripts/add-inline-smart-extraction.cjs
+        run: node scripts/add-inline-smart-extraction-v2.cjs
       - name: Install dependencies
         run: npm ci
       - name: Verify frontend build
