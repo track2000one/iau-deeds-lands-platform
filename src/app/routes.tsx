@@ -8,6 +8,7 @@ const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m
 const AddDeedPage = lazy(() => import('./pages/AddDeedPage').then((m) => ({ default: m.AddDeedPage })));
 const AllDeedsPage = lazy(() => import('./pages/AllDeedsPage').then((m) => ({ default: m.AllDeedsPage })));
 const ViewDeedPage = lazy(() => import('./pages/ViewDeedPage').then((m) => ({ default: m.ViewDeedPage })));
+const MapsPage = lazy(() => import('./pages/MapsPage').then((m) => ({ default: m.MapsPage })));
 const ReportsPage = lazy(() => import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
@@ -71,6 +72,7 @@ export const router = createHashRouter([
           { path: ':deedId', element: page(<ViewDeedPage />) },
         ],
       },
+      { path: 'maps/:deedId?', element: page(<MapsPage />) },
       {
         path: 'assets',
         children: [
