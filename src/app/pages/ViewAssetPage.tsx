@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import {
   ArrowRight,
   Barcode,
@@ -42,6 +42,7 @@ const displayValue = (value: unknown) => {
 
 export const ViewAssetPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { assetId } = useParams();
   const { isAdmin, hasPermission } = usePermissions();
   const [asset, setAsset] = useState<AssetRecord | null>(null);
@@ -51,6 +52,14 @@ export const ViewAssetPage: React.FC = () => {
 
   const canEdit = isAdmin || hasPermission('assets', 'canEdit');
   const canDelete = isAdmin || hasPermission('assets', 'canDelete');
+  const assetGroupKey = String((location.state as { assetGroupKey?: string } | null)?.assetGroupKey || '').trim();
+
+  const returnToAssetList = (replace = false) => {
+    navigate('/assets/list', {
+      replace,
+      state: assetGroupKey ? { assetGroupKey } : undefined,
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -89,7 +98,7 @@ export const ViewAssetPage: React.FC = () => {
     try {
       setDeleting(true);
       await deleteAsset(asset.id);
-      navigate('/assets/list', { replace: true });
+      returnToAssetList(true);
     } catch (deleteError: any) {
       setError(deleteError?.message || 'تعذر حذف الأصل.');
     } finally {
@@ -111,7 +120,7 @@ export const ViewAssetPage: React.FC = () => {
         <Card className="rounded-[28px]">
           <CardContent className="p-8 text-center">
             <p className="font-semibold text-red-600">{error || 'الأصل غير موجود.'}</p>
-            <Button className="mt-5" variant="outline" onClick={() => navigate('/assets/list')}>
+            <Button className="mt-5" variant="outline" onClick={() => returnToAssetList()}>
               العودة إلى سجل الأصول
             </Button>
           </CardContent>
@@ -141,12 +150,12 @@ export const ViewAssetPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate('/assets/list')}>
+          <Button variant="outline" onClick={() => returnToAssetList()}>
             <ArrowRight className="ml-2 h-4 w-4" />
             العودة
           </Button>
           {canEdit && (
-            <Button variant="outline" onClick={() => navigate(`/assets/${asset.id}/edit`)}>
+            <Button variant="outline" onClick={() => navigate(`/assets/${asset.id}/edit`, { state: assetGroupKey ? { assetGroupKey } : undefined })}>
               <Pencil className="ml-2 h-4 w-4" />
               تعديل
             </Button>

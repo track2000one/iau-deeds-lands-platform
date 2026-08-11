@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { ArrowRight, Barcode, Building2, FileText, MapPin, Paperclip, Save, Upload, UserRound, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -31,7 +31,9 @@ const emptyInput: AssetInput = {
 
 export const EditAssetPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { assetId } = useParams();
+  const assetGroupKey = String((location.state as { assetGroupKey?: string } | null)?.assetGroupKey || '').trim();
   const [form, setForm] = useState<AssetInput>(emptyInput);
   const [existingAttachments, setExistingAttachments] = useState<AssetAttachment[]>([]);
   const [newFiles, setNewFiles] = useState<Record<UploadCategory, File[]>>({
@@ -111,7 +113,7 @@ export const EditAssetPage: React.FC = () => {
 
       setProgress('حفظ التعديلات...');
       await updateAsset(assetId, payload);
-      navigate(`/assets/${assetId}`, { replace: true });
+      navigate(`/assets/${assetId}`, { replace: true, state: assetGroupKey ? { assetGroupKey } : undefined });
     } catch (e: any) {
       setError(e?.message || 'تعذر حفظ التعديلات.');
     } finally {
@@ -125,7 +127,7 @@ export const EditAssetPage: React.FC = () => {
     <div className="mx-auto w-full max-w-[1500px] space-y-5 sm:space-y-6">
       <section className="flex flex-col gap-4 rounded-[28px] border border-white/55 bg-white/70 p-5 shadow-lg sm:p-6 lg:flex-row lg:items-center lg:justify-between">
         <div><p className="text-sm font-semibold text-primary">وحدة الأصول</p><h1 className="mt-1 text-2xl font-black sm:text-3xl">تعديل الأصل</h1><p className="mt-1 text-sm text-muted-foreground">{assetNumber}</p></div>
-        <Button variant="outline" onClick={() => navigate(`/assets/${assetId}`)}><ArrowRight className="ml-2 h-4 w-4" />العودة للعرض</Button>
+        <Button variant="outline" onClick={() => navigate(`/assets/${assetId}`, { state: assetGroupKey ? { assetGroupKey } : undefined })}><ArrowRight className="ml-2 h-4 w-4" />العودة للعرض</Button>
       </section>
 
       {error && <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">{error}</div>}

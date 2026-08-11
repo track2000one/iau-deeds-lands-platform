@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import {
   AirVent,
   Archive,
@@ -224,6 +224,7 @@ const AssetCard: React.FC<{
 
 export const AssetsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAdmin, hasPermission } = usePermissions();
   const [query, setQuery] = useState('');
   const [groups, setGroups] = useState<AssetGroupSummary[]>([]);
@@ -235,6 +236,7 @@ export const AssetsPage: React.FC = () => {
   const [searchResult, setSearchResult] = useState<AssetListPage | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchSequence = useRef(0);
+  const restoredGroupRef = useRef<string | null>(null);
 
   const canAdd = isAdmin || hasPermission('assets', 'canAdd');
   const canEdit = isAdmin || hasPermission('assets', 'canEdit');
@@ -319,6 +321,23 @@ export const AssetsPage: React.FC = () => {
     if (willOpen && !loadedGroups[group.key]) await loadGroupPage(group, 1, false);
   };
 
+  useEffect(() => {
+    const groupKey = String((location.state as { assetGroupKey?: string } | null)?.assetGroupKey || '').trim();
+    if (!groupKey || loadingGroups || !groups.length || restoredGroupRef.current === groupKey) return;
+
+    const group = groups.find((item) => item.key === groupKey);
+    if (!group) return;
+
+    restoredGroupRef.current = groupKey;
+    setExpandedGroups((current) => ({ ...current, [groupKey]: true }));
+    if (!loadedGroups[groupKey]) void loadGroupPage(group, 1, false);
+
+    const timer = window.setTimeout(() => {
+      document.getElementById(`asset-group-${groupKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [groups, loadingGroups, location.state]);
+
   const handleDelete = async (asset: CompactAsset) => {
     if (!canDelete) return;
     const identifier = asset.itemNumber || asset.assetNumber || asset.barcode || '';
@@ -365,7 +384,7 @@ export const AssetsPage: React.FC = () => {
           <CardContent className="p-4 sm:p-5">
             {searchLoading ? <div className="py-16 text-center text-sm text-muted-foreground">جارٍ البحث...</div> : !searchResult?.items.length ? <div className="py-16 text-center"><PackageSearch className="mx-auto h-10 w-10 text-primary" /><div className="mt-3 font-bold">لا توجد نتائج مطابقة</div></div> : <>
               <div className="mb-4 text-sm text-muted-foreground">تم العثور على {searchResult.total.toLocaleString('ar-SA')} سجل — يتم عرض أول {searchResult.items.length.toLocaleString('ar-SA')} نتيجة.</div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{searchResult.items.map((asset) => <AssetCard key={asset.id} asset={asset} canEdit={canEdit} canDelete={canDelete} deletingId={deletingId} onView={() => navigate(`/assets/${asset.id}`)} onEdit={() => navigate(`/assets/${asset.id}/edit`)} onDelete={() => handleDelete(asset)} />)}</div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{searchResult.items.map((asset) => <AssetCard key={asset.id} asset={asset} canEdit={canEdit} canDelete={canDelete} deletingId={deletingId} onView={() => navigate(`/assets/${asset.id}`, { state: { assetGroupKey: group.key } })} onEdit={() => navigate(`/assets/${asset.id}/edit`, { state: { assetGroupKey: group.key } })} onDelete={() => handleDelete(asset)} />)}</div>
             </>}
           </CardContent>
         </Card>
@@ -384,7 +403,7 @@ export const AssetsPage: React.FC = () => {
                 const loaded = loadedGroups[group.key];
                 const visual = resolveGroupVisual(group);
                 const GroupIcon = visual.icon;
-                return <section key={group.key} className="overflow-hidden rounded-[24px] border transition duration-300 hover:-translate-y-[1px]" style={{ borderColor: 'rgba(148,163,184,0.28)', background: 'linear-gradient(135deg, rgba(255,255,255,0.97), rgba(248,250,252,0.94))', boxShadow: '0 10px 28px rgba(15,23,42,0.055), inset 0 1px 0 rgba(255,255,255,0.96)' }}>
+                return <section id={`asset-group-${group.key}`} key={group.key} className="scroll-mt-24 overflow-hidden rounded-[24px] border transition duration-300 hover:-translate-y-[1px]" style={{ borderColor: 'rgba(148,163,184,0.28)', background: 'linear-gradient(135deg, rgba(255,255,255,0.97), rgba(248,250,252,0.94))', boxShadow: '0 10px 28px rgba(15,23,42,0.055), inset 0 1px 0 rgba(255,255,255,0.96)' }}>
                   <button type="button" onClick={() => toggleGroup(group)} className="group relative flex w-full items-center justify-between gap-4 overflow-hidden p-4 text-right transition hover:bg-white/30 sm:p-5">
                     <div className="flex min-w-0 items-center gap-4"><div className="relative grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-[18px] border bg-white/85 transition duration-300 group-hover:scale-[1.04]" style={{ borderColor: visual.border, background: visual.iconBackground, boxShadow: visual.iconShadow, color: visual.color }}><span className="absolute inset-3 rounded-full opacity-25 blur-lg" style={{ background: visual.color }} /><GroupIcon className="relative h-7 w-7" /></div><div className="min-w-0"><h2 className="truncate text-lg font-black">مجموعة {group.label}</h2><p className="mt-1 text-xs text-muted-foreground">{group.count.toLocaleString('ar-SA')} سجل • إجمالي الكمية {group.quantity.toLocaleString('ar-SA')}</p></div></div>
                     <div className="flex shrink-0 items-center gap-2"><Badge variant="outline" className="rounded-xl px-3 py-1">{group.count.toLocaleString('ar-SA')}</Badge><div className="grid h-9 w-9 place-items-center rounded-xl border bg-background">{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</div></div>
