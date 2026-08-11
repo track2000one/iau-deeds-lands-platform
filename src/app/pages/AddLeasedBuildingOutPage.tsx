@@ -15,6 +15,7 @@ import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { ContractDateRangeFields, type ContractDateRangeValue } from '../components/ContractDateRangeFields';
 import { toast } from 'sonner';
+import { SmartDocumentExtraction } from '../components/SmartDocumentExtraction';
 import type { LeasedBuildingOut } from '../../types/models';
 
 type FormData = Omit<LeasedBuildingOut, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>;
@@ -62,7 +63,7 @@ export const AddLeasedBuildingOutPage: React.FC = () => {
     endDateType: 'gregorian',
   });
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
+  const { register, handleSubmit, formState: { errors }, setValue, getValues } = useForm<FormData>();
 
   const onSubmit = (data: FormData) => {
     if (!currentUser) {
@@ -108,6 +109,31 @@ export const AddLeasedBuildingOutPage: React.FC = () => {
 
   const cities = ['الدمام', 'الخبر', 'الظهران', 'القطيف', 'الجبيل', 'الأحساء', 'حفر الباطن'];
 
+
+  const applySmartExtraction = React.useCallback((fields: Record<string, unknown>) => {
+    const assign = (key: string, value: unknown) => {
+      if (value === null || value === undefined || String(value).trim() === '') return;
+      const current = getValues(key as any);
+      const empty = current === null || current === undefined || current === '' || (typeof current === 'number' && current === 0);
+      if (empty) setValue(key as any, value as any, { shouldDirty: true });
+    };
+    ["contractNumber","buildingNumber","planNumber","locationName","area","city","district","rentAmount","notes"].forEach((key) => assign(key, fields[key]));
+    ['name', 'commercialRegistration', 'entityRepresentative', 'identityNumber', 'nationality', 'mobileNumber'].forEach((part) => assign('tenant.' + part, fields['tenant.' + part]));
+    setContractDates((current) => ({
+      ...current,
+      startDate: current.startDate || String(fields.contractStartDate || ''),
+      startDateType: current.startDate ? current.startDateType : (fields.contractStartDateType === 'hijri' ? 'hijri' : 'gregorian'),
+      endDate: current.endDate || String(fields.contractEndDate || ''),
+      endDateType: current.endDate ? current.endDateType : (fields.contractEndDateType === 'hijri' ? 'hijri' : 'gregorian'),
+    }));
+    if (!coordinates.trim()) {
+      const direct = String(fields.coordinates || '').trim();
+      const latitude = Number(fields.latitude);
+      const longitude = Number(fields.longitude);
+      if (direct) setCoordinates(direct);
+      else if (Number.isFinite(latitude) && Number.isFinite(longitude)) setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+    }
+  }, [coordinates, getValues, setValue]);
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -120,6 +146,8 @@ export const AddLeasedBuildingOutPage: React.FC = () => {
           إلغاء
         </Button>
       </div>
+
+      <SmartDocumentExtraction module="leased_building_out" onApply={applySmartExtraction} />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Tabs defaultValue="tenant" className="space-y-4">

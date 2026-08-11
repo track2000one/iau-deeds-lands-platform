@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { toast } from 'sonner';
+import { SmartDocumentExtraction } from '../components/SmartDocumentExtraction';
 import type { AllocatedLand } from '../../types/models';
 
 type AllocatedLandFormData = Omit<AllocatedLand, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>;
@@ -58,7 +59,7 @@ export const AddAllocatedLandPage: React.FC = () => {
   const [planFiles, setPlanFiles] = useState<File[]>([]);
   const [siteFiles, setSiteFiles] = useState<File[]>([]);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<AllocatedLandFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, getValues } = useForm<AllocatedLandFormData>({
     defaultValues: {
       propertyDescription: '',
       plotNumber: '',
@@ -99,6 +100,23 @@ export const AddAllocatedLandPage: React.FC = () => {
     }
   };
 
+
+  const applySmartExtraction = React.useCallback((fields: Record<string, unknown>) => {
+    const assign = (key: string, value: unknown) => {
+      if (value === null || value === undefined || String(value).trim() === '') return;
+      const current = getValues(key as any);
+      const empty = current === null || current === undefined || current === '' || (typeof current === 'number' && current === 0);
+      if (empty || key === 'usageType') setValue(key as any, value as any, { shouldDirty: true });
+    };
+    ['propertyDescription', 'plotNumber', 'planNumber', 'area', 'usageType', 'region', 'city', 'district', 'googleEarthLink', 'notes'].forEach((key) => assign(key, fields[key]));
+    if (!coordinates.trim()) {
+      const direct = String(fields.coordinates || '').trim();
+      const latitude = Number(fields.latitude);
+      const longitude = Number(fields.longitude);
+      if (direct) setCoordinates(direct);
+      else if (Number.isFinite(latitude) && Number.isFinite(longitude)) setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+    }
+  }, [coordinates, getValues, setValue]);
   const cities = ['الدمام', 'الخبر', 'الظهران', 'القطيف', 'الجبيل', 'الأحساء', 'حفر الباطن'];
 
   return (
@@ -113,6 +131,8 @@ export const AddAllocatedLandPage: React.FC = () => {
           إلغاء
         </Button>
       </div>
+
+      <SmartDocumentExtraction module="allocated_land" onApply={applySmartExtraction} />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
         <Tabs defaultValue="basic" className="space-y-4">

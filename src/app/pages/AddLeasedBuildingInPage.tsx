@@ -15,6 +15,7 @@ import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { ContractDateRangeFields, type ContractDateRangeValue } from '../components/ContractDateRangeFields';
 import { toast } from 'sonner';
+import { SmartDocumentExtraction } from '../components/SmartDocumentExtraction';
 import type { LeasedBuildingIn } from '../../types/models';
 
 type FormData = Omit<LeasedBuildingIn, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>;
@@ -62,7 +63,7 @@ export const AddLeasedBuildingInPage: React.FC = () => {
     endDateType: 'gregorian',
   });
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
+  const { register, handleSubmit, formState: { errors }, setValue, getValues } = useForm<FormData>();
 
   const onSubmit = (data: FormData) => {
     if (!currentUser) {
@@ -106,6 +107,31 @@ export const AddLeasedBuildingInPage: React.FC = () => {
     navigate('/buildings/leased-in');
   };
 
+
+  const applySmartExtraction = React.useCallback((fields: Record<string, unknown>) => {
+    const assign = (key: string, value: unknown) => {
+      if (value === null || value === undefined || String(value).trim() === '') return;
+      const current = getValues(key as any);
+      const empty = current === null || current === undefined || current === '' || (typeof current === 'number' && current === 0);
+      if (empty) setValue(key as any, value as any, { shouldDirty: true });
+    };
+    ["contractNumber","buildingNumber","locationName","area","region","city","rentAmount","notes"].forEach((key) => assign(key, fields[key]));
+    ['name', 'commercialRegistration', 'entityRepresentative', 'identityNumber', 'nationality', 'mobileNumber'].forEach((part) => assign('owner.' + part, fields['owner.' + part]));
+    setContractDates((current) => ({
+      ...current,
+      startDate: current.startDate || String(fields.contractStartDate || ''),
+      startDateType: current.startDate ? current.startDateType : (fields.contractStartDateType === 'hijri' ? 'hijri' : 'gregorian'),
+      endDate: current.endDate || String(fields.contractEndDate || ''),
+      endDateType: current.endDate ? current.endDateType : (fields.contractEndDateType === 'hijri' ? 'hijri' : 'gregorian'),
+    }));
+    if (!coordinates.trim()) {
+      const direct = String(fields.coordinates || '').trim();
+      const latitude = Number(fields.latitude);
+      const longitude = Number(fields.longitude);
+      if (direct) setCoordinates(direct);
+      else if (Number.isFinite(latitude) && Number.isFinite(longitude)) setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+    }
+  }, [coordinates, getValues, setValue]);
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -118,6 +144,8 @@ export const AddLeasedBuildingInPage: React.FC = () => {
           إلغاء
         </Button>
       </div>
+
+      <SmartDocumentExtraction module="leased_building_in" onApply={applySmartExtraction} />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Tabs defaultValue="owner" className="space-y-4">

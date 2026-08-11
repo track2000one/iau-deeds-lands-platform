@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { toast } from 'sonner';
+import { SmartDocumentExtraction } from '../components/SmartDocumentExtraction';
 import type { DeliveredLand } from '../../types/models';
 
 type DeliveredLandFormData = Omit<DeliveredLand, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>;
@@ -56,7 +57,7 @@ export const AddDeliveredLandPage: React.FC = () => {
   const [planFiles, setPlanFiles] = useState<File[]>([]);
   const [siteFiles, setSiteFiles] = useState<File[]>([]);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<DeliveredLandFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, getValues } = useForm<DeliveredLandFormData>({
     defaultValues: {
       recipientEntity: '',
       deliveryDate: new Date(),
@@ -94,6 +95,23 @@ export const AddDeliveredLandPage: React.FC = () => {
     }
   };
 
+
+  const applySmartExtraction = React.useCallback((fields: Record<string, unknown>) => {
+    const assign = (key: string, value: unknown) => {
+      if (value === null || value === undefined || String(value).trim() === '') return;
+      const current = getValues(key as any);
+      const empty = current === null || current === undefined || current === '' || (typeof current === 'number' && current === 0);
+      if (empty || key === 'deliveryDate') setValue(key as any, value as any, { shouldDirty: true });
+    };
+    ['recipientEntity', 'deliveryDate', 'propertyDescription', 'plotNumber', 'planNumber', 'area', 'location', 'deliveryMinutesNumber', 'notes'].forEach((key) => assign(key, fields[key]));
+    if (!coordinates.trim()) {
+      const direct = String(fields.coordinates || '').trim();
+      const latitude = Number(fields.latitude);
+      const longitude = Number(fields.longitude);
+      if (direct) setCoordinates(direct);
+      else if (Number.isFinite(latitude) && Number.isFinite(longitude)) setCoordinates(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+    }
+  }, [coordinates, getValues, setValue]);
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -106,6 +124,8 @@ export const AddDeliveredLandPage: React.FC = () => {
           إلغاء
         </Button>
       </div>
+
+      <SmartDocumentExtraction module="delivered_land" onApply={applySmartExtraction} />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
         <Tabs defaultValue="delivery" className="space-y-4">

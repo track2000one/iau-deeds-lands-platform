@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { SmartDocumentExtraction } from '../components/SmartDocumentExtraction';
 import type {
   InspectionAttachment,
   InspectionItem,
@@ -236,6 +237,22 @@ export const SiteInspectionFormPage: React.FC = () => {
     }
   };
 
+
+  const applySmartExtraction = React.useCallback((fields: Record<string, unknown>) => {
+    setForm((current) => {
+      const next = { ...current } as any;
+      const alwaysApply = new Set(['siteType', 'visitDate', 'visitDateType', 'followUpDate', 'followUpDateType', 'region']);
+      const keys = ['title', 'siteType', 'siteName', 'visitDate', 'visitDateType', 'visitPurpose', 'inspectorName', 'accompanyingEntity', 'region', 'city', 'district', 'locationDescription', 'deedNumber', 'plotNumber', 'planNumber', 'latitude', 'longitude', 'observations', 'recommendedAction', 'referredEntity', 'followUpDate', 'followUpDateType'];
+      keys.forEach((key) => {
+        const value = fields[key];
+        if (value === null || value === undefined || String(value).trim() === '') return;
+        const existing = next[key];
+        const empty = existing === null || existing === undefined || existing === '';
+        if (empty || alwaysApply.has(key)) next[key] = value;
+      });
+      return next;
+    });
+  }, []);
   if (loading) {
     return <div className="p-10 text-center">جاري تحميل المعاينة...</div>;
   }
@@ -256,6 +273,8 @@ export const SiteInspectionFormPage: React.FC = () => {
           إلغاء
         </Button>
       </div>
+
+      <SmartDocumentExtraction module="site_inspection" onApply={applySmartExtraction} />
 
       <Card className="w-full min-w-0 overflow-hidden">
         <CardHeader><CardTitle>بيانات الزيارة والموقع</CardTitle></CardHeader>

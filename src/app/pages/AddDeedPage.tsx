@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { NativeSelect } from '../components/ui/native-select';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
+import { SmartDocumentExtraction } from '../components/SmartDocumentExtraction';
 
 type Coordinates = {
   latitude: number;
@@ -85,6 +86,7 @@ export const AddDeedPage: React.FC = () => {
     handleSubmit,
     formState: { errors },
     setValue,
+    getValues,
     watch,
   } = useForm<DeedFormData>({
     defaultValues: {
@@ -345,6 +347,22 @@ export const AddDeedPage: React.FC = () => {
   );
 
 
+  const applySmartExtraction = React.useCallback((fields: Record<string, unknown>) => {
+    const assign = (key: string, value: unknown) => {
+      if (value === null || value === undefined || String(value).trim() === '') return;
+      const current = getValues(key as any);
+      const empty = current === null || current === undefined || current === '' || (typeof current === 'number' && current === 0);
+      if (empty) setValue(key as any, value as any, { shouldDirty: true });
+    };
+    ['deedNumber', 'deedDate', 'propertyDescription', 'plotNumber', 'planNumber', 'area', 'location', 'region', 'city', 'district', 'usageType', 'notes'].forEach((key) => assign(key, fields[key]));
+    if (fields.deedDateType === 'hijri' || fields.deedDateType === 'gregorian') setDeedDateType(fields.deedDateType);
+    if (!coordinates) {
+      const latitude = Number(fields.latitude);
+      const longitude = Number(fields.longitude);
+      if (Number.isFinite(latitude) && Number.isFinite(longitude)) setCoordinates({ latitude, longitude });
+    }
+  }, [coordinates, getValues, setValue]);
+
   if (!isAdmin) {
     return (
       <div className="container mx-auto p-6">
@@ -385,6 +403,8 @@ export const AddDeedPage: React.FC = () => {
           {t('app.cancel')}
         </Button>
       </div>
+
+      <SmartDocumentExtraction module="deed" onApply={applySmartExtraction} />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
         <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
