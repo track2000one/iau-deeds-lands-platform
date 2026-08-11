@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'scripts/add-inline-smart-extraction.cjs'
+      - '.github/workflows/apply-inline-smart-extraction.yml'
 
 permissions:
   contents: write
