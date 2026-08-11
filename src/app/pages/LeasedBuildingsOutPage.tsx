@@ -50,6 +50,7 @@ import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { LocationMapPreview } from '../components/LocationMapPreview';
 import { AttachmentPreviewGrid } from '../components/AttachmentPreview';
+import { SmartDocumentExtraction } from '../components/SmartDocumentExtraction';
 import { toast } from 'sonner';
 import type { LeasedBuildingOut, LeasedBuildingIn } from '../../types/models';
 
@@ -280,6 +281,52 @@ export const LeasedBuildingsOutPage: React.FC = () => {
       },
     }));
   };
+
+  const applySmartExtraction = React.useCallback((fields: Record<string, unknown>) => {
+    setForm((current: any) => {
+      const next: any = { ...current };
+      const assign = (key: string, value: unknown) => {
+        if (value === null || value === undefined || String(value).trim() === '') return;
+        const existing = next[key];
+        const initial = (emptyForm as any)[key];
+        const empty = existing === null || existing === undefined || String(existing).trim() === '';
+        if (empty || (formMode === 'add' && existing === initial)) next[key] = String(value);
+      };
+      assign('contractNumber', fields['contractNumber']);
+      assign('buildingNumber', fields['buildingNumber']);
+      assign('planNumber', fields['planNumber']);
+      assign('locationName', fields['locationName']);
+      assign('area', fields['area']);
+      assign('region', fields['region']);
+      assign('city', fields['city']);
+      assign('district', fields['district']);
+      assign('rentAmount', fields['rentAmount']);
+      assign('notes', fields['notes']);
+      const partyKey = 'party';
+      const partyOutputPrefix = 'tenant';
+      next[partyKey] = { ...(current as any)[partyKey] };
+      ["name","commercialRegistration","entityRepresentative","identityNumber","nationality","mobileNumber"].forEach((part) => {
+        const value = fields[partyOutputPrefix + '.' + part];
+        if (value === null || value === undefined || String(value).trim() === '') return;
+        const existing = next[partyKey]?.[part];
+        const initial = (emptyForm as any)[partyKey]?.[part];
+        if (!existing || (formMode === 'add' && existing === initial)) next[partyKey][part] = String(value);
+      });
+      const latitude = Number(fields.latitude);
+      const longitude = Number(fields.longitude);
+      if ((!next.latitude || (formMode === 'add' && next.latitude === (emptyForm as any).latitude)) && Number.isFinite(latitude)) next.latitude = String(latitude);
+      if ((!next.longitude || (formMode === 'add' && next.longitude === (emptyForm as any).longitude)) && Number.isFinite(longitude)) next.longitude = String(longitude);
+      const directCoordinates = String(fields.coordinates || '').trim();
+      if (directCoordinates && (!next.latitude || !next.longitude)) {
+        const parsed = parseCoordinates(directCoordinates);
+        if (parsed) {
+          next.latitude = String(parsed.latitude);
+          next.longitude = String(parsed.longitude);
+        }
+      }
+      return next;
+    });
+  }, [formMode]);
 
   const openAddForm = () => {
     if (!hasPermission('leased_buildings_out', 'canAdd')) {
@@ -640,7 +687,9 @@ export const LeasedBuildingsOutPage: React.FC = () => {
       </Card>
 
       {formOpen && (
-        <BuildingForm
+        <div className="space-y-4">
+          <SmartDocumentExtraction module="leased_building_out" onApply={applySmartExtraction} />
+          <BuildingForm
           formId="leased-building-out-form"
           formTitle={formMode === 'add' ? 'إضافة مبنى مؤجر' : 'تعديل مبنى مؤجر'}
           partyLabel="المستأجر"
@@ -666,6 +715,7 @@ export const LeasedBuildingsOutPage: React.FC = () => {
           setSiteLinks={setSiteLinks}
           setOtherLinks={setOtherLinks}
         />
+        </div>
       )}
 
       {detailsOpen && selectedRecord && (

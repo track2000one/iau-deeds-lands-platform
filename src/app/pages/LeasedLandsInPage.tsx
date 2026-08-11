@@ -50,6 +50,7 @@ import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { LocationMapPreview } from '../components/LocationMapPreview';
 import { AttachmentPreviewGrid } from '../components/AttachmentPreview';
+import { SmartDocumentExtraction } from '../components/SmartDocumentExtraction';
 import { AppDateField } from '../components/AppDateField';
 import { formatFlexibleDate } from '../../utils/dateUtils';
 import type { DateType } from '../../utils/dateUtils';
@@ -292,6 +293,52 @@ export const LeasedLandsInPage: React.FC = () => {
       },
     }));
   };
+
+  const applySmartExtraction = React.useCallback((fields: Record<string, unknown>) => {
+    setForm((current: any) => {
+      const next: any = { ...current };
+      const assign = (key: string, value: unknown) => {
+        if (value === null || value === undefined || String(value).trim() === '') return;
+        const existing = next[key];
+        const initial = (emptyForm as any)[key];
+        const empty = existing === null || existing === undefined || String(existing).trim() === '';
+        if (empty || (formMode === 'add' && existing === initial)) next[key] = String(value);
+      };
+      assign('contractNumber', fields['contractNumber']);
+      assign('contractStartDate', fields['contractStartDate']);
+      assign('contractStartDateType', fields['contractStartDateType']);
+      assign('contractDuration', fields['contractDuration']);
+      assign('plotNumber', fields['plotNumber']);
+      assign('planNumber', fields['planNumber']);
+      assign('area', fields['area']);
+      assign('location', fields['location']);
+      assign('rentAmount', fields['rentAmount']);
+      assign('notes', fields['notes']);
+      const partyKey = 'owner';
+      const partyOutputPrefix = 'owner';
+      next[partyKey] = { ...(current as any)[partyKey] };
+      ["name","commercialRegistration","entityRepresentative","identityNumber","nationality","mobileNumber"].forEach((part) => {
+        const value = fields[partyOutputPrefix + '.' + part];
+        if (value === null || value === undefined || String(value).trim() === '') return;
+        const existing = next[partyKey]?.[part];
+        const initial = (emptyForm as any)[partyKey]?.[part];
+        if (!existing || (formMode === 'add' && existing === initial)) next[partyKey][part] = String(value);
+      });
+      const latitude = Number(fields.latitude);
+      const longitude = Number(fields.longitude);
+      if ((!next.latitude || (formMode === 'add' && next.latitude === (emptyForm as any).latitude)) && Number.isFinite(latitude)) next.latitude = String(latitude);
+      if ((!next.longitude || (formMode === 'add' && next.longitude === (emptyForm as any).longitude)) && Number.isFinite(longitude)) next.longitude = String(longitude);
+      const directCoordinates = String(fields.coordinates || '').trim();
+      if (directCoordinates && (!next.latitude || !next.longitude)) {
+        const parsed = parseCoordinates(directCoordinates);
+        if (parsed) {
+          next.latitude = String(parsed.latitude);
+          next.longitude = String(parsed.longitude);
+        }
+      }
+      return next;
+    });
+  }, [formMode]);
 
   const openAddForm = () => {
     if (!hasPermission('leased_lands_in', 'canAdd')) {
@@ -858,6 +905,8 @@ const LeasedLandInForm: React.FC<LeasedLandInFormProps> = ({
       </div>
 
       <div className="space-y-6">
+            <SmartDocumentExtraction module="leased_land_in" onApply={applySmartExtraction} />
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">

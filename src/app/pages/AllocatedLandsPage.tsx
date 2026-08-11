@@ -54,6 +54,7 @@ import { FileUploadZone } from '../components/FileUploadZone';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { LocationMapPreview } from '../components/LocationMapPreview';
 import { AttachmentPreviewGrid } from '../components/AttachmentPreview';
+import { SmartDocumentExtraction } from '../components/SmartDocumentExtraction';
 import { toast } from 'sonner';
 import type { AllocatedLand } from '../../types/models';
 
@@ -261,6 +262,42 @@ export const AllocatedLandsPage: React.FC = () => {
       [field]: value,
     }));
   };
+
+  const applySmartExtraction = React.useCallback((fields: Record<string, unknown>) => {
+    setForm((current: any) => {
+      const next: any = { ...current };
+      const assign = (key: string, value: unknown) => {
+        if (value === null || value === undefined || String(value).trim() === '') return;
+        const existing = next[key];
+        const initial = (emptyForm as any)[key];
+        const empty = existing === null || existing === undefined || String(existing).trim() === '';
+        if (empty || (formMode === 'add' && existing === initial)) next[key] = String(value);
+      };
+      assign('propertyDescription', fields['propertyDescription']);
+      assign('plotNumber', fields['plotNumber']);
+      assign('planNumber', fields['planNumber']);
+      assign('area', fields['area']);
+      assign('usageType', fields['usageType']);
+      assign('region', fields['region']);
+      assign('city', fields['city']);
+      assign('district', fields['district']);
+      assign('googleEarthLink', fields['googleEarthLink']);
+      assign('notes', fields['notes']);
+      const latitude = Number(fields.latitude);
+      const longitude = Number(fields.longitude);
+      if ((!next.latitude || (formMode === 'add' && next.latitude === (emptyForm as any).latitude)) && Number.isFinite(latitude)) next.latitude = String(latitude);
+      if ((!next.longitude || (formMode === 'add' && next.longitude === (emptyForm as any).longitude)) && Number.isFinite(longitude)) next.longitude = String(longitude);
+      const directCoordinates = String(fields.coordinates || '').trim();
+      if (directCoordinates && (!next.latitude || !next.longitude)) {
+        const parsed = parseCoordinates(directCoordinates);
+        if (parsed) {
+          next.latitude = String(parsed.latitude);
+          next.longitude = String(parsed.longitude);
+        }
+      }
+      return next;
+    });
+  }, [formMode]);
 
   const openAddForm = () => {
     if (!hasPermission('allocated_lands', 'canAdd')) {
@@ -803,6 +840,8 @@ export const AllocatedLandsPage: React.FC = () => {
           </div>
 
           <div className="space-y-6">
+            <SmartDocumentExtraction module="allocated_land" onApply={applySmartExtraction} />
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">البيانات الأساسية</CardTitle>
