@@ -712,6 +712,7 @@ export const LeasedLandsOutPage: React.FC = () => {
 
       {formOpen && (
         <LeasedLandOutForm
+          applySmartExtraction={applySmartExtraction}
           formMode={formMode}
           form={form}
           isSaving={isSaving}
@@ -853,6 +854,7 @@ export const LeasedLandsOutPage: React.FC = () => {
 };
 
 type LeasedLandOutFormProps = {
+  applySmartExtraction: (fields: Record<string, unknown>) => void;
   formMode: 'add' | 'edit';
   form: LeasedLandOutFormState;
   isSaving: boolean;
@@ -872,6 +874,7 @@ type LeasedLandOutFormProps = {
 };
 
 const LeasedLandOutForm: React.FC<LeasedLandOutFormProps> = ({
+  applySmartExtraction,
   formMode,
   form,
   isSaving,
