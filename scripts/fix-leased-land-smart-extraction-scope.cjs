@@ -1,3 +1,4 @@
+// Applies the callback-scope fix to both inline leased-land forms.
 const fs = require('fs');
 
 const targets = [
