@@ -5,12 +5,15 @@ import {
   Barcode,
   Building2,
   Camera,
+  CheckCircle2,
   FileText,
+  Loader2,
   MapPin,
   PackagePlus,
   Paperclip,
   Save,
   ScanBarcode,
+  Sparkles,
   Upload,
   UserRound,
   X,
@@ -23,7 +26,8 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { AppDateField } from '../components/AppDateField';
 import { AssetOfficialTemplateFields } from '../components/AssetOfficialTemplateFields';
-import { createAsset, uploadAssetFile } from '../api/assets';
+import { createAsset, extractAssetData, uploadAssetFile } from '../api/assets';
+import type { AssetSmartExtraction, AssetSmartExtractionFields } from '../api/assets';
 import type { AssetInput, AssetStatus } from '../../types/asset';
 
 type AssetAttachmentCategory =
@@ -41,6 +45,39 @@ const EMPTY_ATTACHMENTS: AssetAttachmentState = {
   warranty_documents: [],
   custody_documents: [],
   other_documents: [],
+};
+
+const SMART_EXTRACTION_LABELS: Record<keyof AssetSmartExtractionFields, string> = {
+  itemNumber: 'رقم الصنف',
+  barcode: 'الباركود',
+  name: 'اسم الصنف / الأصل',
+  category: 'التصنيف',
+  brand: 'الماركة',
+  model: 'الموديل',
+  serialNumber: 'الرقم التسلسلي',
+  purchaseDate: 'تاريخ الشراء',
+  purchaseValue: 'قيمة الشراء',
+  department: 'الجهة / الإدارة',
+  building: 'المبنى',
+  floor: 'الدور',
+  room: 'الغرفة / الموقع',
+  manufacturer: 'الشركة المصنعة',
+  entityName: 'اسم الجهة',
+  region: 'المنطقة',
+  city: 'المدينة',
+  assetDescription: 'وصف الأصل',
+  supplier: 'المورد',
+  invoiceNumber: 'رقم الفاتورة',
+  currency: 'العملة',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  it: 'تقنية معلومات',
+  furniture: 'أثاث',
+  equipment: 'أجهزة ومعدات',
+  vehicle: 'مركبات',
+  land: 'أراضي',
+  other: 'أخرى',
 };
 
 const ATTACHMENT_SECTIONS: Array<{
@@ -161,6 +198,12 @@ export const AddAssetPage: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerStreamRef = useRef<MediaStream | null>(null);
   const scannerFrameRef = useRef<number | null>(null);
+  const smartFileInputRef = useRef<HTMLInputElement | null>(null);
+  const smartCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const [smartSourceFile, setSmartSourceFile] = useState<File | null>(null);
+  const [smartExtraction, setSmartExtraction] = useState<AssetSmartExtraction | null>(null);
+  const [smartExtracting, setSmartExtracting] = useState(false);
+  const [smartExtractionMessage, setSmartExtractionMessage] = useState('');
 
   const totalAttachments = useMemo(
     () => Object.values(attachments).reduce((total, files) => total + files.length, 0),
@@ -337,6 +380,90 @@ export const AddAssetPage: React.FC = () => {
     return stopScanner;
   }, [scannerOpen]);
 
+  const smartExtractionEntries = useMemo(() => {
+    if (!smartExtraction?.fields) return [];
+    return (Object.entries(smartExtraction.fields) as Array<[keyof AssetSmartExtractionFields, unknown]>)
+      .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== '')
+      .map(([key, value]) => ({
+        key,
+        label: SMART_EXTRACTION_LABELS[key] || String(key),
+        value: key === 'category' ? (CATEGORY_LABELS[String(value)] || String(value)) : key === 'purchaseValue' ? Number(value).toLocaleString('ar-SA') + ' ر.س' : String(value),
+      }));
+  }, [smartExtraction]);
+
+  const handleSmartExtraction = async (file: File | null) => {
+    if (!file || smartExtracting) return;
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    const isImage = file.type.startsWith('image/');
+    if (!isPdf && !isImage) {
+      setSmartExtractionMessage('الملف غير مدعوم. استخدم صورة JPG/PNG/WEBP أو ملف PDF.');
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      setSmartExtractionMessage('حجم الملف أكبر من 12MB. يرجى استخدام ملف أصغر.');
+      return;
+    }
+
+    setSmartSourceFile(file);
+    setSmartExtraction(null);
+    setSmartExtractionMessage('جارٍ قراءة المستند وتحليل بيانات الأصل...');
+    setSmartExtracting(true);
+    try {
+      const result = await extractAssetData(file);
+      setSmartExtraction(result);
+      const found = Object.values(result.fields || {}).filter((value) => value !== null && value !== undefined && String(value).trim() !== '').length;
+      setSmartExtractionMessage(found ? ('تم استخراج ' + found.toLocaleString('ar-SA') + ' حقل. راجع النتائج ثم طبّقها على النموذج.') : 'تمت قراءة الملف، لكن لم يتم العثور على بيانات أصل واضحة بما يكفي.');
+    } catch (smartError: any) {
+      setSmartExtractionMessage(String(smartError?.message || 'تعذر قراءة الملف واستخراج البيانات.'));
+    } finally {
+      setSmartExtracting(false);
+      if (smartFileInputRef.current) smartFileInputRef.current.value = '';
+      if (smartCameraInputRef.current) smartCameraInputRef.current.value = '';
+    }
+  };
+
+  const applySmartExtraction = () => {
+    const fields = smartExtraction?.fields;
+    if (!fields) return;
+    let applied = 0;
+    setForm((current) => {
+      const next = { ...current } as AssetInput;
+      const fillText = (key: keyof AssetInput, value: unknown) => {
+        if (value === null || value === undefined || String(value).trim() === '') return;
+        const existing = current[key];
+        if (existing === null || existing === undefined || String(existing).trim() === '') {
+          (next as any)[key] = String(value).trim();
+          applied += 1;
+        }
+      };
+
+      fillText('itemNumber', fields.itemNumber);
+      fillText('barcode', fields.barcode);
+      fillText('name', fields.name);
+      fillText('category', fields.category);
+      fillText('brand', fields.brand);
+      fillText('model', fields.model);
+      fillText('serialNumber', fields.serialNumber);
+      fillText('purchaseDate', fields.purchaseDate);
+      fillText('department', fields.department || fields.entityName);
+      fillText('building', fields.building);
+      fillText('floor', fields.floor);
+      fillText('room', fields.room);
+      fillText('manufacturer', fields.manufacturer);
+      fillText('entityName', fields.entityName || fields.department);
+      fillText('region', fields.region);
+      fillText('city', fields.city);
+      fillText('assetDescription', fields.assetDescription);
+
+      if (fields.purchaseValue !== null && fields.purchaseValue !== undefined && (current.purchaseValue === null || current.purchaseValue === undefined || current.purchaseValue === ('' as any))) {
+        next.purchaseValue = Number(fields.purchaseValue);
+        applied += 1;
+      }
+      return next;
+    });
+    setSmartExtractionMessage('تمت تعبئة الحقول الفارغة تلقائيًا. الحقول التي سبق إدخالها يدويًا لم يتم استبدالها.');
+  };
+
   const handleSubmit = async () => {
     setError('');
 
@@ -435,6 +562,102 @@ export const AddAssetPage: React.FC = () => {
           {error}
         </div>
       )}
+
+      <Card className="overflow-hidden rounded-[30px] border border-cyan-100/80 bg-[linear-gradient(135deg,rgba(255,255,255,.96),rgba(245,252,253,.92),rgba(249,250,251,.96))] shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <CardContent className="p-0">
+          <div className="grid gap-0 xl:grid-cols-[1.15fr_.85fr]">
+            <div className="order-2 border-t border-slate-200/70 p-5 sm:p-6 xl:order-1 xl:border-l xl:border-t-0">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button type="button" onClick={() => smartCameraInputRef.current?.click()} disabled={smartExtracting} className="h-12 flex-1 rounded-2xl bg-slate-900 text-white hover:bg-slate-800">
+                  {smartExtracting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Camera className="ml-2 h-4 w-4" />}
+                  تصوير مباشر بالجوال
+                </Button>
+                <Button type="button" variant="outline" onClick={() => smartFileInputRef.current?.click()} disabled={smartExtracting} className="h-12 flex-1 rounded-2xl bg-white/90">
+                  <Upload className="ml-2 h-4 w-4" />
+                  رفع ملف
+                </Button>
+                <input ref={smartCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => void handleSmartExtraction(event.target.files?.[0] || null)} />
+                <input ref={smartFileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,.pdf,application/pdf" className="hidden" onChange={(event) => void handleSmartExtraction(event.target.files?.[0] || null)} />
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                <span>JPG, PNG, WEBP, PDF حتى 12MB</span>
+                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                <span>الملف يستخدم للتحليل فقط ولا يُحفظ كمرفق تلقائيًا</span>
+              </div>
+
+              {(smartSourceFile || smartExtractionMessage) && (
+                <div className="mt-5 rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-black">نتيجة القراءة (معاينة)</div>
+                      {smartSourceFile && <div className="mt-1 max-w-[520px] truncate text-[11px] text-muted-foreground">{smartSourceFile.name} • {formatFileSize(smartSourceFile.size)}</div>}
+                    </div>
+                    {smartExtraction && (
+                      <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> تم الاستخراج بنجاح
+                      </div>
+                    )}
+                  </div>
+
+                  {smartExtractionMessage && (
+                    <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs leading-6 text-slate-600">
+                      {smartExtracting && <Loader2 className="ml-2 inline h-3.5 w-3.5 animate-spin text-cyan-600" />}
+                      {smartExtractionMessage}
+                    </div>
+                  )}
+
+                  {smartExtractionEntries.length > 0 && (
+                    <>
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {smartExtractionEntries.slice(0, 12).map((entry) => (
+                          <div key={String(entry.key)} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                            <div className="text-[10px] font-semibold text-muted-foreground">{entry.label}</div>
+                            <div className="mt-1 truncate text-xs font-extrabold text-slate-800" title={entry.value}>{entry.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <Button type="button" onClick={applySmartExtraction} className="h-10 rounded-xl bg-slate-900 px-5 text-white hover:bg-slate-800">
+                          <Sparkles className="ml-2 h-4 w-4 text-cyan-300" />
+                          تعبئة الحقول تلقائيًا
+                        </Button>
+                        <span className="text-[11px] text-muted-foreground">راجع البيانات قبل الحفظ. لن يتم استبدال أي حقل أدخلته يدويًا.</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="order-1 relative overflow-hidden p-5 sm:p-7 xl:order-2">
+              <div className="absolute -left-10 -top-12 h-40 w-40 rounded-full bg-cyan-200/25 blur-3xl" />
+              <div className="absolute -bottom-12 right-0 h-36 w-36 rounded-full bg-blue-200/25 blur-3xl" />
+              <div className="relative flex h-full flex-col justify-center">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[10px] font-black tracking-wide text-cyan-700">OCR / AI</span>
+                  <span className="rounded-full border bg-white/70 px-2.5 py-1 text-[10px] font-semibold text-slate-500">قراءة ذكية للمستندات</span>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-cyan-100 bg-white shadow-sm">
+                    <Sparkles className="h-7 w-7 text-cyan-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 sm:text-2xl">الاستخراج الذكي للبيانات</h2>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      التقط صورة فاتورة أو ملصق أصل أو ارفع PDF، وسيحاول النظام قراءة البيانات وتحديد الحقول المناسبة تلقائيًا.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-3">
+                  {['اسم الصنف', 'قيمة الشراء', 'الماركة', 'الموديل', 'الرقم التسلسلي', 'الجهة والموقع'].map((label) => (
+                    <div key={label} className="rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-center font-bold text-slate-600 shadow-sm">{label}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-[0_16px_48px_rgba(15,23,42,0.07)] backdrop-blur-xl">
         <CardHeader className="border-b bg-white/40">

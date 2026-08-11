@@ -142,6 +142,53 @@ export const uploadAssetFile = async (
   };
 };
 
+export type AssetSmartExtractionFields = {
+  itemNumber?: string | null;
+  barcode?: string | null;
+  name?: string | null;
+  category?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  purchaseDate?: string | null;
+  purchaseValue?: number | null;
+  department?: string | null;
+  building?: string | null;
+  floor?: string | null;
+  room?: string | null;
+  manufacturer?: string | null;
+  entityName?: string | null;
+  region?: string | null;
+  city?: string | null;
+  assetDescription?: string | null;
+  supplier?: string | null;
+  invoiceNumber?: string | null;
+  currency?: string | null;
+};
+
+export type AssetSmartExtraction = {
+  fields: AssetSmartExtractionFields;
+  confidence?: number | null;
+  warnings?: string[];
+  summary?: string | null;
+  source?: { fileName?: string; mimeType?: string; size?: number };
+};
+
+export const extractAssetData = async (file: File): Promise<AssetSmartExtraction> => {
+  const body = new FormData();
+  body.append('file', file);
+
+  const response = await authenticatedFetch('/api/assets/extract-data', {
+    method: 'POST',
+    body,
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(String(result?.message || result?.error || 'تعذر استخراج البيانات من الملف.'));
+  }
+  return result as AssetSmartExtraction;
+};
+
 export type AssetExcelTemplateMeta = {
   id: string;
   templateKey: string;
