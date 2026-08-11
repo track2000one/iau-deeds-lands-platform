@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'scripts/redesign-asset-record-cards.cjs'
+      - '.github/workflows/apply-asset-record-card-redesign.yml'
 
 permissions:
   contents: write
