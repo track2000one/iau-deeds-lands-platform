@@ -11,6 +11,7 @@ export type AssetExcelImportKind =
 
 export type ParsedAssetExcelRow = {
   sourceFile: string;
+  sourceFileHash: string;
   sourceSheet: string;
   sourceRow: number;
   kind: AssetExcelImportKind;
@@ -19,6 +20,7 @@ export type ParsedAssetExcelRow = {
 
 export type ParsedAssetExcelFile = {
   fileName: string;
+  fileHash: string;
   sheetName: string;
   kind: AssetExcelImportKind;
   rows: ParsedAssetExcelRow[];
@@ -148,9 +150,10 @@ const statusFromText = (value: string): AssetInput['status'] => {
   return 'available';
 };
 
-const buildExcelPayload = (row: Record<string, unknown>, sourceFile: string, sourceSheet: string, sourceRow: number) => {
+const buildExcelPayload = (row: Record<string, unknown>, sourceFile: string, sourceFileHash: string, sourceSheet: string, sourceRow: number) => {
   const payload: Record<string, unknown> = {
     __sourceFile: sourceFile,
+    __sourceFileHash: sourceFileHash,
     __sourceSheet: sourceSheet,
     __sourceRow: sourceRow,
   };
@@ -166,6 +169,7 @@ const rowToAsset = (
   row: Record<string, unknown>,
   kind: AssetExcelImportKind,
   fileName: string,
+  fileHash: string,
   sheetName: string,
   sourceRow: number
 ): AssetInput | null => {
@@ -257,7 +261,7 @@ const rowToAsset = (
     lastInventoryDateType: 'gregorian',
     unitOfMeasure: text(row, 'وحدة القياس', 'Base Unit of Measure') || null,
     quantity: num(row, 'العدد', 'Quantity') ?? 1,
-    excelPayload: buildExcelPayload(row, fileName, sheetName, sourceRow),
+    excelPayload: buildExcelPayload(row, fileName, fileHash, sheetName, sourceRow),
     notes: `مستورد للاختبار من ملف Excel: ${fileName} — الورقة: ${sheetName} — الصف: ${sourceRow}`,
     attachments: [],
   };
@@ -265,8 +269,23 @@ const rowToAsset = (
   return input;
 };
 
+const hashExcelBuffer = async (data: ArrayBuffer) => {
+  if (globalThis.crypto?.subtle) {
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  let hash = 2166136261;
+  for (const byte of new Uint8Array(data)) {
+    hash ^= byte;
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+};
+
 export async function parseOfficialAssetExcel(file: File): Promise<ParsedAssetExcelFile> {
   const data = await file.arrayBuffer();
+  const fileHash = await hashExcelBuffer(data);
   const workbook = XLSX.read(data, { type: 'array', cellDates: true, cellNF: true, cellStyles: true });
   const selected = chooseDataSheet(workbook, file.name);
   if (!selected || !selected.kind) {
@@ -292,11 +311,11 @@ export async function parseOfficialAssetExcel(file: File): Promise<ParsedAssetEx
     headers.forEach((header, col) => { row[header] = values[col]; });
     const hasAnyData = Object.entries(row).some(([key, value]) => !key.startsWith('__EMPTY') && cleanText(value) !== '');
     if (!hasAnyData) continue;
-    const input = rowToAsset(row, selected.kind, file.name, selected.name, index + 1);
+    const input = rowToAsset(row, selected.kind, file.name, fileHash, selected.name, index + 1);
     if (!input) continue;
-    rows.push({ sourceFile: file.name, sourceSheet: selected.name, sourceRow: index + 1, kind: selected.kind, input });
+    rows.push({ sourceFile: file.name, sourceFileHash: fileHash, sourceSheet: selected.name, sourceRow: index + 1, kind: selected.kind, input });
   }
 
   if (rows.length === 0) warnings.push('لم يتم العثور على سجلات قابلة للاستيراد في الملف.');
-  return { fileName: file.name, sheetName: selected.name, kind: selected.kind, rows, warnings };
+  return { fileName: file.name, fileHash, sheetName: selected.name, kind: selected.kind, rows, warnings };
 }

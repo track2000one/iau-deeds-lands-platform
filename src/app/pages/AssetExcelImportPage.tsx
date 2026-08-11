@@ -22,6 +22,12 @@ type ImportResult = {
   errors: string[];
 };
 
+type DuplicateScan = {
+  total: number;
+  duplicate: number;
+  fresh: number;
+};
+
 const isDuplicateError = (message: string) =>
   /unique|duplicate|مكرر|موجود مسبق|مستخدم مسبق|فريد|رقم الصنف|itemNumber|assetNumber|serialNumber/i.test(message);
 
@@ -41,16 +47,52 @@ const readPayloadValue = (row: ParsedAssetExcelRow, ...keys: string[]) => {
   return '';
 };
 
-const sourceKey = (row: ParsedAssetExcelRow) =>
-  `${row.sourceFile}::${row.sourceSheet}::${row.sourceRow}`;
+const normalizeSourcePart = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
-const existingSourceKey = (asset: any) => {
+const sourceKeys = (row: ParsedAssetExcelRow) => {
+  const sheet = normalizeSourcePart(row.sourceSheet);
+  const sourceRow = String(row.sourceRow);
+  const keys = [`file:${normalizeSourcePart(row.sourceFile)}::${sheet}::${sourceRow}`];
+  if (row.sourceFileHash) keys.unshift(`hash:${normalizeSourcePart(row.sourceFileHash)}::${sheet}::${sourceRow}`);
+  return keys;
+};
+
+const existingSourceKeys = (asset: any) => {
   const payload = asset?.excelPayload as Record<string, unknown> | null | undefined;
-  if (!payload) return '';
-  const file = String(payload.__sourceFile ?? '').trim();
-  const sheet = String(payload.__sourceSheet ?? '').trim();
+  if (!payload) return [];
+  const file = normalizeSourcePart(payload.__sourceFile);
+  const hash = normalizeSourcePart(payload.__sourceFileHash);
+  const sheet = normalizeSourcePart(payload.__sourceSheet);
   const row = String(payload.__sourceRow ?? '').trim();
-  return file && sheet && row ? `${file}::${sheet}::${row}` : '';
+  const keys: string[] = [];
+  if (hash && sheet && row) keys.push(`hash:${hash}::${sheet}::${row}`);
+  if (file && sheet && row) keys.push(`file:${file}::${sheet}::${row}`);
+  return keys;
+};
+
+const buildDuplicateIndex = (existingList: any[]) => {
+  const importedSources = new Set<string>();
+  const serials = new Set<string>();
+  const barcodes = new Set<string>();
+
+  existingList.forEach((asset: any) => {
+    existingSourceKeys(asset).forEach((key) => importedSources.add(key));
+    const serial = cleanIdentifier(asset?.serialNumber).toLowerCase();
+    const barcode = cleanIdentifier(asset?.barcode).toLowerCase();
+    if (serial) serials.add(serial);
+    if (barcode) barcodes.add(barcode);
+  });
+
+  return { importedSources, serials, barcodes };
+};
+
+const isKnownDuplicateRow = (row: ParsedAssetExcelRow, index: ReturnType<typeof buildDuplicateIndex>) => {
+  if (sourceKeys(row).some((key) => index.importedSources.has(key))) return true;
+  const serial = cleanIdentifier(row.input.serialNumber).toLowerCase();
+  const barcode = cleanIdentifier(row.input.barcode).toLowerCase();
+  if (serial && index.serials.has(serial)) return true;
+  if (barcode && index.barcodes.has(barcode)) return true;
+  return false;
 };
 
 const preferredImportedIdentifier = (row: ParsedAssetExcelRow) => {
@@ -102,6 +144,7 @@ export const AssetExcelImportPage: React.FC = () => {
   const [batchIndex, setBatchIndex] = useState(0);
   const [message, setMessage] = useState('');
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [duplicateScan, setDuplicateScan] = useState<DuplicateScan | null>(null);
 
   const maxBatch = useMemo(() => {
     if (limitPerFile === 0 || files.length === 0) return 1;
@@ -131,6 +174,7 @@ export const AssetExcelImportPage: React.FC = () => {
     setParsing(true);
     setBatchIndex(0);
     setResult(null);
+    setDuplicateScan(null);
     setMessage('جارٍ قراءة ملفات Excel والتعرف على بنية كل نموذج...');
     try {
       const parsed: ParsedAssetExcelFile[] = [];
@@ -138,10 +182,42 @@ export const AssetExcelImportPage: React.FC = () => {
         parsed.push(await parseOfficialAssetExcel(file));
       }
       setFiles(parsed);
-      const total = parsed.reduce((sum, item) => sum + item.rows.length, 0);
-      setMessage(`تم تحليل ${parsed.length} ملف بنجاح، وإيجاد ${total.toLocaleString('ar-SA')} سجل قابل للاستيراد.`);
+      const allRows = parsed.flatMap((item) => item.rows);
+      const total = allRows.length;
+      setMessage(`تم تحليل ${parsed.length} ملف بنجاح، وإيجاد ${total.toLocaleString('ar-SA')} سجل. جارٍ فحص التكرار مع بيانات المنصة...`);
+
+      const existingAssets = await getAssets();
+      const existingList = Array.isArray(existingAssets) ? existingAssets : [];
+      const duplicateIndex = buildDuplicateIndex(existingList);
+      let duplicate = 0;
+      const seenSources = new Set(duplicateIndex.importedSources);
+      const seenSerials = new Set(duplicateIndex.serials);
+      const seenBarcodes = new Set(duplicateIndex.barcodes);
+
+      for (const row of allRows) {
+        const rowKeys = sourceKeys(row);
+        const serial = cleanIdentifier(row.input.serialNumber).toLowerCase();
+        const barcode = cleanIdentifier(row.input.barcode).toLowerCase();
+        const repeated = rowKeys.some((key) => seenSources.has(key)) || (serial && seenSerials.has(serial)) || (barcode && seenBarcodes.has(barcode));
+        if (repeated) {
+          duplicate += 1;
+          continue;
+        }
+        rowKeys.forEach((key) => seenSources.add(key));
+        if (serial) seenSerials.add(serial);
+        if (barcode) seenBarcodes.add(barcode);
+      }
+
+      const scan = { total, duplicate, fresh: Math.max(0, total - duplicate) };
+      setDuplicateScan(scan);
+      if (total > 0 && duplicate === total) {
+        setMessage(`تم فحص الملف: جميع السجلات وعددها ${total.toLocaleString('ar-SA')} مكررة أو سبق استيرادها. لن تتم إضافة سجلات جديدة.`);
+      } else {
+        setMessage(`اكتمل فحص الملف: ${scan.fresh.toLocaleString('ar-SA')} سجل جديد، و${scan.duplicate.toLocaleString('ar-SA')} سجل مكرر/سبق استيراده.`);
+      }
     } catch (error: any) {
       setFiles([]);
+      setDuplicateScan(null);
       setMessage(error?.message || 'تعذر قراءة ملفات Excel.');
     } finally {
       setParsing(false);
@@ -172,7 +248,10 @@ export const AssetExcelImportPage: React.FC = () => {
     try {
       const existingAssets = await getAssets();
       const existingList = Array.isArray(existingAssets) ? existingAssets : [];
-      const importedSourceKeys = new Set(existingList.map(existingSourceKey).filter(Boolean));
+      const duplicateIndex = buildDuplicateIndex(existingList);
+      const importedSourceKeys = new Set(duplicateIndex.importedSources);
+      const seenSerials = new Set(duplicateIndex.serials);
+      const seenBarcodes = new Set(duplicateIndex.barcodes);
       const usedIdentifiers = new Set<string>();
 
       existingList.forEach((asset: any) => {
@@ -184,10 +263,18 @@ export const AssetExcelImportPage: React.FC = () => {
 
       const queue: ParsedAssetExcelRow[] = [];
       for (const row of importRows) {
-        if (importedSourceKeys.has(sourceKey(row))) {
+        const rowKeys = sourceKeys(row);
+        const serial = cleanIdentifier(row.input.serialNumber).toLowerCase();
+        const barcode = cleanIdentifier(row.input.barcode).toLowerCase();
+        const repeated = rowKeys.some((key) => importedSourceKeys.has(key)) || (serial && seenSerials.has(serial)) || (barcode && seenBarcodes.has(barcode));
+        if (repeated) {
           state.skipped += 1;
           continue;
         }
+
+        rowKeys.forEach((key) => importedSourceKeys.add(key));
+        if (serial) seenSerials.add(serial);
+        if (barcode) seenBarcodes.add(barcode);
 
         const preferred = preferredImportedIdentifier(row);
         const uniqueItemNumber = makeUniqueIdentifier(preferred, row, usedIdentifiers);
@@ -195,6 +282,7 @@ export const AssetExcelImportPage: React.FC = () => {
           ...((row.input.excelPayload || {}) as Record<string, unknown>),
           __platformImportedItemNumber: uniqueItemNumber,
           __sourcePreferredIdentifier: preferred,
+          __importFingerprint: sourceKeys(row)[0],
         };
 
         queue.push({
@@ -297,6 +385,14 @@ export const AssetExcelImportPage: React.FC = () => {
           {message && (
             <div className="rounded-2xl border bg-background/70 px-4 py-3 text-sm font-semibold">{message}</div>
           )}
+
+          {duplicateScan && duplicateScan.total > 0 && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border bg-white/80 p-4"><div className="text-xs text-muted-foreground">إجمالي سجلات الملف</div><div className="mt-1 text-2xl font-black">{duplicateScan.total.toLocaleString('ar-SA')}</div></div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4"><div className="text-xs font-bold text-emerald-700">سجلات جديدة</div><div className="mt-1 text-2xl font-black text-emerald-700">{duplicateScan.fresh.toLocaleString('ar-SA')}</div></div>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4"><div className="text-xs font-bold text-amber-800">مكرر / سبق استيراده</div><div className="mt-1 text-2xl font-black text-amber-800">{duplicateScan.duplicate.toLocaleString('ar-SA')}</div></div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -391,9 +487,17 @@ export const AssetExcelImportPage: React.FC = () => {
                 </div>
               </div>
 
-              <Button className="h-12 w-full rounded-2xl" onClick={() => void importSelectedRows()} disabled={importing || importRows.length === 0}>
+              <Button
+                className="h-12 w-full rounded-2xl"
+                onClick={() => void importSelectedRows()}
+                disabled={importing || importRows.length === 0 || Boolean(duplicateScan && duplicateScan.total > 0 && duplicateScan.duplicate === duplicateScan.total)}
+              >
                 {importing ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <UploadCloud className="ml-2 h-5 w-5" />}
-                {importing ? 'جارٍ استيراد البيانات...' : `استيراد ${batchLabel} إلى وحدة الأصول`}
+                {importing
+                  ? 'جارٍ استيراد البيانات...'
+                  : duplicateScan && duplicateScan.total > 0 && duplicateScan.duplicate === duplicateScan.total
+                    ? 'جميع سجلات الملف مكررة — لا يوجد ما يُستورد'
+                    : `استيراد ${batchLabel} إلى وحدة الأصول`}
               </Button>
             </CardContent>
           </Card>
