@@ -7,6 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { ScrollArea } from '../components/ui/scroll-area';
+import {
+  formatMapCoordinate,
+  normalizeMapCoordinates,
+  openGoogleMapsLocation,
+} from '../utils/mapNavigation';
 
 export const MapsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,35 +22,42 @@ export const MapsPage: React.FC = () => {
   const [mapView, setMapView] = useState<'street' | 'satellite'>('street');
 
   const deedsWithCoordinates = useMemo(() => {
-    return deeds.filter(deed => deed.coordinates);
+    return deeds.filter((deed) => Boolean(normalizeMapCoordinates((deed as any).coordinates)));
   }, [deeds]);
 
   const selectedDeed = useMemo(() => {
-    return selectedDeedId ? deeds.find(d => d.id === selectedDeedId) : null;
+    return selectedDeedId ? deeds.find((deed) => deed.id === selectedDeedId) : null;
   }, [selectedDeedId, deeds]);
+
+  const selectedCoordinates = useMemo(() => {
+    return normalizeMapCoordinates((selectedDeed as any)?.coordinates);
+  }, [selectedDeed]);
 
   const openInGoogleEarth = (lat: number, lng: number) => {
     const url = `https://earth.google.com/web/@${lat},${lng},0a,1000d,1y,0h,0t,0r`;
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const openInGoogleMaps = (lat: number, lng: number) => {
-    const url = `https://www.google.com/maps?q=${lat},${lng}`;
-    window.open(url, '_blank');
+    openGoogleMapsLocation({ latitude: lat, longitude: lng }, true);
   };
 
-  // Calculate center point
+  // Calculate center point using only validated numeric coordinates.
   const centerPoint = useMemo(() => {
-    if (selectedDeed?.coordinates) {
-      return selectedDeed.coordinates;
-    }
-    if (deedsWithCoordinates.length > 0) {
-      const avgLat = deedsWithCoordinates.reduce((sum, d) => sum + d.coordinates!.latitude, 0) / deedsWithCoordinates.length;
-      const avgLng = deedsWithCoordinates.reduce((sum, d) => sum + d.coordinates!.longitude, 0) / deedsWithCoordinates.length;
+    if (selectedCoordinates) return selectedCoordinates;
+
+    const validCoordinates = deedsWithCoordinates
+      .map((deed) => normalizeMapCoordinates((deed as any).coordinates))
+      .filter((value): value is { latitude: number; longitude: number } => Boolean(value));
+
+    if (validCoordinates.length > 0) {
+      const avgLat = validCoordinates.reduce((sum, value) => sum + value.latitude, 0) / validCoordinates.length;
+      const avgLng = validCoordinates.reduce((sum, value) => sum + value.longitude, 0) / validCoordinates.length;
       return { latitude: avgLat, longitude: avgLng };
     }
+
     return { latitude: 26.3927, longitude: 50.0438 }; // Default: Dammam
-  }, [selectedDeed, deedsWithCoordinates]);
+  }, [selectedCoordinates, deedsWithCoordinates]);
 
   return (
     <div className="space-y-6">
@@ -87,17 +99,17 @@ export const MapsPage: React.FC = () => {
                 <h3 className="text-xl font-semibold text-blue-900 mb-2">عرض الخريطة التفاعلية</h3>
                 <p className="text-blue-700 text-center mb-4 px-4">
                   خريطة تفاعلية باستخدام OpenStreetMap / Leaflet<br />
-                  المركز: {centerPoint.latitude.toFixed(4)}, {centerPoint.longitude.toFixed(4)}
+                  المركز: {formatMapCoordinate(centerPoint.latitude)}, {formatMapCoordinate(centerPoint.longitude)}
                 </p>
 
-                {selectedDeed && selectedDeed.coordinates && (
+                {selectedDeed && selectedCoordinates && (
                   <div className="flex gap-2 mt-4">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => openInGoogleMaps(
-                        selectedDeed.coordinates!.latitude,
-                        selectedDeed.coordinates!.longitude
+                        selectedCoordinates.latitude,
+                        selectedCoordinates.longitude
                       )}
                     >
                       <MapPin className="h-4 w-4 mr-2" />
@@ -107,8 +119,8 @@ export const MapsPage: React.FC = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => openInGoogleEarth(
-                        selectedDeed.coordinates!.latitude,
-                        selectedDeed.coordinates!.longitude
+                        selectedCoordinates.latitude,
+                        selectedCoordinates.longitude
                       )}
                     >
                       <Globe className="h-4 w-4 mr-2" />
@@ -146,44 +158,48 @@ export const MapsPage: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-2 pb-4">
-                    {deedsWithCoordinates.map((deed) => (
-                      <div
-                        key={deed.id}
-                        className={`
-                          p-3 rounded-lg border-2 cursor-pointer transition-all
-                          ${selectedDeedId === deed.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50 hover:bg-muted/30'
-                          }
-                        `}
-                        onClick={() => setSelectedDeedId(deed.id)}
-                      >
-                        <div className="flex items-start gap-2">
-                          <MapPin
-                            className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
-                              selectedDeedId === deed.id ? 'text-primary' : 'text-muted-foreground'
-                            }`}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium text-sm truncate">{deed.deedNumber}</p>
-                              {deed.isPlanned && (
-                                <Badge variant="secondary" className="text-xs">مخططة</Badge>
-                              )}
+                    {deedsWithCoordinates.map((deed) => {
+                      const coordinates = normalizeMapCoordinates((deed as any).coordinates);
+
+                      return (
+                        <div
+                          key={deed.id}
+                          className={`
+                            p-3 rounded-lg border-2 cursor-pointer transition-all
+                            ${selectedDeedId === deed.id
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                            }
+                          `}
+                          onClick={() => setSelectedDeedId(deed.id)}
+                        >
+                          <div className="flex items-start gap-2">
+                            <MapPin
+                              className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
+                                selectedDeedId === deed.id ? 'text-primary' : 'text-muted-foreground'
+                              }`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium text-sm truncate">{deed.deedNumber}</p>
+                                {deed.isPlanned && (
+                                  <Badge variant="secondary" className="text-xs">مخططة</Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mb-1">
+                                {deed.city} - {deed.district}
+                              </p>
+                              <div className="text-xs font-mono text-muted-foreground">
+                                {formatMapCoordinate(coordinates?.latitude)}, {formatMapCoordinate(coordinates?.longitude)}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {deed.area.toLocaleString()} {t('deed.sqm')}
+                              </p>
                             </div>
-                            <p className="text-xs text-muted-foreground mb-1">
-                              {deed.city} - {deed.district}
-                            </p>
-                            <div className="text-xs font-mono text-muted-foreground">
-                              {deed.coordinates?.latitude.toFixed(4)}, {deed.coordinates?.longitude.toFixed(4)}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {deed.area.toLocaleString()} {t('deed.sqm')}
-                            </p>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </ScrollArea>
