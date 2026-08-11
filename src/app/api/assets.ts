@@ -171,12 +171,12 @@ export type AssetSmartExtraction = {
   confidence?: number | null;
   warnings?: string[];
   summary?: string | null;
-  source?: { fileName?: string; mimeType?: string; size?: number };
+  source?: { fileName?: string; mimeType?: string; size?: number; files?: Array<{ fileName?: string; mimeType?: string; size?: number }> };
 };
 
-export const extractAssetData = async (file: File): Promise<AssetSmartExtraction> => {
+export const extractAssetData = async (files: File[]): Promise<AssetSmartExtraction> => {
   const body = new FormData();
-  body.append('file', file);
+  files.forEach((file) => body.append('files', file));
 
   const response = await authenticatedFetch('/api/assets/extract-data', {
     method: 'POST',
