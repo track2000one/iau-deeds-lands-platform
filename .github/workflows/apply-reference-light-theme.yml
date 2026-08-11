@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'scripts/apply-reference-light-theme.cjs'
+      - '.github/workflows/apply-reference-light-theme.yml'
 
 permissions:
   contents: write
