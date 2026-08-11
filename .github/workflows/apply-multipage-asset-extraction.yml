@@ -1,0 +1,38 @@
+name: Apply Multipage Asset Extraction
+
+on:
+  push:
+    paths:
+      - 'scripts/enable-multipage-asset-extraction.cjs'
+      - 'scripts/trigger-multipage-asset-extraction.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply multipage extraction frontend patch
+        run: node scripts/enable-multipage-asset-extraction.cjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify frontend build
+        run: npm run build
+      - name: Commit generated frontend changes
+        run: |
+          if git diff --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/api/assets.ts src/app/pages/AddAssetPage.tsx
+          git commit -m "Support multipage smart asset extraction"
+          git push origin HEAD:main
