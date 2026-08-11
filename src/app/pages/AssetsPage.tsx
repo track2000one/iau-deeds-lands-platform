@@ -384,7 +384,7 @@ export const AssetsPage: React.FC = () => {
           <CardContent className="p-4 sm:p-5">
             {searchLoading ? <div className="py-16 text-center text-sm text-muted-foreground">جارٍ البحث...</div> : !searchResult?.items.length ? <div className="py-16 text-center"><PackageSearch className="mx-auto h-10 w-10 text-primary" /><div className="mt-3 font-bold">لا توجد نتائج مطابقة</div></div> : <>
               <div className="mb-4 text-sm text-muted-foreground">تم العثور على {searchResult.total.toLocaleString('ar-SA')} سجل — يتم عرض أول {searchResult.items.length.toLocaleString('ar-SA')} نتيجة.</div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{searchResult.items.map((asset) => <AssetCard key={asset.id} asset={asset} canEdit={canEdit} canDelete={canDelete} deletingId={deletingId} onView={() => navigate(`/assets/${asset.id}`, { state: { assetGroupKey: group.key } })} onEdit={() => navigate(`/assets/${asset.id}/edit`, { state: { assetGroupKey: group.key } })} onDelete={() => handleDelete(asset)} />)}</div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{searchResult.items.map((asset) => <AssetCard key={asset.id} asset={asset} canEdit={canEdit} canDelete={canDelete} deletingId={deletingId} onView={() => navigate(`/assets/${asset.id}`)} onEdit={() => navigate(`/assets/${asset.id}/edit`)} onDelete={() => handleDelete(asset)} />)}</div>
             </>}
           </CardContent>
         </Card>
@@ -410,7 +410,7 @@ export const AssetsPage: React.FC = () => {
                   </button>
                   {expanded && <div className="border-t bg-muted/10 p-4 sm:p-5">
                     {loaded?.loading && !loaded.items.length ? <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل المجموعة...</div> : <>
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{(loaded?.items || []).map((asset) => <AssetCard key={asset.id} asset={asset} canEdit={canEdit} canDelete={canDelete} deletingId={deletingId} onView={() => navigate(`/assets/${asset.id}`)} onEdit={() => navigate(`/assets/${asset.id}/edit`)} onDelete={() => handleDelete(asset)} />)}</div>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{(loaded?.items || []).map((asset) => <AssetCard key={asset.id} asset={asset} canEdit={canEdit} canDelete={canDelete} deletingId={deletingId} onView={() => navigate(`/assets/${asset.id}`, { state: { assetGroupKey: group.key } })} onEdit={() => navigate(`/assets/${asset.id}/edit`, { state: { assetGroupKey: group.key } })} onDelete={() => handleDelete(asset)} />)}</div>
                       {loaded && loaded.page < loaded.totalPages && <div className="mt-5 flex justify-center"><Button variant="outline" disabled={loaded.loading} onClick={() => loadGroupPage(group, loaded.page + 1, true)}>{loaded.loading ? 'جارٍ التحميل...' : 'عرض المزيد'}</Button></div>}
                     </>}
                   </div>}
