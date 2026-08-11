@@ -1,0 +1,38 @@
+name: Apply Platform Record Cards 3D
+
+on:
+  push:
+    paths:
+      - 'scripts/apply-platform-record-cards-3d.cjs'
+      - '.github/workflows/apply-platform-record-cards-3d.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  record-cards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply platform 3D record cards
+        run: node scripts/apply-platform-record-cards-3d.cjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify frontend build
+        run: npm run build
+      - name: Commit platform 3D record cards
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/components/ThemeInitializer.tsx src/app/pages/AllDeedsPage.tsx src/app/pages/AllocatedLandsPage.tsx src/app/pages/DeliveredLandsPage.tsx src/app/pages/SiteInspectionsPage.tsx src/app/pages/LeasedLandsOutPage.tsx src/app/pages/LeasedLandsInPage.tsx src/app/pages/LeasedBuildingsOutPage.tsx src/app/pages/LeasedBuildingsInPage.tsx
+          git commit -m "Apply professional 3D record cards across platform"
+          git push origin HEAD:main
