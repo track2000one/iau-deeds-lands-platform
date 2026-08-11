@@ -56,7 +56,11 @@ const SMART_EXTRACTION_LABELS: Record<keyof AssetSmartExtractionFields, string> 
   model: 'الموديل',
   serialNumber: 'الرقم التسلسلي',
   purchaseDate: 'تاريخ الشراء',
-  purchaseValue: 'قيمة الشراء',
+  purchaseValue: 'قيمة الشراء قبل الضريبة',
+  vatRate: 'نسبة ضريبة القيمة المضافة',
+  vatAmount: 'قيمة الضريبة',
+  purchaseValueBeforeVat: 'القيمة قبل الضريبة',
+  purchaseValueIncludingVat: 'الإجمالي شامل الضريبة',
   department: 'الجهة / الإدارة',
   building: 'المبنى',
   floor: 'الدور',
@@ -130,6 +134,11 @@ const formatFileSize = (size: number) => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const SAUDI_STANDARD_VAT_RATE = 15;
+const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const formatMoney = (value: number | null | undefined) =>
+  Number(value || 0).toLocaleString('ar-SA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 const AttachmentImagePreview: React.FC<{ file: File }> = ({ file }) => {
   const [previewUrl, setPreviewUrl] = useState('');
   const isImage = file.type.startsWith('image/');
@@ -178,6 +187,10 @@ const emptyForm: AssetInput = {
   purchaseDate: '',
   purchaseDateType: 'gregorian',
   purchaseValue: null,
+  vatRate: SAUDI_STANDARD_VAT_RATE,
+  vatAmount: null,
+  purchaseValueBeforeVat: null,
+  purchaseValueIncludingVat: null,
   notes: '',
   attachments: [],
   excelPayload: { templateType: 'ppe' },
@@ -212,6 +225,37 @@ export const AddAssetPage: React.FC = () => {
 
   const setField = <K extends keyof AssetInput>(key: K, value: AssetInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const updatePurchaseFinancials = (rawValue: number | null, rate = Number(form.vatRate ?? SAUDI_STANDARD_VAT_RATE)) => {
+    const safeRate = Number.isFinite(rate) ? Math.max(0, rate) : SAUDI_STANDARD_VAT_RATE;
+    if (rawValue === null || !Number.isFinite(Number(rawValue))) {
+      setForm((current) => ({
+        ...current,
+        purchaseValue: null,
+        purchaseValueBeforeVat: null,
+        vatRate: safeRate,
+        vatAmount: null,
+        purchaseValueIncludingVat: null,
+      }));
+      return;
+    }
+    const base = roundMoney(Math.max(0, Number(rawValue)));
+    const tax = roundMoney(base * safeRate / 100);
+    const total = roundMoney(base + tax);
+    setForm((current) => ({
+      ...current,
+      purchaseValue: base,
+      purchaseValueBeforeVat: base,
+      vatRate: safeRate,
+      vatAmount: tax,
+      purchaseValueIncludingVat: total,
+    }));
+  };
+
+  const updateVatRate = (rate: number) => {
+    const base = form.purchaseValueBeforeVat ?? form.purchaseValue ?? null;
+    updatePurchaseFinancials(base === null || base === undefined ? null : Number(base), rate);
   };
 
   const addFiles = (category: AssetAttachmentCategory, files: FileList | null) => {
@@ -492,9 +536,27 @@ export const AddAssetPage: React.FC = () => {
       fillText('city', fields.city);
       fillText('assetDescription', fields.assetDescription);
 
-      if (fields.purchaseValue !== null && fields.purchaseValue !== undefined && (current.purchaseValue === null || current.purchaseValue === undefined || current.purchaseValue === ('' as any))) {
-        next.purchaseValue = Number(fields.purchaseValue);
-        applied += 1;
+      const purchaseIsEmpty = current.purchaseValue === null || current.purchaseValue === undefined || current.purchaseValue === ('' as any);
+      const extractedRate = Number(fields.vatRate ?? SAUDI_STANDARD_VAT_RATE);
+      let extractedBase = fields.purchaseValueBeforeVat ?? fields.purchaseValue ?? null;
+      const extractedTotal = fields.purchaseValueIncludingVat ?? null;
+      if ((extractedBase === null || extractedBase === undefined) && extractedTotal !== null && extractedTotal !== undefined) {
+        extractedBase = Number(extractedTotal) / (1 + extractedRate / 100);
+      }
+      if (purchaseIsEmpty && extractedBase !== null && extractedBase !== undefined && Number.isFinite(Number(extractedBase))) {
+        const base = roundMoney(Number(extractedBase));
+        const tax = fields.vatAmount !== null && fields.vatAmount !== undefined
+          ? roundMoney(Number(fields.vatAmount))
+          : roundMoney(base * extractedRate / 100);
+        const total = extractedTotal !== null && extractedTotal !== undefined
+          ? roundMoney(Number(extractedTotal))
+          : roundMoney(base + tax);
+        next.purchaseValue = base;
+        next.purchaseValueBeforeVat = base;
+        next.vatRate = extractedRate;
+        next.vatAmount = tax;
+        next.purchaseValueIncludingVat = total;
+        applied += 4;
       }
       return next;
     });
@@ -558,6 +620,10 @@ export const AddAssetPage: React.FC = () => {
           form.purchaseValue === null || form.purchaseValue === undefined || form.purchaseValue === ('' as any)
             ? null
             : Number(form.purchaseValue),
+        vatRate: Number(form.vatRate ?? SAUDI_STANDARD_VAT_RATE),
+        vatAmount: form.vatAmount === null || form.vatAmount === undefined ? null : Number(form.vatAmount),
+        purchaseValueBeforeVat: form.purchaseValueBeforeVat === null || form.purchaseValueBeforeVat === undefined ? null : Number(form.purchaseValueBeforeVat),
+        purchaseValueIncludingVat: form.purchaseValueIncludingVat === null || form.purchaseValueIncludingVat === undefined ? null : Number(form.purchaseValueIncludingVat),
         notes: String(form.notes || '').trim() || null,
         attachments: uploaded,
       });
@@ -866,8 +932,41 @@ export const AddAssetPage: React.FC = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label>قيمة الشراء</Label>
-            <Input type="number" min="0" step="0.01" value={form.purchaseValue ?? ''} onChange={(e) => setField('purchaseValue', e.target.value === '' ? null : Number(e.target.value))} placeholder="0.00" />
+            <Label>قيمة الشراء قبل الضريبة</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.purchaseValueBeforeVat ?? form.purchaseValue ?? ''}
+              onChange={(e) => updatePurchaseFinancials(e.target.value === '' ? null : Number(e.target.value))}
+              placeholder="0.00"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>ضريبة القيمة المضافة</Label>
+            <Select value={String(Number(form.vatRate ?? SAUDI_STANDARD_VAT_RATE))} onValueChange={(value) => updateVatRate(Number(value))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15">النسبة الأساسية في السعودية — 15%</SelectItem>
+                <SelectItem value="0">بدون ضريبة / غير خاضع</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>قيمة الضريبة</Label>
+            <div className="flex h-10 items-center justify-between rounded-md border border-amber-200 bg-amber-50/70 px-3 text-sm">
+              <span className="font-black text-amber-900">{formatMoney(form.vatAmount)} ر.س</span>
+              <span className="text-xs font-bold text-amber-700">{Number(form.vatRate ?? SAUDI_STANDARD_VAT_RATE)}%</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>الإجمالي شامل الضريبة</Label>
+            <div className="flex h-10 items-center rounded-md border border-emerald-200 bg-emerald-50/70 px-3 text-sm font-black text-emerald-900">
+              {formatMoney(form.purchaseValueIncludingVat)} ر.س
+            </div>
+          </div>
+          <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50/55 px-3 py-2 text-xs leading-6 text-blue-800">
+            تُطبّق النسبة الأساسية لضريبة القيمة المضافة في المملكة العربية السعودية تلقائيًا بنسبة 15%. ويمكن اختيار «بدون ضريبة» للحالات غير الخاضعة أو المستثناة وفق المستند المالي.
           </div>
           <div className="space-y-2 md:col-span-2">
             <Label>ملاحظات</Label>

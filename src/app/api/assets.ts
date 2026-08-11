@@ -152,6 +152,10 @@ export type AssetSmartExtractionFields = {
   serialNumber?: string | null;
   purchaseDate?: string | null;
   purchaseValue?: number | null;
+  vatRate?: number | null;
+  vatAmount?: number | null;
+  purchaseValueBeforeVat?: number | null;
+  purchaseValueIncludingVat?: number | null;
   department?: string | null;
   building?: string | null;
   floor?: string | null;

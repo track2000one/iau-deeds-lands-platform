@@ -107,6 +107,10 @@ export interface AssetRecord {
   purchaseDate?: string | null;
   purchaseDateType?: 'gregorian' | 'hijri';
   purchaseValue?: number | null;
+  vatRate?: number | null;
+  vatAmount?: number | null;
+  purchaseValueBeforeVat?: number | null;
+  purchaseValueIncludingVat?: number | null;
   serviceDate?: string | null;
   serviceDateType?: 'gregorian' | 'hijri';
   acquisitionCost?: number | null;
@@ -165,6 +169,10 @@ export type AssetInput = {
   purchaseDate?: string | null;
   purchaseDateType?: 'gregorian' | 'hijri';
   purchaseValue?: number | null;
+  vatRate?: number | null;
+  vatAmount?: number | null;
+  purchaseValueBeforeVat?: number | null;
+  purchaseValueIncludingVat?: number | null;
   serviceDate?: string | null;
   serviceDateType?: 'gregorian' | 'hijri';
   acquisitionCost?: number | null;
