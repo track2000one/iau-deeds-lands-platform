@@ -5,7 +5,7 @@ import {
   RotateCcw,
   Save,
   ShieldCheck,
-  Sparkles,
+  Sun,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -36,89 +36,95 @@ const getUserKey = (username?: string | null) => {
   };
 };
 
-const AssetThemePreview: React.FC<{
+const ThemeMiniPreview: React.FC<{
   theme: ThemeOption;
   active: boolean;
-}> = ({ theme, active }) => {
-  const dashboard = theme.visual.assetDashboard;
-
-  return (
+}> = ({ theme, active }) => (
+  <div
+    className="relative mt-5 overflow-hidden rounded-[22px] border p-4"
+    style={{
+      background: theme.visual.background,
+      borderColor: theme.visual.border,
+      boxShadow: active
+        ? `0 0 0 2px ${theme.visual.glow}, ${theme.visual.shadow}`
+        : theme.visual.shadow,
+    }}
+  >
     <div
-      className="relative mt-5 overflow-hidden rounded-[22px] border p-3 text-white"
+      className="absolute -right-10 -top-10 h-28 w-28 rounded-full blur-3xl"
+      style={{ background: theme.visual.glow }}
+    />
+
+    <div
+      className="relative rounded-2xl border px-3 py-2"
       style={{
-        background: dashboard.base,
-        borderColor: dashboard.border,
-        boxShadow: active
-          ? `0 0 0 2px ${dashboard.glow}, ${dashboard.shadow}`
-          : dashboard.shadow,
+        background: theme.visual.topbar,
+        borderColor: theme.visual.border,
       }}
     >
+      <div className="flex items-center justify-between gap-3">
+        <div className="h-2.5 w-24 rounded-full bg-primary/70" />
+        <div className="flex gap-1.5">
+          <div className="h-2.5 w-2.5 rounded-full bg-primary/75" />
+          <div className="h-2.5 w-2.5 rounded-full bg-secondary/70" />
+        </div>
+      </div>
+    </div>
+
+    <div className="relative mt-3 grid grid-cols-[72px_1fr] gap-3">
       <div
-        className="pointer-events-none absolute inset-0"
-        style={{ background: dashboard.overlay }}
-      />
-      <div className="relative space-y-2.5">
-        <div
-          className="h-7 rounded-xl border"
-          style={{
-            background: dashboard.panel,
-            borderColor: dashboard.border,
-          }}
-        />
-        <div className="grid grid-cols-4 gap-2">
+        className="rounded-2xl border p-2"
+        style={{
+          background: theme.visual.sidebar,
+          borderColor: theme.visual.border,
+        }}
+      >
+        <div className="space-y-2">
           {[0, 1, 2, 3].map((item) => (
             <div
               key={item}
-              className="h-12 rounded-xl border"
+              className={[
+                'h-7 rounded-xl border',
+                item === 1 ? 'bg-primary/15' : 'bg-background/45',
+              ].join(' ')}
+              style={{ borderColor: theme.visual.border }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-2">
+          {[0, 1, 2].map((item) => (
+            <div
+              key={item}
+              className="h-14 rounded-2xl border"
               style={{
                 background:
-                  item === 1 ? dashboard.panelStrong : dashboard.panel,
-                borderColor: dashboard.border,
+                  item === 1
+                    ? theme.visual.glassStrong
+                    : theme.visual.glass,
+                borderColor: theme.visual.border,
               }}
             />
           ))}
         </div>
-        <div className="grid grid-cols-[0.78fr_1.4fr] gap-2">
-          <div
-            className="h-24 rounded-xl border"
-            style={{
-              background: dashboard.panel,
-              borderColor: dashboard.border,
-            }}
-          />
-          <div
-            className="h-24 rounded-xl border p-2"
-            style={{
-              background: dashboard.panelStrong,
-              borderColor: dashboard.border,
-            }}
-          >
-            <div
-              className="h-2.5 w-2/3 rounded-full"
-              style={{ background: dashboard.glow }}
-            />
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <div
-                className="h-12 rounded-lg border"
-                style={{
-                  background: dashboard.panel,
-                  borderColor: dashboard.border,
-                }}
-              />
-              <div
-                className="h-12 rounded-lg border"
-                style={{
-                  background: dashboard.panel,
-                  borderColor: dashboard.border,
-                }}
-              />
-            </div>
-          </div>
+
+        <div
+          className="h-20 rounded-2xl border p-3"
+          style={{
+            background: theme.visual.glassStrong,
+            borderColor: theme.visual.border,
+          }}
+        >
+          <div className="h-2.5 w-1/2 rounded-full bg-primary/70" />
+          <div className="mt-3 h-2 w-4/5 rounded-full bg-muted-foreground/25" />
+          <div className="mt-2 h-2 w-2/3 rounded-full bg-muted-foreground/20" />
         </div>
       </div>
     </div>
-  );
-};
+  </div>
+);
 
 export const AppearanceSettingsPage: React.FC = () => {
   const { username } = useAuth();
@@ -152,7 +158,7 @@ export const AppearanceSettingsPage: React.FC = () => {
   const previewTheme = (theme: ThemeOption) => {
     setSelectedTheme(theme.id);
     applyAppearanceTheme(theme.id);
-    toast.info('تم تطبيق اللون كتجربة على وحدة الأصول؛ اضغط حفظ لاعتماده');
+    toast.info('تم تطبيق المعاينة؛ اضغط حفظ لاعتماد المظهر');
   };
 
   const saveTheme = () => {
@@ -160,13 +166,13 @@ export const AppearanceSettingsPage: React.FC = () => {
     const theme = getThemeById(selectedTheme);
 
     localStorage.setItem(keys.theme, theme.id);
-    localStorage.setItem(keys.mode, 'light');
+    localStorage.setItem(keys.mode, theme.mode);
 
     applyAppearanceTheme(theme.id);
     setSavedTheme(theme.id);
     savedThemeRef.current = theme.id;
 
-    toast.success('تم حفظ لون وحدة الأصول لهذا المستخدم');
+    toast.success('تم حفظ المظهر لهذا المستخدم');
   };
 
   const resetTheme = () => {
@@ -174,14 +180,14 @@ export const AppearanceSettingsPage: React.FC = () => {
     const theme = getThemeById(DEFAULT_THEME_ID);
 
     localStorage.setItem(keys.theme, theme.id);
-    localStorage.setItem(keys.mode, 'light');
+    localStorage.setItem(keys.mode, theme.mode);
 
     setSelectedTheme(theme.id);
     setSavedTheme(theme.id);
     savedThemeRef.current = theme.id;
     applyAppearanceTheme(theme.id);
 
-    toast.success('تمت استعادة اللون الافتراضي لوحدة الأصول');
+    toast.success('تمت استعادة المظهر الرسمي الافتراضي');
   };
 
   const selected = getThemeById(selectedTheme);
@@ -193,40 +199,37 @@ export const AppearanceSettingsPage: React.FC = () => {
           <div>
             <Badge variant="secondary" className="mb-3">
               <ShieldCheck className="ml-2 h-4 w-4" />
-              تجربة ألوان وحدة الأصول
+              المظاهر الرسمية المعتمدة للمنصة
             </Badge>
 
-            <h1 className="text-3xl font-bold">ألوان المظهر التجريبية</h1>
+            <h1 className="text-3xl font-bold">إعدادات المظهر</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              تم حذف الثيمات السابقة واستبدالها بست لوحات ألوان مستوحاة من
-              المراجع المرفقة. في هذه المرحلة ينعكس الاختيار على لوحة وحدة
-              الأصول فقط، بينما يبقى المظهر العام للمنصة فاتحًا وثابتًا.
+              تم حصر المظاهر في خيارات رسمية هادئة تناسب منصة إدارية جامعية،
+              مع وضوح مرتفع للنصوص والنماذج والجداول والتقارير.
             </p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button variant="outline" onClick={resetTheme}>
               <RotateCcw className="ml-2 h-4 w-4" />
-              استعادة الافتراضي
+              استعادة الرسمي
             </Button>
 
             <Button onClick={saveTheme} className="future-glow-button">
               <Save className="ml-2 h-4 w-4" />
-              حفظ التجربة
+              حفظ لهذا المستخدم
             </Button>
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-primary/15 bg-background/70 p-3 text-sm text-muted-foreground">
-          <Sparkles className="ml-2 inline h-4 w-4" />
-          بعد اختيار اللون انتقل إلى «وحدة الأصول» لمشاهدة النتيجة الفعلية.
-          لن نعمم أي لوحة على بقية المنصة إلا بعد اعتمادك للثيم الأفضل.
+        <div className="mt-4 rounded-2xl border border-primary/15 bg-background/55 p-3 text-sm text-muted-foreground">
+          المظهر الافتراضي للمنصة هو «الكلاسيك الرسمي». يمكن للمستخدم اختيار
+          بديل رسمي آخر دون تغيير الهوية العامة للنظام.
         </div>
 
         {selectedTheme !== savedTheme && (
           <div className="mt-3 rounded-2xl border border-primary/25 bg-primary/10 p-3 text-sm">
-            اللون الحالي قيد المعاينة فقط. اضغط «حفظ التجربة» لاعتماده لهذا
-            المستخدم.
+            المظهر الحالي قيد المعاينة فقط. اضغط «حفظ لهذا المستخدم» لاعتماده.
           </div>
         )}
       </div>
@@ -236,11 +239,11 @@ export const AppearanceSettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Palette className="h-5 w-5" />
-              اختر لوحة الألوان
+              اختر المظهر الرسمي
             </CardTitle>
             <CardDescription>
-              ست لوحات فقط، مطابقة للألوان التي أرسلتها، ومخصصة حاليًا لتجربة
-              لوحة وحدة الأصول.
+              الخيارات التالية مصممة للاستخدام الإداري الرسمي، بدون مظاهر نيون
+              أو ألوان ترفيهية أو تباين منخفض.
             </CardDescription>
           </CardHeader>
 
@@ -286,36 +289,29 @@ export const AppearanceSettingsPage: React.FC = () => {
                       {isActive ? (
                         <Check className="h-5 w-5" />
                       ) : (
-                        <Palette className="h-4 w-4" />
+                        <Sun className="h-4 w-4" />
                       )}
                     </div>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full border bg-background/70 px-2.5 py-1">
+                    <span className="rounded-full border bg-background/50 px-2.5 py-1">
                       {theme.glassLabel}
                     </span>
-                    <span className="rounded-full border bg-background/70 px-2.5 py-1">
+                    <span className="rounded-full border bg-background/50 px-2.5 py-1">
                       {theme.glowLabel}
                     </span>
                   </div>
 
-                  <AssetThemePreview theme={theme} active={isActive} />
+                  <ThemeMiniPreview theme={theme} active={isActive} />
 
-                  <div className="mt-4 grid grid-cols-4 gap-2">
+                  <div className="mt-4 grid grid-cols-5 gap-2">
                     {theme.preview.map((color) => (
                       <div
                         key={color}
-                        className="h-11 rounded-xl border shadow-sm"
+                        className="h-10 rounded-xl border shadow-sm"
                         style={{ background: color }}
-                        title={color}
                       />
-                    ))}
-                  </div>
-
-                  <div className="mt-2 grid grid-cols-4 gap-2 text-center text-[10px] text-muted-foreground">
-                    {theme.preview.map((color) => (
-                      <span key={`${theme.id}-${color}`}>{color}</span>
                     ))}
                   </div>
                 </button>
@@ -328,13 +324,17 @@ export const AppearanceSettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5" />
-              المعاينة المختارة
+              معاينة المظهر
             </CardTitle>
             <CardDescription>{selected.name}</CardDescription>
           </CardHeader>
 
           <CardContent>
-            <AssetThemePreview theme={selected} active />
+            <div className="future-hero-art min-h-[260px]">
+              <div className="future-shield">
+                <ShieldCheck className="h-24 w-24" />
+              </div>
+            </div>
 
             <div className="future-glass-thick mt-4 rounded-2xl border p-4">
               <div className="flex flex-wrap items-center gap-2">
@@ -346,23 +346,20 @@ export const AppearanceSettingsPage: React.FC = () => {
                 {selected.description}
               </p>
 
-              <div className="mt-4 grid grid-cols-4 gap-2">
-                {selected.preview.map((color) => (
-                  <div key={color} className="text-center">
-                    <div
-                      className="h-12 rounded-xl border shadow-sm"
-                      style={{ background: color }}
-                    />
-                    <span className="mt-1 block text-[10px] text-muted-foreground">
-                      {color}
-                    </span>
-                  </div>
-                ))}
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl border bg-background/35 p-3">
+                  <span className="text-xs text-muted-foreground">نوع السطح</span>
+                  <p className="mt-1 font-semibold">{selected.glassLabel}</p>
+                </div>
+
+                <div className="rounded-xl border bg-background/35 p-3">
+                  <span className="text-xs text-muted-foreground">الإضاءة</span>
+                  <p className="mt-1 font-semibold">{selected.glowLabel}</p>
+                </div>
               </div>
 
-              <p className="mt-4 text-xs leading-5 text-muted-foreground">
-                هذه تجربة خاصة بوحدة الأصول. بعد اختيار اللوحة الأفضل يمكن
-                توحيدها على بقية صفحات المنصة في خطوة مستقلة.
+              <p className="mt-4 text-xs text-muted-foreground">
+                المعاينة فورية، ولا يتم اعتمادها لهذا المستخدم إلا بعد الحفظ.
               </p>
             </div>
           </CardContent>
