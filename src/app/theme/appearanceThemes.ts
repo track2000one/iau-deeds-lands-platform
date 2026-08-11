@@ -8,7 +8,8 @@ export type ThemeId =
   | 'glass-sapphire'
   | 'glass-emerald'
   | 'glass-violet'
-  | 'glass-amber';
+  | 'glass-amber'
+  | 'warm-university';
 
 export type ThemeOption = {
   id: ThemeId;
@@ -374,6 +375,43 @@ export const themes: ThemeOption[] = [
       },
     },
   },
+  {
+    id: 'warm-university',
+    name: 'Warm University',
+    title: 'الجامعي الدافئ',
+    description:
+      'ثيم تجريبي لوحدة الأصول مستوحى من الواجهة الفاتحة: خلفية عاجية، بطاقات بيضاء، نص كحلي ولمسات ذهبية هادئة.',
+    badge: 'تجريبي',
+    mode: 'light',
+    preview: ['#F8F6F0', '#FFFFFF', '#E9DFC7', '#C5A35A', '#17324D'],
+    glassLabel: 'بطاقات بيضاء',
+    glowLabel: 'ذهبي هادئ',
+    visual: {
+      background:
+        'radial-gradient(circle at 82% 2%, rgba(197,163,90,.07), transparent 26%), linear-gradient(180deg,#fcfbf7 0%,#f6f2e8 100%)',
+      glass: 'rgba(255,255,255,.91)',
+      glassStrong: 'rgba(255,255,255,.98)',
+      border: 'rgba(111,95,66,.18)',
+      glow: 'rgba(197,163,90,.11)',
+      glowSecondary: 'rgba(23,50,77,.06)',
+      shadow: '0 16px 42px rgba(48,55,62,.09)',
+      topbar: 'rgba(255,255,255,.97)',
+      sidebar: 'rgba(252,251,247,.98)',
+      assetDashboard: {
+        base: '#F7F4EC',
+        overlay:
+          'radial-gradient(circle at 84% 0%,rgba(197,163,90,.13),transparent 25%),radial-gradient(circle at 12% 10%,rgba(23,50,77,.045),transparent 28%),linear-gradient(135deg,#fbfaf6 0%,#f5efe1 54%,#faf8f2 100%)',
+        panel: 'rgba(255,255,255,.76)',
+        panelStrong: 'rgba(255,255,255,.92)',
+        border: 'rgba(128,105,66,.20)',
+        glow: 'rgba(197,163,90,.14)',
+        glowSecondary: 'rgba(23,50,77,.07)',
+        shadow: 'inset 0 1px 0 rgba(255,255,255,.95),0 18px 42px rgba(80,67,45,.10)',
+        button: '#17324D',
+        buttonHover: '#214665',
+      },
+    },
+  },
 ];
 
 const commonLight = {
@@ -611,6 +649,34 @@ export const themeVariables: Record<ThemeId, Record<string, string>> = {
     sidebarRing: '42 89% 55%',
     ...commonDark,
   },
+  'warm-university': {
+    background: '42 38% 97%',
+    foreground: '210 54% 20%',
+    card: '0 0% 100%',
+    cardForeground: '210 54% 20%',
+    popover: '0 0% 100%',
+    popoverForeground: '210 54% 20%',
+    primary: '210 54% 20%',
+    primaryForeground: '0 0% 100%',
+    secondary: '40 43% 56%',
+    secondaryForeground: '210 54% 18%',
+    muted: '42 30% 93%',
+    mutedForeground: '211 16% 42%',
+    accent: '40 43% 56%',
+    accentForeground: '210 54% 18%',
+    border: '39 22% 80%',
+    input: '39 22% 80%',
+    ring: '40 43% 48%',
+    sidebar: '42 42% 98%',
+    sidebarForeground: '210 54% 22%',
+    sidebarPrimary: '210 54% 20%',
+    sidebarPrimaryForeground: '0 0% 100%',
+    sidebarAccent: '42 35% 92%',
+    sidebarAccentForeground: '210 54% 20%',
+    sidebarBorder: '39 22% 83%',
+    sidebarRing: '40 43% 48%',
+    ...commonLight,
+  },
 };
 
 export const getThemeById = (themeId?: string | null): ThemeOption =>
@@ -652,4 +718,10 @@ export const applyAppearanceTheme = (themeId: ThemeId) => {
   root.style.setProperty('--asset-dashboard-shadow', theme.visual.assetDashboard.shadow);
   root.style.setProperty('--asset-dashboard-button', theme.visual.assetDashboard.button);
   root.style.setProperty('--asset-dashboard-button-hover', theme.visual.assetDashboard.buttonHover);
+
+  const warmAsset = theme.id === 'warm-university';
+  root.style.setProperty('--asset-dashboard-text', warmAsset ? '#17324D' : '#FFFFFF');
+  root.style.setProperty('--asset-dashboard-muted', warmAsset ? '#66717D' : '#CBD5E1');
+  root.style.setProperty('--asset-dashboard-inner-border', warmAsset ? 'rgba(128,105,66,.18)' : 'rgba(255,255,255,.12)');
+  root.style.setProperty('--asset-dashboard-soft', warmAsset ? 'rgba(23,50,77,.055)' : 'rgba(255,255,255,.10)');
 };
