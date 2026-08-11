@@ -157,3 +157,5 @@ page = replaceOnce(
 
 fs.writeFileSync(pagePath, page);
 console.log('Asset report operation date filter patch applied.');
+
+// Workflow trigger marker.
