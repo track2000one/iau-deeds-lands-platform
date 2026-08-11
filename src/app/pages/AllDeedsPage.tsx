@@ -32,6 +32,11 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { toast } from 'sonner';
+import {
+  normalizeMapCoordinates,
+  openGoogleMapsLocation,
+  shouldOpenExternalMap,
+} from '../utils/mapNavigation';
 
 export const AllDeedsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -91,6 +96,22 @@ export const AllDeedsPage: React.FC = () => {
       setDeedToDelete(null);
     }
   };
+
+  const handleMapOpen = React.useCallback((deed: any) => {
+    const coordinates = normalizeMapCoordinates(deed?.coordinates);
+
+    if (!coordinates) {
+      toast.error('لا توجد إحداثيات صالحة لهذا الصك');
+      return;
+    }
+
+    if (shouldOpenExternalMap()) {
+      openGoogleMapsLocation(coordinates);
+      return;
+    }
+
+    navigate(`/maps/${deed.id}`);
+  }, [navigate]);
 
   return (
     <div className="mobile-full-width w-full min-w-0 space-y-5 rounded-2xl border border-sky-200/70 bg-gradient-to-br from-white via-sky-50/70 to-violet-50/50 p-3 shadow-[0_24px_80px_rgba(30,64,175,0.12)] backdrop-blur-xl sm:p-4 md:p-6">
@@ -229,7 +250,7 @@ export const AllDeedsPage: React.FC = () => {
                 </div>
                 <div>
                   <dt className="flex items-center gap-1 text-xs text-muted-foreground"><Map className="h-3.5 w-3.5" />الإحداثيات</dt>
-                  <dd className="mt-1 font-semibold">{deed.coordinates ? 'متوفرة' : 'غير متوفرة'}</dd>
+                  <dd className="mt-1 font-semibold">{normalizeMapCoordinates(deed.coordinates) ? 'متوفرة' : 'غير متوفرة'}</dd>
                 </div>
               </dl>
 
@@ -238,8 +259,8 @@ export const AllDeedsPage: React.FC = () => {
                   <Eye className="ml-1 h-4 w-4" />عرض
                 </Button>
 
-                {deed.coordinates && (
-                  <Button variant="outline" size="sm" className="h-10" onClick={() => navigate(`/maps/${deed.id}`)}>
+                {normalizeMapCoordinates(deed.coordinates) && (
+                  <Button variant="outline" size="sm" className="h-10" onClick={() => handleMapOpen(deed)}>
                     <MapPin className="ml-1 h-4 w-4" />الخريطة
                   </Button>
                 )}
