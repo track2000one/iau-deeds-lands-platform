@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = 'src/app/pages/AssetReportsPage.tsx';
 let src = fs.readFileSync(path, 'utf8');
 
+// Increase vertical breathing room between report identity, filters, summary, statement title, and table.
 const replacements = [
   [
     '@page{size:A4 landscape;margin:0}',
