@@ -1,0 +1,37 @@
+name: Fix Asset Report Print Spacing
+
+on:
+  push:
+    paths:
+      - 'scripts/fix-asset-report-print-spacing.cjs'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply print spacing patch
+        run: node scripts/fix-asset-report-print-spacing.cjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify frontend build
+        run: npm run build
+      - name: Commit generated report changes
+        run: |
+          if git diff --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/AssetReportsPage.tsx
+          git commit -m "Improve asset report print spacing"
+          git push origin HEAD:main
