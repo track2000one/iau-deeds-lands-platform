@@ -1,0 +1,43 @@
+name: Fix Leased Land Smart Extraction Scope
+
+on:
+  push:
+    paths:
+      - 'scripts/fix-leased-land-smart-extraction-scope.cjs'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply scope fix
+        run: node scripts/fix-leased-land-smart-extraction-scope.cjs
+      - name: Verify callback wiring
+        run: |
+          grep -n "applySmartExtraction={applySmartExtraction}" src/app/pages/LeasedLandsOutPage.tsx
+          grep -n "applySmartExtraction={applySmartExtraction}" src/app/pages/LeasedLandsInPage.tsx
+          grep -n "applySmartExtraction: (fields: Record<string, unknown>) => void" src/app/pages/LeasedLandsOutPage.tsx
+          grep -n "applySmartExtraction: (fields: Record<string, unknown>) => void" src/app/pages/LeasedLandsInPage.tsx
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify frontend build
+        run: npm run build
+      - name: Commit fix
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/LeasedLandsOutPage.tsx src/app/pages/LeasedLandsInPage.tsx
+          git commit -m "Fix smart extraction callback scope in leased land forms"
+          git push origin HEAD:main
