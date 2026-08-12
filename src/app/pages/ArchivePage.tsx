@@ -1088,14 +1088,14 @@ export const ArchivePage: React.FC = () => {
           <div>
             <h2 className="flex items-center gap-2 text-lg font-black text-slate-800 sm:text-xl">
               <Archive className="h-5 w-5 text-sky-700" />
-              ملفات الأرشفة (${filteredDocuments.length})
+              ملفات الأرشفة ({filteredDocuments.length})
             </h2>
             <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
               عرض الملفات كبطاقات واضحة مع بياناتها وإجراءاتها الرئيسية.
             </p>
           </div>
           <Badge variant="outline" className="w-fit border-slate-300 bg-white/90 px-3 py-1 font-bold text-slate-700 shadow-sm">
-            ${filteredDocuments.length} ملف
+            {filteredDocuments.length} ملف
           </Badge>
         </div>
 
@@ -1119,21 +1119,21 @@ export const ArchivePage: React.FC = () => {
                       <div className="min-w-0 flex-1">
                         <div className="mb-2 flex flex-wrap items-center gap-2">
                           <Badge variant="outline" className="border-slate-300 bg-white/95 px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-sm">
-                            ${doc.category || 'غير مصنف'}
+                            {doc.category || 'غير مصنف'}
                           </Badge>
                           <Badge
                             variant="outline"
                             className={`px-2.5 py-1 text-[11px] font-black ${getArchiveConfidentialityClassName(doc.confidentiality)}`}
                           >
-                            ${getConfidentialityLabel(doc.confidentiality)}
+                            {getConfidentialityLabel(doc.confidentiality)}
                           </Badge>
                         </div>
 
                         <h3 className="line-clamp-2 text-base font-black leading-7 text-slate-800 sm:text-lg">
-                          ${doc.title}
+                          {doc.title}
                         </h3>
                         <p className="mt-1 truncate text-xs text-slate-500" dir="auto">
-                          ${doc.originalName || doc.fileName}
+                          {doc.originalName || doc.fileName}
                         </p>
                       </div>
 
@@ -1148,26 +1148,26 @@ export const ArchivePage: React.FC = () => {
                       <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                         <div>
                           <p className="text-[11px] font-medium text-slate-400">رقم المستند</p>
-                          <p className="mt-1 break-words font-bold text-slate-700">${doc.documentNumber || '-'}</p>
+                          <p className="mt-1 break-words font-bold text-slate-700">{doc.documentNumber || '-'}</p>
                         </div>
                         <div>
                           <p className="text-[11px] font-medium text-slate-400">تاريخ المستند</p>
                           <p className="mt-1 flex items-center gap-1 font-bold text-slate-700">
                             <CalendarDays className="h-3.5 w-3.5 text-sky-600" />
-                            ${formatArchiveDocumentDate(doc.documentDate, doc.documentDateType)}
+                            {formatArchiveDocumentDate(doc.documentDate, doc.documentDateType)}
                           </p>
                         </div>
                         <div className="col-span-2">
                           <p className="text-[11px] font-medium text-slate-400">الجهة / المصدر</p>
-                          <p className="mt-1 line-clamp-2 font-bold text-slate-700">${doc.issuingAuthority || '-'}</p>
+                          <p className="mt-1 line-clamp-2 font-bold text-slate-700">{doc.issuingAuthority || '-'}</p>
                         </div>
                         <div>
                           <p className="text-[11px] font-medium text-slate-400">نوع الملف</p>
-                          <p className="mt-1 font-black text-slate-700">${getArchiveFileTypeLabel(doc)}</p>
+                          <p className="mt-1 font-black text-slate-700">{getArchiveFileTypeLabel(doc)}</p>
                         </div>
                         <div>
                           <p className="text-[11px] font-medium text-slate-400">الحجم</p>
-                          <p className="mt-1 font-black text-slate-700">${formatFileSize(doc.fileSize)}</p>
+                          <p className="mt-1 font-black text-slate-700">{formatFileSize(doc.fileSize)}</p>
                         </div>
                       </div>
                     </div>
@@ -1181,7 +1181,7 @@ export const ArchivePage: React.FC = () => {
                           .slice(0, 4)
                           .map((tag) => (
                             <span key={tag} className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-500 shadow-sm">
-                              #${tag}
+                              #{tag}
                             </span>
                           ))}
                       </div>
