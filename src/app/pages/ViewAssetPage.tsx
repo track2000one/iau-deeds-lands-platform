@@ -161,9 +161,15 @@ export const ViewAssetPage: React.FC = () => {
             </Button>
           )}
           {canDelete && (
-            <Button variant="destructive" disabled={deleting} onClick={handleDelete}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleting}
+              onClick={handleDelete}
+              className="platform-record-danger border-red-500 bg-gradient-to-b from-white via-red-50 to-red-100 font-extrabold text-red-600 shadow-[0_5px_0_#fca5a5,0_9px_18px_rgba(220,38,38,0.18),inset_0_1px_0_rgba(255,255,255,0.95)] hover:border-red-600 hover:bg-gradient-to-b hover:from-red-50 hover:via-red-100 hover:to-red-200 hover:text-red-700 active:translate-y-[3px] active:shadow-[0_2px_0_#fca5a5,0_4px_8px_rgba(220,38,38,0.16)] disabled:opacity-60"
+            >
               <Trash2 className="ml-2 h-4 w-4" />
-              {deleting ? 'جارٍ الحذف...' : 'حذف'}
+              {deleting ? 'جارٍ الحذف...' : 'حذف الأصل'}
             </Button>
           )}
         </div>
