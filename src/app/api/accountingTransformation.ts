@@ -12,23 +12,51 @@ export type AccountingTransformationQuery = {
   recordType?: string;
   committeeStatus?: string;
   readinessStatus?: string;
+  group?: string;
   page?: number;
   limit?: number;
   all?: boolean;
 };
 
-export const getAccountingTransformationStats = () =>
-  apiJson<AccountingTransformationStats>('/api/accounting-transformation/stats');
+export type AccountingTransformationGroupSummary = {
+  key: string;
+  label: string;
+  code?: string | null;
+  count: number;
+  averageOverall: number;
+  averageCensus: number;
+  averageInventory: number;
+  averageValuation: number;
+};
 
-export const getAccountingTransformationRecords = (query: AccountingTransformationQuery = {}) => {
+const buildQuery = (query: AccountingTransformationQuery = {}) => {
   const params = new URLSearchParams();
   if (query.search) params.set('search', query.search);
   if (query.recordType && query.recordType !== 'all') params.set('recordType', query.recordType);
   if (query.committeeStatus && query.committeeStatus !== 'all') params.set('committeeStatus', query.committeeStatus);
   if (query.readinessStatus && query.readinessStatus !== 'all') params.set('readinessStatus', query.readinessStatus);
+  if (query.group && query.group !== 'all') params.set('group', query.group);
   if (query.page) params.set('page', String(query.page));
   if (query.limit) params.set('limit', String(query.limit));
   if (query.all) params.set('all', '1');
+  return params;
+};
+
+export const getAccountingTransformationStats = () =>
+  apiJson<AccountingTransformationStats>('/api/accounting-transformation/stats');
+
+export const getAccountingTransformationGroups = (
+  query: Pick<AccountingTransformationQuery, 'search' | 'recordType' | 'committeeStatus' | 'readinessStatus'> = {}
+) => {
+  const params = buildQuery(query);
+  const suffix = params.toString();
+  return apiJson<AccountingTransformationGroupSummary[]>(
+    `/api/accounting-transformation/groups${suffix ? `?${suffix}` : ''}`
+  );
+};
+
+export const getAccountingTransformationRecords = (query: AccountingTransformationQuery = {}) => {
+  const params = buildQuery(query);
   const suffix = params.toString();
   return apiJson<AccountingTransformationPage>(`/api/accounting-transformation${suffix ? `?${suffix}` : ''}`);
 };
