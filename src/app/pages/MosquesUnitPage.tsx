@@ -1,0 +1,493 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import { QRCodeSVG } from 'qrcode.react';
+import * as XLSX from 'xlsx';
+import 'leaflet/dist/leaflet.css';
+import {
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  Briefcase,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  Clock3,
+  ExternalLink,
+  Eye,
+  FileText,
+  MapPin,
+  MessageSquare,
+  Plus,
+  Printer,
+  QrCode,
+  RefreshCw,
+  Save,
+  Search,
+  Shield,
+  UserPlus,
+  Users,
+  Wrench,
+  X,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { usePermissions } from '../../context/PermissionsContext';
+import { useAuth } from '../../context/AuthContext';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { NativeSelect } from '../components/ui/native-select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import {
+  mosqueApi,
+  type MosqueAssignment,
+  type MosqueDashboard,
+  type MosqueJobApplication,
+  type MosqueLeave,
+  type MosqueModuleRole,
+  type MosqueNotification,
+  type MosquePersonnel,
+  type MosqueRequest,
+  type MosqueSite,
+  type MosqueTicket,
+} from '../api/mosques';
+
+const roleLabels: Record<MosqueModuleRole, string> = {
+  head: 'رئيس الوحدة',
+  supervisor: 'مشرف الوحدة',
+  personnel: 'منسوب مسجد / مصلى',
+  viewer: 'عرض فقط',
+};
+
+const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', prayer_room: 'مصلى' };
+const siteStatusLabels: Record<string, string> = { active: 'نشط', maintenance: 'تحت الصيانة', temporarily_closed: 'مغلق مؤقتًا' };
+const requestTypeLabels: Record<string, string> = {
+  maintenance: 'صيانة', renovation: 'ترميم', equipment: 'تجهيزات', cleaning: 'نظافة', carpet: 'فرش',
+  air_conditioning: 'مكيفات', audio: 'أجهزة صوت', lighting: 'إنارة', other: 'أخرى',
+};
+const ticketTypeLabels: Record<string, string> = {
+  cleaning: 'مشكلة نظافة', electrical: 'عطل كهرباء', air_conditioning: 'عطل مكيف', audio: 'مشكلة صوتيات',
+  supplies: 'نقص مستلزمات', general: 'ملاحظة عامة', complaint: 'شكوى', other: 'أخرى',
+};
+const leaveTypeLabels: Record<string, string> = { leave: 'إجازة', apology: 'اعتذار', temporary_absence: 'غياب مؤقت' };
+const priorityLabels: Record<string, string> = { low: 'منخفضة', medium: 'متوسطة', high: 'عالية', urgent: 'عاجلة' };
+const statusLabels: Record<string, string> = {
+  new: 'جديد', pending: 'جديد', under_review: 'تحت المراجعة', approved: 'معتمد', returned_for_edit: 'معاد للتعديل',
+  rejected: 'مرفوض', assigned: 'مسند', in_progress: 'قيد التنفيذ', completed: 'مكتمل', resolved: 'تم الحل', closed: 'مغلق',
+  shortlisted: 'مرشح مبدئيًا', interview: 'مقابلة', accepted: 'مقبول', archived: 'مؤرشف',
+};
+
+const requestTransitions: Record<string, string[]> = {
+  new: ['under_review', 'returned_for_edit', 'rejected'], under_review: ['approved', 'returned_for_edit', 'rejected'],
+  returned_for_edit: ['new'], approved: ['in_progress'], in_progress: ['completed'], completed: ['closed', 'in_progress'],
+};
+const ticketTransitions: Record<string, string[]> = {
+  new: ['under_review', 'assigned', 'rejected'], under_review: ['assigned', 'in_progress', 'rejected'],
+  assigned: ['in_progress', 'rejected'], in_progress: ['resolved'], resolved: ['closed', 'in_progress'],
+};
+const leaveTransitions: Record<string, string[]> = {
+  pending: ['under_review', 'approved', 'returned_for_edit', 'rejected'], under_review: ['approved', 'returned_for_edit', 'rejected'], returned_for_edit: ['pending'],
+};
+const jobTransitions: Record<string, string[]> = {
+  new: ['under_review', 'rejected'], under_review: ['shortlisted', 'rejected'], shortlisted: ['interview', 'rejected'],
+  interview: ['accepted', 'rejected'], accepted: ['archived'], rejected: ['archived'],
+};
+
+const statusBadgeClass = (status: string) => {
+  if (['approved', 'completed', 'resolved', 'accepted', 'closed'].includes(status)) return 'border-emerald-300 bg-emerald-50 text-emerald-700';
+  if (['rejected'].includes(status)) return 'border-red-300 bg-red-50 text-red-700';
+  if (['urgent', 'returned_for_edit'].includes(status)) return 'border-amber-300 bg-amber-50 text-amber-700';
+  return 'border-sky-300 bg-sky-50 text-sky-700';
+};
+
+const card3d = 'border-slate-200/90 bg-gradient-to-b from-white to-slate-50/80 shadow-[0_6px_0_rgba(51,65,85,0.10),0_13px_26px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,1)]';
+const button3d = 'shadow-[0_4px_0_rgba(71,85,105,0.13),0_7px_12px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,1)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(71,85,105,0.12)]';
+
+const emptySite = {
+  name: '', siteType: 'mosque', city: 'الدمام', district: '', campusLocation: '', area: '', capacity: '', latitude: '', longitude: '',
+  status: 'active', imamName: '', muezzinName: '', khateebName: '', contactPhone: '', notes: '',
+};
+const emptyRequest = { siteId: '', requestType: 'maintenance', priority: 'medium', description: '', notes: '', file: null as File | null };
+const emptyLeave = { siteId: '', requestType: 'leave', startDate: '', endDate: '', reason: '', replacementName: '', notes: '' };
+
+export const MosquesUnitPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { hasPermission, isAdmin } = usePermissions();
+  const { users } = useAuth();
+  const canAdd = isAdmin || hasPermission('mosques', 'canAdd');
+  const canEdit = isAdmin || hasPermission('mosques', 'canEdit');
+  const canDelete = isAdmin || hasPermission('mosques', 'canDelete');
+  const canPrint = isAdmin || hasPermission('mosques', 'canPrint');
+
+  const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<MosqueModuleRole>('viewer');
+  const [linkedSiteId, setLinkedSiteId] = useState<string | null>(null);
+  const [dashboard, setDashboard] = useState<MosqueDashboard | null>(null);
+  const [sites, setSites] = useState<MosqueSite[]>([]);
+  const [requests, setRequests] = useState<MosqueRequest[]>([]);
+  const [tickets, setTickets] = useState<MosqueTicket[]>([]);
+  const [leaves, setLeaves] = useState<MosqueLeave[]>([]);
+  const [jobs, setJobs] = useState<MosqueJobApplication[]>([]);
+  const [personnel, setPersonnel] = useState<MosquePersonnel[]>([]);
+  const [assignments, setAssignments] = useState<MosqueAssignment[]>([]);
+  const [notifications, setNotifications] = useState<MosqueNotification[]>([]);
+  const [search, setSearch] = useState('');
+
+  const [siteDialog, setSiteDialog] = useState(false);
+  const [editingSite, setEditingSite] = useState<MosqueSite | null>(null);
+  const [siteForm, setSiteForm] = useState<any>(emptySite);
+  const [requestDialog, setRequestDialog] = useState(false);
+  const [requestForm, setRequestForm] = useState<any>(emptyRequest);
+  const [leaveDialog, setLeaveDialog] = useState(false);
+  const [leaveForm, setLeaveForm] = useState<any>(emptyLeave);
+  const [statusDialog, setStatusDialog] = useState(false);
+  const [statusTarget, setStatusTarget] = useState<{ kind: 'request' | 'ticket' | 'leave' | 'job'; item: any } | null>(null);
+  const [statusValue, setStatusValue] = useState('');
+  const [statusNote, setStatusNote] = useState('');
+  const [statusEvidence, setStatusEvidence] = useState<File | null>(null);
+  const [qrSite, setQrSite] = useState<MosqueSite | null>(null);
+  const [personnelDialog, setPersonnelDialog] = useState(false);
+  const [personnelForm, setPersonnelForm] = useState({ siteId: '', name: '', role: 'imam', mobile: '', email: '' });
+  const [saving, setSaving] = useState(false);
+
+  const loadAll = async () => {
+    setLoading(true);
+    try {
+      const me = await mosqueApi.me();
+      setRole(me.role);
+      setLinkedSiteId(me.siteId || null);
+      const [dash, siteRows, requestRows, ticketRows, leaveRows, personRows, noticeRows] = await Promise.all([
+        mosqueApi.dashboard(), mosqueApi.sites(), mosqueApi.requests(), mosqueApi.tickets(), mosqueApi.leaves(), mosqueApi.personnel(), mosqueApi.notifications(),
+      ]);
+      setDashboard(dash);
+      setSites(siteRows);
+      setRequests(requestRows);
+      setTickets(ticketRows);
+      setLeaves(leaveRows);
+      setPersonnel(personRows);
+      setNotifications(noticeRows);
+
+      if (me.role === 'head' || me.role === 'supervisor') {
+        try { setJobs(await mosqueApi.jobs()); } catch { setJobs([]); }
+      } else setJobs([]);
+
+      if (me.role === 'head') {
+        try { setAssignments(await mosqueApi.assignments()); } catch { setAssignments([]); }
+      } else setAssignments([]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل بيانات وحدة المساجد');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadAll(); }, []);
+
+  const visibleSites = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const base = role === 'personnel' && linkedSiteId ? sites.filter((site) => site.id === linkedSiteId) : sites;
+    if (!q) return base;
+    return base.filter((site) => [site.name, site.city, site.district, site.campusLocation].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)));
+  }, [sites, search, role, linkedSiteId]);
+
+  const mapSites = useMemo(() => visibleSites.filter((site) => Number.isFinite(Number(site.latitude)) && Number.isFinite(Number(site.longitude))), [visibleSites]);
+  const mapCenter: [number, number] = useMemo(() => {
+    if (!mapSites.length) return [26.3927, 50.0438];
+    return [mapSites.reduce((s, x) => s + Number(x.latitude), 0) / mapSites.length, mapSites.reduce((s, x) => s + Number(x.longitude), 0) / mapSites.length];
+  }, [mapSites]);
+
+  const publicUrlForSite = (site: MosqueSite) => `${window.location.origin}${window.location.pathname}#/mosques/public?site=${encodeURIComponent(site.publicToken)}`;
+
+  const openSiteDialog = (site?: MosqueSite) => {
+    setEditingSite(site || null);
+    setSiteForm(site ? {
+      name: site.name, siteType: site.siteType, city: site.city || '', district: site.district || '', campusLocation: site.campusLocation || '',
+      area: site.area ?? '', capacity: site.capacity ?? '', latitude: site.latitude ?? '', longitude: site.longitude ?? '', status: site.status,
+      imamName: site.imamName || '', muezzinName: site.muezzinName || '', khateebName: site.khateebName || '', contactPhone: site.contactPhone || '', notes: site.notes || '',
+    } : emptySite);
+    setSiteDialog(true);
+  };
+
+  const saveSite = async () => {
+    if (!siteForm.name.trim()) return toast.error('اسم المسجد أو المصلى مطلوب');
+    setSaving(true);
+    try {
+      const payload = {
+        ...siteForm,
+        area: siteForm.area === '' ? null : Number(siteForm.area),
+        capacity: siteForm.capacity === '' ? null : Number(siteForm.capacity),
+        latitude: siteForm.latitude === '' ? null : Number(siteForm.latitude),
+        longitude: siteForm.longitude === '' ? null : Number(siteForm.longitude),
+        mapUrl: siteForm.latitude !== '' && siteForm.longitude !== '' ? `https://www.google.com/maps?q=${siteForm.latitude},${siteForm.longitude}` : null,
+        images: [],
+      };
+      if (editingSite) await mosqueApi.updateSite(editingSite.id, payload); else await mosqueApi.createSite(payload);
+      toast.success(editingSite ? 'تم تحديث بيانات الموقع' : 'تمت إضافة المسجد/المصلى');
+      setSiteDialog(false);
+      await loadAll();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر الحفظ'); } finally { setSaving(false); }
+  };
+
+  const deleteSite = async (site: MosqueSite) => {
+    if (!confirm(`هل تريد حذف ${site.name}؟ إذا كان مرتبطًا بإجراءات فلن يسمح النظام بالحذف.`)) return;
+    try { await mosqueApi.deleteSite(site.id); toast.success('تم الحذف'); await loadAll(); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر الحذف'); }
+  };
+
+  const openRequestDialog = () => {
+    setRequestForm({ ...emptyRequest, siteId: linkedSiteId || sites[0]?.id || '' });
+    setRequestDialog(true);
+  };
+
+  const saveRequest = async () => {
+    if (!requestForm.siteId || requestForm.description.trim().length < 5) return toast.error('حدد الموقع واكتب وصفًا واضحًا للطلب');
+    setSaving(true);
+    try {
+      const attachments: string[] = [];
+      if (requestForm.file) attachments.push((await mosqueApi.upload(requestForm.file)).driveUrl);
+      await mosqueApi.createRequest({ ...requestForm, file: undefined, attachments });
+      toast.success('تم إنشاء الطلب وإرساله للمراجعة');
+      setRequestDialog(false);
+      await loadAll();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر إنشاء الطلب'); } finally { setSaving(false); }
+  };
+
+  const openLeaveDialog = () => {
+    setLeaveForm({ ...emptyLeave, siteId: linkedSiteId || sites[0]?.id || '' });
+    setLeaveDialog(true);
+  };
+
+  const saveLeave = async () => {
+    if (!leaveForm.siteId || !leaveForm.startDate || !leaveForm.endDate || !leaveForm.reason.trim() || !leaveForm.replacementName.trim()) return toast.error('أكمل بيانات الإجازة والبديل');
+    setSaving(true);
+    try {
+      await mosqueApi.createLeave(leaveForm);
+      toast.success('تم إرسال طلب الإجازة/الاعتذار');
+      setLeaveDialog(false);
+      await loadAll();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر إرسال الطلب'); } finally { setSaving(false); }
+  };
+
+  const transitionsFor = (kind: string, status: string) => {
+    if (kind === 'request') return requestTransitions[status] || [];
+    if (kind === 'ticket') return ticketTransitions[status] || [];
+    if (kind === 'leave') return leaveTransitions[status] || [];
+    return jobTransitions[status] || [];
+  };
+
+  const openStatusDialog = (kind: 'request' | 'ticket' | 'leave' | 'job', item: any) => {
+    const next = transitionsFor(kind, item.status);
+    if (!next.length) return toast.info('لا توجد حالة تالية متاحة لهذا السجل');
+    setStatusTarget({ kind, item });
+    setStatusValue(next[0]);
+    setStatusNote('');
+    setStatusEvidence(null);
+    setStatusDialog(true);
+  };
+
+  const applyStatus = async () => {
+    if (!statusTarget || !statusValue) return;
+    if (['rejected', 'returned_for_edit'].includes(statusValue) && !statusNote.trim()) return toast.error('اكتب سبب الرفض أو ملاحظة الإعادة');
+    setSaving(true);
+    try {
+      let evidenceUrl: string | undefined;
+      if (statusTarget.kind === 'request' && statusValue === 'completed') {
+        if (!statusEvidence && !statusTarget.item.completionEvidenceUrl) return toast.error('يلزم رفع إثبات الإنجاز قبل إكمال الطلب');
+        if (statusEvidence) evidenceUrl = (await mosqueApi.upload(statusEvidence)).driveUrl;
+      }
+      const payload = { status: statusValue, note: statusNote, rejectionReason: statusNote, returnReason: statusNote, completionEvidenceUrl: evidenceUrl };
+      if (statusTarget.kind === 'request') await mosqueApi.updateRequestStatus(statusTarget.item.id, payload);
+      if (statusTarget.kind === 'ticket') await mosqueApi.updateTicketStatus(statusTarget.item.id, { ...payload, resolutionNote: statusNote });
+      if (statusTarget.kind === 'leave') await mosqueApi.updateLeaveStatus(statusTarget.item.id, payload);
+      if (statusTarget.kind === 'job') await mosqueApi.updateJobStatus(statusTarget.item.id, payload);
+      toast.success('تم تحديث الحالة');
+      setStatusDialog(false);
+      await loadAll();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تحديث الحالة'); } finally { setSaving(false); }
+  };
+
+  const convertTicket = async (ticket: MosqueTicket) => {
+    if (!confirm(`تحويل البلاغ ${ticket.ticketNumber} إلى طلب صيانة مرتبط؟`)) return;
+    try { await mosqueApi.convertTicketToRequest(ticket.id, { requestType: 'maintenance', priority: 'medium' }); toast.success('تم إنشاء طلب صيانة مرتبط بالبلاغ'); await loadAll(); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر التحويل'); }
+  };
+
+  const savePersonnel = async () => {
+    if (!personnelForm.siteId || !personnelForm.name.trim()) return toast.error('الموقع والاسم مطلوبان');
+    setSaving(true);
+    try { await mosqueApi.createPersonnel(personnelForm); toast.success('تمت إضافة منسوب المسجد'); setPersonnelDialog(false); await loadAll(); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر الإضافة'); } finally { setSaving(false); }
+  };
+
+  const setUserAssignment = async (userId: string, roleValue: MosqueModuleRole, siteId?: string) => {
+    try {
+      await mosqueApi.setAssignment(userId, { role: roleValue, siteId: siteId || null, personnelRole: roleValue === 'personnel' ? 'collaborator' : null });
+      toast.success('تم تحديث الدور التشغيلي');
+      setAssignments(await mosqueApi.assignments());
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تحديث الدور'); }
+  };
+
+  const exportReportExcel = async () => {
+    try {
+      const data = await mosqueApi.reportSummary();
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.sites || []), 'المساجد والمصليات');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.requests || []), 'الطلبات');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.tickets || []), 'البلاغات');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.leaves || []), 'الإجازات');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.jobs || []), 'التوظيف');
+      XLSX.writeFile(workbook, `mosques-unit-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تصدير التقرير'); }
+  };
+
+  const unreadNotifications = notifications.filter((item) => !item.isRead).length;
+
+  if (loading) {
+    return <div className="flex min-h-[420px] items-center justify-center"><RefreshCw className="h-8 w-8 animate-spin text-primary" /><span className="mr-3 font-semibold">جاري تحميل وحدة المساجد والمصليات...</span></div>;
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-[1760px] space-y-5 p-1 sm:p-3 md:p-5" dir="rtl">
+      <section className="relative overflow-hidden rounded-[28px] border border-sky-200/70 bg-gradient-to-l from-white via-sky-50/70 to-emerald-50/40 p-5 shadow-[0_12px_35px_rgba(15,23,42,0.08)] md:p-7">
+        <div className="absolute -left-16 -top-20 h-52 w-52 rounded-full bg-sky-300/20 blur-3xl" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">وحدة تشغيلية متكاملة</Badge>
+              <Badge variant="outline" className="border-sky-300 bg-white text-sky-700"><Shield className="ml-1 h-3.5 w-3.5" />{roleLabels[role]}</Badge>
+            </div>
+            <h1 className="text-2xl font-black text-slate-900 md:text-4xl">وحدة العناية بالمساجد والمصليات الجامعية</h1>
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-slate-600 md:text-base">إدارة المساجد والمصليات، الطلبات والصيانة، البلاغات، الإجازات، التوظيف، الخرائط، التقارير والإشعارات ضمن مسار حوكمة موحد.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className={button3d} onClick={() => navigate('/mosques/public')}><ExternalLink className="ml-2 h-4 w-4" />البوابة العامة</Button>
+            <Button variant="outline" className={button3d} onClick={loadAll}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button>
+            {canAdd && ['head', 'supervisor'].includes(role) && <Button className={`${button3d} bg-sky-700 hover:bg-sky-800`} onClick={() => openSiteDialog()}><Plus className="ml-2 h-4 w-4" />إضافة مسجد / مصلى</Button>}
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+        <Stat title="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} />
+        <Stat title="طلبات جديدة" value={dashboard?.stats.newRequests || 0} icon={ClipboardList} />
+        <Stat title="تحت المراجعة" value={dashboard?.stats.reviewRequests || 0} icon={Clock3} />
+        <Stat title="معتمدة" value={dashboard?.stats.approvedRequests || 0} icon={CheckCircle2} />
+        <Stat title="طلبات متأخرة" value={dashboard?.stats.lateRequests || 0} icon={AlertTriangle} />
+        <Stat title="بلاغات مفتوحة" value={dashboard?.stats.openTickets || 0} icon={MessageSquare} />
+        <Stat title="إجازات معلقة" value={dashboard?.stats.pendingLeaves || 0} icon={CalendarDays} />
+        <Stat title="طلبات توظيف" value={dashboard?.stats.jobs || 0} icon={Briefcase} />
+      </div>
+
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border bg-white/80 p-2">
+          <TabsTrigger value="overview">الرئيسية</TabsTrigger>
+          <TabsTrigger value="sites">المساجد والمصليات</TabsTrigger>
+          <TabsTrigger value="requests">الطلبات</TabsTrigger>
+          <TabsTrigger value="tickets">البلاغات</TabsTrigger>
+          <TabsTrigger value="leaves">الإجازات</TabsTrigger>
+          {(role === 'head' || role === 'supervisor') && <TabsTrigger value="jobs">التوظيف</TabsTrigger>}
+          <TabsTrigger value="map">الخريطة</TabsTrigger>
+          <TabsTrigger value="reports">التقارير</TabsTrigger>
+          {(role === 'head' || role === 'supervisor') && <TabsTrigger value="team">المنسوبون</TabsTrigger>}
+          {role === 'head' && <TabsTrigger value="roles">الأدوار التشغيلية</TabsTrigger>}
+          <TabsTrigger value="notifications" className="gap-1">الإشعارات {unreadNotifications > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{unreadNotifications}</span>}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className={card3d}><CardHeader><CardTitle>آخر طلبات الصيانة والاحتياج</CardTitle><CardDescription>أحدث العمليات التي تحتاج متابعة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد طلبات حتى الآن" />}</CardContent></Card>
+            <Card className={card3d}><CardHeader><CardTitle>آخر البلاغات</CardTitle><CardDescription>بلاغات الزوار ومنسوبي الجامعة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد بلاغات حتى الآن" />}</CardContent></Card>
+          </div>
+          <Card className={card3d}><CardHeader><CardTitle>ضوابط سير الإجراءات</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="رفض أو إعادة الطلب" text="لا يمكن الرفض أو الإعادة دون سبب موثق." /><Rule title="إثبات الإنجاز" text="الطلب التنفيذي لا يصبح مكتملًا قبل إرفاق ما يثبت الإنجاز." /><Rule title="الإجازات والبدلاء" text="يفحص النظام تعارض فترة البديل قبل قبول الطلب." /><Rule title="البلاغات" text="يبقى البلاغ مستقلًا ويمكن تحويله إلى طلب صيانة مرتبط دون فقد تاريخه." /></CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="sites" className="space-y-4">
+          <Card className={card3d}><CardContent className="p-4"><div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pr-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم المسجد أو المدينة أو الحي أو الموقع..." /></div></CardContent></Card>
+          {visibleSites.length === 0 ? <Empty text="لا توجد مساجد أو مصليات مسجلة" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{visibleSites.map((site) => <SiteCard key={site.id} site={site} canEdit={canEdit && ['head', 'supervisor'].includes(role)} canDelete={canDelete && role === 'head'} onEdit={() => openSiteDialog(site)} onDelete={() => deleteSite(site)} onQr={() => setQrSite(site)} />)}</div>}
+        </TabsContent>
+
+        <TabsContent value="requests" className="space-y-4">
+          {canAdd && role !== 'viewer' && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />طلب صيانة / احتياج جديد</Button></div>}
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{requests.map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} onStatus={canEdit && ['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} />)}</div>
+          {!requests.length && <Empty text="لا توجد طلبات مسجلة" />}
+        </TabsContent>
+
+        <TabsContent value="tickets" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{tickets.map((item) => <WorkflowCard key={item.id} title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'مبلغ مجهول']} onStatus={canEdit && ['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={canAdd && ['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className={button3d} onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline">مرتبط بطلب صيانة</Badge> : null} />)}</div>
+          {!tickets.length && <Empty text="لا توجد بلاغات مسجلة" />}
+        </TabsContent>
+
+        <TabsContent value="leaves" className="space-y-4">
+          {canAdd && role !== 'viewer' && <div className="flex justify-end"><Button className={button3d} onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button></div>}
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{leaves.map((item) => <WorkflowCard key={item.id} title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} onStatus={canEdit && ['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} />)}</div>
+          {!leaves.length && <Empty text="لا توجد طلبات إجازة أو اعتذار" />}
+        </TabsContent>
+
+        <TabsContent value="jobs" className="space-y-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">بيانات الهوية والجوال والبريد والسيرة الذاتية تظهر فقط للمخولين داخل الوحدة، ولا تظهر في البوابة العامة.</div>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{jobs.map((item) => <WorkflowCard key={item.id} title={item.applicationNumber} subtitle={`${item.fullName} — ${item.jobType}`} description={`${item.qualification}${item.preferredLocation ? ` — ${item.preferredLocation}` : ''}`} status={item.status} meta={[item.email, item.phone]} onStatus={canEdit && role === 'head' ? () => openStatusDialog('job', item) : undefined} extraAction={item.cvUrl ? <Button variant="outline" size="sm" className={button3d} onClick={() => window.open(item.cvUrl!, '_blank')}><Eye className="ml-1 h-3.5 w-3.5" />السيرة الذاتية</Button> : null} />)}</div>
+          {!jobs.length && <Empty text="لا توجد طلبات توظيف" />}
+        </TabsContent>
+
+        <TabsContent value="map" className="space-y-4">
+          <Card className={`${card3d} overflow-hidden`}><CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />خريطة المساجد والمصليات</CardTitle><CardDescription>OpenStreetMap / Leaflet — اضغط على أي نقطة لعرض بيانات الموقع.</CardDescription></CardHeader><CardContent><div className="h-[560px] overflow-hidden rounded-2xl border"><MapContainer key={`${mapCenter[0]}-${mapCenter[1]}-${mapSites.length}`} center={mapCenter} zoom={13} className="h-full w-full"><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />{mapSites.map((site) => <CircleMarker key={site.id} center={[Number(site.latitude), Number(site.longitude)]} radius={10} pathOptions={{ fillOpacity: 0.85 }}><Popup><div dir="rtl" className="min-w-[180px]"><strong>{site.name}</strong><div>{siteTypeLabels[site.siteType]} — {siteStatusLabels[site.status]}</div><div>{site.city || ''} {site.district || ''}</div><div>بلاغات: {site._count?.tickets || 0}</div><button onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')} className="mt-2 underline">فتح في Google Maps</button></div></Popup></CircleMarker>)}</MapContainer></div></CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-4">
+          <Card className={card3d}><CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" />التقارير والإحصائيات</CardTitle><CardDescription>تجميع بيانات الوحدة للتقارير الشهرية والسنوية مع التصدير.</CardDescription></CardHeader><CardContent><div className="grid gap-3 md:grid-cols-3"><ReportMetric label="إجمالي الطلبات" value={requests.length} /><ReportMetric label="المكتملة والمغلقة" value={requests.filter((x) => ['completed', 'closed'].includes(x.status)).length} /><ReportMetric label="البلاغات المفتوحة" value={tickets.filter((x) => !['closed', 'rejected'].includes(x.status)).length} /></div><div className="mt-5 flex flex-wrap gap-2">{canPrint && <Button variant="outline" className={button3d} onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة / حفظ PDF</Button>}<Button variant="outline" className={button3d} onClick={exportReportExcel}><FileText className="ml-2 h-4 w-4" />تصدير Excel</Button></div></CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="team" className="space-y-4">
+          {canAdd && <div className="flex justify-end"><Button className={button3d} onClick={() => { setPersonnelForm({ siteId: sites[0]?.id || '', name: '', role: 'imam', mobile: '', email: '' }); setPersonnelDialog(true); }}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب مسجد</Button></div>}
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{personnel.map((item) => <Card key={item.id} className={card3d}><CardContent className="p-5"><div className="flex items-start justify-between"><div><h3 className="font-black">{item.name}</h3><p className="text-sm text-muted-foreground">{item.site?.name}</p></div><Badge variant="outline">{item.role === 'imam' ? 'إمام' : item.role === 'muezzin' ? 'مؤذن' : item.role === 'khateeb' ? 'خطيب' : 'متعاون'}</Badge></div><div className="mt-4 grid grid-cols-2 gap-2 text-sm"><Info label="الجوال" value={item.mobile || '-'} /><Info label="البريد" value={item.email || '-'} /></div></CardContent></Card>)}</div>
+          {!personnel.length && <Empty text="لا يوجد منسوبون مسجلون" />}
+        </TabsContent>
+
+        <TabsContent value="roles" className="space-y-4">
+          <Card className={card3d}><CardHeader><CardTitle>الأدوار التشغيلية داخل الوحدة</CardTitle><CardDescription>هذه الأدوار تحدد مسار الإجراء داخل الوحدة. صلاحية الدخول للقسم نفسه تمنح من لوحة التحكم العامة للمستخدمين.</CardDescription></CardHeader><CardContent className="space-y-3">{users.filter((u) => u.role !== 'admin').map((user) => {
+            const assignment = assignments.find((a) => a.userId === user.uid);
+            return <div key={user.uid} className="grid gap-3 rounded-2xl border bg-white p-4 md:grid-cols-[1.3fr_1fr_1.3fr] md:items-center"><div><p className="font-bold">{user.username}</p><p className="text-xs text-muted-foreground">{user.email}</p></div><NativeSelect value={assignment?.role || 'viewer'} onChange={(e) => setUserAssignment(user.uid, e.target.value as MosqueModuleRole, assignment?.siteId || undefined)}><option value="viewer">عرض فقط</option><option value="supervisor">مشرف الوحدة</option><option value="personnel">منسوب مسجد/مصلى</option><option value="head">رئيس الوحدة</option></NativeSelect><NativeSelect value={assignment?.siteId || ''} onChange={(e) => setUserAssignment(user.uid, assignment?.role || 'viewer', e.target.value)}><option value="">غير مرتبط بموقع محدد</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></div>;
+          })}</CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-3">
+          {notifications.map((notice) => <button key={notice.id} onClick={async () => { if (!notice.isRead) { await mosqueApi.readNotification(notice.id); setNotifications((current) => current.map((x) => x.id === notice.id ? { ...x, isRead: true } : x)); } }} className={`w-full rounded-2xl border p-4 text-right transition ${notice.isRead ? 'bg-white' : 'border-sky-300 bg-sky-50 shadow-sm'}`}><div className="flex items-start justify-between gap-3"><div><p className="font-bold">{notice.title}</p><p className="mt-1 text-sm text-muted-foreground">{notice.message}</p></div><Bell className={`h-5 w-5 ${notice.isRead ? 'text-slate-400' : 'text-sky-600'}`} /></div><p className="mt-2 text-xs text-muted-foreground">{new Date(notice.createdAt).toLocaleString('ar-SA')}</p></button>)}
+          {!notifications.length && <Empty text="لا توجد إشعارات" />}
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={siteDialog} onOpenChange={setSiteDialog}><DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto" dir="rtl"><DialogHeader><DialogTitle>{editingSite ? 'تعديل بيانات المسجد / المصلى' : 'إضافة مسجد / مصلى جديد'}</DialogTitle><DialogDescription>أدخل البيانات الأساسية والموقع والمنسوبين الرئيسيين.</DialogDescription></DialogHeader><div className="grid gap-4 md:grid-cols-3"><Field label="الاسم *"><Input value={siteForm.name} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} /></Field><Field label="النوع"><NativeSelect value={siteForm.siteType} onChange={(e) => setSiteForm({ ...siteForm, siteType: e.target.value })}><option value="mosque">مسجد</option><option value="prayer_room">مصلى</option></NativeSelect></Field><Field label="الحالة"><NativeSelect value={siteForm.status} onChange={(e) => setSiteForm({ ...siteForm, status: e.target.value })}><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect></Field><Field label="المدينة"><Input value={siteForm.city} onChange={(e) => setSiteForm({ ...siteForm, city: e.target.value })} /></Field><Field label="الحي"><Input value={siteForm.district} onChange={(e) => setSiteForm({ ...siteForm, district: e.target.value })} /></Field><Field label="الموقع داخل الجامعة"><Input value={siteForm.campusLocation} onChange={(e) => setSiteForm({ ...siteForm, campusLocation: e.target.value })} /></Field><Field label="المساحة م²"><Input type="number" value={siteForm.area} onChange={(e) => setSiteForm({ ...siteForm, area: e.target.value })} /></Field><Field label="الطاقة الاستيعابية"><Input type="number" value={siteForm.capacity} onChange={(e) => setSiteForm({ ...siteForm, capacity: e.target.value })} /></Field><Field label="رقم التواصل"><Input value={siteForm.contactPhone} onChange={(e) => setSiteForm({ ...siteForm, contactPhone: e.target.value })} /></Field><Field label="خط العرض"><Input type="number" step="any" value={siteForm.latitude} onChange={(e) => setSiteForm({ ...siteForm, latitude: e.target.value })} /></Field><Field label="خط الطول"><Input type="number" step="any" value={siteForm.longitude} onChange={(e) => setSiteForm({ ...siteForm, longitude: e.target.value })} /></Field><div className="flex items-end"><Button type="button" variant="outline" className={`w-full ${button3d}`} onClick={() => navigator.geolocation?.getCurrentPosition((p) => setSiteForm({ ...siteForm, latitude: p.coords.latitude, longitude: p.coords.longitude }), () => toast.error('تعذر تحديد الموقع'))}><MapPin className="ml-2 h-4 w-4" />التقاط موقعي الحالي</Button></div><Field label="الإمام"><Input value={siteForm.imamName} onChange={(e) => setSiteForm({ ...siteForm, imamName: e.target.value })} /></Field><Field label="المؤذن"><Input value={siteForm.muezzinName} onChange={(e) => setSiteForm({ ...siteForm, muezzinName: e.target.value })} /></Field><Field label="الخطيب"><Input value={siteForm.khateebName} onChange={(e) => setSiteForm({ ...siteForm, khateebName: e.target.value })} /></Field><div className="md:col-span-3"><Field label="ملاحظات"><Textarea value={siteForm.notes} onChange={(e) => setSiteForm({ ...siteForm, notes: e.target.value })} /></Field></div></div><DialogFooter><Button variant="outline" onClick={() => setSiteDialog(false)}>إلغاء</Button><Button onClick={saveSite} disabled={saving}><Save className="ml-2 h-4 w-4" />حفظ</Button></DialogFooter></DialogContent></Dialog>
+
+      <Dialog open={requestDialog} onOpenChange={setRequestDialog}><DialogContent dir="rtl"><DialogHeader><DialogTitle>إنشاء طلب صيانة أو احتياج</DialogTitle></DialogHeader><div className="space-y-4"><Field label="المسجد / المصلى"><NativeSelect value={requestForm.siteId} onChange={(e) => setRequestForm({ ...requestForm, siteId: e.target.value })} disabled={role === 'personnel'}>{sites.filter((s) => role !== 'personnel' || !linkedSiteId || s.id === linkedSiteId).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><div className="grid grid-cols-2 gap-3"><Field label="نوع الطلب"><NativeSelect value={requestForm.requestType} onChange={(e) => setRequestForm({ ...requestForm, requestType: e.target.value })}>{Object.entries(requestTypeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></Field><Field label="الأولوية"><NativeSelect value={requestForm.priority} onChange={(e) => setRequestForm({ ...requestForm, priority: e.target.value })}>{Object.entries(priorityLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></Field></div><Field label="وصف المشكلة / الاحتياج"><Textarea rows={5} value={requestForm.description} onChange={(e) => setRequestForm({ ...requestForm, description: e.target.value })} /></Field><Field label="صورة أو PDF"><Input type="file" accept="image/*,application/pdf" onChange={(e) => setRequestForm({ ...requestForm, file: e.target.files?.[0] || null })} /></Field><Field label="ملاحظات"><Input value={requestForm.notes} onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })} /></Field></div><DialogFooter><Button variant="outline" onClick={() => setRequestDialog(false)}>إلغاء</Button><Button onClick={saveRequest} disabled={saving}>إرسال الطلب</Button></DialogFooter></DialogContent></Dialog>
+
+      <Dialog open={leaveDialog} onOpenChange={setLeaveDialog}><DialogContent dir="rtl"><DialogHeader><DialogTitle>طلب إجازة / اعتذار</DialogTitle></DialogHeader><div className="space-y-4"><Field label="المسجد / المصلى"><NativeSelect value={leaveForm.siteId} onChange={(e) => setLeaveForm({ ...leaveForm, siteId: e.target.value })} disabled={role === 'personnel'}>{sites.filter((s) => role !== 'personnel' || !linkedSiteId || s.id === linkedSiteId).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="نوع الطلب"><NativeSelect value={leaveForm.requestType} onChange={(e) => setLeaveForm({ ...leaveForm, requestType: e.target.value })}>{Object.entries(leaveTypeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></Field><div className="grid grid-cols-2 gap-3"><Field label="من"><Input type="date" value={leaveForm.startDate} onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value })} /></Field><Field label="إلى"><Input type="date" value={leaveForm.endDate} onChange={(e) => setLeaveForm({ ...leaveForm, endDate: e.target.value })} /></Field></div><Field label="السبب"><Textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} /></Field><Field label="اسم النائب / البديل"><Input value={leaveForm.replacementName} onChange={(e) => setLeaveForm({ ...leaveForm, replacementName: e.target.value })} /></Field><Field label="ملاحظات"><Input value={leaveForm.notes} onChange={(e) => setLeaveForm({ ...leaveForm, notes: e.target.value })} /></Field></div><DialogFooter><Button variant="outline" onClick={() => setLeaveDialog(false)}>إلغاء</Button><Button onClick={saveLeave} disabled={saving}>إرسال الطلب</Button></DialogFooter></DialogContent></Dialog>
+
+      <Dialog open={statusDialog} onOpenChange={setStatusDialog}><DialogContent dir="rtl"><DialogHeader><DialogTitle>تحديث حالة الإجراء</DialogTitle><DialogDescription>{statusTarget?.item?.requestNumber || statusTarget?.item?.ticketNumber || statusTarget?.item?.leaveNumber || statusTarget?.item?.applicationNumber}</DialogDescription></DialogHeader><div className="space-y-4"><Field label="الحالة الجديدة"><NativeSelect value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>{statusTarget ? transitionsFor(statusTarget.kind, statusTarget.item.status).filter((s) => !(s === 'approved' && role !== 'head')).map((s) => <option key={s} value={s}>{statusLabels[s] || s}</option>) : null}</NativeSelect></Field><Field label={['rejected', 'returned_for_edit'].includes(statusValue) ? 'السبب / الملاحظة *' : 'ملاحظة الإجراء'}><Textarea value={statusNote} onChange={(e) => setStatusNote(e.target.value)} /></Field>{statusTarget?.kind === 'request' && statusValue === 'completed' && <Field label="إثبات الإنجاز *"><Input type="file" accept="image/*,application/pdf" onChange={(e) => setStatusEvidence(e.target.files?.[0] || null)} /></Field>}</div><DialogFooter><Button variant="outline" onClick={() => setStatusDialog(false)}>إلغاء</Button><Button onClick={applyStatus} disabled={saving}>تحديث الحالة</Button></DialogFooter></DialogContent></Dialog>
+
+      <Dialog open={Boolean(qrSite)} onOpenChange={(open) => !open && setQrSite(null)}><DialogContent dir="rtl"><DialogHeader><DialogTitle>رمز QR — {qrSite?.name}</DialogTitle><DialogDescription>يفتح نموذج البلاغ العام مرتبطًا بهذا الموقع دون كشف معرف قاعدة البيانات.</DialogDescription></DialogHeader>{qrSite && <div className="flex flex-col items-center gap-4 rounded-2xl border bg-white p-6"><QRCodeSVG value={publicUrlForSite(qrSite)} size={220} level="M" includeMargin /><p className="break-all text-center text-xs text-muted-foreground" dir="ltr">{publicUrlForSite(qrSite)}</p><Button variant="outline" className={button3d} onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة الرمز</Button></div>}</DialogContent></Dialog>
+
+      <Dialog open={personnelDialog} onOpenChange={setPersonnelDialog}><DialogContent dir="rtl"><DialogHeader><DialogTitle>إضافة منسوب مسجد / مصلى</DialogTitle></DialogHeader><div className="space-y-4"><Field label="الموقع"><NativeSelect value={personnelForm.siteId} onChange={(e) => setPersonnelForm({ ...personnelForm, siteId: e.target.value })}>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="الاسم"><Input value={personnelForm.name} onChange={(e) => setPersonnelForm({ ...personnelForm, name: e.target.value })} /></Field><Field label="الصفة"><NativeSelect value={personnelForm.role} onChange={(e) => setPersonnelForm({ ...personnelForm, role: e.target.value })}><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborator">متعاون</option></NativeSelect></Field><Field label="الجوال"><Input value={personnelForm.mobile} onChange={(e) => setPersonnelForm({ ...personnelForm, mobile: e.target.value })} /></Field><Field label="البريد"><Input value={personnelForm.email} onChange={(e) => setPersonnelForm({ ...personnelForm, email: e.target.value })} /></Field></div><DialogFooter><Button variant="outline" onClick={() => setPersonnelDialog(false)}>إلغاء</Button><Button onClick={savePersonnel} disabled={saving}>حفظ</Button></DialogFooter></DialogContent></Dialog>
+    </div>
+  );
+};
+
+const Stat = ({ title, value, icon: Icon }: { title: string; value: number; icon: React.ElementType }) => <Card className={card3d}><CardContent className="flex items-center justify-between gap-3 p-4"><div><p className="text-xs text-muted-foreground">{title}</p><p className="mt-1 text-2xl font-black text-slate-800">{value}</p></div><div className="rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-sky-700 shadow-sm"><Icon className="h-5 w-5" /></div></CardContent></Card>;
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
+const Info = ({ label, value }: { label: string; value: React.ReactNode }) => <div><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 break-words font-semibold">{value}</p></div>;
+const Empty = ({ text }: { text: string }) => <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center text-muted-foreground"><Building2 className="mx-auto mb-3 h-10 w-10 opacity-30" /><p>{text}</p></div>;
+const Rule = ({ title, text }: { title: string; text: string }) => <div className="rounded-2xl border bg-white p-4"><p className="font-bold text-slate-800">{title}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p></div>;
+const ReportMetric = ({ label, value }: { label: string; value: number }) => <div className="rounded-2xl border bg-gradient-to-b from-white to-sky-50 p-5 text-center shadow-sm"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-3xl font-black text-slate-800">{value}</p></div>;
+const MiniRow = ({ title, subtitle, status }: { title: string; subtitle: string; status: string }) => <div className="flex items-start justify-between gap-3 rounded-2xl border bg-white p-3"><div className="min-w-0"><p className="truncate font-bold">{title}</p><p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{subtitle}</p></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>;
+
+const SiteCard = ({ site, canEdit, canDelete, onEdit, onDelete, onQr }: { site: MosqueSite; canEdit: boolean; canDelete: boolean; onEdit: () => void; onDelete: () => void; onQr: () => void }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-emerald-400 via-sky-500 to-blue-800" /><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2">{siteTypeLabels[site.siteType]}</Badge><h3 className="text-lg font-black text-slate-800">{site.name}</h3><p className="mt-1 text-sm text-muted-foreground">{site.city || '-'} — {site.district || '-'}</p></div><Badge variant="outline" className={site.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : site.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-50'}>{siteStatusLabels[site.status]}</Badge></div><div className="my-4 grid grid-cols-2 gap-3 rounded-2xl border bg-slate-50/70 p-3 text-sm"><Info label="الموقع داخل الجامعة" value={site.campusLocation || '-'} /><Info label="المساحة" value={site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'} /><Info label="الإمام" value={site.imamName || '-'} /><Info label="المؤذن" value={site.muezzinName || '-'} /><Info label="الطلبات" value={site._count?.requests || 0} /><Info label="البلاغات" value={site._count?.tickets || 0} /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Button variant="outline" className={button3d} onClick={onQr}><QrCode className="ml-1 h-4 w-4" />QR</Button>{site.latitude != null && site.longitude != null && <Button variant="outline" className={button3d} onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')}><MapPin className="ml-1 h-4 w-4" />الخريطة</Button>}{canEdit && <Button variant="outline" className={button3d} onClick={onEdit}>تعديل</Button>}{canDelete && <Button variant="outline" className="border-red-300 text-red-600" onClick={onDelete}>حذف</Button>}</div></CardContent></Card>;
+
+const WorkflowCard = ({ title, subtitle, description, status, meta, onStatus, extraAction }: { title: string; subtitle: string; description: string; status: string; meta: string[]; onStatus?: () => void; extraAction?: React.ReactNode }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-sky-400 via-blue-600 to-slate-800" /><CardContent className="flex min-h-[265px] flex-col p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{title}</p><h3 className="mt-1 font-black text-slate-800">{subtitle}</h3></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div><p className="mt-4 line-clamp-3 rounded-2xl border bg-slate-50/80 p-3 text-sm leading-6 text-slate-700">{description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">{meta.map((x, i) => <span key={i} className="rounded-xl border bg-white p-2">{x || '-'}</span>)}</div><div className="mt-auto flex flex-wrap gap-2 border-t pt-4">{onStatus && <Button variant="outline" size="sm" className={button3d} onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />تحديث الحالة</Button>}{extraAction}</div></CardContent></Card>;
