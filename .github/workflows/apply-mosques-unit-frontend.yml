@@ -1,0 +1,39 @@
+name: Apply Mosques Unit Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-mosques-unit-frontend.cjs'
+      - '.github/workflows/apply-mosques-unit-frontend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm install qrcode.react --save
+      - run: node scripts/apply-mosques-unit-frontend.cjs
+      - run: npm run build
+      - name: Commit frontend module
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json src/types/permissions.ts src/app/components/PermissionMatrix.tsx src/app/routes.tsx src/app/components/Layout.tsx
+          git commit -m "Integrate university mosques care module frontend"
+          git push
