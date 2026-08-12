@@ -1,0 +1,38 @@
+name: Fix Archive 3D Card Bindings
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fix-archive-3d-card-bindings.cjs'
+      - '.github/workflows/fix-archive-3d-card-bindings.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/fix-archive-3d-card-bindings.cjs
+      - run: npm run build
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/ArchivePage.tsx
+          git commit -m "Fix archive 3D card data bindings"
+          git push
