@@ -20,6 +20,7 @@ const MODULES: ModuleName[] = [
   'leased_buildings_in',
   'contracts_follow_up',
   'assets',
+  'accounting_transformation',
   'mosques',
   'archive',
   'reports',

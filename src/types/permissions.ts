@@ -10,6 +10,7 @@ export type ModuleName =
   | 'leased_buildings_in'
   | 'contracts_follow_up'
   | 'assets'
+  | 'accounting_transformation'
   | 'mosques'
   | 'archive'
   | 'site_inspections'
@@ -53,6 +54,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   leased_buildings_in: 'المباني المستأجرة',
   contracts_follow_up: 'متابعة العقود',
   assets: 'وحدة الأصول',
+  accounting_transformation: 'لجنة متابعة متطلبات التحول المحاسبي',
   mosques: 'وحدة العناية بالمساجد والمصليات الجامعية',
   archive: 'الأرشفة',
   site_inspections: 'المعاينات الميدانية',
@@ -71,6 +73,7 @@ export const MODULE_LABELS_EN: Record<ModuleName, string> = {
   leased_buildings_in: 'Leased Buildings (In)',
   contracts_follow_up: 'Contract Follow-up',
   assets: 'Assets Unit',
+  accounting_transformation: 'Accounting Transformation Requirements Committee',
   mosques: 'University Mosques & Prayer Rooms Care Unit',
   archive: 'Archive',
   site_inspections: 'Field Inspections',
@@ -105,6 +108,7 @@ export const createEmptyPermissions = (): UserPermissions => ({
   leased_buildings_in: { ...NONE },
   contracts_follow_up: { ...NONE },
   assets: { ...NONE },
+  accounting_transformation: { ...NONE },
   mosques: { ...NONE },
   archive: { ...NONE },
   site_inspections: { ...NONE },
@@ -123,6 +127,7 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   leased_buildings_in: { ...FULL },
   contracts_follow_up: { ...FULL },
   assets: { ...FULL },
+  accounting_transformation: { ...FULL },
   mosques: { ...FULL },
   archive: { ...FULL },
   site_inspections: { ...FULL },

@@ -45,6 +45,12 @@ const AssetExcelImportPage = lazy(() => import('./pages/AssetExcelImportPage').t
 const ContractsFollowUpPage = lazy(() => import('./pages/ContractsFollowUpPage').then((m) => ({ default: m.ContractsFollowUpPage })));
 const MosquesUnitPage = lazy(() => import('./pages/MosquesUnitPage').then((m) => ({ default: m.MosquesUnitPage })));
 const MosquesPublicPage = lazy(() => import('./pages/MosquesPublicPage').then((m) => ({ default: m.MosquesPublicPage })));
+const AccountingTransformationDashboardPage = lazy(() => import('./pages/AccountingTransformationDashboardPage').then((m) => ({ default: m.AccountingTransformationDashboardPage })));
+const AccountingTransformationRecordsPage = lazy(() => import('./pages/AccountingTransformationRecordsPage').then((m) => ({ default: m.AccountingTransformationRecordsPage })));
+const AccountingTransformationFormPage = lazy(() => import('./pages/AccountingTransformationFormPage').then((m) => ({ default: m.AccountingTransformationFormPage })));
+const AccountingTransformationViewPage = lazy(() => import('./pages/AccountingTransformationViewPage').then((m) => ({ default: m.AccountingTransformationViewPage })));
+const AccountingTransformationImportPage = lazy(() => import('./pages/AccountingTransformationImportPage').then((m) => ({ default: m.AccountingTransformationImportPage })));
+const AccountingTransformationReportsPage = lazy(() => import('./pages/AccountingTransformationReportsPage').then((m) => ({ default: m.AccountingTransformationReportsPage })));
 
 const LoadingPage = () => (
   <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">جارٍ فتح الصفحة...</div>
@@ -57,6 +63,9 @@ const assetPermission = (element: ReactNode, action: 'canView' | 'canAdd' | 'can
 );
 const mosquePermission = (element: ReactNode, action: 'canView' | 'canAdd' | 'canEdit' | 'canDelete' | 'canPrint') => (
   <PermissionGuard module="mosques" action={action}>{page(element)}</PermissionGuard>
+);
+const accountingTransformationPermission = (element: ReactNode, action: 'canView' | 'canAdd' | 'canEdit' | 'canDelete' | 'canPrint') => (
+  <PermissionGuard module="accounting_transformation" action={action}>{page(element)}</PermissionGuard>
 );
 
 export const router = createHashRouter([
@@ -98,6 +107,18 @@ export const router = createHashRouter([
           { path: 'new', element: page(<SiteInspectionFormPage />) },
           { path: ':inspectionId', element: page(<ViewSiteInspectionPage />) },
           { path: ':inspectionId/edit', element: page(<SiteInspectionFormPage />) },
+        ],
+      },
+      {
+        path: 'accounting-transformation',
+        children: [
+          { index: true, element: accountingTransformationPermission(<AccountingTransformationDashboardPage />, 'canView') },
+          { path: 'records', element: accountingTransformationPermission(<AccountingTransformationRecordsPage />, 'canView') },
+          { path: 'new', element: accountingTransformationPermission(<AccountingTransformationFormPage />, 'canAdd') },
+          { path: 'import', element: accountingTransformationPermission(<AccountingTransformationImportPage />, 'canAdd') },
+          { path: 'reports', element: accountingTransformationPermission(<AccountingTransformationReportsPage />, 'canView') },
+          { path: ':recordId/edit', element: accountingTransformationPermission(<AccountingTransformationFormPage />, 'canEdit') },
+          { path: ':recordId', element: accountingTransformationPermission(<AccountingTransformationViewPage />, 'canView') },
         ],
       },
       { path: 'mosques', element: mosquePermission(<MosquesUnitPage />, 'canView') },
