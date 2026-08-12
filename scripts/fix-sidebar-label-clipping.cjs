@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = 'src/app/components/Layout.tsx';
 let s = fs.readFileSync(path, 'utf8');
 
+// Re-run after preserving the pre-change backup branch.
 s = s.replace(
   'w-[84vw] max-w-[300px] shrink-0\n            lg:w-[250px] xl:w-[270px] 2xl:w-[290px]',
   'w-[88vw] max-w-[340px] shrink-0\n            lg:w-[300px] xl:w-[320px] 2xl:w-[340px]'
