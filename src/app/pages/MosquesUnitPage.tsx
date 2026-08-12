@@ -299,11 +299,13 @@ export const MosquesUnitPage: React.FC = () => {
   const applyStatus = async () => {
     if (!statusTarget || !statusValue) return;
     if (['rejected', 'returned_for_edit'].includes(statusValue) && !statusNote.trim()) return toast.error('اكتب سبب الرفض أو ملاحظة الإعادة');
+    if (statusTarget.kind === 'request' && statusValue === 'completed' && !statusEvidence && !statusTarget.item.completionEvidenceUrl) {
+      return toast.error('يلزم رفع إثبات الإنجاز قبل إكمال الطلب');
+    }
     setSaving(true);
     try {
       let evidenceUrl: string | undefined;
       if (statusTarget.kind === 'request' && statusValue === 'completed') {
-        if (!statusEvidence && !statusTarget.item.completionEvidenceUrl) return toast.error('يلزم رفع إثبات الإنجاز قبل إكمال الطلب');
         if (statusEvidence) evidenceUrl = (await mosqueApi.upload(statusEvidence)).driveUrl;
       }
       const payload = { status: statusValue, note: statusNote, rejectionReason: statusNote, returnReason: statusNote, completionEvidenceUrl: evidenceUrl };
