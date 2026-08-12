@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
   Briefcase,
@@ -12,8 +12,10 @@ import {
   Pause,
   Play,
   Search,
+  ScanLine,
   Send,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { mosquePublicApi, type PublicMosqueSite } from '../api/mosques';
@@ -76,6 +78,9 @@ export const MosquesPublicPage: React.FC = () => {
   const [brokenSlides, setBrokenSlides] = useState<string[]>([]);
   const [activeSlide, setActiveSlide] = useState(0);
   const [galleryPaused, setGalleryPaused] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerStatus, setScannerStatus] = useState('وجّه كاميرا الجوال نحو رمز المسجد أو المصلى');
+  const scannerReaderRef = useRef<any>(null);
   const [ticketSaving, setTicketSaving] = useState(false);
   const [jobSaving, setJobSaving] = useState(false);
   const [ticketResult, setTicketResult] = useState<{ ticketNumber: string; trackingToken: string } | null>(null);
@@ -134,6 +139,103 @@ export const MosquesPublicPage: React.FC = () => {
     const preloader = new window.Image();
     preloader.src = next.imageUrl;
   }, [activeSlide, slides]);
+
+  useEffect(() => {
+    if (!scannerOpen) return;
+    let cancelled = false;
+    let startTimer = 0;
+
+    const normalizeName = (value: string) => String(value || '')
+      .trim()
+      .toLocaleLowerCase('ar')
+      .replace(/[ـ\s]+/g, ' ');
+
+    const decodeSafe = (value: string) => {
+      try { return decodeURIComponent(value); } catch { return value; }
+    };
+
+    const findSiteFromCode = (decodedText: string) => {
+      const raw = String(decodedText || '').trim();
+      if (!raw) return null;
+
+      let candidate = raw;
+      try {
+        const parsed = JSON.parse(raw);
+        candidate = String(parsed?.siteToken || parsed?.publicToken || parsed?.site || parsed?.name || raw);
+      } catch {
+        const urlMatch = raw.match(/[?&]site=([^&#]+)/i);
+        const prefixMatch = raw.match(/^(?:IAU[-_ ]?MOSQUE|MOSQUE|SITE)\s*[:=]\s*(.+)$/i);
+        candidate = decodeSafe(urlMatch?.[1] || prefixMatch?.[1] || raw);
+      }
+
+      const directToken = sites.find((site) => site.publicToken === candidate);
+      if (directToken) return directToken;
+
+      const normalizedCandidate = normalizeName(candidate);
+      return sites.find((site) => normalizeName(site.name) === normalizedCandidate) || null;
+    };
+
+    const stopReader = async () => {
+      const reader = scannerReaderRef.current;
+      scannerReaderRef.current = null;
+      if (!reader) return;
+      try { if (reader.isScanning) await reader.stop(); } catch {}
+      try { reader.clear(); } catch {}
+    };
+
+    const startReader = async () => {
+      try {
+        setScannerStatus('جاري تشغيل الكاميرا الخلفية...');
+        const { Html5Qrcode } = await import('html5-qrcode');
+        if (cancelled) return;
+
+        const reader = new Html5Qrcode('mosque-public-barcode-reader');
+        scannerReaderRef.current = reader;
+        await reader.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: (width: number, height: number) => ({
+              width: Math.max(180, Math.min(300, Math.floor(width * 0.82))),
+              height: Math.max(120, Math.min(190, Math.floor(height * 0.48))),
+            }),
+            aspectRatio: 1.777778,
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+          },
+          async (decodedText: string) => {
+            const matchedSite = findSiteFromCode(decodedText);
+            if (!matchedSite) {
+              setScannerStatus('تمت قراءة الرمز، لكنه غير مرتبط بمسجد أو مصلى مسجل في المنصة.');
+              return;
+            }
+
+            setTicketForm((current) => ({ ...current, siteToken: matchedSite.publicToken }));
+            toast.success(`تم تحديد الموقع: ${matchedSite.name}`);
+            await stopReader();
+            if (!cancelled) setScannerOpen(false);
+          },
+          () => undefined,
+        );
+        if (!cancelled) setScannerStatus('وجّه الكاميرا نحو QR أو الباركود المثبت على المسجد أو المصلى');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error || '');
+        if (!cancelled) {
+          setScannerStatus(
+            message.toLowerCase().includes('permission')
+              ? 'تعذر الوصول إلى الكاميرا. اسمح للمتصفح باستخدام الكاميرا ثم أعد المحاولة.'
+              : 'تعذر تشغيل قارئ الباركود. تأكد من استخدام HTTPS ومنح إذن الكاميرا.'
+          );
+        }
+      }
+    };
+
+    startTimer = window.setTimeout(startReader, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(startTimer);
+      void stopReader();
+    };
+  }, [scannerOpen, sites]);
 
   const selectedSite = sites.find((site) => site.publicToken === ticketForm.siteToken);
   const currentSlide = slides[activeSlide] || fallbackSlides[0];
@@ -234,7 +336,16 @@ export const MosquesPublicPage: React.FC = () => {
           <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border bg-white p-2"><TabsTrigger value="report">تقديم بلاغ</TabsTrigger><TabsTrigger value="track">متابعة بلاغ</TabsTrigger><TabsTrigger value="jobs">التوظيف / التعاون</TabsTrigger><TabsTrigger value="track-job">متابعة التوظيف</TabsTrigger></TabsList>
 
           <TabsContent value="report">
-            <Card className={shell}><CardHeader><CardTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5" />تقديم بلاغ أو شكوى</CardTitle><CardDescription>سيصدر رقم بلاغ ورمز متابعة خاص. بيانات التواصل اختيارية.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-2"><Field label="المسجد / المصلى"><NativeSelect value={ticketForm.siteToken} onChange={(e) => setTicketForm({ ...ticketForm, siteToken: e.target.value })} disabled={Boolean(qrSiteToken)}>{sites.map((site) => <option key={site.publicToken} value={site.publicToken}>{site.name}</option>)}</NativeSelect></Field><Field label="نوع البلاغ"><NativeSelect value={ticketForm.ticketType} onChange={(e) => setTicketForm({ ...ticketForm, ticketType: e.target.value })}>{Object.entries(ticketTypes).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</NativeSelect></Field><div className="md:col-span-2"><Field label="وصف البلاغ *"><Textarea rows={5} value={ticketForm.description} onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })} placeholder="اشرح المشكلة باختصار ووضوح..." /></Field></div><Field label="الاسم (اختياري)"><Input value={ticketForm.reporterName} onChange={(e) => setTicketForm({ ...ticketForm, reporterName: e.target.value })} /></Field><Field label="الجوال (اختياري)"><Input value={ticketForm.reporterPhone} onChange={(e) => setTicketForm({ ...ticketForm, reporterPhone: e.target.value })} /></Field><Field label="البريد الإلكتروني (اختياري)"><Input type="email" value={ticketForm.reporterEmail} onChange={(e) => setTicketForm({ ...ticketForm, reporterEmail: e.target.value })} /></Field><Field label="صورة أو PDF"><Input type="file" accept="image/*,application/pdf" onChange={(e) => setTicketForm({ ...ticketForm, file: e.target.files?.[0] || null })} /></Field><div className="md:col-span-2 flex justify-end"><Button onClick={submitTicket} disabled={ticketSaving}><Send className="ml-2 h-4 w-4" />{ticketSaving ? 'جاري الإرسال...' : 'إرسال البلاغ'}</Button></div>{ticketResult && <div className="md:col-span-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-5"><div className="flex items-center gap-2 font-bold text-emerald-800"><CheckCircle2 className="h-5 w-5" />تم استلام بلاغكم</div><p className="mt-2">رقم البلاغ: <strong>{ticketResult.ticketNumber}</strong></p><p className="mt-1 break-all text-sm">رمز المتابعة: <strong dir="ltr">{ticketResult.trackingToken}</strong></p><p className="mt-2 text-xs text-emerald-800">احتفظ برمز المتابعة؛ فهو أكثر أمانًا من البحث برقم تسلسلي يمكن تخمينه.</p></div>}</CardContent></Card>
+            <Card className={shell}><CardHeader><CardTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5" />تقديم بلاغ أو شكوى</CardTitle><CardDescription>سيصدر رقم بلاغ ورمز متابعة خاص. بيانات التواصل اختيارية.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-2"><div className="space-y-1.5">
+                <Label>المسجد / المصلى *</Label>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <NativeSelect value={ticketForm.siteToken} onChange={(e) => setTicketForm({ ...ticketForm, siteToken: e.target.value })} disabled={Boolean(qrSiteToken)}>{sites.map((site) => <option key={site.publicToken} value={site.publicToken}>{site.name}</option>)}</NativeSelect>
+                  <Button type="button" variant="outline" disabled={Boolean(qrSiteToken) || sites.length === 0} onClick={() => setScannerOpen(true)} className="whitespace-nowrap border-sky-300 bg-sky-50 text-sky-800 shadow-[0_4px_0_rgba(14,116,144,.14)] hover:bg-sky-100">
+                    <ScanLine className="ml-2 h-4 w-4" />مسح QR / باركود
+                  </Button>
+                </div>
+                <p className="text-[11px] leading-5 text-muted-foreground">من الجوال: امسح الرمز المثبت على المسجد أو الجامع أو المصلى ليتم اختيار الموقع تلقائيًا.</p>
+              </div><Field label="نوع البلاغ"><NativeSelect value={ticketForm.ticketType} onChange={(e) => setTicketForm({ ...ticketForm, ticketType: e.target.value })}>{Object.entries(ticketTypes).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</NativeSelect></Field><div className="md:col-span-2"><Field label="وصف البلاغ *"><Textarea rows={5} value={ticketForm.description} onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })} placeholder="اشرح المشكلة باختصار ووضوح..." /></Field></div><Field label="الاسم (اختياري)"><Input value={ticketForm.reporterName} onChange={(e) => setTicketForm({ ...ticketForm, reporterName: e.target.value })} /></Field><Field label="الجوال (اختياري)"><Input value={ticketForm.reporterPhone} onChange={(e) => setTicketForm({ ...ticketForm, reporterPhone: e.target.value })} /></Field><Field label="البريد الإلكتروني (اختياري)"><Input type="email" value={ticketForm.reporterEmail} onChange={(e) => setTicketForm({ ...ticketForm, reporterEmail: e.target.value })} /></Field><Field label="صورة أو PDF"><Input type="file" accept="image/*,application/pdf" onChange={(e) => setTicketForm({ ...ticketForm, file: e.target.files?.[0] || null })} /></Field><div className="md:col-span-2 flex justify-end"><Button onClick={submitTicket} disabled={ticketSaving}><Send className="ml-2 h-4 w-4" />{ticketSaving ? 'جاري الإرسال...' : 'إرسال البلاغ'}</Button></div>{ticketResult && <div className="md:col-span-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-5"><div className="flex items-center gap-2 font-bold text-emerald-800"><CheckCircle2 className="h-5 w-5" />تم استلام بلاغكم</div><p className="mt-2">رقم البلاغ: <strong>{ticketResult.ticketNumber}</strong></p><p className="mt-1 break-all text-sm">رمز المتابعة: <strong dir="ltr">{ticketResult.trackingToken}</strong></p><p className="mt-2 text-xs text-emerald-800">احتفظ برمز المتابعة؛ فهو أكثر أمانًا من البحث برقم تسلسلي يمكن تخمينه.</p></div>}</CardContent></Card>
           </TabsContent>
 
           <TabsContent value="track"><TrackCard title="متابعة البلاغ" token={ticketTrackToken} onToken={setTicketTrackToken} onSearch={trackTicket} result={ticketTrackResult} /></TabsContent>
@@ -243,6 +354,27 @@ export const MosquesPublicPage: React.FC = () => {
 
           <TabsContent value="track-job"><TrackCard title="متابعة طلب التوظيف" token={jobTrackToken} onToken={setJobTrackToken} onSearch={trackJob} result={jobTrackResult} /></TabsContent>
         </Tabs>
+
+        {scannerOpen && (
+          <div className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/75 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="قارئ باركود المسجد أو المصلى">
+            <div className="w-full max-w-xl overflow-hidden rounded-[28px] border border-sky-200 bg-white shadow-[0_24px_70px_rgba(2,8,23,.42)]">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <div>
+                  <h3 className="flex items-center gap-2 text-lg font-black text-slate-900"><ScanLine className="h-5 w-5 text-sky-700" />قارئ المسجد / الجامع / المصلى</h3>
+                  <p className="mt-1 text-xs text-slate-500">يدعم QR Code والباركودات الشائعة باستخدام الكاميرا الخلفية.</p>
+                </div>
+                <button type="button" aria-label="إغلاق قارئ الباركود" onClick={() => setScannerOpen(false)} className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-100"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="space-y-4 p-4 sm:p-5">
+                <div className="overflow-hidden rounded-2xl border border-sky-200 bg-slate-950 p-2">
+                  <div id="mosque-public-barcode-reader" className="min-h-[280px] overflow-hidden rounded-xl bg-slate-950" />
+                </div>
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold leading-6 text-sky-900">{scannerStatus}</div>
+                <div className="flex justify-end"><Button type="button" variant="outline" onClick={() => setScannerOpen(false)}>إلغاء</Button></div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
