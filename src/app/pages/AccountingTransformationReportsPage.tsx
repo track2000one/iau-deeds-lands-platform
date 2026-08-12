@@ -127,7 +127,7 @@ export const AccountingTransformationReportsPage: React.FC = () => {
       <section className="rounded-[28px] border bg-white/90 p-5 shadow-[0_14px_38px_rgba(15,42,70,.08)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div><div className="mb-2 flex items-center gap-2 text-sky-700"><BarChart3 className="h-5 w-5" /><span className="text-xs font-bold">لجنة متابعة متطلبات التحول المحاسبي</span></div><h1 className="text-2xl font-black text-slate-900 md:text-3xl">{reportTitle}</h1><p className="mt-1 text-sm text-slate-500">تقرير موحد لمتابعة الأراضي والمباني ونسب اكتمال متطلبات الحصر والجرد والتقييم.</p></div>
-          <div className="print-hidden flex flex-wrap gap-2"><Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />لوحة اللجنة</Button><Button variant="outline" className="rounded-2xl" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />Excel</Button>{canPrint && <Button className="rounded-2xl" onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button>}</div>
+          <div className="print-hidden flex flex-wrap gap-2"><Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />لوحة اللجنة</Button>{canPrint && <><Button variant="outline" className="rounded-2xl" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />Excel</Button><Button className="rounded-2xl" onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button></>}</div>
         </div>
       </section>
 

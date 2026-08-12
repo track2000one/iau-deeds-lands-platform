@@ -126,7 +126,7 @@ export const AccountingTransformationDashboardPage: React.FC = () => {
               <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="text-lg font-black">الخدمات الرئيسية</h2><p className="mt-1 text-xs text-slate-300">بنفس مسار وحدة الأصول: إدخال، استعراض، استيراد، تقارير.</p></div>{stats.needsCompletion > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs text-amber-100"><TriangleAlert className="h-3.5 w-3.5" />{stats.needsCompletion} يحتاج استكمال</span>}</div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {quickActions.map(({ label, description, path, icon: Icon }) => {
-                  const disabled = path.endsWith('/new') && !canAdd;
+                  const disabled = (path.endsWith('/new') || path.endsWith('/import')) && !canAdd;
                   return <button key={path} disabled={disabled} onClick={() => !disabled && navigate(path)} className="group rounded-[24px] border border-white/15 bg-white/[.07] p-5 text-right transition hover:-translate-y-0.5 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"><div className="mb-4 grid h-11 w-11 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100"><Icon className="h-5 w-5" /></div><h3 className="font-black">{label}</h3><p className="mt-2 text-xs leading-6 text-slate-300">{description}</p></button>;
                 })}
               </div>
