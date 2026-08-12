@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 import {
   ArrowRight,
   BarChart3,
@@ -10,6 +11,7 @@ import {
   Printer,
   RotateCcw,
   Search,
+  UploadCloud,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -18,8 +20,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input';
 import { NativeSelect } from '../components/ui/native-select';
 import { usePermissions } from '../../context/PermissionsContext';
-import { getAccountingTransformationRecords } from '../api/accountingTransformation';
+import {
+  downloadOfficialAccountingExcelTemplate,
+  getAccountingTransformationRecords,
+  getOfficialAccountingExcelTemplate,
+  uploadOfficialAccountingExcelTemplate,
+  type AccountingExcelTemplateMeta,
+} from '../api/accountingTransformation';
 import type { AccountingTransformationRecord } from '../../types/accountingTransformation';
+import { buildOfficialAccountingTransformationExcel } from '../../utils/officialAccountingTransformationExcel';
 import {
   ACCOUNTING_COMMITTEE_STATUS_LABELS,
   ACCOUNTING_FIELDS,
@@ -104,6 +113,13 @@ const groupKeyFor = (item: AccountingTransformationRecord) => {
 const groupLabelFor = (item: AccountingTransformationRecord) =>
   item.accountingGroup || item.accountingGroupCode || (item.recordType === 'land' ? 'الأراضي' : 'المباني');
 
+const escapeHtml = (value: unknown) => String(value ?? '-').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+const openPrintHtml = (html: string) => {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' }); const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank', 'noopener,noreferrer'); if (!win) { URL.revokeObjectURL(url); return false; }
+  window.setTimeout(() => URL.revokeObjectURL(url), 120000); return true;
+};
+
 export const AccountingTransformationReportsPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, hasPermission } = usePermissions();
@@ -124,6 +140,11 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [selectedFields, setSelectedFields] = useState<FieldKey[]>(printableFields.map(([key]) => key));
+  const [officialTemplate, setOfficialTemplate] = useState<AccountingExcelTemplateMeta | null>(null);
+  const [templateLoading, setTemplateLoading] = useState(true);
+  const [templateUploading, setTemplateUploading] = useState(false);
+  const [officialExporting, setOfficialExporting] = useState(false);
+  const [officialExcelMessage, setOfficialExcelMessage] = useState('');
   const [settings, setSettings] = useState<ReportSettings>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -136,6 +157,12 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
   }, [settings]);
+
+  useEffect(() => {
+    let cancelled = false; setTemplateLoading(true);
+    getOfficialAccountingExcelTemplate().then((template) => { if (!cancelled) setOfficialTemplate(template); }).catch(() => { if (!cancelled) setOfficialTemplate(null); }).finally(() => { if (!cancelled) setTemplateLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -219,6 +246,27 @@ export const AccountingTransformationReportsPage: React.FC = () => {
     }
   };
 
+  const handleOfficialTemplateUpload = async (file: File | null) => {
+    if (!file) return; if (!file.name.toLowerCase().endsWith('.xlsx')) return setOfficialExcelMessage('النموذج الرسمي يجب أن يكون بصيغة XLSX.');
+    try { setTemplateUploading(true); setOfficialExcelMessage('جارٍ رفع النموذج الرسمي واعتماده...'); const template = await uploadOfficialAccountingExcelTemplate(file); setOfficialTemplate(template); setOfficialExcelMessage('تم اعتماد نموذج Excel الرسمي بنجاح.'); }
+    catch (error) { setOfficialExcelMessage(error instanceof Error ? error.message : 'تعذر رفع النموذج الرسمي.'); } finally { setTemplateUploading(false); }
+  };
+
+  const exportOfficialExcel = async () => {
+    if (!officialTemplate || !filteredItems.length) return;
+    try { setOfficialExporting(true); setOfficialExcelMessage('جارٍ تعبئة نتائج التصفية داخل النموذج الرسمي...'); const buffer = await downloadOfficialAccountingExcelTemplate(); const result = await buildOfficialAccountingTransformationExcel(buffer, filteredItems); saveAs(result.blob, `نموذج-التحول-المحاسبي-الرسمي-${new Date().toISOString().slice(0, 10)}.xlsx`); setOfficialExcelMessage(`تم تجهيز ${result.exportedCount.toLocaleString('ar-SA')} سجل داخل النموذج الرسمي المعتمد.`); }
+    catch (error) { setOfficialExcelMessage(error instanceof Error ? error.message : 'تعذر تجهيز النموذج الرسمي.'); } finally { setOfficialExporting(false); }
+  };
+
+  const printTabularReport = () => {
+    if (!canPrint || !filteredItems.length || !selectedFields.length) return;
+    const selected = printableFields.filter(([key]) => selectedFields.includes(key));
+    const headers = selected.map(([, label]) => `<th>${escapeHtml(label)}</th>`).join('');
+    const body = filteredItems.map((item, index) => `<tr><td>${index + 1}</td>${selected.map(([key]) => `<td>${escapeHtml(displayValue(item, key))}</td>`).join('')}</tr>`).join('');
+    const groupLabel = group === 'all' ? 'جميع المجموعات' : groups.find((x) => x.key === group)?.label || '-';
+    openPrintHtml(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>${escapeHtml(settings.reportTitle)}</title><style>@page{size:A4 landscape;margin:6mm 4mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{text-align:center;border-bottom:1px solid #1f4e79;padding:2mm;margin-bottom:2mm}.head h1{font-size:15px;margin:0}.head p{font-size:9px;margin:1mm 0}.meta{font-size:8px;border:1px solid #dbe3ec;padding:1.5mm 2mm;margin-bottom:2mm}.statement{text-align:center;font-size:12px;font-weight:800;margin:2mm 0}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}th{background:#0d3156;color:white;border:1px solid #dbe3ec;padding:2px;font-size:9px}td{border:1px solid #dbe3ec;padding:1.5px;text-align:center;overflow-wrap:anywhere}tbody tr:nth-child(even){background:#f8fafc}thead{display:table-header-group}tr{break-inside:avoid}.foot{font-size:7px;color:#64748b;margin-top:2mm;display:flex;justify-content:space-between}</style></head><body><div class="head"><h1>${escapeHtml(settings.universityName)}</h1><p>${escapeHtml(settings.departmentName)}</p><h1>${escapeHtml(settings.reportTitle)}</h1></div><div class="meta">النوع: ${escapeHtml(recordType === 'all' ? 'الكل' : ACCOUNTING_RECORD_TYPE_LABELS[recordType as AccountingRecordType])} | حالة اللجنة: ${escapeHtml(committeeStatus === 'all' ? 'الكل' : ACCOUNTING_COMMITTEE_STATUS_LABELS[committeeStatus] || committeeStatus)} | المجموعة: ${escapeHtml(groupLabel)}${appliedSearch ? ' | البحث: ' + escapeHtml(appliedSearch) : ''} | إجمالي النتائج: ${filteredItems.length.toLocaleString('ar-SA')}</div><div class="statement">${escapeHtml(settings.statementTitle)}</div><table><thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table><div class="foot"><span>تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</span><span>لجنة متابعة متطلبات التحول المحاسبي</span></div><script>window.onload=()=>window.print()</script></body></html>`);
+  };
+
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
     setAppliedSearch(search.trim());
@@ -251,7 +299,7 @@ export const AccountingTransformationReportsPage: React.FC = () => {
       <section className="rounded-[28px] border bg-white/90 p-5 shadow-[0_14px_38px_rgba(15,42,70,.08)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div><div className="mb-2 flex items-center gap-2 text-sky-700"><BarChart3 className="h-5 w-5" /><span className="text-xs font-bold">لجنة متابعة متطلبات التحول المحاسبي</span></div><h1 className="text-2xl font-black text-slate-900 md:text-3xl">{settings.reportTitle}</h1><p className="mt-1 text-sm text-slate-500">تقرير متقدم بنفس أسلوب تقارير وحدة الأصول، مع المجموعات والتصفية واختيار الأعمدة والتصدير.</p></div>
-          <div className="print-hidden flex flex-wrap gap-2"><Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />لوحة اللجنة</Button>{canAdd && <Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation/import')}><FileSpreadsheet className="ml-2 h-4 w-4" />استيراد Excel</Button>}{canPrint && <><Button variant="outline" className="rounded-2xl" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />Excel</Button><Button className="rounded-2xl" onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />التقرير الجدولي / PDF</Button></>}</div>
+          <div className="print-hidden flex flex-wrap gap-2"><Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />لوحة اللجنة</Button>{canAdd && <Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation/import')}><FileSpreadsheet className="ml-2 h-4 w-4" />استيراد Excel</Button>}{canPrint && <><Button variant="outline" className="rounded-2xl" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />Excel</Button><Button className="rounded-2xl" onClick={printTabularReport}><Printer className="ml-2 h-4 w-4" />التقرير الجدولي / PDF</Button></>}</div>
         </div>
       </section>
 
@@ -270,6 +318,14 @@ export const AccountingTransformationReportsPage: React.FC = () => {
       <Card className="print-hidden rounded-[24px]"><CardHeader className="border-b"><div className="flex items-center justify-between gap-2"><CardTitle className="text-base">إعدادات عنوان التقرير والبيان</CardTitle><Button variant="outline" size="sm" onClick={resetSettings}>استعادة الإعدادات</Button></div></CardHeader><CardContent className="grid gap-3 p-4 md:grid-cols-2"><Input value={settings.universityName} onChange={(e) => setSettings((v) => ({ ...v, universityName: e.target.value }))} placeholder="اسم الجامعة" /><Input value={settings.departmentName} onChange={(e) => setSettings((v) => ({ ...v, departmentName: e.target.value }))} placeholder="اسم الإدارة" /><Input value={settings.reportTitle} onChange={(e) => setSettings((v) => ({ ...v, reportTitle: e.target.value }))} placeholder="عنوان التقرير" /><Input value={settings.statementTitle} onChange={(e) => setSettings((v) => ({ ...v, statementTitle: e.target.value }))} placeholder="عنوان البيان" /></CardContent></Card>
 
       <Card className="print-hidden rounded-[24px]"><CardHeader className="border-b"><CardTitle className="text-base">اختيار أعمدة التقرير</CardTitle></CardHeader><CardContent className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{printableFields.map(([key, label]) => <label key={key} className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border bg-white px-3 py-3 text-xs font-bold text-slate-700"><span>{label}</span><input type="checkbox" checked={selectedFields.includes(key)} onChange={(e) => setSelectedFields((current) => e.target.checked ? [...current, key] : current.filter((item) => item !== key))} /></label>)}</CardContent></Card>
+
+      <Card className="print-hidden rounded-[24px] border-emerald-200/80 bg-gradient-to-l from-white via-emerald-50/25 to-white shadow-[0_7px_0_rgba(16,120,87,.06),0_12px_24px_rgba(15,42,70,.05)]">
+        <CardHeader className="border-b"><CardTitle className="flex items-center gap-2 text-base text-emerald-800"><FileSpreadsheet className="h-5 w-5" />نموذج Excel الرسمي المعتمد</CardTitle></CardHeader>
+        <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0"><p className="text-sm font-bold text-slate-800">{templateLoading ? 'جارٍ التحقق من النموذج المعتمد...' : officialTemplate ? officialTemplate.fileName : 'لم يتم اعتماد نموذج رسمي حتى الآن'}</p><p className="mt-1 text-xs leading-6 text-slate-500">يتم تعبئة نتائج التصفية الحالية داخل ورقتي الأراضي والمباني مع الحفاظ على بنية وتنسيق ملف Excel الرسمي.</p>{officialExcelMessage && <p className="mt-2 text-xs font-bold text-emerald-700">{officialExcelMessage}</p>}</div>
+          <div className="flex flex-wrap gap-2">{isAdmin && <label className="inline-flex cursor-pointer items-center rounded-xl border bg-white px-4 py-2 text-sm font-bold shadow-sm"><UploadCloud className="ml-2 h-4 w-4" />{templateUploading ? 'جارٍ الاعتماد...' : officialTemplate ? 'استبدال النموذج الرسمي' : 'اعتماد النموذج الرسمي'}<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" disabled={templateUploading} onChange={(e) => handleOfficialTemplateUpload(e.target.files?.[0] || null)} /></label>}{canPrint && <Button className="bg-emerald-700 hover:bg-emerald-800" disabled={!officialTemplate || !filteredItems.length || officialExporting} onClick={exportOfficialExcel}><Download className="ml-2 h-4 w-4" />{officialExporting ? 'جاري التجهيز...' : 'تنزيل Excel الرسمي'}</Button>}</div>
+        </CardContent>
+      </Card>
 
       <div className="print-hidden flex flex-wrap items-center justify-between gap-3"><label className="flex items-center gap-2 text-xs text-slate-500">حجم الصفحة<NativeSelect value={String(pageSize)} onChange={(e) => setPageSize(Number(e.target.value))} className="h-9 w-24"><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></NativeSelect></label><div className="text-xs text-slate-500">الصفحة {page} من {totalPages} — {filteredItems.length.toLocaleString('ar-SA')} سجل</div></div>
 

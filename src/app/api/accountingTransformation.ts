@@ -119,3 +119,25 @@ export const uploadAccountingTransformationFile = async (file: File): Promise<Ac
     mimeType: result.mimeType || file.type || null,
   };
 };
+
+
+export type AccountingExcelTemplateMeta = {
+  id: string; templateKey: string; title: string; fileName: string; driveFileId: string; driveUrl: string; mimeType?: string | null; fileSize?: number | null; uploadedBy?: string | null; createdAt: string; updatedAt: string;
+};
+
+export const getOfficialAccountingExcelTemplate = () =>
+  apiJson<AccountingExcelTemplateMeta | null>('/api/accounting-transformation/excel-template');
+
+export const uploadOfficialAccountingExcelTemplate = async (file: File) => {
+  const body = new FormData(); body.append('file', file);
+  const response = await authenticatedFetch('/api/accounting-transformation/excel-template', { method: 'POST', body });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(String(result?.message || result?.error || 'تعذر رفع نموذج Excel الرسمي.'));
+  return result as AccountingExcelTemplateMeta;
+};
+
+export const downloadOfficialAccountingExcelTemplate = async () => {
+  const response = await authenticatedFetch('/api/accounting-transformation/excel-template/file');
+  if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(String(result?.message || result?.error || 'تعذر تنزيل نموذج Excel الرسمي.')); }
+  return response.arrayBuffer();
+};
