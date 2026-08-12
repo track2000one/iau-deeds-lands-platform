@@ -1,0 +1,32 @@
+name: Show Full Mosque Slide Image
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/show-full-mosque-slide-image.cjs'
+      - '.github/workflows/show-full-mosque-slide-image.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/show-full-mosque-slide-image.cjs
+      - run: npm run build
+      - name: Commit slideshow image display fix
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/MosquesPublicPage.tsx
+          git commit -m "Show full mosque slideshow images without cropping"
+          git restore --worktree .
+          git pull --rebase origin main
+          git push origin main
