@@ -1,0 +1,38 @@
+name: Fix Sidebar Label Clipping
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fix-sidebar-label-clipping.cjs'
+      - '.github/workflows/fix-sidebar-label-clipping.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/fix-sidebar-label-clipping.cjs
+      - run: npm run build
+      - name: Commit sidebar fix
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
+          git add src/app/components/Layout.tsx
+          git commit -m "Prevent sidebar labels from clipping"
+          git push
