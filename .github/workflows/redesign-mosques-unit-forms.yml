@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'scripts/redesign-mosques-unit-forms.cjs'
+      - 'scripts/redesign-mosques-unit-forms-v2.cjs'
+      - 'scripts/mosque-form-fragments/**'
       - '.github/workflows/redesign-mosques-unit-forms.yml'
   workflow_dispatch:
 
@@ -23,7 +24,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: node scripts/redesign-mosques-unit-forms.cjs
+      - run: node scripts/redesign-mosques-unit-forms-v2.cjs
       - run: npm run build
       - name: Commit redesigned mosque forms
         run: |
