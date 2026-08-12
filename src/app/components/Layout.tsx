@@ -116,6 +116,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'leased-buildings-in', path: '/buildings/leased-in', icon: Building, label: t('nav.leasedBuildingsIn'), module: 'leased_buildings_in', action: 'canView' },
     { id: 'contracts-followup', path: '/contracts/follow-up', icon: FileClock, label: ui('متابعة العقود', 'Contract Follow-up'), module: 'contracts_follow_up', action: 'canView' },
     { id: 'assets', path: '/assets', icon: Package, label: ui('وحدة الأصول', 'Assets Unit'), module: 'assets', action: 'canView' },
+    { id: 'mosques', path: '/mosques', icon: Building, label: ui('وحدة العناية بالمساجد والمصليات', 'Mosques & Prayer Rooms Care'), module: 'mosques', action: 'canView' },
     { id: 'search', path: '/search', icon: Search, label: t('nav.search'), alwaysVisible: true },
     { id: 'reports', path: '/reports', icon: BarChart3, label: t('nav.reports'), module: 'reports', action: 'canView' },
     { id: 'admin', path: '/admin', icon: Shield, label: t('nav.admin'), adminOnly: true },
@@ -139,6 +140,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/buildings/leased-in')) return 'leased-buildings-in';
     if (path.startsWith('/contracts/follow-up')) return 'contracts-followup';
     if (path.startsWith('/assets')) return 'assets';
+    if (path.startsWith('/mosques')) return 'mosques';
     if (path.startsWith('/search')) return 'search';
     if (path.startsWith('/reports')) return 'reports';
     if (path.startsWith('/archive')) return 'archive';

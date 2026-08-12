@@ -43,6 +43,8 @@ const EditAssetPage = lazy(() => import('./pages/EditAssetPage').then((m) => ({ 
 const AssetReportsPage = lazy(() => import('./pages/AssetReportsPage').then((m) => ({ default: m.AssetReportsPage })));
 const AssetExcelImportPage = lazy(() => import('./pages/AssetExcelImportPage').then((m) => ({ default: m.AssetExcelImportPage })));
 const ContractsFollowUpPage = lazy(() => import('./pages/ContractsFollowUpPage').then((m) => ({ default: m.ContractsFollowUpPage })));
+const MosquesUnitPage = lazy(() => import('./pages/MosquesUnitPage').then((m) => ({ default: m.MosquesUnitPage })));
+const MosquesPublicPage = lazy(() => import('./pages/MosquesPublicPage').then((m) => ({ default: m.MosquesPublicPage })));
 
 const LoadingPage = () => (
   <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">جارٍ فتح الصفحة...</div>
@@ -53,12 +55,16 @@ const adminOnly = (element: ReactNode) => <RequireAdmin>{page(element)}</Require
 const assetPermission = (element: ReactNode, action: 'canView' | 'canAdd' | 'canEdit' | 'canDelete' | 'canPrint') => (
   <PermissionGuard module="assets" action={action}>{page(element)}</PermissionGuard>
 );
+const mosquePermission = (element: ReactNode, action: 'canView' | 'canAdd' | 'canEdit' | 'canDelete' | 'canPrint') => (
+  <PermissionGuard module="mosques" action={action}>{page(element)}</PermissionGuard>
+);
 
 export const router = createHashRouter([
   { path: '/login', element: page(<LoginPage />) },
   { path: '/forgot-password', element: page(<ForgotPasswordPage />) },
   { path: '/reset-password', element: page(<ResetPasswordPage />) },
   { path: '/activate-account', element: page(<ActivateAccountPage />) },
+  { path: '/mosques/public', element: page(<MosquesPublicPage />) },
   {
     path: '/',
     element: <Root />,
@@ -94,6 +100,7 @@ export const router = createHashRouter([
           { path: ':inspectionId/edit', element: page(<SiteInspectionFormPage />) },
         ],
       },
+      { path: 'mosques', element: mosquePermission(<MosquesUnitPage />, 'canView') },
       { path: 'contracts/follow-up', element: <PermissionGuard module="contracts_follow_up" action="canView">{page(<ContractsFollowUpPage />)}</PermissionGuard> },
       { path: 'reports', element: page(<ReportsPage />) },
       { path: 'archive', element: page(<ArchivePage />) },
