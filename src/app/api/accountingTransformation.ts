@@ -29,6 +29,16 @@ export type AccountingTransformationGroupSummary = {
   averageValuation: number;
 };
 
+export type AccountingTransformationImportPreview = {
+  total: number;
+  fresh: number;
+  duplicate: number;
+  invalid: number;
+  freshIndexes: number[];
+  duplicateIndexes: number[];
+  invalidIndexes: number[];
+};
+
 const buildQuery = (query: AccountingTransformationQuery = {}) => {
   const params = new URLSearchParams();
   if (query.search) params.set('search', query.search);
@@ -78,6 +88,12 @@ export const updateAccountingTransformationRecord = (id: string, input: Accounti
 
 export const deleteAccountingTransformationRecord = (id: string) =>
   apiJson<void>(`/api/accounting-transformation/${id}`, { method: 'DELETE' });
+
+export const previewAccountingTransformationImport = (items: AccountingTransformationInput[]) =>
+  apiJson<AccountingTransformationImportPreview>('/api/accounting-transformation/bulk-preview', {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  });
 
 export const bulkImportAccountingTransformationRecords = (items: AccountingTransformationInput[]) =>
   apiJson<{ created: number; updated: number; skipped: number; total: number }>(
