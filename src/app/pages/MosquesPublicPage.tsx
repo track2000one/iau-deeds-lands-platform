@@ -202,7 +202,7 @@ export const MosquesPublicPage: React.FC = () => {
               src={currentSlide.imageUrl}
               alt={currentSlide.title}
               referrerPolicy="no-referrer"
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain bg-slate-950"
               onError={() => setBrokenSlides((current) => current.includes(currentSlide.id) ? current : [...current, currentSlide.id])}
             />
             <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,20,24,.18),rgba(2,20,24,.08)_42%,rgba(2,20,24,.72)_100%),linear-gradient(180deg,rgba(2,20,24,.02)_35%,rgba(2,20,24,.72)_100%)]" />
