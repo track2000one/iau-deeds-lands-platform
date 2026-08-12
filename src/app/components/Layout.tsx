@@ -252,8 +252,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             inset-y-0 lg:inset-y-auto
             h-dvh lg:h-auto
             z-50 lg:z-0
-            w-[84vw] max-w-[300px] shrink-0
-            lg:w-[250px] xl:w-[270px] 2xl:w-[290px]
+            w-[88vw] max-w-[340px] shrink-0
+            lg:w-[300px] xl:w-[320px] 2xl:w-[340px]
             bg-sidebar text-sidebar-foreground
             transition-transform duration-300 ease-in-out
             flex flex-col
@@ -315,7 +315,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     key={item.id}
                     variant="ghost"
                     className={`
-                      future-nav-item w-full ${isRTL ? 'justify-end' : 'justify-start'} gap-3 text-sm h-12 px-4
+                      future-nav-item w-full ${isRTL ? 'justify-end' : 'justify-start'} gap-3 text-[13px] min-h-12 h-auto px-3 py-2.5 whitespace-normal
                       ${isActive ? 'is-active font-bold' : ''}
                     `}
                     onClick={() => {
@@ -324,7 +324,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     }}
                   >
                     <Icon className="h-4.5 w-4.5 shrink-0" />
-                    <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <span className={`min-w-0 flex-1 whitespace-normal break-words leading-5 ${isRTL ? 'text-right' : 'text-left'}`} title={item.label}>
                       {item.label}
                     </span>
                   </Button>
