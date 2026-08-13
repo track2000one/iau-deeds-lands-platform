@@ -1,0 +1,32 @@
+name: Apply Mosque Personnel Roles
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/add-mosque-personnel-roles.cjs'
+      - '.github/workflows/apply-mosque-personnel-roles.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/add-mosque-personnel-roles.cjs
+      - run: npm run build
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/MosquesUnitPage.tsx
+          git commit -m "Add mosque imam muezzin and khateeb account roles"
+          git restore --worktree .
+          git pull --rebase origin main
+          git push origin main
