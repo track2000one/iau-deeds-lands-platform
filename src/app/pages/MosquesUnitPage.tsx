@@ -136,6 +136,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [role, setRole] = useState<MosqueModuleRole>('viewer');
   const [linkedSiteId, setLinkedSiteId] = useState<string | null>(null);
   const [myPersonnelRole, setMyPersonnelRole] = useState<string | null>(null);
+  const [fullPermissionAccess, setFullPermissionAccess] = useState(false);
   const [dashboard, setDashboard] = useState<MosqueDashboard | null>(null);
   const [sites, setSites] = useState<MosqueSite[]>([]);
   const [requests, setRequests] = useState<MosqueRequest[]>([]);
@@ -173,6 +174,7 @@ export const MosquesUnitPage: React.FC = () => {
       setRole(me.role);
       setLinkedSiteId(me.siteId || null);
       setMyPersonnelRole(me.personnelRole || null);
+      setFullPermissionAccess(Boolean(me.fullPermissionAccess && me.accessSource === 'module_permissions'));
 
       const [dash, siteRows, noticeRows] = await Promise.all([
         mosqueApi.dashboard(), mosqueApi.sites(), mosqueApi.notifications(),
@@ -425,7 +427,7 @@ export const MosquesUnitPage: React.FC = () => {
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">وحدة تشغيلية متكاملة</Badge>
-              <Badge variant="outline" className="border-sky-300 bg-white text-sky-700"><Shield className="ml-1 h-3.5 w-3.5" />{role === 'personnel' && myPersonnelRole ? personnelRoleLabels[myPersonnelRole] || myPersonnelRole : roleLabels[role]}</Badge>
+              <Badge variant="outline" className="border-sky-300 bg-white text-sky-700"><Shield className="ml-1 h-3.5 w-3.5" />{fullPermissionAccess ? 'مسؤول الوحدة — صلاحية كاملة' : role === 'personnel' && myPersonnelRole ? personnelRoleLabels[myPersonnelRole] || myPersonnelRole : roleLabels[role]}</Badge>
             </div>
             <h1 className="text-2xl font-black text-slate-900 md:text-4xl">وحدة العناية بالمساجد والمصليات الجامعية</h1>
             <p className="mt-2 max-w-4xl text-sm leading-7 text-slate-600 md:text-base">إدارة المساجد والمصليات، الطلبات والصيانة، البلاغات، الإجازات، التوظيف، الخرائط، التقارير والإشعارات ضمن مسار حوكمة موحد.</p>
