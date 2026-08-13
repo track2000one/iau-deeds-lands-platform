@@ -704,14 +704,22 @@ export const AdminDashboardPage: React.FC = () => {
       </Tabs>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent
+          className="flex max-h-[92dvh] w-[calc(100vw-1.5rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100vw-3rem)] sm:max-w-5xl"
+          dir="rtl"
+        >
+          <DialogHeader className="shrink-0 border-b bg-background px-5 py-4 text-right sm:px-6">
             <DialogTitle>تعديل بيانات المستخدم</DialogTitle>
             <DialogDescription>
-              حدّث الاسم والبريد والدور وحالة الحساب.
+              حدّث الاسم والبريد والدور وحالة الحساب. ويمكنك التمرير داخل النافذة بعجلة الفأرة أو مفاتيح الأسهم.
             </DialogDescription>
           </DialogHeader>
 
+          <div
+            className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 outline-none [scrollbar-gutter:stable] sm:px-6"
+            tabIndex={0}
+            aria-label="محتوى تعديل المستخدم قابل للتمرير"
+          >
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
               <Label>اسم المستخدم</Label>
@@ -797,8 +805,9 @@ export const AdminDashboardPage: React.FC = () => {
               }
             />
           )}
+          </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t bg-background px-5 py-4 sm:px-6">
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               إلغاء
             </Button>
