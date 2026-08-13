@@ -1,0 +1,98 @@
+name: Scope homepage by module permissions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/scope-homepage-by-permissions.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Apply scoped homepage routing
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          routes = Path('src/app/routes.tsx')
+          text = routes.read_text(encoding='utf-8')
+
+          old = "import { PermissionGuard } from './components/PermissionGuard';\n"
+          new = old + "import { usePermissions } from '../context/PermissionsContext';\n"
+          if old not in text:
+              raise SystemExit('routes import anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''const LoadingPage = () => (\n  <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">جارٍ فتح الصفحة...</div>\n);\n\nconst page = (element: ReactNode) => <Suspense fallback={<LoadingPage />}>{element}</Suspense>;\n'''
+          new = '''const LoadingPage = () => (\n  <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">جارٍ فتح الصفحة...</div>\n);\n\nconst CORE_HOME_MODULES = [\n  'deeds',\n  'allocated_lands',\n  'delivered_lands',\n  'leased_lands_out',\n  'leased_lands_in',\n  'leased_buildings_out',\n  'leased_buildings_in',\n] as const;\n\nconst SCOPED_LANDING_ROUTES = [\n  ['assets', '/assets'],\n  ['accounting_transformation', '/accounting-transformation'],\n  ['mosques', '/mosques'],\n  ['contracts_follow_up', '/contracts/follow-up'],\n  ['site_inspections', '/site-inspections'],\n  ['reports', '/reports'],\n  ['archive', '/archive'],\n] as const;\n\nconst HomeLandingPage = () => {\n  const { isAdmin, loading, hasPermission } = usePermissions();\n\n  if (loading) return <LoadingPage />;\n\n  const canUsePropertyHome =\n    isAdmin || CORE_HOME_MODULES.some((module) => hasPermission(module, 'canView'));\n\n  if (canUsePropertyHome) return <HomePage />;\n\n  const scopedLanding = SCOPED_LANDING_ROUTES.find(([module]) =>\n    hasPermission(module, 'canView')\n  );\n\n  if (scopedLanding) return <Navigate to={scopedLanding[1]} replace />;\n\n  return (\n    <div className="mx-auto mt-10 max-w-2xl rounded-2xl border bg-card p-8 text-center shadow-sm">\n      <h2 className="text-xl font-bold">لا توجد صفحة تشغيلية مخولة لهذا الحساب</h2>\n      <p className="mt-3 text-sm leading-7 text-muted-foreground">\n        يرجى التواصل مع مسؤول المنصة لإسناد صلاحية الوحدة أو الإدارة المناسبة.\n      </p>\n    </div>\n  );\n};\n\nconst page = (element: ReactNode) => <Suspense fallback={<LoadingPage />}>{element}</Suspense>;\n'''
+          if old not in text:
+              raise SystemExit('routes loading anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = "      { index: true, element: page(<HomePage />) },\n"
+          new = "      { index: true, element: page(<HomeLandingPage />) },\n"
+          if old not in text:
+              raise SystemExit('routes index anchor not found')
+          text = text.replace(old, new, 1)
+          routes.write_text(text, encoding='utf-8')
+
+          layout = Path('src/app/components/Layout.tsx')
+          text = layout.read_text(encoding='utf-8')
+
+          old = "  const locale = isRTL ? 'ar-SA' : 'en-US';\n\n"
+          new = '''  const locale = isRTL ? 'ar-SA' : 'en-US';\n\n  const coreHomeModules = [\n    'deeds',\n    'allocated_lands',\n    'delivered_lands',\n    'leased_lands_out',\n    'leased_lands_in',\n    'leased_buildings_out',\n    'leased_buildings_in',\n  ] as const;\n\n  const scopedLandingRoutes = [\n    ['assets', '/assets'],\n    ['accounting_transformation', '/accounting-transformation'],\n    ['mosques', '/mosques'],\n    ['contracts_follow_up', '/contracts/follow-up'],\n    ['site_inspections', '/site-inspections'],\n    ['reports', '/reports'],\n    ['archive', '/archive'],\n  ] as const;\n\n  const hasCoreHomeAccess =\n    isAdmin || coreHomeModules.some((module) => hasPermission(module, 'canView'));\n  const defaultLandingPath = hasCoreHomeAccess\n    ? '/'\n    : scopedLandingRoutes.find(([module]) => hasPermission(module, 'canView'))?.[1] || '/appearance';\n\n'''
+          if old not in text:
+              raise SystemExit('layout locale anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = "    { id: 'home', path: '/', icon: Home, label: t('nav.home'), alwaysVisible: true },\n"
+          new = "    { id: 'home', path: '/', icon: Home, label: t('nav.home'), alwaysVisible: hasCoreHomeAccess },\n"
+          if old not in text:
+              raise SystemExit('layout home menu anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = "onClick={() => navigate(isAdmin ? '/admin' : '/')}"
+          new = "onClick={() => navigate(isAdmin ? '/admin' : defaultLandingPath)}"
+          if old not in text:
+              raise SystemExit('layout account navigation anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = "onClick={() => navigate('/')}\n              aria-label=\"Platform home\""
+          new = "onClick={() => navigate(defaultLandingPath)}\n              aria-label=\"Platform home\""
+          if old not in text:
+              raise SystemExit('layout logo navigation anchor not found')
+          text = text.replace(old, new, 1)
+
+          layout.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build verification
+        run: npm run build
+
+      - name: Commit verified changes
+        shell: bash
+        run: |
+          git config user.name "OpenAI Project Automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/scope-homepage-by-permissions.yml
+          git add src/app/routes.tsx src/app/components/Layout.tsx .github/workflows/scope-homepage-by-permissions.yml
+          git commit -m "fix: scope platform home by module permissions"
+          git push origin main
