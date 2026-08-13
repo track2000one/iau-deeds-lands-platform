@@ -71,6 +71,7 @@ const roleLabels: Record<MosqueModuleRole, string> = {
   viewer: 'عرض فقط',
 };
 
+const personnelRoleLabels: Record<string, string> = { imam: 'إمام', muezzin: 'مؤذن', khateeb: 'خطيب', collaborating_khateeb: 'خطيب متعاون', collaborator: 'خطيب متعاون' };
 const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', prayer_room: 'مصلى' };
 const siteStatusLabels: Record<string, string> = { active: 'نشط', maintenance: 'تحت الصيانة', temporarily_closed: 'مغلق مؤقتًا' };
 const requestTypeLabels: Record<string, string> = {
@@ -160,6 +161,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [qrSite, setQrSite] = useState<MosqueSite | null>(null);
   const [personnelDialog, setPersonnelDialog] = useState(false);
   const [personnelForm, setPersonnelForm] = useState({ siteId: '', name: '', role: 'imam', mobile: '', email: '' });
+  const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, { role: MosqueModuleRole; siteId: string; personnelRole: string }>>({});
   const [saving, setSaving] = useState(false);
 
   const loadAll = async () => {
@@ -184,7 +186,11 @@ export const MosquesUnitPage: React.FC = () => {
       } else setJobs([]);
 
       if (me.role === 'head') {
-        try { setAssignments(await mosqueApi.assignments()); } catch { setAssignments([]); }
+        try {
+          const rows = await mosqueApi.assignments();
+          setAssignments(rows);
+          setAssignmentDrafts(Object.fromEntries(rows.map((item) => [item.userId, { role: item.role, siteId: item.siteId || '', personnelRole: item.personnelRole || 'imam' }])));
+        } catch { setAssignments([]); setAssignmentDrafts({}); }
       } else setAssignments([]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل بيانات وحدة المساجد');
@@ -330,11 +336,26 @@ export const MosquesUnitPage: React.FC = () => {
     try { await mosqueApi.createPersonnel(personnelForm); toast.success('تمت إضافة منسوب المسجد'); setPersonnelDialog(false); await loadAll(); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر الإضافة'); } finally { setSaving(false); }
   };
 
-  const setUserAssignment = async (userId: string, roleValue: MosqueModuleRole, siteId?: string) => {
+  const setUserAssignment = async (userId: string, roleValue: MosqueModuleRole, siteId?: string, personnelRole?: string) => {
     try {
-      await mosqueApi.setAssignment(userId, { role: roleValue, siteId: siteId || null, personnelRole: roleValue === 'personnel' ? 'collaborator' : null });
-      toast.success('تم تحديث الدور التشغيلي');
-      setAssignments(await mosqueApi.assignments());
+      if (roleValue === 'personnel' && !siteId) {
+        toast.error('حدد المسجد أو المصلى المرتبط بالمنسوب');
+        return;
+      }
+      if (roleValue === 'personnel' && !personnelRole) {
+        toast.error('حدد صفة المنسوب: إمام أو مؤذن أو خطيب أو خطيب متعاون');
+        return;
+      }
+      await mosqueApi.setAssignment(userId, {
+        role: roleValue,
+        siteId: siteId || null,
+        personnelRole: roleValue === 'personnel' ? personnelRole : null,
+      });
+      toast.success(roleValue === 'personnel' ? 'تم ربط المستخدم بالموقع والصفة التشغيلية' : 'تم تحديث الدور التشغيلي');
+      const rows = await mosqueApi.assignments();
+      setAssignments(rows);
+      setAssignmentDrafts(Object.fromEntries(rows.map((item) => [item.userId, { role: item.role, siteId: item.siteId || '', personnelRole: item.personnelRole || 'imam' }])));
+      setPersonnel(await mosqueApi.personnel());
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تحديث الدور'); }
   };
 
@@ -456,10 +477,45 @@ export const MosquesUnitPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="roles" className="space-y-4">
-          <Card className={card3d}><CardHeader><CardTitle>الأدوار التشغيلية داخل الوحدة</CardTitle><CardDescription>هذه الأدوار تحدد مسار الإجراء داخل الوحدة. صلاحية الدخول للقسم نفسه تمنح من لوحة التحكم العامة للمستخدمين.</CardDescription></CardHeader><CardContent className="space-y-3">{users.filter((u) => u.role !== 'admin').map((user) => {
-            const assignment = assignments.find((a) => a.userId === user.uid);
-            return <div key={user.uid} className="grid gap-3 rounded-2xl border bg-white p-4 md:grid-cols-[1.3fr_1fr_1.3fr] md:items-center"><div><p className="font-bold">{user.username}</p><p className="text-xs text-muted-foreground">{user.email}</p></div><NativeSelect value={assignment?.role || 'viewer'} onChange={(e) => setUserAssignment(user.uid, e.target.value as MosqueModuleRole, assignment?.siteId || undefined)}><option value="viewer">عرض فقط</option><option value="supervisor">مشرف الوحدة</option><option value="personnel">منسوب مسجد/مصلى</option><option value="head">رئيس الوحدة</option></NativeSelect><NativeSelect value={assignment?.siteId || ''} onChange={(e) => setUserAssignment(user.uid, assignment?.role || 'viewer', e.target.value)}><option value="">غير مرتبط بموقع محدد</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></div>;
-          })}</CardContent></Card>
+          <Card className={card3d}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" />الأدوار التشغيلية وربط منسوبي المساجد</CardTitle>
+              <CardDescription>اربط حساب المستخدم بمسجد أو مصلى وحدد صفته التشغيلية بدقة: إمام، مؤذن، خطيب، أو خطيب متعاون.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {users.filter((user) => user.role !== 'admin').map((user) => {
+                const current = assignments.find((item) => item.userId === user.uid);
+                const draft = assignmentDrafts[user.uid] || { role: current?.role || 'viewer', siteId: current?.siteId || '', personnelRole: current?.personnelRole || 'imam' };
+                return (
+                  <div key={user.uid} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                    <div className="mb-3 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                      <div><p className="font-bold text-slate-900">{user.username}</p><p className="text-xs text-muted-foreground" dir="ltr">{user.email}</p></div>
+                      {current && <Badge variant="outline" className="w-fit">{roleLabels[current.role]}{current.role === 'personnel' && current.personnelRole ? ' — ' + (personnelRoleLabels[current.personnelRole] || current.personnelRole) : ''}</Badge>}
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-4">
+                      <Field label="الدور داخل الوحدة">
+                        <NativeSelect value={draft.role} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, role: e.target.value as MosqueModuleRole } }))}>
+                          <option value="viewer">عرض فقط</option><option value="personnel">منسوب مسجد / مصلى</option><option value="supervisor">مشرف الوحدة</option><option value="head">رئيس الوحدة</option>
+                        </NativeSelect>
+                      </Field>
+                      <Field label="المسجد / المصلى">
+                        <NativeSelect value={draft.siteId} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, siteId: e.target.value } }))} disabled={draft.role !== 'personnel'}>
+                          <option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
+                        </NativeSelect>
+                      </Field>
+                      <Field label="الصفة التشغيلية">
+                        <NativeSelect value={draft.personnelRole} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, personnelRole: e.target.value } }))} disabled={draft.role !== 'personnel'}>
+                          <option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option>
+                        </NativeSelect>
+                      </Field>
+                      <div className="flex items-end"><Button className={button3d} onClick={() => setUserAssignment(user.uid, draft.role, draft.siteId, draft.personnelRole)}><Save className="ml-2 h-4 w-4" />حفظ الربط</Button></div>
+                    </div>
+                  </div>
+                );
+              })}
+              {!users.filter((user) => user.role !== 'admin').length && <Empty text="لا توجد حسابات مستخدمين للربط" />}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-3">
@@ -578,7 +634,7 @@ export const MosquesUnitPage: React.FC = () => {
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-emerald-50/20 sm:max-w-[900px]" dir="rtl">
           <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6"><DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><UserPlus className="h-5 w-5 text-sky-700" />إضافة منسوب مسجد / مصلى</DialogTitle><DialogDescription>سجل المنسوب التشغيلي وربطه بالموقع مع بيانات التواصل والصفة داخل المسجد أو المصلى.</DialogDescription></DialogHeader>
           <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-4 md:p-6">
-            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-violet-50/40 pb-4"><CardTitle className="text-base md:text-lg">الارتباط والصفة</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><Field label="المسجد / المصلى *"><NativeSelect className="h-11" value={personnelForm.siteId} onChange={(e) => setPersonnelForm({ ...personnelForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="الصفة *"><NativeSelect className="h-11" value={personnelForm.role} onChange={(e) => setPersonnelForm({ ...personnelForm, role: e.target.value })}><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborator">متعاون</option></NativeSelect></Field></CardContent></Card>
+            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-violet-50/40 pb-4"><CardTitle className="text-base md:text-lg">الارتباط والصفة</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><Field label="المسجد / المصلى *"><NativeSelect className="h-11" value={personnelForm.siteId} onChange={(e) => setPersonnelForm({ ...personnelForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="الصفة *"><NativeSelect className="h-11" value={personnelForm.role} onChange={(e) => setPersonnelForm({ ...personnelForm, role: e.target.value })}><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option></NativeSelect></Field></CardContent></Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-emerald-50/40 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><Users className="h-5 w-5" />بيانات المنسوب</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><div className="md:col-span-2"><Field label="الاسم الكامل *"><Input className="h-11" autoFocus value={personnelForm.name} onChange={(e) => setPersonnelForm({ ...personnelForm, name: e.target.value })} placeholder="الاسم الرباعي" /></Field></div><Field label="رقم الجوال"><Input className="h-11" type="tel" inputMode="tel" value={personnelForm.mobile} onChange={(e) => setPersonnelForm({ ...personnelForm, mobile: e.target.value })} placeholder="05xxxxxxxx" /></Field><Field label="البريد الإلكتروني"><Input className="h-11" type="email" inputMode="email" value={personnelForm.email} onChange={(e) => setPersonnelForm({ ...personnelForm, email: e.target.value })} placeholder="name@iau.edu.sa" /></Field></CardContent></Card>
             <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-6 text-slate-700">هذا السجل هو المرجع التشغيلي للمنسوب وبيانات التواصل. أما أسماء الإمام والمؤذن والخطيب داخل سجل المسجد فهي بيانات تعريفية مختصرة للموقع.</div>
           </div>
