@@ -47,6 +47,18 @@ export const PermissionMatrix: React.FC<{
   const { i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
   const ui = (ar: string, en: string) => (isArabic ? ar : en);
+  const scrollAreaRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollPermissions = (position: 'top' | 'bottom') => {
+    const element = scrollAreaRef.current;
+    if (!element) return;
+
+    element.scrollTo({
+      top: position === 'top' ? 0 : element.scrollHeight,
+      behavior: 'smooth',
+    });
+    element.focus({ preventScroll: true });
+  };
 
   const setPermission = (
     moduleName: ModuleName,
@@ -82,18 +94,49 @@ export const PermissionMatrix: React.FC<{
   return (
     <Card className="overflow-hidden">
       <div className="border-b p-4">
-        <h3 className="font-semibold">{ui('صلاحيات المستخدم التفصيلية', 'Detailed User Permissions')}</h3>
-        <p className="text-sm text-muted-foreground">
-          {ui('الأقسام غير المفعلة ستختفي من القائمة الجانبية.', 'Disabled sections will be hidden from the sidebar.')}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {ui('صلاحية «إضافة مستخدم جديد» مخصصة حاليًا لوحدة العناية بالمساجد والمصليات، وتسمح بإنشاء أو ربط حساب المنسوب ضمن نفس عملية إضافته.', 'Create User is currently scoped to the Mosques & Prayer Rooms Care Unit and creates or links the personnel login in the same operation.')}
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="font-semibold">{ui('صلاحيات المستخدم التفصيلية', 'Detailed User Permissions')}</h3>
+            <p className="text-sm text-muted-foreground">
+              {ui('الأقسام غير المفعلة ستختفي من القائمة الجانبية.', 'Disabled sections will be hidden from the sidebar.')}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {ui('صلاحية «إضافة مستخدم جديد» مخصصة حاليًا لوحدة العناية بالمساجد والمصليات، وتسمح بإنشاء أو ربط حساب المنسوب ضمن نفس عملية إضافته.', 'Create User is currently scoped to the Mosques & Prayer Rooms Care Unit and creates or links the personnel login in the same operation.')}
+            </p>
+            <p className="mt-2 text-xs font-medium text-primary">
+              {ui('يمكن تمرير الجدول بعجلة الفأرة، سحب شريط التمرير، أو استخدام مفاتيح الأسهم بعد النقر داخل الجدول.', 'Scroll with the mouse wheel, drag the scrollbar, or use the arrow keys after focusing the table.')}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => scrollPermissions('top')}
+              className="rounded-lg border bg-background px-3 py-2 text-xs font-semibold shadow-sm transition hover:bg-muted"
+              title={ui('الانتقال إلى أعلى جدول الصلاحيات', 'Go to top of permissions table')}
+            >
+              ▲ {ui('أعلى', 'Top')}
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollPermissions('bottom')}
+              className="rounded-lg border bg-background px-3 py-2 text-xs font-semibold shadow-sm transition hover:bg-muted"
+              title={ui('الانتقال إلى أسفل جدول الصلاحيات', 'Go to bottom of permissions table')}
+            >
+              ▼ {ui('أسفل', 'Bottom')}
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div
+        ref={scrollAreaRef}
+        tabIndex={0}
+        className="max-h-[62vh] min-h-[320px] overflow-auto overscroll-contain outline-none [scrollbar-gutter:stable] focus:ring-2 focus:ring-primary/20"
+        aria-label={ui('جدول صلاحيات المستخدم قابل للتمرير', 'Scrollable user permissions table')}
+      >
         <table className="w-full min-w-[900px] text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-background shadow-sm">
             <tr className="border-b bg-muted/40">
               <th className={`p-3 ${isArabic ? 'text-right' : 'text-left'}`}>{ui('القسم', 'Section')}</th>
               {ACTIONS.map((action) => (
