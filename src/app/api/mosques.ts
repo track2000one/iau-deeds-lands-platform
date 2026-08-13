@@ -168,7 +168,7 @@ const publicJson = async <T,>(path: string, options: RequestInit = {}): Promise<
 };
 
 export const mosqueApi = {
-  me: () => apiJson<{ role: MosqueModuleRole; siteId?: string | null; userId: string; isAdmin: boolean }>('/api/mosques/me'),
+  me: () => apiJson<{ role: MosqueModuleRole; siteId?: string | null; personnelRole?: string | null; userId: string; isAdmin: boolean }>('/api/mosques/me'),
   dashboard: () => apiJson<MosqueDashboard>('/api/mosques/dashboard'),
   sites: () => apiJson<MosqueSite[]>('/api/mosques/sites'),
   createSite: (input: Partial<MosqueSite>) => apiJson<MosqueSite>('/api/mosques/sites', { method: 'POST', body: JSON.stringify(input) }),

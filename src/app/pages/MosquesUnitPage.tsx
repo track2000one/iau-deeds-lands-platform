@@ -135,6 +135,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<MosqueModuleRole>('viewer');
   const [linkedSiteId, setLinkedSiteId] = useState<string | null>(null);
+  const [myPersonnelRole, setMyPersonnelRole] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<MosqueDashboard | null>(null);
   const [sites, setSites] = useState<MosqueSite[]>([]);
   const [requests, setRequests] = useState<MosqueRequest[]>([]);
@@ -170,6 +171,7 @@ export const MosquesUnitPage: React.FC = () => {
       const me = await mosqueApi.me();
       setRole(me.role);
       setLinkedSiteId(me.siteId || null);
+      setMyPersonnelRole(me.personnelRole || null);
       const [dash, siteRows, requestRows, ticketRows, leaveRows, personRows, noticeRows] = await Promise.all([
         mosqueApi.dashboard(), mosqueApi.sites(), mosqueApi.requests(), mosqueApi.tickets(), mosqueApi.leaves(), mosqueApi.personnel(), mosqueApi.notifications(),
       ]);
@@ -386,7 +388,7 @@ export const MosquesUnitPage: React.FC = () => {
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">وحدة تشغيلية متكاملة</Badge>
-              <Badge variant="outline" className="border-sky-300 bg-white text-sky-700"><Shield className="ml-1 h-3.5 w-3.5" />{roleLabels[role]}</Badge>
+              <Badge variant="outline" className="border-sky-300 bg-white text-sky-700"><Shield className="ml-1 h-3.5 w-3.5" />{role === 'personnel' && myPersonnelRole ? personnelRoleLabels[myPersonnelRole] || myPersonnelRole : roleLabels[role]}</Badge>
             </div>
             <h1 className="text-2xl font-black text-slate-900 md:text-4xl">وحدة العناية بالمساجد والمصليات الجامعية</h1>
             <p className="mt-2 max-w-4xl text-sm leading-7 text-slate-600 md:text-base">إدارة المساجد والمصليات، الطلبات والصيانة، البلاغات، الإجازات، التوظيف، الخرائط، التقارير والإشعارات ضمن مسار حوكمة موحد.</p>
@@ -472,7 +474,7 @@ export const MosquesUnitPage: React.FC = () => {
 
         <TabsContent value="team" className="space-y-4">
           {canAdd && <div className="flex justify-end"><Button className={button3d} onClick={() => { setPersonnelForm({ siteId: sites[0]?.id || '', name: '', role: 'imam', mobile: '', email: '' }); setPersonnelDialog(true); }}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب مسجد</Button></div>}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{personnel.map((item) => <Card key={item.id} className={card3d}><CardContent className="p-5"><div className="flex items-start justify-between"><div><h3 className="font-black">{item.name}</h3><p className="text-sm text-muted-foreground">{item.site?.name}</p></div><Badge variant="outline">{item.role === 'imam' ? 'إمام' : item.role === 'muezzin' ? 'مؤذن' : item.role === 'khateeb' ? 'خطيب' : 'متعاون'}</Badge></div><div className="mt-4 grid grid-cols-2 gap-2 text-sm"><Info label="الجوال" value={item.mobile || '-'} /><Info label="البريد" value={item.email || '-'} /></div></CardContent></Card>)}</div>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{personnel.map((item) => <Card key={item.id} className={card3d}><CardContent className="p-5"><div className="flex items-start justify-between"><div><h3 className="font-black">{item.name}</h3><p className="text-sm text-muted-foreground">{item.site?.name}</p></div><Badge variant="outline">{personnelRoleLabels[item.role] || item.role}</Badge></div><div className="mt-4 grid grid-cols-2 gap-2 text-sm"><Info label="الجوال" value={item.mobile || '-'} /><Info label="البريد" value={item.email || '-'} /></div></CardContent></Card>)}</div>
           {!personnel.length && <Empty text="لا يوجد منسوبون مسجلون" />}
         </TabsContent>
 
