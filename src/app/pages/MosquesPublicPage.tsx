@@ -33,7 +33,8 @@ const ticketTypes = {
   cleaning: 'مشكلة نظافة', electrical: 'عطل كهرباء', air_conditioning: 'عطل مكيف', audio: 'مشكلة صوتيات',
   supplies: 'نقص مستلزمات', general: 'ملاحظة عامة', complaint: 'شكوى', other: 'أخرى',
 };
-const jobTypes = { imam: 'إمام', muezzin: 'مؤذن', khateeb: 'خطيب', collaborator: 'متعاون', administrative: 'وظيفة إدارية' };
+const jobTypes = { imam: 'إمام', muezzin: 'مؤذن', khateeb: 'خطيب', collaborating_khateeb: 'خطيب متعاون', administrative: 'وظيفة إدارية' };
+const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', jami: 'جامع', prayer_room: 'مصلى' };
 const statusLabels: Record<string, string> = {
   new: 'جديد', under_review: 'تحت المراجعة', assigned: 'مسند', in_progress: 'قيد التنفيذ', resolved: 'تم الحل', closed: 'مغلق', rejected: 'مرفوض',
   shortlisted: 'مرشح مبدئيًا', interview: 'مقابلة', accepted: 'مقبول', archived: 'مؤرشف',
@@ -293,7 +294,7 @@ export const MosquesPublicPage: React.FC = () => {
               <h1 className="text-2xl font-black text-slate-900 md:text-4xl">وحدة العناية بالمساجد والمصليات الجامعية</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">واجهة تعريفية وخدمات إلكترونية للعناية ببيوت الله في جامعة الإمام عبدالرحمن بن فيصل، تشمل البلاغات والمتابعة وطلبات التعاون والتوظيف.</p>
             </div>
-            <Button variant="outline" className="shadow-[0_4px_0_rgba(71,85,105,.14)]" onClick={() => navigate('/login')}><LogIn className="ml-2 h-4 w-4" />دخول منسوبي الوحدة</Button>
+            <Button variant="outline" className="shadow-[0_4px_0_rgba(71,85,105,.14)]" onClick={() => navigate('/login')}><LogIn className="ml-2 h-4 w-4" />دخول منسوبي الوحدة والمساجد</Button>
           </div>
         </header>
 
@@ -330,14 +331,18 @@ export const MosquesPublicPage: React.FC = () => {
           </div>
         </section>
 
-        {selectedSite && qrSiteToken && <Card className={`${shell} border-sky-300`}><CardContent className="flex items-center gap-4 p-5"><div className="rounded-2xl bg-sky-100 p-3 text-sky-700"><MapPin className="h-6 w-6" /></div><div><p className="text-xs text-muted-foreground">المسجد / المصلى المرتبط بالرمز</p><h2 className="text-xl font-black">{selectedSite.name}</h2><p className="text-sm text-muted-foreground">{selectedSite.city || ''} — {selectedSite.district || ''}</p></div></CardContent></Card>}
+        {selectedSite && qrSiteToken && <Card className={`${shell} border-sky-300`}><CardContent className="p-5"><div className="flex items-start gap-4"><div className="rounded-2xl bg-sky-100 p-3 text-sky-700"><MapPin className="h-6 w-6" /></div><div className="flex-1"><p className="text-xs text-muted-foreground">الموقع المرتبط بالـ QR</p><h2 className="text-xl font-black">{selectedSite.name}</h2><p className="text-sm text-muted-foreground">{siteTypeLabels[selectedSite.siteType] || selectedSite.siteType} — {[selectedSite.campusLocation, selectedSite.city, selectedSite.district].filter(Boolean).join(' — ')}</p><div className="mt-3 flex flex-wrap gap-2 text-xs"><Badge variant="outline">المساحة: {selectedSite.area ? `${selectedSite.area} م²` : 'غير محددة'}</Badge><Badge variant="outline">السعة: {selectedSite.capacity || 'غير محددة'}</Badge>{selectedSite.mapUrl && <Button size="sm" variant="outline" onClick={() => window.open(selectedSite.mapUrl!, '_blank')}><MapPin className="ml-1 h-3.5 w-3.5" />فتح على الخريطة</Button>}</div></div></div></CardContent></Card>}
 
         <Tabs defaultValue="report" className="space-y-4">
-          <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border bg-white p-2"><TabsTrigger value="report">تقديم بلاغ</TabsTrigger><TabsTrigger value="track">متابعة بلاغ</TabsTrigger><TabsTrigger value="jobs">التوظيف / التعاون</TabsTrigger><TabsTrigger value="track-job">متابعة التوظيف</TabsTrigger></TabsList>
+          <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border bg-white p-2"><TabsTrigger value="report">تقديم بلاغ</TabsTrigger><TabsTrigger value="track">متابعة بلاغ</TabsTrigger><TabsTrigger value="locations">المساجد والمواقع</TabsTrigger><TabsTrigger value="jobs">التوظيف / التعاون</TabsTrigger><TabsTrigger value="track-job">متابعة التوظيف</TabsTrigger></TabsList>
+
+          <TabsContent value="locations">
+            <Card className={shell}><CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />المساجد والجوامع والمصليات</CardTitle><CardDescription>معلومات عامة ومواقع يمكن لمنسوبي الجامعة والزوار الاطلاع عليها دون كشف أي بيانات داخلية.</CardDescription></CardHeader><CardContent><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{sites.map((site) => <div key={site.publicToken} className="rounded-2xl border bg-white p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div><h3 className="font-black">{site.name}</h3><p className="mt-1 text-xs text-muted-foreground">{siteTypeLabels[site.siteType] || site.siteType}</p></div><MapPin className="h-5 w-5 text-sky-600" /></div><p className="mt-3 text-sm text-slate-600">{[site.campusLocation, site.city, site.district].filter(Boolean).join(' — ') || 'الموقع غير موضح'}</p><div className="mt-3 flex flex-wrap gap-2"><Badge variant="outline">السعة: {site.capacity || '-'}</Badge>{site.mapUrl && <Button size="sm" variant="outline" onClick={() => window.open(site.mapUrl!, '_blank')}><MapPin className="ml-1 h-3.5 w-3.5" />الخريطة</Button>}</div></div>)}</div></CardContent></Card>
+          </TabsContent>
 
           <TabsContent value="report">
             <Card className={shell}><CardHeader><CardTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5" />تقديم بلاغ أو شكوى</CardTitle><CardDescription>سيصدر رقم بلاغ ورمز متابعة خاص. بيانات التواصل اختيارية.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-2"><div className="space-y-1.5">
-                <Label>المسجد / المصلى *</Label>
+                <Label>المسجد / الجامع / المصلى *</Label>
                 <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                   <NativeSelect value={ticketForm.siteToken} onChange={(e) => setTicketForm({ ...ticketForm, siteToken: e.target.value })} disabled={Boolean(qrSiteToken)}>{sites.map((site) => <option key={site.publicToken} value={site.publicToken}>{site.name}</option>)}</NativeSelect>
                   <Button type="button" variant="outline" disabled={Boolean(qrSiteToken) || sites.length === 0} onClick={() => setScannerOpen(true)} className="whitespace-nowrap border-sky-300 bg-sky-50 text-sky-800 shadow-[0_4px_0_rgba(14,116,144,.14)] hover:bg-sky-100">

@@ -1,12 +1,12 @@
 import { apiJson, authenticatedFetch, getApiBaseUrl } from '../../lib/http';
 
-export type MosqueModuleRole = 'head' | 'supervisor' | 'personnel' | 'viewer';
+export type MosqueModuleRole = 'head' | 'supervisor' | 'personnel' | 'university_member' | 'viewer';
 
 export type MosqueSite = {
   id: string;
   publicToken: string;
   name: string;
-  siteType: 'mosque' | 'prayer_room';
+  siteType: 'mosque' | 'jami' | 'prayer_room';
   city?: string | null;
   district?: string | null;
   campusLocation?: string | null;
@@ -129,6 +129,17 @@ export type MosqueAssignment = {
   site?: { name: string } | null;
 };
 
+
+export type MosqueStaffUser = {
+  uid: string;
+  username: string;
+  email: string;
+  isActive: boolean;
+  moduleRole: MosqueModuleRole;
+  siteId?: string | null;
+  personnelRole?: string | null;
+};
+
 export type MosqueNotification = {
   id: string;
   title: string;
@@ -142,6 +153,7 @@ export type MosqueNotification = {
 export type MosqueDashboard = {
   role: MosqueModuleRole;
   siteId?: string | null;
+  personnelRole?: string | null;
   stats: {
     sites: number;
     newRequests: number;
@@ -151,12 +163,20 @@ export type MosqueDashboard = {
     openTickets: number;
     pendingLeaves: number;
     jobs: number;
+    managedSites: number;
+    assignedRequests: number;
+    urgentRequests: number;
+    newTickets: number;
+    myRequests: number;
+    myLeaves: number;
   };
   recentRequests: MosqueRequest[];
   recentTickets: MosqueTicket[];
+  linkedSite?: MosqueSite | null;
+  managedSiteIds?: string[];
 };
 
-export type PublicMosqueSite = Pick<MosqueSite, 'publicToken' | 'name' | 'siteType' | 'city' | 'district' | 'campusLocation' | 'latitude' | 'longitude' | 'mapUrl' | 'status'>;
+export type PublicMosqueSite = Pick<MosqueSite, 'publicToken' | 'name' | 'siteType' | 'city' | 'district' | 'campusLocation' | 'area' | 'capacity' | 'latitude' | 'longitude' | 'mapUrl' | 'status'>;
 
 const publicJson = async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
   const base = getApiBaseUrl();
@@ -192,6 +212,8 @@ export const mosqueApi = {
 
   personnel: () => apiJson<MosquePersonnel[]>('/api/mosques/personnel'),
   createPersonnel: (input: Record<string, unknown>) => apiJson<MosquePersonnel>('/api/mosques/personnel', { method: 'POST', body: JSON.stringify(input) }),
+  createPersonnelAccount: (input: Record<string, unknown>) => apiJson<{ personnel: MosquePersonnel; user: { uid: string; username: string; email: string; isActive: boolean }; accountCreated: boolean; message: string }>('/api/mosques/personnel/account', { method: 'POST', body: JSON.stringify(input) }),
+  staffDirectory: () => apiJson<MosqueStaffUser[]>('/api/mosques/staff-directory'),
   assignments: () => apiJson<MosqueAssignment[]>('/api/mosques/assignments'),
   setAssignment: (userId: string, input: Record<string, unknown>) => apiJson<MosqueAssignment>(`/api/mosques/assignments/${userId}`, { method: 'PUT', body: JSON.stringify(input) }),
 

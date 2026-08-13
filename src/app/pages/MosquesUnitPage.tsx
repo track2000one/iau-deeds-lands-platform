@@ -33,7 +33,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
-import { useAuth } from '../../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -61,18 +60,20 @@ import {
   type MosquePersonnel,
   type MosqueRequest,
   type MosqueSite,
+  type MosqueStaffUser,
   type MosqueTicket,
 } from '../api/mosques';
 
 const roleLabels: Record<MosqueModuleRole, string> = {
   head: 'رئيس الوحدة',
   supervisor: 'مشرف الوحدة',
-  personnel: 'منسوب مسجد / مصلى',
-  viewer: 'عرض فقط',
+  personnel: 'منسوب المسجد أو المصلى',
+  university_member: 'منسوب الجامعة',
+  viewer: 'منسوب الجامعة',
 };
 
 const personnelRoleLabels: Record<string, string> = { imam: 'إمام', muezzin: 'مؤذن', khateeb: 'خطيب', collaborating_khateeb: 'خطيب متعاون', collaborator: 'خطيب متعاون' };
-const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', prayer_room: 'مصلى' };
+const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', jami: 'جامع', prayer_room: 'مصلى' };
 const siteStatusLabels: Record<string, string> = { active: 'نشط', maintenance: 'تحت الصيانة', temporarily_closed: 'مغلق مؤقتًا' };
 const requestTypeLabels: Record<string, string> = {
   maintenance: 'صيانة', renovation: 'ترميم', equipment: 'تجهيزات', cleaning: 'نظافة', carpet: 'فرش',
@@ -118,7 +119,7 @@ const button3d = 'shadow-[0_4px_0_rgba(71,85,105,0.13),0_7px_12px_rgba(15,23,42,
 
 const emptySite = {
   name: '', siteType: 'mosque', city: 'الدمام', district: '', campusLocation: '', area: '', capacity: '', latitude: '', longitude: '',
-  status: 'active', imamName: '', muezzinName: '', khateebName: '', contactPhone: '', notes: '',
+  status: 'active', imamName: '', muezzinName: '', khateebName: '', contactPhone: '', supervisorUserId: '', notes: '',
 };
 const emptyRequest = { siteId: '', requestType: 'maintenance', priority: 'medium', description: '', notes: '', file: null as File | null };
 const emptyLeave = { siteId: '', requestType: 'leave', startDate: '', endDate: '', reason: '', replacementName: '', notes: '' };
@@ -126,7 +127,6 @@ const emptyLeave = { siteId: '', requestType: 'leave', startDate: '', endDate: '
 export const MosquesUnitPage: React.FC = () => {
   const navigate = useNavigate();
   const { hasPermission, isAdmin } = usePermissions();
-  const { users } = useAuth();
   const canAdd = isAdmin || hasPermission('mosques', 'canAdd');
   const canEdit = isAdmin || hasPermission('mosques', 'canEdit');
   const canDelete = isAdmin || hasPermission('mosques', 'canDelete');
@@ -144,6 +144,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [jobs, setJobs] = useState<MosqueJobApplication[]>([]);
   const [personnel, setPersonnel] = useState<MosquePersonnel[]>([]);
   const [assignments, setAssignments] = useState<MosqueAssignment[]>([]);
+  const [staffUsers, setStaffUsers] = useState<MosqueStaffUser[]>([]);
   const [notifications, setNotifications] = useState<MosqueNotification[]>([]);
   const [search, setSearch] = useState('');
 
@@ -172,34 +173,59 @@ export const MosquesUnitPage: React.FC = () => {
       setRole(me.role);
       setLinkedSiteId(me.siteId || null);
       setMyPersonnelRole(me.personnelRole || null);
-      const [dash, siteRows, requestRows, ticketRows, leaveRows, personRows, noticeRows] = await Promise.all([
-        mosqueApi.dashboard(), mosqueApi.sites(), mosqueApi.requests(), mosqueApi.tickets(), mosqueApi.leaves(), mosqueApi.personnel(), mosqueApi.notifications(),
+
+      const [dash, siteRows, noticeRows] = await Promise.all([
+        mosqueApi.dashboard(), mosqueApi.sites(), mosqueApi.notifications(),
       ]);
       setDashboard(dash);
       setSites(siteRows);
-      setRequests(requestRows);
-      setTickets(ticketRows);
-      setLeaves(leaveRows);
-      setPersonnel(personRows);
       setNotifications(noticeRows);
 
       if (me.role === 'head' || me.role === 'supervisor') {
+        const [requestRows, ticketRows, leaveRows, personRows, staffRows] = await Promise.all([
+          mosqueApi.requests(), mosqueApi.tickets(), mosqueApi.leaves(), mosqueApi.personnel(), mosqueApi.staffDirectory(),
+        ]);
+        setRequests(requestRows);
+        setTickets(ticketRows);
+        setLeaves(leaveRows);
+        setPersonnel(personRows);
+        setStaffUsers(staffRows);
         try { setJobs(await mosqueApi.jobs()); } catch { setJobs([]); }
-      } else setJobs([]);
-
-      if (me.role === 'head') {
-        try {
-          const rows = await mosqueApi.assignments();
-          setAssignments(rows);
-          setAssignmentDrafts(Object.fromEntries(rows.map((item) => [item.userId, { role: item.role, siteId: item.siteId || '', personnelRole: item.personnelRole || 'imam' }])));
-        } catch { setAssignments([]); setAssignmentDrafts({}); }
-      } else setAssignments([]);
+        if (me.role === 'head') {
+          try {
+            const rows = await mosqueApi.assignments();
+            setAssignments(rows);
+            setAssignmentDrafts(Object.fromEntries(rows.map((item) => [item.userId, { role: item.role, siteId: item.siteId || '', personnelRole: item.personnelRole || 'imam' }])));
+          } catch { setAssignments([]); setAssignmentDrafts({}); }
+        } else {
+          setAssignments([]);
+          setAssignmentDrafts({});
+        }
+      } else if (me.role === 'personnel') {
+        const [requestRows, leaveRows] = await Promise.all([mosqueApi.requests(), mosqueApi.leaves()]);
+        setRequests(requestRows);
+        setLeaves(leaveRows);
+        setTickets([]);
+        setJobs([]);
+        setPersonnel([]);
+        setAssignments([]);
+        setStaffUsers([]);
+      } else {
+        setRequests([]);
+        setTickets([]);
+        setLeaves([]);
+        setJobs([]);
+        setPersonnel([]);
+        setAssignments([]);
+        setStaffUsers([]);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل بيانات وحدة المساجد');
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => { loadAll(); }, []);
 
@@ -223,7 +249,7 @@ export const MosquesUnitPage: React.FC = () => {
     setSiteForm(site ? {
       name: site.name, siteType: site.siteType, city: site.city || '', district: site.district || '', campusLocation: site.campusLocation || '',
       area: site.area ?? '', capacity: site.capacity ?? '', latitude: site.latitude ?? '', longitude: site.longitude ?? '', status: site.status,
-      imamName: site.imamName || '', muezzinName: site.muezzinName || '', khateebName: site.khateebName || '', contactPhone: site.contactPhone || '', notes: site.notes || '',
+      imamName: site.imamName || '', muezzinName: site.muezzinName || '', khateebName: site.khateebName || '', contactPhone: site.contactPhone || '', supervisorUserId: site.supervisorUserId || '', notes: site.notes || '',
     } : emptySite);
     setSiteDialog(true);
   };
@@ -241,10 +267,13 @@ export const MosquesUnitPage: React.FC = () => {
         mapUrl: siteForm.latitude !== '' && siteForm.longitude !== '' ? `https://www.google.com/maps?q=${siteForm.latitude},${siteForm.longitude}` : null,
         images: [],
       };
-      if (editingSite) await mosqueApi.updateSite(editingSite.id, payload); else await mosqueApi.createSite(payload);
-      toast.success(editingSite ? 'تم تحديث بيانات الموقع' : 'تمت إضافة المسجد/المصلى');
+      const savedSite = editingSite
+        ? await mosqueApi.updateSite(editingSite.id, { ...payload, images: editingSite.images || [] })
+        : await mosqueApi.createSite(payload);
+      toast.success(editingSite ? 'تم تحديث بيانات الموقع' : 'تمت إضافة الموقع وإنشاء QR تلقائيًا');
       setSiteDialog(false);
       await loadAll();
+      if (!editingSite) setQrSite(savedSite);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر الحفظ'); } finally { setSaving(false); }
   };
 
@@ -333,9 +362,14 @@ export const MosquesUnitPage: React.FC = () => {
   };
 
   const savePersonnel = async () => {
-    if (!personnelForm.siteId || !personnelForm.name.trim()) return toast.error('الموقع والاسم مطلوبان');
+    if (!personnelForm.siteId || !personnelForm.name.trim() || !personnelForm.email.trim()) return toast.error('الموقع والاسم والبريد الإلكتروني مطلوبة لإنشاء حساب المنسوب');
     setSaving(true);
-    try { await mosqueApi.createPersonnel(personnelForm); toast.success('تمت إضافة منسوب المسجد'); setPersonnelDialog(false); await loadAll(); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر الإضافة'); } finally { setSaving(false); }
+    try {
+      const result = await mosqueApi.createPersonnelAccount(personnelForm);
+      toast.success(result.message || 'تمت إضافة منسوب المسجد وربط حسابه');
+      setPersonnelDialog(false);
+      await loadAll();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر إضافة منسوب المسجد'); } finally { setSaving(false); }
   };
 
   const setUserAssignment = async (userId: string, roleValue: MosqueModuleRole, siteId?: string, personnelRole?: string) => {
@@ -375,6 +409,9 @@ export const MosquesUnitPage: React.FC = () => {
   };
 
   const unreadNotifications = notifications.filter((item) => !item.isRead).length;
+  const linkedSite = dashboard?.linkedSite || visibleSites[0] || null;
+  const activeMyRequests = requests.filter((item) => !['closed', 'rejected'].includes(item.status));
+  const maintenanceMyRequests = requests.filter((item) => item.requestType === 'maintenance' && !['closed', 'rejected'].includes(item.status));
 
   if (loading) {
     return <div className="flex min-h-[420px] items-center justify-center"><RefreshCw className="h-8 w-8 animate-spin text-primary" /><span className="mr-3 font-semibold">جاري تحميل وحدة المساجد والمصليات...</span></div>;
@@ -397,12 +434,12 @@ export const MosquesUnitPage: React.FC = () => {
             <Button variant="outline" className={button3d} onClick={() => navigate('/mosques/public')}><ExternalLink className="ml-2 h-4 w-4" />البوابة العامة</Button>
             <Button variant="outline" className={button3d} onClick={() => window.open('https://inspection-vna1.vercel.app/', '_blank', 'noopener,noreferrer')}><ClipboardList className="ml-2 h-4 w-4" />نظام المعاينة</Button>
             <Button variant="outline" className={button3d} onClick={loadAll}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button>
-            {canAdd && ['head', 'supervisor'].includes(role) && <Button className={`${button3d} bg-sky-700 hover:bg-sky-800`} onClick={() => openSiteDialog()}><Plus className="ml-2 h-4 w-4" />إضافة مسجد / مصلى</Button>}
+            {['head', 'supervisor'].includes(role) && <Button className={`${button3d} bg-sky-700 hover:bg-sky-800`} onClick={() => openSiteDialog()}><Plus className="ml-2 h-4 w-4" />إضافة مسجد / مصلى</Button>}
           </div>
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+      {role === 'head' && <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
         <Stat title="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} />
         <Stat title="طلبات جديدة" value={dashboard?.stats.newRequests || 0} icon={ClipboardList} />
         <Stat title="تحت المراجعة" value={dashboard?.stats.reviewRequests || 0} icon={Clock3} />
@@ -411,29 +448,68 @@ export const MosquesUnitPage: React.FC = () => {
         <Stat title="بلاغات مفتوحة" value={dashboard?.stats.openTickets || 0} icon={MessageSquare} />
         <Stat title="إجازات معلقة" value={dashboard?.stats.pendingLeaves || 0} icon={CalendarDays} />
         <Stat title="طلبات توظيف" value={dashboard?.stats.jobs || 0} icon={Briefcase} />
-      </div>
+      </div>}
+
+      {role === 'supervisor' && <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <Stat title="المساجد التابعة لي" value={dashboard?.stats.managedSites || 0} icon={Building2} />
+        <Stat title="طلبات تحتاج متابعة" value={dashboard?.stats.assignedRequests || 0} icon={ClipboardList} />
+        <Stat title="بلاغات جديدة" value={dashboard?.stats.newTickets || 0} icon={MessageSquare} />
+        <Stat title="طلبات عاجلة" value={dashboard?.stats.urgentRequests || 0} icon={AlertTriangle} />
+        <Stat title="إجازات للمراجعة" value={dashboard?.stats.pendingLeaves || 0} icon={CalendarDays} />
+        <Stat title="التنبيهات" value={unreadNotifications} icon={Bell} />
+      </div>}
+
+      {role === 'personnel' && <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <Stat title="الموقع المرتبط" value={linkedSite ? 1 : 0} icon={Building2} />
+        <Stat title="طلباتي الحالية" value={dashboard?.stats.myRequests || activeMyRequests.length} icon={ClipboardList} />
+        <Stat title="طلبات الصيانة" value={maintenanceMyRequests.length} icon={Wrench} />
+        <Stat title="الإجازات الحالية" value={dashboard?.stats.myLeaves || 0} icon={CalendarDays} />
+        <Stat title="الإشعارات" value={unreadNotifications} icon={Bell} />
+      </div>}
+
+
 
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border bg-white/80 p-2">
           <TabsTrigger value="overview">الرئيسية</TabsTrigger>
           <TabsTrigger value="sites">المساجد والمصليات</TabsTrigger>
-          <TabsTrigger value="requests">الطلبات</TabsTrigger>
-          <TabsTrigger value="tickets">البلاغات</TabsTrigger>
-          <TabsTrigger value="leaves">الإجازات</TabsTrigger>
-          {(role === 'head' || role === 'supervisor') && <TabsTrigger value="jobs">التوظيف</TabsTrigger>}
+          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger value="requests">الطلبات</TabsTrigger>}
+          {['head', 'supervisor'].includes(role) && <TabsTrigger value="tickets">البلاغات</TabsTrigger>}
+          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger value="leaves">الإجازات</TabsTrigger>}
+          {['head', 'supervisor'].includes(role) && <TabsTrigger value="jobs">التوظيف</TabsTrigger>}
           <TabsTrigger value="map">الخريطة</TabsTrigger>
-          <TabsTrigger value="reports">التقارير</TabsTrigger>
-          {(role === 'head' || role === 'supervisor') && <TabsTrigger value="team">المنسوبون</TabsTrigger>}
+          {['head', 'supervisor'].includes(role) && <TabsTrigger value="reports">التقارير</TabsTrigger>}
+          {['head', 'supervisor'].includes(role) && <TabsTrigger value="team">منسوبو المساجد</TabsTrigger>}
           {role === 'head' && <TabsTrigger value="roles">الأدوار التشغيلية</TabsTrigger>}
-          <TabsTrigger value="notifications" className="gap-1">الإشعارات {unreadNotifications > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{unreadNotifications}</span>}</TabsTrigger>
+          {role !== 'university_member' && role !== 'viewer' && <TabsTrigger value="notifications" className="gap-1">الإشعارات {unreadNotifications > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{unreadNotifications}</span>}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className={card3d}><CardHeader><CardTitle>آخر طلبات الصيانة والاحتياج</CardTitle><CardDescription>أحدث العمليات التي تحتاج متابعة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد طلبات حتى الآن" />}</CardContent></Card>
-            <Card className={card3d}><CardHeader><CardTitle>آخر البلاغات</CardTitle><CardDescription>بلاغات الزوار ومنسوبي الجامعة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد بلاغات حتى الآن" />}</CardContent></Card>
-          </div>
-          <Card className={card3d}><CardHeader><CardTitle>ضوابط سير الإجراءات</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="رفض أو إعادة الطلب" text="لا يمكن الرفض أو الإعادة دون سبب موثق." /><Rule title="إثبات الإنجاز" text="الطلب التنفيذي لا يصبح مكتملًا قبل إرفاق ما يثبت الإنجاز." /><Rule title="الإجازات والبدلاء" text="يفحص النظام تعارض فترة البديل قبل قبول الطلب." /><Rule title="البلاغات" text="يبقى البلاغ مستقلًا ويمكن تحويله إلى طلب صيانة مرتبط دون فقد تاريخه." /></CardContent></Card>
+          {role === 'head' && <>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className={card3d}><CardHeader><CardTitle>آخر طلبات الصيانة والاحتياج</CardTitle><CardDescription>أحدث العمليات داخل منظومة الوحدة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد طلبات حتى الآن" />}</CardContent></Card>
+              <Card className={card3d}><CardHeader><CardTitle>آخر البلاغات</CardTitle><CardDescription>بلاغات الزوار ومنسوبي الجامعة التي تحتاج متابعة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد بلاغات حتى الآن" />}</CardContent></Card>
+            </div>
+            <Card className={card3d}><CardHeader><CardTitle>إدارة المنظومة</CardTitle><CardDescription>رئيس الوحدة يملك الرؤية الشاملة والتقارير والإعدادات واعتماد الإجراءات.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="الإشراف الشامل" text="متابعة جميع المساجد والمصليات والطلبات والبلاغات." /><Rule title="الاعتماد" text="اعتماد الطلبات والإجازات والقرارات النهائية." /><Rule title="المؤشرات" text="متابعة الأداء والطلبات المتأخرة والحالات العاجلة." /><Rule title="المنسوبون" text="إدارة المشرفين ومنسوبي المساجد وربطهم بالمواقع." /></CardContent></Card>
+          </>}
+
+          {role === 'supervisor' && <>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className={card3d}><CardHeader><CardTitle>الطلبات التي تحتاج متابعة</CardTitle><CardDescription>طلبات المساجد التابعة لك حسب الإسناد التشغيلي.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد طلبات معلقة" />}</CardContent></Card>
+              <Card className={card3d}><CardHeader><CardTitle>البلاغات الجديدة</CardTitle><CardDescription>متابعة البلاغات والشكاوى للمواقع التابعة لك.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد بلاغات جديدة" />}</CardContent></Card>
+            </div>
+            <Card className={card3d}><CardHeader><CardTitle>مهام مشرف الوحدة</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="المراجعة اليومية" text="استقبال الطلبات ومراجعة الصيانة والاحتياجات." /><Rule title="البلاغات" text="متابعة البلاغات والشكاوى وتحديث حالاتها." /><Rule title="المنسوبون" text="التواصل مع منسوبي المساجد وإضافة الحسابات التشغيلية." /><Rule title="التقارير" text="رفع تقارير دورية عن المساجد التابعة لك." /></CardContent></Card>
+          </>}
+
+          {role === 'personnel' && <>
+            <Card className={card3d}><CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5" />بيانات المسجد أو المصلى المرتبط بحسابي</CardTitle><CardDescription>{myPersonnelRole ? `الصفة التشغيلية: ${personnelRoleLabels[myPersonnelRole] || myPersonnelRole}` : 'منسوب مسجد أو مصلى'}</CardDescription></CardHeader><CardContent>{linkedSite ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Info label="الاسم" value={linkedSite.name} /><Info label="النوع" value={siteTypeLabels[linkedSite.siteType] || linkedSite.siteType} /><Info label="الموقع" value={[linkedSite.campusLocation, linkedSite.city, linkedSite.district].filter(Boolean).join(' — ') || '-'} /><Info label="الحالة" value={siteStatusLabels[linkedSite.status] || linkedSite.status} /></div> : <Empty text="لم يتم ربط حسابك بمسجد أو مصلى حتى الآن" />}</CardContent></Card>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className={card3d}><CardHeader><CardTitle>طلباتي الحالية</CardTitle><CardDescription>متابعة طلبات الاحتياج والصيانة التي قدمتها.</CardDescription></CardHeader><CardContent className="space-y-2">{activeMyRequests.length ? activeMyRequests.slice(0, 5).map((item) => <MiniRow key={item.id} title={item.requestNumber} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد طلبات حالية" />}</CardContent></Card>
+              <Card className={card3d}><CardHeader><CardTitle>الخدمات السريعة</CardTitle><CardDescription>تقديم طلب أو إجازة/اعتذار واستقبال الإشعارات.</CardDescription></CardHeader><CardContent className="flex flex-wrap gap-3"><Button className={button3d} onClick={openRequestDialog}><Wrench className="ml-2 h-4 w-4" />تقديم طلب جديد</Button><Button variant="outline" className={button3d} onClick={openLeaveDialog}><CalendarDays className="ml-2 h-4 w-4" />إجازة أو اعتذار</Button>{linkedSite?.mapUrl && <Button variant="outline" className={button3d} onClick={() => window.open(linkedSite.mapUrl!, '_blank')}><MapPin className="ml-2 h-4 w-4" />موقع المسجد</Button>}</CardContent></Card>
+            </div>
+          </>}
+
+          {(role === 'university_member' || role === 'viewer') && <Card className={card3d}><CardHeader><CardTitle>منسوب الجامعة</CardTitle><CardDescription>الموظف، عضو هيئة التدريس، أو الطالب.</CardDescription></CardHeader><CardContent className="space-y-4"><p className="text-sm leading-7 text-slate-600">يمكنك الاطلاع على المعلومات العامة ومواقع المساجد والمصليات، وإرسال بلاغ أو شكوى ومتابعته برقم المتابعة. البيانات الداخلية والتقارير وبيانات الموظفين غير متاحة لهذا الدور.</p><div className="flex flex-wrap gap-3"><Button className={button3d} onClick={() => navigate('/mosques/public')}><MessageSquare className="ml-2 h-4 w-4" />إرسال أو متابعة بلاغ</Button><Button variant="outline" className={button3d} onClick={() => navigate('/mosques/public')}><MapPin className="ml-2 h-4 w-4" />معلومات ومواقع المساجد</Button></div></CardContent></Card>}
         </TabsContent>
 
         <TabsContent value="sites" className="space-y-4">
@@ -442,19 +518,19 @@ export const MosquesUnitPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="requests" className="space-y-4">
-          {canAdd && role !== 'viewer' && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />طلب صيانة / احتياج جديد</Button></div>}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{requests.map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} onStatus={canEdit && ['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} />)}</div>
+          {(role === 'personnel' || ['head', 'supervisor'].includes(role)) && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />طلب صيانة / احتياج جديد</Button></div>}
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{requests.map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} />)}</div>
           {!requests.length && <Empty text="لا توجد طلبات مسجلة" />}
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{tickets.map((item) => <WorkflowCard key={item.id} title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'مبلغ مجهول']} onStatus={canEdit && ['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={canAdd && ['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className={button3d} onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline">مرتبط بطلب صيانة</Badge> : null} />)}</div>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{tickets.map((item) => <WorkflowCard key={item.id} title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'مبلغ مجهول']} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className={button3d} onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline">مرتبط بطلب صيانة</Badge> : null} />)}</div>
           {!tickets.length && <Empty text="لا توجد بلاغات مسجلة" />}
         </TabsContent>
 
         <TabsContent value="leaves" className="space-y-4">
-          {canAdd && role !== 'viewer' && <div className="flex justify-end"><Button className={button3d} onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button></div>}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{leaves.map((item) => <WorkflowCard key={item.id} title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} onStatus={canEdit && ['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} />)}</div>
+          {(role === 'personnel' || ['head', 'supervisor'].includes(role)) && <div className="flex justify-end"><Button className={button3d} onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button></div>}
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{leaves.map((item) => <WorkflowCard key={item.id} title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} />)}</div>
           {!leaves.length && <Empty text="لا توجد طلبات إجازة أو اعتذار" />}
         </TabsContent>
 
@@ -473,7 +549,7 @@ export const MosquesUnitPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="team" className="space-y-4">
-          {canAdd && <div className="flex justify-end"><Button className={button3d} onClick={() => { setPersonnelForm({ siteId: sites[0]?.id || '', name: '', role: 'imam', mobile: '', email: '' }); setPersonnelDialog(true); }}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب مسجد</Button></div>}
+          {['head', 'supervisor'].includes(role) && <div className="flex justify-end"><Button className={button3d} onClick={() => { setPersonnelForm({ siteId: sites[0]?.id || '', name: '', role: 'imam', mobile: '', email: '' }); setPersonnelDialog(true); }}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب مسجد</Button></div>}
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{personnel.map((item) => <Card key={item.id} className={card3d}><CardContent className="p-5"><div className="flex items-start justify-between"><div><h3 className="font-black">{item.name}</h3><p className="text-sm text-muted-foreground">{item.site?.name}</p></div><Badge variant="outline">{personnelRoleLabels[item.role] || item.role}</Badge></div><div className="mt-4 grid grid-cols-2 gap-2 text-sm"><Info label="الجوال" value={item.mobile || '-'} /><Info label="البريد" value={item.email || '-'} /></div></CardContent></Card>)}</div>
           {!personnel.length && <Empty text="لا يوجد منسوبون مسجلون" />}
         </TabsContent>
@@ -485,7 +561,7 @@ export const MosquesUnitPage: React.FC = () => {
               <CardDescription>اربط حساب المستخدم بمسجد أو مصلى وحدد صفته التشغيلية بدقة: إمام، مؤذن، خطيب، أو خطيب متعاون.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {users.filter((user) => user.role !== 'admin').map((user) => {
+              {staffUsers.map((user) => {
                 const current = assignments.find((item) => item.userId === user.uid);
                 const draft = assignmentDrafts[user.uid] || { role: current?.role || 'viewer', siteId: current?.siteId || '', personnelRole: current?.personnelRole || 'imam' };
                 return (
@@ -497,7 +573,7 @@ export const MosquesUnitPage: React.FC = () => {
                     <div className="grid gap-3 md:grid-cols-4">
                       <Field label="الدور داخل الوحدة">
                         <NativeSelect value={draft.role} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, role: e.target.value as MosqueModuleRole } }))}>
-                          <option value="viewer">عرض فقط</option><option value="personnel">منسوب مسجد / مصلى</option><option value="supervisor">مشرف الوحدة</option><option value="head">رئيس الوحدة</option>
+                          <option value="university_member">منسوب الجامعة</option><option value="personnel">منسوب المسجد أو المصلى</option><option value="supervisor">مشرف الوحدة</option><option value="head">رئيس الوحدة</option>
                         </NativeSelect>
                       </Field>
                       <Field label="المسجد / المصلى">
@@ -515,7 +591,7 @@ export const MosquesUnitPage: React.FC = () => {
                   </div>
                 );
               })}
-              {!users.filter((user) => user.role !== 'admin').length && <Empty text="لا توجد حسابات مستخدمين للربط" />}
+              {!staffUsers.length && <Empty text="لا توجد حسابات مستخدمين للربط" />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -532,21 +608,22 @@ export const MosquesUnitPage: React.FC = () => {
             <div className="flex items-start gap-3">
               <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-sky-200 bg-white text-sky-700 shadow-sm"><Building2 className="h-5 w-5" /></div>
               <div>
-                <DialogTitle className="text-xl font-black text-slate-900 md:text-2xl">{editingSite ? 'تعديل بيانات المسجد / المصلى' : 'إضافة مسجد / مصلى جديد'}</DialogTitle>
+                <DialogTitle className="text-xl font-black text-slate-900 md:text-2xl">{editingSite ? 'تعديل بيانات المسجد / الجامع / المصلى' : 'إضافة مسجد / جامع / مصلى جديد'}</DialogTitle>
                 <DialogDescription className="mt-1 leading-6">نموذج موحد لتسجيل البيانات الأساسية والموقع والطاقة الاستيعابية وبيانات المسؤولين الرئيسيين.</DialogDescription>
               </div>
             </div>
           </DialogHeader>
           <div className="max-h-[calc(94vh-150px)] space-y-5 overflow-y-auto p-4 md:p-6">
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
-              <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><FileText className="h-5 w-5" />المعلومات الأساسية</CardTitle><CardDescription>تعريف المسجد أو المصلى وحالته وموقعه الإداري داخل الجامعة.</CardDescription></CardHeader>
+              <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><FileText className="h-5 w-5" />المعلومات الأساسية</CardTitle><CardDescription>تعريف المسجد أو الجامع أو المصلى وحالته وموقعه الإداري داخل الجامعة.</CardDescription></CardHeader>
               <CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2 lg:grid-cols-3">
-                <Field label="اسم المسجد / المصلى *"><Input className="h-11" autoFocus value={siteForm.name} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} placeholder="مثال: مسجد الحرم الجامعي" /></Field>
-                <Field label="النوع"><NativeSelect className="h-11" value={siteForm.siteType} onChange={(e) => setSiteForm({ ...siteForm, siteType: e.target.value })}><option value="mosque">مسجد</option><option value="prayer_room">مصلى</option></NativeSelect></Field>
+                <Field label="اسم المسجد / الجامع / المصلى *"><Input className="h-11" autoFocus value={siteForm.name} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} placeholder="مثال: مسجد الحرم الجامعي" /></Field>
+                <Field label="النوع"><NativeSelect className="h-11" value={siteForm.siteType} onChange={(e) => setSiteForm({ ...siteForm, siteType: e.target.value })}><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect></Field>
                 <Field label="الحالة"><NativeSelect className="h-11" value={siteForm.status} onChange={(e) => setSiteForm({ ...siteForm, status: e.target.value })}><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect></Field>
                 <Field label="المدينة"><Input className="h-11" value={siteForm.city} onChange={(e) => setSiteForm({ ...siteForm, city: e.target.value })} /></Field>
                 <Field label="الحي"><Input className="h-11" value={siteForm.district} onChange={(e) => setSiteForm({ ...siteForm, district: e.target.value })} /></Field>
                 <Field label="الموقع داخل الجامعة"><Input className="h-11" value={siteForm.campusLocation} onChange={(e) => setSiteForm({ ...siteForm, campusLocation: e.target.value })} placeholder="الحرم / المبنى / الكلية" /></Field>
+                {role === 'head' && <Field label="المشرف المسؤول عن الموقع"><NativeSelect className="h-11" value={siteForm.supervisorUserId || ''} onChange={(e) => setSiteForm({ ...siteForm, supervisorUserId: e.target.value })}><option value="">بدون إسناد حالي</option>{staffUsers.filter((user) => user.moduleRole === 'supervisor').map((user) => <option key={user.uid} value={user.uid}>{user.username}</option>)}</NativeSelect></Field>}
               </CardContent>
             </Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
@@ -630,15 +707,25 @@ export const MosquesUnitPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(qrSite)} onOpenChange={(open) => !open && setQrSite(null)}><DialogContent dir="rtl"><DialogHeader><DialogTitle>رمز QR — {qrSite?.name}</DialogTitle><DialogDescription>يفتح نموذج البلاغ العام مرتبطًا بهذا الموقع دون كشف معرف قاعدة البيانات.</DialogDescription></DialogHeader>{qrSite && <div className="flex flex-col items-center gap-4 rounded-2xl border bg-white p-6"><QRCodeSVG value={publicUrlForSite(qrSite)} size={220} level="M" includeMargin /><p className="break-all text-center text-xs text-muted-foreground" dir="ltr">{publicUrlForSite(qrSite)}</p><Button variant="outline" className={button3d} onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة الرمز</Button></div>}</DialogContent></Dialog>
+      <Dialog open={Boolean(qrSite)} onOpenChange={(open) => !open && setQrSite(null)}>
+        <DialogContent dir="rtl" className="sm:max-w-[620px]">
+          <DialogHeader><DialogTitle>QR / الباركود التلقائي — {qrSite?.name}</DialogTitle><DialogDescription>يُنشأ الرمز تلقائيًا مع سجل المسجد أو الجامع أو المصلى، ويرتبط بالسجل الدائم لعرض أحدث بياناته وتقديم البلاغات.</DialogDescription></DialogHeader>
+          {qrSite && <div className="space-y-4">
+            <div className="flex flex-col items-center gap-4 rounded-2xl border bg-white p-6"><QRCodeSVG value={publicUrlForSite(qrSite)} size={240} level="M" includeMargin /><p className="break-all text-center text-xs text-muted-foreground" dir="ltr">{publicUrlForSite(qrSite)}</p></div>
+            <div className="grid gap-3 rounded-2xl border bg-slate-50 p-4 text-sm sm:grid-cols-2"><Info label="النوع" value={siteTypeLabels[qrSite.siteType] || qrSite.siteType} /><Info label="الموقع" value={[qrSite.campusLocation, qrSite.city, qrSite.district].filter(Boolean).join(' — ') || '-'} /><Info label="المساحة" value={qrSite.area ? `${qrSite.area} م²` : '-'} /><Info label="الإحداثيات" value={qrSite.latitude != null && qrSite.longitude != null ? `${qrSite.latitude}, ${qrSite.longitude}` : '-'} /></div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm leading-6 text-emerald-900">الرمز دائم ولا يحتاج إلى إعادة إنشائه عند تعديل بيانات الموقع؛ لأنه يفتح السجل الحالي عبر رمز عام آمن، ولا يضع بيانات الموظفين أو البيانات الداخلية داخل الباركود.</div>
+            <div className="flex justify-end"><Button variant="outline" className={button3d} onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة الرمز</Button></div>
+          </div>}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={personnelDialog} onOpenChange={setPersonnelDialog}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-emerald-50/20 sm:max-w-[900px]" dir="rtl">
-          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6"><DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><UserPlus className="h-5 w-5 text-sky-700" />إضافة منسوب مسجد / مصلى</DialogTitle><DialogDescription>سجل المنسوب التشغيلي وربطه بالموقع مع بيانات التواصل والصفة داخل المسجد أو المصلى.</DialogDescription></DialogHeader>
+          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6"><DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><UserPlus className="h-5 w-5 text-sky-700" />إضافة منسوب مسجد / مصلى</DialogTitle><DialogDescription>يتم إنشاء أو ربط حساب دخول للمنسوب بواسطة رئيس الوحدة أو المشرف، ثم ربطه بالموقع وصفته التشغيلية.</DialogDescription></DialogHeader>
           <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-4 md:p-6">
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-violet-50/40 pb-4"><CardTitle className="text-base md:text-lg">الارتباط والصفة</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><Field label="المسجد / المصلى *"><NativeSelect className="h-11" value={personnelForm.siteId} onChange={(e) => setPersonnelForm({ ...personnelForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="الصفة *"><NativeSelect className="h-11" value={personnelForm.role} onChange={(e) => setPersonnelForm({ ...personnelForm, role: e.target.value })}><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option></NativeSelect></Field></CardContent></Card>
-            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-emerald-50/40 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><Users className="h-5 w-5" />بيانات المنسوب</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><div className="md:col-span-2"><Field label="الاسم الكامل *"><Input className="h-11" autoFocus value={personnelForm.name} onChange={(e) => setPersonnelForm({ ...personnelForm, name: e.target.value })} placeholder="الاسم الرباعي" /></Field></div><Field label="رقم الجوال"><Input className="h-11" type="tel" inputMode="tel" value={personnelForm.mobile} onChange={(e) => setPersonnelForm({ ...personnelForm, mobile: e.target.value })} placeholder="05xxxxxxxx" /></Field><Field label="البريد الإلكتروني"><Input className="h-11" type="email" inputMode="email" value={personnelForm.email} onChange={(e) => setPersonnelForm({ ...personnelForm, email: e.target.value })} placeholder="name@iau.edu.sa" /></Field></CardContent></Card>
-            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-6 text-slate-700">هذا السجل هو المرجع التشغيلي للمنسوب وبيانات التواصل. أما أسماء الإمام والمؤذن والخطيب داخل سجل المسجد فهي بيانات تعريفية مختصرة للموقع.</div>
+            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-emerald-50/40 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><Users className="h-5 w-5" />بيانات المنسوب</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><div className="md:col-span-2"><Field label="الاسم الكامل *"><Input className="h-11" autoFocus value={personnelForm.name} onChange={(e) => setPersonnelForm({ ...personnelForm, name: e.target.value })} placeholder="الاسم الرباعي" /></Field></div><Field label="رقم الجوال"><Input className="h-11" type="tel" inputMode="tel" value={personnelForm.mobile} onChange={(e) => setPersonnelForm({ ...personnelForm, mobile: e.target.value })} placeholder="05xxxxxxxx" /></Field><Field label="البريد الإلكتروني *"><Input className="h-11" type="email" inputMode="email" value={personnelForm.email} onChange={(e) => setPersonnelForm({ ...personnelForm, email: e.target.value })} placeholder="name@iau.edu.sa" /></Field></CardContent></Card>
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-6 text-slate-700">عند الحفظ يتم إنشاء حساب دخول جديد إذا لم يكن البريد مسجلًا، أو ربط الحساب الموجود. الحساب الجديد يستلم رابط التفعيل وبيانات الدخول عبر البريد الإلكتروني.</div>
           </div>
           <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => setPersonnelDialog(false)}>إلغاء</Button><Button className={'min-w-32 ' + button3d} onClick={savePersonnel} disabled={saving}><Save className="ml-2 h-4 w-4" />{saving ? 'جاري الحفظ...' : 'حفظ المنسوب'}</Button></DialogFooter>
         </DialogContent>
