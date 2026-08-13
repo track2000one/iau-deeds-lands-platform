@@ -151,6 +151,10 @@ export const MosquesUnitPage: React.FC = () => {
   const [staffUsers, setStaffUsers] = useState<MosqueStaffUser[]>([]);
   const [notifications, setNotifications] = useState<MosqueNotification[]>([]);
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('overview');
+  const [requestQuickFilter, setRequestQuickFilter] = useState<'all' | 'new' | 'under_review' | 'approved' | 'late'>('all');
+  const [ticketQuickFilter, setTicketQuickFilter] = useState<'all' | 'open'>('all');
+  const [leaveQuickFilter, setLeaveQuickFilter] = useState<'all' | 'pending'>('all');
 
   const [siteDialog, setSiteDialog] = useState(false);
   const [editingSite, setEditingSite] = useState<MosqueSite | null>(null);
@@ -163,6 +167,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [leaveForm, setLeaveForm] = useState<any>(emptyLeave);
   const [statusDialog, setStatusDialog] = useState(false);
   const [statusTarget, setStatusTarget] = useState<{ kind: 'request' | 'ticket' | 'leave' | 'job'; item: any } | null>(null);
+  const [viewingWorkflow, setViewingWorkflow] = useState<{ kind: 'request' | 'ticket' | 'leave'; item: any } | null>(null);
   const [statusValue, setStatusValue] = useState('');
   const [statusNote, setStatusNote] = useState('');
   const [statusEvidence, setStatusEvidence] = useState<File | null>(null);
@@ -494,6 +499,25 @@ export const MosquesUnitPage: React.FC = () => {
   const linkedSite = dashboard?.linkedSite || visibleSites[0] || null;
   const activeMyRequests = requests.filter((item) => !['closed', 'rejected'].includes(item.status));
   const maintenanceMyRequests = requests.filter((item) => item.requestType === 'maintenance' && !['closed', 'rejected'].includes(item.status));
+  const filteredRequests = useMemo(() => {
+    if (requestQuickFilter === 'all') return requests;
+    if (requestQuickFilter === 'late') {
+      const threshold = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      return requests.filter((item) => ['new', 'under_review', 'approved', 'in_progress'].includes(item.status) && new Date(item.createdAt).getTime() < threshold);
+    }
+    return requests.filter((item) => item.status === requestQuickFilter);
+  }, [requests, requestQuickFilter]);
+  const filteredTickets = useMemo(() => ticketQuickFilter === 'open' ? tickets.filter((item) => !['closed', 'rejected'].includes(item.status)) : tickets, [tickets, ticketQuickFilter]);
+  const filteredLeaves = useMemo(() => leaveQuickFilter === 'pending' ? leaves.filter((item) => ['pending', 'under_review'].includes(item.status)) : leaves, [leaves, leaveQuickFilter]);
+
+  const goToDashboardSection = (tab: string, filters: { request?: 'all' | 'new' | 'under_review' | 'approved' | 'late'; ticket?: 'all' | 'open'; leave?: 'all' | 'pending' } = {}) => {
+    setRequestQuickFilter(filters.request || 'all');
+    setTicketQuickFilter(filters.ticket || 'all');
+    setLeaveQuickFilter(filters.leave || 'all');
+    setActiveTab(tab);
+  };
+
+  const handleTabChange = (tab: string) => goToDashboardSection(tab);
 
   if (loading) {
     return <div className="flex min-h-[420px] items-center justify-center"><RefreshCw className="h-8 w-8 animate-spin text-primary" /><span className="mr-3 font-semibold">جاري تحميل وحدة المساجد والمصليات...</span></div>;
@@ -522,14 +546,14 @@ export const MosquesUnitPage: React.FC = () => {
       </section>
 
       {role === 'head' && <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <Stat title="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} />
-        <Stat title="طلبات جديدة" value={dashboard?.stats.newRequests || 0} icon={ClipboardList} />
-        <Stat title="تحت المراجعة" value={dashboard?.stats.reviewRequests || 0} icon={Clock3} />
-        <Stat title="معتمدة" value={dashboard?.stats.approvedRequests || 0} icon={CheckCircle2} />
-        <Stat title="طلبات متأخرة" value={dashboard?.stats.lateRequests || 0} icon={AlertTriangle} />
-        <Stat title="بلاغات مفتوحة" value={dashboard?.stats.openTickets || 0} icon={MessageSquare} />
-        <Stat title="إجازات معلقة" value={dashboard?.stats.pendingLeaves || 0} icon={CalendarDays} />
-        <Stat title="طلبات توظيف" value={dashboard?.stats.jobs || 0} icon={Briefcase} />
+        <Stat title="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} onClick={() => goToDashboardSection('sites')} />
+        <Stat title="طلبات جديدة" value={dashboard?.stats.newRequests || 0} icon={ClipboardList} onClick={() => goToDashboardSection('requests', { request: 'new' })} />
+        <Stat title="تحت المراجعة" value={dashboard?.stats.reviewRequests || 0} icon={Clock3} onClick={() => goToDashboardSection('requests', { request: 'under_review' })} />
+        <Stat title="معتمدة" value={dashboard?.stats.approvedRequests || 0} icon={CheckCircle2} onClick={() => goToDashboardSection('requests', { request: 'approved' })} />
+        <Stat title="طلبات متأخرة" value={dashboard?.stats.lateRequests || 0} icon={AlertTriangle} onClick={() => goToDashboardSection('requests', { request: 'late' })} />
+        <Stat title="بلاغات مفتوحة" value={dashboard?.stats.openTickets || 0} icon={MessageSquare} onClick={() => goToDashboardSection('tickets', { ticket: 'open' })} />
+        <Stat title="إجازات معلقة" value={dashboard?.stats.pendingLeaves || 0} icon={CalendarDays} onClick={() => goToDashboardSection('leaves', { leave: 'pending' })} />
+        <Stat title="طلبات توظيف" value={dashboard?.stats.jobs || 0} icon={Briefcase} onClick={() => goToDashboardSection('jobs')} />
       </div>}
 
       {role === 'supervisor' && <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -551,7 +575,7 @@ export const MosquesUnitPage: React.FC = () => {
 
 
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border bg-white/80 p-2">
           <TabsTrigger value="overview">الرئيسية</TabsTrigger>
           <TabsTrigger value="sites">المساجد والمصليات</TabsTrigger>
@@ -601,19 +625,22 @@ export const MosquesUnitPage: React.FC = () => {
 
         <TabsContent value="requests" className="space-y-4">
           {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />الإبلاغ عن مشكلة / طلب صيانة أو احتياج</Button></div>}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{requests.map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} />)}</div>
-          {!requests.length && <Empty text="لا توجد طلبات مسجلة" />}
+          {requestQuickFilter !== 'all' && <QuickFilterBar label={requestQuickFilter === 'new' ? 'الطلبات الجديدة' : requestQuickFilter === 'under_review' ? 'الطلبات تحت المراجعة' : requestQuickFilter === 'approved' ? 'الطلبات المعتمدة' : 'الطلبات المتأخرة'} onClear={() => setRequestQuickFilter('all')} />}
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredRequests.map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} submitterName={item.applicant?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || 'مقدم الطلب'} onView={() => setViewingWorkflow({ kind: 'request', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} />)}</div>
+          {!filteredRequests.length && <Empty text="لا توجد طلبات مطابقة" />}
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{tickets.map((item) => <WorkflowCard key={item.id} title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'مبلغ مجهول']} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className={button3d} onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline">مرتبط بطلب صيانة</Badge> : null} />)}</div>
-          {!tickets.length && <Empty text="لا توجد بلاغات مسجلة" />}
+          {ticketQuickFilter !== 'all' && <QuickFilterBar label="البلاغات المفتوحة" onClear={() => setTicketQuickFilter('all')} />}
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredTickets.map((item) => <WorkflowCard key={item.id} title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'بدون وسيلة تواصل']} submitterName={item.reporterName || 'غير محدد'} submitterRole="مقدّم البلاغ" onView={() => setViewingWorkflow({ kind: 'ticket', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className={button3d} onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline">مرتبط بطلب صيانة</Badge> : null} />)}</div>
+          {!filteredTickets.length && <Empty text="لا توجد بلاغات مطابقة" />}
         </TabsContent>
 
         <TabsContent value="leaves" className="space-y-4">
           {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button></div>}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{leaves.map((item) => <WorkflowCard key={item.id} title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} />)}</div>
-          {!leaves.length && <Empty text="لا توجد طلبات إجازة أو اعتذار" />}
+          {leaveQuickFilter !== 'all' && <QuickFilterBar label="الإجازات والاعتذارات المعلقة" onClear={() => setLeaveQuickFilter('all')} />}
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredLeaves.map((item) => <WorkflowCard key={item.id} title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} submitterName={item.applicant?.name || item.personnel?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || (item.personnel?.role ? personnelRoleLabels[item.personnel.role] || item.personnel.role : 'مقدم الطلب')} onView={() => setViewingWorkflow({ kind: 'leave', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} />)}</div>
+          {!filteredLeaves.length && <Empty text="لا توجد طلبات إجازة أو اعتذار مطابقة" />}
         </TabsContent>
 
         <TabsContent value="jobs" className="space-y-4">
@@ -820,6 +847,8 @@ export const MosquesUnitPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      <WorkflowDetailsDialog target={viewingWorkflow} onOpenChange={(open) => !open && setViewingWorkflow(null)} />
+
       <Dialog open={statusDialog} onOpenChange={setStatusDialog}>
         <DialogContent className="max-h-[90vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-violet-50/20 sm:max-w-[760px]" dir="rtl">
           <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-violet-50/50 p-5 text-right"><DialogTitle className="text-xl font-black">تحديث حالة الإجراء</DialogTitle><DialogDescription>{statusTarget?.item?.requestNumber || statusTarget?.item?.ticketNumber || statusTarget?.item?.leaveNumber || statusTarget?.item?.applicationNumber}</DialogDescription></DialogHeader>
@@ -880,7 +909,10 @@ export const MosquesUnitPage: React.FC = () => {
   );
 };
 
-const Stat = ({ title, value, icon: Icon }: { title: string; value: number; icon: React.ElementType }) => <Card className={card3d}><CardContent className="flex items-center justify-between gap-3 p-4"><div><p className="text-xs text-muted-foreground">{title}</p><p className="mt-1 text-2xl font-black text-slate-800">{value}</p></div><div className="rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-sky-700 shadow-sm"><Icon className="h-5 w-5" /></div></CardContent></Card>;
+const Stat = ({ title, value, icon: Icon, onClick }: { title: string; value: number; icon: React.ElementType; onClick?: () => void }) => {
+  const card = <Card className={`${card3d} h-full ${onClick ? 'transition-transform duration-150 hover:-translate-y-0.5' : ''}`}><CardContent className="flex h-full items-center justify-between gap-3 p-4"><div><p className="text-xs text-muted-foreground">{title}</p><p className="mt-1 text-2xl font-black text-slate-800">{value}</p></div><div className="rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-sky-700 shadow-sm"><Icon className="h-5 w-5" /></div></CardContent></Card>;
+  return onClick ? <button type="button" className="block h-full w-full text-right focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2" onClick={onClick}>{card}</button> : card;
+};
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
 const Info = ({ label, value }: { label: string; value: React.ReactNode }) => <div><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 break-words font-semibold">{value}</p></div>;
 const Empty = ({ text }: { text: string }) => <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center text-muted-foreground"><Building2 className="mx-auto mb-3 h-10 w-10 opacity-30" /><p>{text}</p></div>;
@@ -890,4 +922,53 @@ const MiniRow = ({ title, subtitle, status }: { title: string; subtitle: string;
 
 const SiteCard = ({ site, canEdit, canDelete, onEdit, onDelete, onQr }: { site: MosqueSite; canEdit: boolean; canDelete: boolean; onEdit: () => void; onDelete: () => void; onQr: () => void }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-emerald-400 via-sky-500 to-blue-800" /><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2">{siteTypeLabels[site.siteType]}</Badge><h3 className="text-lg font-black text-slate-800">{site.name}</h3><p className="mt-1 text-sm text-muted-foreground">{site.city || '-'} — {site.district || '-'}</p></div><Badge variant="outline" className={site.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : site.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-50'}>{siteStatusLabels[site.status]}</Badge></div><div className="my-4 grid grid-cols-2 gap-3 rounded-2xl border bg-slate-50/70 p-3 text-sm"><Info label="الموقع داخل الجامعة" value={site.campusLocation || '-'} /><Info label="المساحة" value={site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'} /><Info label="الإمام" value={site.imamName || '-'} /><Info label="المؤذن" value={site.muezzinName || '-'} /><Info label="الطلبات" value={site._count?.requests || 0} /><Info label="البلاغات" value={site._count?.tickets || 0} /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Button variant="outline" className={button3d} onClick={onQr}><QrCode className="ml-1 h-4 w-4" />QR</Button>{site.latitude != null && site.longitude != null && <Button variant="outline" className={button3d} onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')}><MapPin className="ml-1 h-4 w-4" />الخريطة</Button>}{canEdit && <Button variant="outline" className={button3d} onClick={onEdit}>تعديل</Button>}{canDelete && <Button variant="outline" className="border-red-300 text-red-600" onClick={onDelete}>حذف</Button>}</div></CardContent></Card>;
 
-const WorkflowCard = ({ title, subtitle, description, status, meta, onStatus, extraAction }: { title: string; subtitle: string; description: string; status: string; meta: string[]; onStatus?: () => void; extraAction?: React.ReactNode }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-sky-400 via-blue-600 to-slate-800" /><CardContent className="flex min-h-[265px] flex-col p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{title}</p><h3 className="mt-1 font-black text-slate-800">{subtitle}</h3></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div><p className="mt-4 line-clamp-3 rounded-2xl border bg-slate-50/80 p-3 text-sm leading-6 text-slate-700">{description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">{meta.map((x, i) => <span key={i} className="rounded-xl border bg-white p-2">{x || '-'}</span>)}</div><div className="mt-auto flex flex-wrap gap-2 border-t pt-4">{onStatus && <Button variant="outline" size="sm" className={button3d} onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />تحديث الحالة</Button>}{extraAction}</div></CardContent></Card>;
+const QuickFilterBar = ({ label, onClear }: { label: string; onClear: () => void }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm"><span>العرض الحالي: <strong>{label}</strong></span><Button variant="outline" size="sm" className={button3d} onClick={onClear}>عرض الكل</Button></div>;
+
+const WorkflowCard = ({ title, subtitle, description, status, meta, submitterName, submitterRole, onView, onStatus, extraAction }: { title: string; subtitle: string; description: string; status: string; meta: string[]; submitterName?: string; submitterRole?: string; onView?: () => void; onStatus?: () => void; extraAction?: React.ReactNode }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-sky-400 via-blue-600 to-slate-800" /><CardContent className="flex min-h-[315px] flex-col p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{title}</p><h3 className="mt-1 font-black text-slate-800">{subtitle}</h3></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>{submitterName && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-white/90 p-3"><div><p className="text-[11px] text-muted-foreground">مقدم الإجراء</p><p className="mt-1 font-bold text-slate-800">{submitterName}</p></div>{submitterRole && <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700">{submitterRole}</Badge>}</div>}<p className="mt-3 line-clamp-3 rounded-2xl border bg-slate-50/80 p-3 text-sm leading-6 text-slate-700">{description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">{meta.map((x, i) => <span key={i} className="rounded-xl border bg-white p-2">{x || '-'}</span>)}</div><div className="mt-auto flex flex-wrap gap-2 border-t pt-4">{onView && <Button variant="outline" size="sm" className={button3d} onClick={onView}><Eye className="ml-1 h-3.5 w-3.5" />عرض التفاصيل</Button>}{onStatus && <Button variant="outline" size="sm" className={button3d} onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />تحديث الحالة</Button>}{extraAction}</div></CardContent></Card>;
+
+const WorkflowDetailsDialog = ({ target, onOpenChange }: { target: { kind: 'request' | 'ticket' | 'leave'; item: any } | null; onOpenChange: (open: boolean) => void }) => {
+  if (!target) return null;
+  const { kind, item } = target;
+  const isRequest = kind === 'request';
+  const isTicket = kind === 'ticket';
+  const applicant = isTicket
+    ? { name: item.reporterName || 'غير محدد', roleLabel: 'مقدّم البلاغ', email: item.reporterEmail || null, mobile: item.reporterPhone || null }
+    : item.applicant || {
+        name: item.personnel?.name || 'غير محدد',
+        roleLabel: item.personnel?.role ? (personnelRoleLabels[item.personnel.role] || item.personnel.role) : 'غير محدد',
+        email: item.personnel?.email || null,
+        mobile: item.personnel?.mobile || null,
+      };
+  const recordNumber = item.requestNumber || item.ticketNumber || item.leaveNumber || '-';
+  const attachmentUrls = isRequest && Array.isArray(item.attachments) ? item.attachments.filter(Boolean) : isTicket && item.attachmentUrl ? [item.attachmentUrl] : !isRequest && !isTicket && item.attachmentUrl ? [item.attachmentUrl] : [];
+
+  return (
+    <Dialog open={Boolean(target)} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[900px]" dir="rtl">
+        <DialogHeader className="text-right">
+          <DialogTitle className="flex items-center gap-2 text-xl font-black"><Eye className="h-5 w-5 text-sky-700" />{isRequest ? 'تفاصيل طلب الصيانة / الاحتياج' : isTicket ? 'تفاصيل البلاغ' : 'تفاصيل الإجازة / الاعتذار'}</DialogTitle>
+          <DialogDescription>{recordNumber}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid gap-3 rounded-2xl border bg-slate-50/80 p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Info label="رقم الإجراء" value={recordNumber} />
+            <Info label="الحالة" value={<Badge variant="outline" className={statusBadgeClass(item.status)}>{statusLabels[item.status] || item.status}</Badge>} />
+            <Info label="المسجد / المصلى" value={item.site?.name || '-'} />
+            <Info label="تاريخ التقديم" value={item.createdAt ? new Date(item.createdAt).toLocaleString('ar-SA') : '-'} />
+          </div>
+
+          <Card className="border-sky-200/70 bg-white/90"><CardHeader className="pb-3"><CardTitle className="text-base">بيانات مقدم الإجراء</CardTitle></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Info label="الاسم" value={applicant.name || '-'} /><Info label="الصفة" value={applicant.roleLabel || '-'} /><Info label="الجوال" value={applicant.mobile || '-'} /><Info label="البريد الإلكتروني" value={applicant.email || '-'} /></CardContent></Card>
+
+          {isRequest && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">بيانات الطلب</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Info label="نوع الطلب" value={requestTypeLabels[item.requestType] || item.requestType} /><Info label="الأولوية" value={priorityLabels[item.priority] || item.priority} /></div><div><p className="text-[11px] text-muted-foreground">الوصف</p><p className="mt-1 rounded-xl border bg-slate-50 p-3 text-sm leading-7">{item.description || '-'}</p></div>{item.notes && <Info label="الملاحظات" value={item.notes} />}{item.returnReason && <Info label="ملاحظة الإعادة" value={item.returnReason} />}{item.rejectionReason && <Info label="سبب الرفض" value={item.rejectionReason} />}</CardContent></Card>}
+
+          {isTicket && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">بيانات البلاغ</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Info label="نوع البلاغ" value={ticketTypeLabels[item.ticketType] || item.ticketType} /><Info label="الطلب المرتبط" value={item.convertedRequestId ? 'تم التحويل إلى طلب صيانة' : 'غير محول'} /></div><div><p className="text-[11px] text-muted-foreground">الوصف</p><p className="mt-1 rounded-xl border bg-slate-50 p-3 text-sm leading-7">{item.description || '-'}</p></div>{item.resolutionNote && <Info label="ملاحظة الحل" value={item.resolutionNote} />}{item.rejectionReason && <Info label="سبب الرفض" value={item.rejectionReason} />}{item.notes && <Info label="الملاحظات" value={item.notes} />}</CardContent></Card>}
+
+          {!isRequest && !isTicket && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">بيانات الإجازة / الاعتذار</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Info label="نوع الطلب" value={leaveTypeLabels[item.requestType] || item.requestType} /><Info label="من" value={item.startDate ? new Date(item.startDate).toLocaleDateString('ar-SA') : '-'} /><Info label="إلى" value={item.endDate ? new Date(item.endDate).toLocaleDateString('ar-SA') : '-'} /><Info label="البديل" value={item.replacementName || '-'} /></div><div><p className="text-[11px] text-muted-foreground">السبب</p><p className="mt-1 rounded-xl border bg-slate-50 p-3 text-sm leading-7">{item.reason || '-'}</p></div>{item.notes && <Info label="الملاحظات" value={item.notes} />}{item.reviewerNote && <Info label="ملاحظة المراجع" value={item.reviewerNote} />}{item.returnReason && <Info label="ملاحظة الإعادة" value={item.returnReason} />}{item.rejectionReason && <Info label="سبب الرفض" value={item.rejectionReason} />}</CardContent></Card>}
+
+          {(attachmentUrls.length > 0 || item.completionEvidenceUrl) && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">المرفقات</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">{attachmentUrls.map((url: string, index: number) => <Button key={`${url}-${index}`} variant="outline" size="sm" className={button3d} onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}><ExternalLink className="ml-1 h-3.5 w-3.5" />مرفق {index + 1}</Button>)}{item.completionEvidenceUrl && <Button variant="outline" size="sm" className={button3d} onClick={() => window.open(item.completionEvidenceUrl, '_blank', 'noopener,noreferrer')}><CheckCircle2 className="ml-1 h-3.5 w-3.5" />إثبات الإنجاز</Button>}</CardContent></Card>}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};

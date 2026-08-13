@@ -26,6 +26,17 @@ export type MosqueSite = {
   _count?: { requests: number; tickets: number; personnel: number };
 };
 
+export type MosqueApplicantInfo = {
+  userId?: string | null;
+  name: string;
+  email?: string | null;
+  mobile?: string | null;
+  role?: string | null;
+  roleLabel?: string | null;
+  moduleRole?: string | null;
+  active?: boolean;
+};
+
 export type MosqueRequest = {
   id: string;
   requestNumber: string;
@@ -37,6 +48,7 @@ export type MosqueRequest = {
   attachments?: string[] | null;
   notes?: string | null;
   submittedBy?: string | null;
+  applicant?: MosqueApplicantInfo | null;
   assignedTo?: string | null;
   rejectionReason?: string | null;
   returnReason?: string | null;
@@ -74,6 +86,7 @@ export type MosqueLeave = {
   siteId: string;
   personnelId?: string | null;
   applicantUserId?: string | null;
+  applicant?: MosqueApplicantInfo | null;
   requestType: string;
   startDate: string;
   endDate: string;
