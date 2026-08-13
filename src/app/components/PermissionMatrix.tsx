@@ -36,6 +36,7 @@ const ACTIONS: Array<{
   { key: 'canEdit', ar: 'تعديل', en: 'Edit' },
   { key: 'canDelete', ar: 'حذف', en: 'Delete' },
   { key: 'canPrint', ar: 'طباعة', en: 'Print' },
+  { key: 'canCreateUser', ar: 'إضافة مستخدم جديد', en: 'Create User' },
 ];
 
 export const PermissionMatrix: React.FC<{
@@ -71,6 +72,7 @@ export const PermissionMatrix: React.FC<{
         canEdit: false,
         canDelete: false,
         canPrint: false,
+        canCreateUser: false,
       };
     }
 
@@ -84,10 +86,13 @@ export const PermissionMatrix: React.FC<{
         <p className="text-sm text-muted-foreground">
           {ui('الأقسام غير المفعلة ستختفي من القائمة الجانبية.', 'Disabled sections will be hidden from the sidebar.')}
         </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {ui('صلاحية «إضافة مستخدم جديد» مخصصة حاليًا لوحدة العناية بالمساجد والمصليات، وتسمح بإنشاء أو ربط حساب المنسوب ضمن نفس عملية إضافته.', 'Create User is currently scoped to the Mosques & Prayer Rooms Care Unit and creates or links the personnel login in the same operation.')}
+        </p>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="border-b bg-muted/40">
               <th className={`p-3 ${isArabic ? 'text-right' : 'text-left'}`}>{ui('القسم', 'Section')}</th>
@@ -106,25 +111,32 @@ export const PermissionMatrix: React.FC<{
                   {isArabic ? MODULE_LABELS[moduleName] : MODULE_LABELS_EN[moduleName]}
                 </td>
 
-                {ACTIONS.map((action) => (
-                  <td key={action.key} className="p-3 text-center">
-                    <Label className="inline-flex cursor-pointer items-center justify-center">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={Boolean(value[moduleName]?.[action.key])}
-                        disabled={disabled}
-                        onChange={(event) =>
-                          setPermission(
-                            moduleName,
-                            action.key,
-                            event.target.checked
-                          )
-                        }
-                      />
-                    </Label>
-                  </td>
-                ))}
+                {ACTIONS.map((action) => {
+                  const supported = action.key !== 'canCreateUser' || moduleName === 'mosques';
+                  return (
+                    <td key={action.key} className="p-3 text-center">
+                      {supported ? (
+                        <Label className="inline-flex cursor-pointer items-center justify-center">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={Boolean(value[moduleName]?.[action.key])}
+                            disabled={disabled}
+                            onChange={(event) =>
+                              setPermission(
+                                moduleName,
+                                action.key,
+                                event.target.checked
+                              )
+                            }
+                          />
+                        </Label>
+                      ) : (
+                        <span className="text-muted-foreground/60" title={ui('غير مطبق لهذا القسم', 'Not applicable to this section')}>—</span>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
