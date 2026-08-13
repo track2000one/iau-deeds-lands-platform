@@ -41,6 +41,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import {
   Dialog,
   DialogContent,
@@ -152,6 +153,8 @@ export const MosquesUnitPage: React.FC = () => {
   const [siteDialog, setSiteDialog] = useState(false);
   const [editingSite, setEditingSite] = useState<MosqueSite | null>(null);
   const [siteForm, setSiteForm] = useState<any>(emptySite);
+  const [showSiteMap, setShowSiteMap] = useState(false);
+  const [locatingSite, setLocatingSite] = useState(false);
   const [requestDialog, setRequestDialog] = useState(false);
   const [requestForm, setRequestForm] = useState<any>(emptyRequest);
   const [leaveDialog, setLeaveDialog] = useState(false);
@@ -248,6 +251,7 @@ export const MosquesUnitPage: React.FC = () => {
 
   const openSiteDialog = (site?: MosqueSite) => {
     setEditingSite(site || null);
+    setShowSiteMap(false);
     setSiteForm(site ? {
       name: site.name, siteType: site.siteType, city: site.city || '', district: site.district || '', campusLocation: site.campusLocation || '',
       area: site.area ?? '', capacity: site.capacity ?? '', latitude: site.latitude ?? '', longitude: site.longitude ?? '', status: site.status,
@@ -255,6 +259,50 @@ export const MosquesUnitPage: React.FC = () => {
     } : emptySite);
     setSiteDialog(true);
   };
+
+  const sitePickerCoordinates = useMemo(() => {
+    const latitude = Number(siteForm.latitude);
+    const longitude = Number(siteForm.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return undefined;
+    return { latitude, longitude };
+  }, [siteForm.latitude, siteForm.longitude]);
+
+  const updateSiteCoordinates = React.useCallback((coordinates: { latitude: number; longitude: number }) => {
+    setSiteForm((current: any) => ({
+      ...current,
+      latitude: Number(coordinates.latitude.toFixed(6)),
+      longitude: Number(coordinates.longitude.toFixed(6)),
+    }));
+  }, []);
+
+  const captureCurrentSiteLocation = React.useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error('المتصفح لا يدعم تحديد الموقع الجغرافي');
+      return;
+    }
+
+    setLocatingSite(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        updateSiteCoordinates({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        setShowSiteMap(true);
+        setLocatingSite(false);
+        toast.success('تم تحديد الموقع وتعبئة الإحداثيات');
+      },
+      (error) => {
+        setLocatingSite(false);
+        const message = error.code === error.PERMISSION_DENIED
+          ? 'يرجى السماح للمتصفح باستخدام الموقع الجغرافي ثم إعادة المحاولة'
+          : 'تعذر تحديد الموقع الحالي. تأكد من تفعيل خدمة الموقع في الجهاز';
+        toast.error(message);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }, [updateSiteCoordinates]);
 
   const saveSite = async () => {
     if (!siteForm.name.trim()) return toast.error('اسم المسجد أو المصلى مطلوب');
@@ -638,10 +686,31 @@ export const MosquesUnitPage: React.FC = () => {
             </Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
               <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-blue-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><MapPin className="h-5 w-5" />الموقع الجغرافي</CardTitle><CardDescription>يمكن إدخال الإحداثيات يدويًا أو التقاط الموقع الحالي من الجهاز.</CardDescription></CardHeader>
-              <CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-[1fr_1fr_auto] md:items-end">
-                <Field label="خط العرض"><Input className="h-11" type="number" step="any" inputMode="decimal" value={siteForm.latitude} onChange={(e) => setSiteForm({ ...siteForm, latitude: e.target.value })} placeholder="26.3927" /></Field>
-                <Field label="خط الطول"><Input className="h-11" type="number" step="any" inputMode="decimal" value={siteForm.longitude} onChange={(e) => setSiteForm({ ...siteForm, longitude: e.target.value })} placeholder="50.0438" /></Field>
-                <Button type="button" variant="outline" className={'h-11 w-full md:w-auto ' + button3d} onClick={() => navigator.geolocation?.getCurrentPosition((p) => setSiteForm({ ...siteForm, latitude: p.coords.latitude, longitude: p.coords.longitude }), () => toast.error('تعذر تحديد الموقع'))}><MapPin className="ml-2 h-4 w-4" />التقاط موقعي الحالي</Button>
+              <CardContent className="space-y-4 pt-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <Field label="خط العرض"><Input className="h-11" type="number" step="any" inputMode="decimal" value={siteForm.latitude} onChange={(e) => setSiteForm((current: any) => ({ ...current, latitude: e.target.value }))} placeholder="26.3927" /></Field>
+                  <Field label="خط الطول"><Input className="h-11" type="number" step="any" inputMode="decimal" value={siteForm.longitude} onChange={(e) => setSiteForm((current: any) => ({ ...current, longitude: e.target.value }))} placeholder="50.0438" /></Field>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <Button type="button" variant="outline" className={'h-11 ' + button3d} onClick={captureCurrentSiteLocation} disabled={locatingSite}>
+                    {locatingSite ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <MapPin className="ml-2 h-4 w-4" />}
+                    {locatingSite ? 'جاري تحديد الموقع...' : 'تحديد موقعي الحالي'}
+                  </Button>
+                  <Button type="button" variant="outline" className={'h-11 ' + button3d} onClick={() => setShowSiteMap((current) => !current)}>
+                    <MapPin className="ml-2 h-4 w-4" />
+                    {showSiteMap ? 'إخفاء الخريطة' : 'تحديد الموقع من الخريطة'}
+                  </Button>
+                  {sitePickerCoordinates && (
+                    <div className="flex min-h-11 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-xs font-semibold text-emerald-800" dir="ltr">
+                      {sitePickerCoordinates.latitude.toFixed(6)}, {sitePickerCoordinates.longitude.toFixed(6)}
+                    </div>
+                  )}
+                </div>
+                {showSiteMap && (
+                  <div className="overflow-hidden rounded-2xl border border-sky-200 bg-white p-1 shadow-sm">
+                    <MapCoordinatePicker coordinates={sitePickerCoordinates} onChange={updateSiteCoordinates} />
+                  </div>
+                )}
               </CardContent>
             </Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
