@@ -20,12 +20,14 @@ import {
   MapPin,
   MessageSquare,
   Plus,
+  Pencil,
   Printer,
   QrCode,
   RefreshCw,
   Save,
   Search,
   Shield,
+  Trash2,
   UserPlus,
   Users,
   Wrench,
@@ -166,6 +168,8 @@ export const MosquesUnitPage: React.FC = () => {
   const [statusEvidence, setStatusEvidence] = useState<File | null>(null);
   const [qrSite, setQrSite] = useState<MosqueSite | null>(null);
   const [personnelDialog, setPersonnelDialog] = useState(false);
+  const [editingPersonnel, setEditingPersonnel] = useState<MosquePersonnel | null>(null);
+  const [viewingPersonnel, setViewingPersonnel] = useState<MosquePersonnel | null>(null);
   const [personnelForm, setPersonnelForm] = useState({ siteId: '', name: '', role: 'imam', mobile: '', email: '' });
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, { role: MosqueModuleRole; siteId: string; personnelRole: string }>>({});
   const [saving, setSaving] = useState(false);
@@ -411,15 +415,43 @@ export const MosquesUnitPage: React.FC = () => {
     try { await mosqueApi.convertTicketToRequest(ticket.id, { requestType: 'maintenance', priority: 'medium' }); toast.success('تم إنشاء طلب صيانة مرتبط بالبلاغ'); await loadAll(); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر التحويل'); }
   };
 
+  const openPersonnelDialog = (item?: MosquePersonnel) => {
+    setEditingPersonnel(item || null);
+    setPersonnelForm(item ? {
+      siteId: item.siteId,
+      name: item.name,
+      role: item.role,
+      mobile: item.mobile || '',
+      email: item.email || '',
+    } : { siteId: sites[0]?.id || '', name: '', role: 'imam', mobile: '', email: '' });
+    setPersonnelDialog(true);
+  };
+
+  const deletePersonnel = async (item: MosquePersonnel) => {
+    if (!confirm(`هل تريد حذف ${item.name} من منسوبي المساجد؟ سيتم إلغاء ربطه التشغيلي بالموقع مع الإبقاء على حساب المستخدم الأساسي.`)) return;
+    try {
+      await mosqueApi.deletePersonnel(item.id);
+      toast.success('تم حذف المنسوب وإلغاء ربطه التشغيلي');
+      if (viewingPersonnel?.id === item.id) setViewingPersonnel(null);
+      await loadAll();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر حذف المنسوب'); }
+  };
+
   const savePersonnel = async () => {
-    if (!personnelForm.siteId || !personnelForm.name.trim() || !personnelForm.email.trim()) return toast.error('الموقع والاسم والبريد الإلكتروني مطلوبة لإنشاء حساب المنسوب');
+    if (!personnelForm.siteId || !personnelForm.name.trim() || !personnelForm.email.trim()) return toast.error('الموقع والاسم والبريد الإلكتروني مطلوبة');
     setSaving(true);
     try {
-      const result = await mosqueApi.createPersonnelAccount(personnelForm);
-      toast.success(result.message || 'تمت إضافة منسوب المسجد وربط حسابه');
+      if (editingPersonnel) {
+        await mosqueApi.updatePersonnel(editingPersonnel.id, personnelForm);
+        toast.success('تم تحديث بيانات المنسوب وربطه التشغيلي');
+      } else {
+        const result = await mosqueApi.createPersonnelAccount(personnelForm);
+        toast.success(result.message || 'تمت إضافة منسوب المسجد وربط حسابه');
+      }
       setPersonnelDialog(false);
+      setEditingPersonnel(null);
       await loadAll();
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر إضافة منسوب المسجد'); } finally { setSaving(false); }
+    } catch (error) { toast.error(error instanceof Error ? error.message : editingPersonnel ? 'تعذر تحديث بيانات المنسوب' : 'تعذر إضافة منسوب المسجد'); } finally { setSaving(false); }
   };
 
   const setUserAssignment = async (userId: string, roleValue: MosqueModuleRole, siteId?: string, personnelRole?: string) => {
@@ -599,8 +631,26 @@ export const MosquesUnitPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="team" className="space-y-4">
-          {['head', 'supervisor'].includes(role) && <div className="flex justify-end"><Button className={button3d} onClick={() => { setPersonnelForm({ siteId: sites[0]?.id || '', name: '', role: 'imam', mobile: '', email: '' }); setPersonnelDialog(true); }}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب مسجد / جامع / مصلى</Button></div>}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{personnel.map((item) => <Card key={item.id} className={card3d}><CardContent className="p-5"><div className="flex items-start justify-between"><div><h3 className="font-black">{item.name}</h3><p className="text-sm text-muted-foreground">{item.site?.name}</p></div><Badge variant="outline">{personnelRoleLabels[item.role] || item.role}</Badge></div><div className="mt-4 grid grid-cols-2 gap-2 text-sm"><Info label="الجوال" value={item.mobile || '-'} /><Info label="البريد" value={item.email || '-'} /></div></CardContent></Card>)}</div>
+          {['head', 'supervisor'].includes(role) && <div className="flex justify-end"><Button className={button3d} onClick={() => openPersonnelDialog()}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب مسجد / جامع / مصلى</Button></div>}
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            {personnel.map((item) => (
+              <Card key={item.id} className={`${card3d} overflow-hidden`}>
+                <div className="h-1.5 bg-gradient-to-l from-emerald-400 via-sky-500 to-blue-800" />
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><h3 className="font-black">{item.name}</h3><p className="text-sm text-muted-foreground">{item.site?.name || '-'}</p></div>
+                    <div className="flex flex-col items-end gap-1"><Badge variant="outline">{personnelRoleLabels[item.role] || item.role}</Badge><Badge variant="outline" className={item.active ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-600'}>{item.active ? 'نشط' : 'غير نشط'}</Badge></div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-sm"><Info label="الجوال" value={item.mobile || '-'} /><Info label="البريد" value={item.email || '-'} /></div>
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+                    <Button variant="outline" size="sm" className={button3d} onClick={() => setViewingPersonnel(item)}><Eye className="ml-1 h-3.5 w-3.5" />عرض</Button>
+                    {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" size="sm" className={button3d} onClick={() => openPersonnelDialog(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل</Button>}
+                    {canDelete && role === 'head' && <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => deletePersonnel(item)}><Trash2 className="ml-1 h-3.5 w-3.5" />حذف</Button>}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
           {!personnel.length && <Empty text="لا يوجد منسوبون مسجلون" />}
         </TabsContent>
 
@@ -790,15 +840,39 @@ export const MosquesUnitPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={personnelDialog} onOpenChange={setPersonnelDialog}>
+      <Dialog open={Boolean(viewingPersonnel)} onOpenChange={(open) => !open && setViewingPersonnel(null)}>
+        <DialogContent className="sm:max-w-[720px]" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="flex items-center gap-2 text-xl font-black"><Eye className="h-5 w-5 text-sky-700" />عرض بيانات منسوب المسجد</DialogTitle>
+            <DialogDescription>بيانات الارتباط التشغيلي والحساب المسجل للمنسوب.</DialogDescription>
+          </DialogHeader>
+          {viewingPersonnel && <div className="space-y-4">
+            <div className="grid gap-3 rounded-2xl border bg-slate-50/80 p-4 sm:grid-cols-2">
+              <Info label="الاسم الكامل" value={viewingPersonnel.name} />
+              <Info label="الصفة التشغيلية" value={personnelRoleLabels[viewingPersonnel.role] || viewingPersonnel.role} />
+              <Info label="المسجد / المصلى" value={viewingPersonnel.site?.name || sites.find((site) => site.id === viewingPersonnel.siteId)?.name || '-'} />
+              <Info label="حالة السجل" value={viewingPersonnel.active ? 'نشط' : 'غير نشط'} />
+              <Info label="رقم الجوال" value={viewingPersonnel.mobile || '-'} />
+              <Info label="البريد الإلكتروني" value={viewingPersonnel.email || '-'} />
+              <Info label="حساب مستخدم مرتبط" value={viewingPersonnel.userId ? 'نعم' : 'لا'} />
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" className={button3d} onClick={() => { const item = viewingPersonnel; setViewingPersonnel(null); openPersonnelDialog(item); }}><Pencil className="ml-2 h-4 w-4" />تعديل</Button>}
+              {canDelete && role === 'head' && <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => deletePersonnel(viewingPersonnel)}><Trash2 className="ml-2 h-4 w-4" />حذف</Button>}
+            </div>
+          </div>}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={personnelDialog} onOpenChange={(open) => { setPersonnelDialog(open); if (!open) setEditingPersonnel(null); }}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-emerald-50/20 sm:max-w-[900px]" dir="rtl">
-          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6"><DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><UserPlus className="h-5 w-5 text-sky-700" />إضافة منسوب مسجد / جامع / مصلى</DialogTitle><DialogDescription>يتم إنشاء أو ربط حساب دخول للمنسوب بواسطة رئيس الوحدة أو المشرف، ثم ربطه بالموقع وصفته التشغيلية.</DialogDescription></DialogHeader>
+          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6"><DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl">{editingPersonnel ? <Pencil className="h-5 w-5 text-sky-700" /> : <UserPlus className="h-5 w-5 text-sky-700" />}{editingPersonnel ? 'تعديل بيانات منسوب المسجد / الجامع / المصلى' : 'إضافة منسوب مسجد / جامع / مصلى'}</DialogTitle><DialogDescription>{editingPersonnel ? 'يمكن للمسؤول تحديث بيانات المنسوب والموقع والصفة التشغيلية، وتنعكس التغييرات على ربط حسابه.' : 'يتم إنشاء أو ربط حساب دخول للمنسوب بواسطة رئيس الوحدة أو المشرف، ثم ربطه بالموقع وصفته التشغيلية.'}</DialogDescription></DialogHeader>
           <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-4 md:p-6">
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-violet-50/40 pb-4"><CardTitle className="text-base md:text-lg">الارتباط والصفة</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><Field label="المسجد / المصلى *"><NativeSelect className="h-11" value={personnelForm.siteId} onChange={(e) => setPersonnelForm({ ...personnelForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="الصفة *"><NativeSelect className="h-11" value={personnelForm.role} onChange={(e) => setPersonnelForm({ ...personnelForm, role: e.target.value })}><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option></NativeSelect></Field></CardContent></Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-emerald-50/40 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><Users className="h-5 w-5" />بيانات المنسوب</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><div className="md:col-span-2"><Field label="الاسم الكامل *"><Input className="h-11" autoFocus value={personnelForm.name} onChange={(e) => setPersonnelForm({ ...personnelForm, name: e.target.value })} placeholder="الاسم الرباعي" /></Field></div><Field label="رقم الجوال"><Input className="h-11" type="tel" inputMode="tel" value={personnelForm.mobile} onChange={(e) => setPersonnelForm({ ...personnelForm, mobile: e.target.value })} placeholder="05xxxxxxxx" /></Field><Field label="البريد الإلكتروني *"><Input className="h-11" type="email" inputMode="email" value={personnelForm.email} onChange={(e) => setPersonnelForm({ ...personnelForm, email: e.target.value })} placeholder="name@iau.edu.sa" /></Field></CardContent></Card>
-            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-6 text-slate-700"><strong>حساب منسوب المسجد:</strong> عند الحفظ يتم إنشاء حساب دخول جديد إذا لم يكن البريد مسجلًا، أو ربط الحساب الموجود. الحساب يمنح المنسوب الدخول إلى موقعه فقط لتقديم طلب صيانة/احتياج، إجازة أو اعتذار، متابعة طلباته واستقبال الإشعارات. ويستلم الحساب الجديد رابط التفعيل وبيانات الدخول عبر البريد الإلكتروني.</div>
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-6 text-slate-700"><strong>{editingPersonnel ? 'تعديل حساب منسوب المسجد:' : 'حساب منسوب المسجد:'}</strong> {editingPersonnel ? 'يتم تحديث بيانات السجل والربط التشغيلي وحساب المستخدم المرتبط دون إنشاء حساب جديد أو إعادة إرسال دعوة التفعيل.' : 'عند الحفظ يتم إنشاء حساب دخول جديد إذا لم يكن البريد مسجلًا، أو ربط الحساب الموجود. الحساب يمنح المنسوب الدخول إلى موقعه فقط لتقديم طلب صيانة/احتياج، إجازة أو اعتذار، متابعة طلباته واستقبال الإشعارات. ويستلم الحساب الجديد رابط التفعيل وبيانات الدخول عبر البريد الإلكتروني.'}</div>
           </div>
-          <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => setPersonnelDialog(false)}>إلغاء</Button><Button className={'min-w-32 ' + button3d} onClick={savePersonnel} disabled={saving}><Save className="ml-2 h-4 w-4" />{saving ? 'جاري الحفظ...' : 'حفظ المنسوب'}</Button></DialogFooter>
+          <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => { setPersonnelDialog(false); setEditingPersonnel(null); }}>إلغاء</Button><Button className={'min-w-32 ' + button3d} onClick={savePersonnel} disabled={saving}><Save className="ml-2 h-4 w-4" />{saving ? 'جاري الحفظ...' : editingPersonnel ? 'حفظ التعديلات' : 'حفظ المنسوب'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
