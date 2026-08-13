@@ -1,0 +1,60 @@
+name: Fix admin edit dialog scrolling
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-admin-edit-dialog-scroll.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply admin dialog scrolling fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/app/pages/AdminDashboardPage.tsx')
+          text = path.read_text()
+
+          old = '''      <Dialog open={editOpen} onOpenChange={setEditOpen}>\n        <DialogContent>\n          <DialogHeader>\n            <DialogTitle>تعديل بيانات المستخدم</DialogTitle>\n            <DialogDescription>\n              حدّث الاسم والبريد والدور وحالة الحساب.\n            </DialogDescription>\n          </DialogHeader>\n\n          <div className="grid gap-4 py-2">'''
+
+          new = '''      <Dialog open={editOpen} onOpenChange={setEditOpen}>\n        <DialogContent\n          className="flex max-h-[92dvh] w-[calc(100vw-1.5rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100vw-3rem)] sm:max-w-5xl"\n          dir="rtl"\n        >\n          <DialogHeader className="shrink-0 border-b bg-background px-5 py-4 text-right sm:px-6">\n            <DialogTitle>تعديل بيانات المستخدم</DialogTitle>\n            <DialogDescription>\n              حدّث الاسم والبريد والدور وحالة الحساب. ويمكنك التمرير داخل النافذة بعجلة الفأرة أو مفاتيح الأسهم.\n            </DialogDescription>\n          </DialogHeader>\n\n          <div\n            className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 outline-none [scrollbar-gutter:stable] sm:px-6"\n            tabIndex={0}\n            aria-label="محتوى تعديل المستخدم قابل للتمرير"\n          >\n          <div className="grid gap-4 py-2">'''
+
+          if old not in text:
+              raise SystemExit('Edit dialog opening block not found')
+          text = text.replace(old, new, 1)
+
+          old = '''          {editForm.role === 'employee' && (\n            <PermissionMatrix\n              value={editForm.permissions}\n              onChange={(permissions) =>\n                setEditForm((current) => ({\n                  ...current,\n                  permissions,\n                }))\n              }\n            />\n          )}\n\n          <DialogFooter>\n            <Button variant="outline" onClick={() => setEditOpen(false)}>\n              إلغاء\n            </Button>\n            <Button onClick={saveEditedUser} disabled={editSaving}>\n              {editSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}\n            </Button>\n          </DialogFooter>\n        </DialogContent>\n      </Dialog>'''
+
+          new = '''          {editForm.role === 'employee' && (\n            <PermissionMatrix\n              value={editForm.permissions}\n              onChange={(permissions) =>\n                setEditForm((current) => ({\n                  ...current,\n                  permissions,\n                }))\n              }\n            />\n          )}\n          </div>\n\n          <DialogFooter className="shrink-0 border-t bg-background px-5 py-4 sm:px-6">\n            <Button variant="outline" onClick={() => setEditOpen(false)}>\n              إلغاء\n            </Button>\n            <Button onClick={saveEditedUser} disabled={editSaving}>\n              {editSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}\n            </Button>\n          </DialogFooter>\n        </DialogContent>\n      </Dialog>'''
+
+          if old not in text:
+              raise SystemExit('Edit dialog closing block not found')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+      - name: Install dependencies
+        run: npm ci
+      - name: Build verification
+        run: npm run build
+      - name: Commit verified changes
+        run: |
+          git config user.name 'OpenAI Project Automation'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/app/pages/AdminDashboardPage.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: make user edit dialog viewport scrollable'
+          git push origin main
