@@ -64,6 +64,32 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const ui = (ar: string, en: string) => (isRTL ? ar : en);
   const locale = isRTL ? 'ar-SA' : 'en-US';
 
+  const coreHomeModules = [
+    'deeds',
+    'allocated_lands',
+    'delivered_lands',
+    'leased_lands_out',
+    'leased_lands_in',
+    'leased_buildings_out',
+    'leased_buildings_in',
+  ] as const;
+
+  const scopedLandingRoutes = [
+    ['assets', '/assets'],
+    ['accounting_transformation', '/accounting-transformation'],
+    ['mosques', '/mosques'],
+    ['contracts_follow_up', '/contracts/follow-up'],
+    ['site_inspections', '/site-inspections'],
+    ['reports', '/reports'],
+    ['archive', '/archive'],
+  ] as const;
+
+  const hasCoreHomeAccess =
+    isAdmin || coreHomeModules.some((module) => hasPermission(module, 'canView'));
+  const defaultLandingPath = hasCoreHomeAccess
+    ? '/'
+    : scopedLandingRoutes.find(([module]) => hasPermission(module, 'canView'))?.[1] || '/appearance';
+
   React.useEffect(() => {
     if (!sidebarOpen || window.innerWidth >= 1024) return;
 
@@ -105,7 +131,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const menuItems = [
-    { id: 'home', path: '/', icon: Home, label: t('nav.home'), alwaysVisible: true },
+    { id: 'home', path: '/', icon: Home, label: t('nav.home'), alwaysVisible: hasCoreHomeAccess },
     { id: 'add-deed', path: '/deeds/new', icon: PlusCircle, label: t('nav.addDeed'), module: 'deeds', action: 'canAdd' },
     { id: 'all-deeds', path: '/deeds', icon: FileText, label: t('nav.allDeeds'), module: 'deeds', action: 'canView' },
     { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: t('nav.allocatedLands'), module: 'allocated_lands', action: 'canView' },
@@ -175,7 +201,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Button>
 
             <div className="hidden md:flex items-center gap-2">
-              <Button title={ui('الحساب', 'Account')} aria-label={ui('الحساب', 'Account')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button" onClick={() => navigate(isAdmin ? '/admin' : '/')}>
+              <Button title={ui('الحساب', 'Account')} aria-label={ui('الحساب', 'Account')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button" onClick={() => navigate(isAdmin ? '/admin' : defaultLandingPath)}>
                 <User className="h-4 w-4" />
               </Button>
               {(isAdmin || hasPermission('contracts_follow_up', 'canView')) && (
@@ -221,7 +247,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={() => navigate(defaultLandingPath)}
               aria-label="Platform home"
               className="h-10 w-10 sm:h-12 sm:w-12 overflow-hidden rounded-2xl border bg-background/60 p-1.5 grid place-items-center shadow-[0_0_25px_hsl(var(--primary)/0.25)] transition-transform hover:scale-105"
             >

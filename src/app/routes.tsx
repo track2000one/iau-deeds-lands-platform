@@ -3,6 +3,7 @@ import { createHashRouter, Navigate } from 'react-router';
 import { Root } from './Root';
 import { RequireAdmin } from './components/RequireAdmin';
 import { PermissionGuard } from './components/PermissionGuard';
+import { usePermissions } from '../context/PermissionsContext';
 
 const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
 const AddDeedPage = lazy(() => import('./pages/AddDeedPage').then((m) => ({ default: m.AddDeedPage })));
@@ -56,6 +57,52 @@ const LoadingPage = () => (
   <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">جارٍ فتح الصفحة...</div>
 );
 
+const CORE_HOME_MODULES = [
+  'deeds',
+  'allocated_lands',
+  'delivered_lands',
+  'leased_lands_out',
+  'leased_lands_in',
+  'leased_buildings_out',
+  'leased_buildings_in',
+] as const;
+
+const SCOPED_LANDING_ROUTES = [
+  ['assets', '/assets'],
+  ['accounting_transformation', '/accounting-transformation'],
+  ['mosques', '/mosques'],
+  ['contracts_follow_up', '/contracts/follow-up'],
+  ['site_inspections', '/site-inspections'],
+  ['reports', '/reports'],
+  ['archive', '/archive'],
+] as const;
+
+const HomeLandingPage = () => {
+  const { isAdmin, loading, hasPermission } = usePermissions();
+
+  if (loading) return <LoadingPage />;
+
+  const canUsePropertyHome =
+    isAdmin || CORE_HOME_MODULES.some((module) => hasPermission(module, 'canView'));
+
+  if (canUsePropertyHome) return <HomePage />;
+
+  const scopedLanding = SCOPED_LANDING_ROUTES.find(([module]) =>
+    hasPermission(module, 'canView')
+  );
+
+  if (scopedLanding) return <Navigate to={scopedLanding[1]} replace />;
+
+  return (
+    <div className="mx-auto mt-10 max-w-2xl rounded-2xl border bg-card p-8 text-center shadow-sm">
+      <h2 className="text-xl font-bold">لا توجد صفحة تشغيلية مخولة لهذا الحساب</h2>
+      <p className="mt-3 text-sm leading-7 text-muted-foreground">
+        يرجى التواصل مع مسؤول المنصة لإسناد صلاحية الوحدة أو الإدارة المناسبة.
+      </p>
+    </div>
+  );
+};
+
 const page = (element: ReactNode) => <Suspense fallback={<LoadingPage />}>{element}</Suspense>;
 const adminOnly = (element: ReactNode) => <RequireAdmin>{page(element)}</RequireAdmin>;
 const assetPermission = (element: ReactNode, action: 'canView' | 'canAdd' | 'canEdit' | 'canDelete' | 'canPrint') => (
@@ -78,7 +125,7 @@ export const router = createHashRouter([
     path: '/',
     element: <Root />,
     children: [
-      { index: true, element: page(<HomePage />) },
+      { index: true, element: page(<HomeLandingPage />) },
       {
         path: 'deeds',
         children: [
