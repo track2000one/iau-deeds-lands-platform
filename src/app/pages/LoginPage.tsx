@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
+import { mosqueApi } from '../api/mosques';
 import { PLATFORM_LOGO_URL } from '../config/branding';
 import {
   Eye,
@@ -52,7 +53,20 @@ export const LoginPage: React.FC = () => {
           ? 'تم تسجيل الدخول بنجاح'
           : 'Login successful'
       );
-      navigate('/');
+
+      // منسوبو المساجد (إمام/مؤذن/خطيب/خطيب متعاون) يذهبون مباشرة
+      // إلى واجهة الخدمة الذاتية الخاصة بوحدة المساجد بدل الصفحة الرئيسية العامة.
+      try {
+        const mosqueMe = await mosqueApi.me();
+        if (mosqueMe.role === 'personnel') {
+          navigate('/mosques', { replace: true });
+          return;
+        }
+      } catch {
+        // إذا لم يكن الحساب مرتبطًا بالوحدة نستمر بالتوجيه العام المعتاد.
+      }
+
+      navigate('/', { replace: true });
     } catch (error) {
       const message =
         error instanceof Error && error.message
