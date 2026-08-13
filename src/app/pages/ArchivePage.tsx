@@ -955,7 +955,7 @@ export const ArchivePage: React.FC = () => {
           <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h2 className="text-xl md:text-2xl font-bold">تفاصيل ملف الأرشفة</h2>
-              <p className="text-sm text-muted-foreground mt-1">عرض بيانات الملف ورابط Google Drive والإجراءات.</p>
+              <p className="text-sm text-muted-foreground mt-1">عرض بيانات الملف والإجراءات المتاحة.</p>
             </div>
 
             <Button variant="outline" onClick={() => { setDetailsOpen(false); setSelectedDocument(null); }} className="w-full md:w-auto">
@@ -991,7 +991,6 @@ export const ArchivePage: React.FC = () => {
               <InfoItem label="الحجم" value={formatFileSize(selectedDocument.fileSize)} />
               <InfoItem label="تاريخ الأرشفة" value={formatDate(selectedDocument.createdAt)} />
               <InfoItem label="آخر تعديل" value={formatDate(selectedDocument.updatedAt)} />
-              <InfoItem label="رقم Google Drive" value={selectedDocument.driveFileId || '-'} />
             </div>
 
             {selectedDocument.description && <InfoBlock label="الوصف / الملاحظات" value={selectedDocument.description} />}
