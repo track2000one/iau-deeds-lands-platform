@@ -520,7 +520,7 @@ export const MosquesUnitPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="requests" className="space-y-4">
-          {(role === 'personnel' || ['head', 'supervisor'].includes(role)) && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />طلب صيانة / احتياج جديد</Button></div>}
+          {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />الإبلاغ عن مشكلة / طلب صيانة أو احتياج</Button></div>}
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{requests.map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} />)}</div>
           {!requests.length && <Empty text="لا توجد طلبات مسجلة" />}
         </TabsContent>
@@ -531,7 +531,7 @@ export const MosquesUnitPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="leaves" className="space-y-4">
-          {(role === 'personnel' || ['head', 'supervisor'].includes(role)) && <div className="flex justify-end"><Button className={button3d} onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button></div>}
+          {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button></div>}
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{leaves.map((item) => <WorkflowCard key={item.id} title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} />)}</div>
           {!leaves.length && <Empty text="لا توجد طلبات إجازة أو اعتذار" />}
         </TabsContent>
@@ -551,7 +551,7 @@ export const MosquesUnitPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="team" className="space-y-4">
-          {['head', 'supervisor'].includes(role) && <div className="flex justify-end"><Button className={button3d} onClick={() => { setPersonnelForm({ siteId: sites[0]?.id || '', name: '', role: 'imam', mobile: '', email: '' }); setPersonnelDialog(true); }}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب مسجد</Button></div>}
+          {['head', 'supervisor'].includes(role) && <div className="flex justify-end"><Button className={button3d} onClick={() => { setPersonnelForm({ siteId: sites[0]?.id || '', name: '', role: 'imam', mobile: '', email: '' }); setPersonnelDialog(true); }}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب مسجد / جامع / مصلى</Button></div>}
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{personnel.map((item) => <Card key={item.id} className={card3d}><CardContent className="p-5"><div className="flex items-start justify-between"><div><h3 className="font-black">{item.name}</h3><p className="text-sm text-muted-foreground">{item.site?.name}</p></div><Badge variant="outline">{personnelRoleLabels[item.role] || item.role}</Badge></div><div className="mt-4 grid grid-cols-2 gap-2 text-sm"><Info label="الجوال" value={item.mobile || '-'} /><Info label="البريد" value={item.email || '-'} /></div></CardContent></Card>)}</div>
           {!personnel.length && <Empty text="لا يوجد منسوبون مسجلون" />}
         </TabsContent>
@@ -661,8 +661,8 @@ export const MosquesUnitPage: React.FC = () => {
       <Dialog open={requestDialog} onOpenChange={setRequestDialog}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-emerald-50/20 sm:max-w-[980px]" dir="rtl">
           <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6">
-            <DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><Wrench className="h-5 w-5 text-sky-700" />إنشاء طلب صيانة أو احتياج</DialogTitle>
-            <DialogDescription>سجل الطلب بشكل واضح مع تحديد الموقع والأولوية وإرفاق ما يدعم الطلب عند الحاجة.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><Wrench className="h-5 w-5 text-sky-700" />الإبلاغ عن مشكلة / طلب صيانة أو احتياج</DialogTitle>
+            <DialogDescription>هذه الخدمة مخصصة للإمام والمؤذن والخطيب والخطيب المتعاون للإبلاغ عن مشكلة في المسجد أو الجامع أو المصلى وطلب الصيانة أو الاحتياج.</DialogDescription>
           </DialogHeader>
           <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-4 md:p-6">
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
@@ -723,11 +723,11 @@ export const MosquesUnitPage: React.FC = () => {
 
       <Dialog open={personnelDialog} onOpenChange={setPersonnelDialog}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-emerald-50/20 sm:max-w-[900px]" dir="rtl">
-          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6"><DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><UserPlus className="h-5 w-5 text-sky-700" />إضافة منسوب مسجد / مصلى</DialogTitle><DialogDescription>يتم إنشاء أو ربط حساب دخول للمنسوب بواسطة رئيس الوحدة أو المشرف، ثم ربطه بالموقع وصفته التشغيلية.</DialogDescription></DialogHeader>
+          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6"><DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><UserPlus className="h-5 w-5 text-sky-700" />إضافة منسوب مسجد / جامع / مصلى</DialogTitle><DialogDescription>يتم إنشاء أو ربط حساب دخول للمنسوب بواسطة رئيس الوحدة أو المشرف، ثم ربطه بالموقع وصفته التشغيلية.</DialogDescription></DialogHeader>
           <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-4 md:p-6">
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-violet-50/40 pb-4"><CardTitle className="text-base md:text-lg">الارتباط والصفة</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><Field label="المسجد / المصلى *"><NativeSelect className="h-11" value={personnelForm.siteId} onChange={(e) => setPersonnelForm({ ...personnelForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="الصفة *"><NativeSelect className="h-11" value={personnelForm.role} onChange={(e) => setPersonnelForm({ ...personnelForm, role: e.target.value })}><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option></NativeSelect></Field></CardContent></Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-emerald-50/40 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><Users className="h-5 w-5" />بيانات المنسوب</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><div className="md:col-span-2"><Field label="الاسم الكامل *"><Input className="h-11" autoFocus value={personnelForm.name} onChange={(e) => setPersonnelForm({ ...personnelForm, name: e.target.value })} placeholder="الاسم الرباعي" /></Field></div><Field label="رقم الجوال"><Input className="h-11" type="tel" inputMode="tel" value={personnelForm.mobile} onChange={(e) => setPersonnelForm({ ...personnelForm, mobile: e.target.value })} placeholder="05xxxxxxxx" /></Field><Field label="البريد الإلكتروني *"><Input className="h-11" type="email" inputMode="email" value={personnelForm.email} onChange={(e) => setPersonnelForm({ ...personnelForm, email: e.target.value })} placeholder="name@iau.edu.sa" /></Field></CardContent></Card>
-            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-6 text-slate-700">عند الحفظ يتم إنشاء حساب دخول جديد إذا لم يكن البريد مسجلًا، أو ربط الحساب الموجود. الحساب الجديد يستلم رابط التفعيل وبيانات الدخول عبر البريد الإلكتروني.</div>
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-6 text-slate-700"><strong>حساب منسوب المسجد:</strong> عند الحفظ يتم إنشاء حساب دخول جديد إذا لم يكن البريد مسجلًا، أو ربط الحساب الموجود. الحساب يمنح المنسوب الدخول إلى موقعه فقط لتقديم طلب صيانة/احتياج، إجازة أو اعتذار، متابعة طلباته واستقبال الإشعارات. ويستلم الحساب الجديد رابط التفعيل وبيانات الدخول عبر البريد الإلكتروني.</div>
           </div>
           <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => setPersonnelDialog(false)}>إلغاء</Button><Button className={'min-w-32 ' + button3d} onClick={savePersonnel} disabled={saving}><Save className="ml-2 h-4 w-4" />{saving ? 'جاري الحفظ...' : 'حفظ المنسوب'}</Button></DialogFooter>
         </DialogContent>
