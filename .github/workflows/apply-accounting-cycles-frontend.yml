@@ -26,7 +26,7 @@ jobs:
         run: |
           git config user.name 'OpenAI Project Automation'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/app/routes.tsx src/app/pages/AccountingTransformationDashboardPage.tsx src/app/pages/AccountingTransformationImportPage.tsx src/app/pages/AccountingTransformationRecordsPage.tsx
+          git add src/app/routes.tsx src/app/pages/AccountingTransformationDashboardPage.tsx src/app/pages/AccountingTransformationCyclesPage.tsx src/app/pages/AccountingTransformationImportPage.tsx src/app/pages/AccountingTransformationRecordsPage.tsx
           git diff --cached --quiet && exit 0
-          git commit -m 'feat: integrate accounting transformation data cycles UI'
+          git commit -m 'fix: polish accounting transformation data cycles UX'
           git push origin main
