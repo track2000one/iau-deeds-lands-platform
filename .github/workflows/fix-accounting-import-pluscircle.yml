@@ -1,0 +1,49 @@
+name: Fix accounting import PlusCircle
+
+# Temporary one-shot workflow.
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-accounting-import-pluscircle.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Add missing PlusCircle import
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          p = Path('src/app/pages/AccountingTransformationImportPage.tsx')
+          s = p.read_text()
+          old = "  LandPlot,\n  Loader2,\n  UploadCloud,"
+          new = "  LandPlot,\n  Loader2,\n  PlusCircle,\n  UploadCloud,"
+          if 'PlusCircle,' not in s:
+              if old not in s:
+                  raise SystemExit('lucide import marker not found')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+
+      - name: Verify frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Commit fix and remove temporary workflow
+        run: |
+          git config user.name 'OpenAI Project Automation'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm .github/workflows/fix-accounting-import-pluscircle.yml
+          git add src/app/pages/AccountingTransformationImportPage.tsx .github/workflows/fix-accounting-import-pluscircle.yml
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: import PlusCircle on accounting transformation import page'
+          git push origin main
