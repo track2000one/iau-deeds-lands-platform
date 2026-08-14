@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   LandPlot,
   Loader2,
+  PlusCircle,
   UploadCloud,
 } from 'lucide-react';
 import { toast } from 'sonner';
