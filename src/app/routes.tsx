@@ -52,6 +52,7 @@ const AccountingTransformationFormPage = lazy(() => import('./pages/AccountingTr
 const AccountingTransformationViewPage = lazy(() => import('./pages/AccountingTransformationViewPage').then((m) => ({ default: m.AccountingTransformationViewPage })));
 const AccountingTransformationImportPage = lazy(() => import('./pages/AccountingTransformationImportPage').then((m) => ({ default: m.AccountingTransformationImportPage })));
 const AccountingTransformationReportsPage = lazy(() => import('./pages/AccountingTransformationReportsPage').then((m) => ({ default: m.AccountingTransformationReportsPage })));
+const AccountingTransformationCyclesPage = lazy(() => import('./pages/AccountingTransformationCyclesPage').then((m) => ({ default: m.AccountingTransformationCyclesPage })));
 
 const LoadingPage = () => (
   <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">جارٍ فتح الصفحة...</div>
@@ -164,6 +165,7 @@ export const router = createHashRouter([
           { path: 'new', element: accountingTransformationPermission(<AccountingTransformationFormPage />, 'canAdd') },
           { path: 'import', element: accountingTransformationPermission(<AccountingTransformationImportPage />, 'canAdd') },
           { path: 'reports', element: accountingTransformationPermission(<AccountingTransformationReportsPage />, 'canView') },
+          { path: 'cycles', element: accountingTransformationPermission(<AccountingTransformationCyclesPage />, 'canView') },
           { path: ':recordId/edit', element: accountingTransformationPermission(<AccountingTransformationFormPage />, 'canEdit') },
           { path: ':recordId', element: accountingTransformationPermission(<AccountingTransformationViewPage />, 'canView') },
         ],

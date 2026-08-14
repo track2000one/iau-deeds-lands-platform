@@ -22,12 +22,14 @@ import { NativeSelect } from '../components/ui/native-select';
 import { usePermissions } from '../../context/PermissionsContext';
 import {
   deleteAccountingTransformationRecord,
+  getAccountingTransformationCycles,
   getAccountingTransformationGroups,
   getAccountingTransformationRecords,
   getAccountingTransformationStats,
   type AccountingTransformationGroupSummary,
 } from '../api/accountingTransformation';
 import type {
+  AccountingTransformationCycle,
   AccountingTransformationRecord,
   AccountingTransformationStats,
 } from '../../types/accountingTransformation';
@@ -147,22 +149,29 @@ export const AccountingTransformationRecordsPage: React.FC = () => {
   const [appliedSearch, setAppliedSearch] = useState(params.get('search') || '');
   const [recordType, setRecordType] = useState(params.get('type') || 'all');
   const [committeeStatus, setCommitteeStatus] = useState(params.get('status') || 'all');
+  const cycleId = params.get('cycle') || '';
+  const [selectedCycle, setSelectedCycle] = useState<AccountingTransformationCycle | null>(null);
 
   const canAdd = isAdmin || hasPermission('accounting_transformation', 'canAdd');
   const canEdit = isAdmin || hasPermission('accounting_transformation', 'canEdit');
   const canDelete = isAdmin || hasPermission('accounting_transformation', 'canDelete');
 
-  const commonFilters = useMemo(() => ({ search: appliedSearch, recordType, committeeStatus }), [appliedSearch, recordType, committeeStatus]);
+  const commonFilters = useMemo(() => ({ search: appliedSearch, recordType, committeeStatus, cycleId: cycleId || undefined }), [appliedSearch, recordType, committeeStatus, cycleId]);
+  const isArchivedCycle = selectedCycle?.status === 'archived';
+  const effectiveCanEdit = canEdit && !isArchivedCycle;
+  const effectiveCanDelete = canDelete && !isArchivedCycle;
 
   const loadOverview = async () => {
     setLoading(true);
     try {
-      const [groupData, statData] = await Promise.all([
+      const [groupData, statData, cycleData] = await Promise.all([
         getAccountingTransformationGroups(commonFilters),
-        getAccountingTransformationStats(),
+        getAccountingTransformationStats(cycleId || undefined),
+        cycleId ? getAccountingTransformationCycles() : Promise.resolve([]),
       ]);
       setGroups(groupData || []);
       setStats(statData || EMPTY_STATS);
+      setSelectedCycle(cycleId ? (cycleData.find((cycle) => cycle.id === cycleId) || null) : null);
       setLoadedGroups({});
       setExpandedGroups({});
     } catch (error) {
@@ -172,7 +181,7 @@ export const AccountingTransformationRecordsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { loadOverview(); }, [appliedSearch, recordType, committeeStatus]);
+  useEffect(() => { loadOverview(); }, [appliedSearch, recordType, committeeStatus, cycleId]);
 
   const loadGroup = async (groupKey: string, page = 1, append = false) => {
     setLoadedGroups((prev) => ({
@@ -211,6 +220,7 @@ export const AccountingTransformationRecordsPage: React.FC = () => {
     if (trimmed) next.set('search', trimmed);
     if (recordType !== 'all') next.set('type', recordType);
     if (committeeStatus !== 'all') next.set('status', committeeStatus);
+    if (cycleId) next.set('cycle', cycleId);
     setParams(next);
   };
 
@@ -239,6 +249,8 @@ export const AccountingTransformationRecordsPage: React.FC = () => {
         <div className="flex flex-wrap gap-2">{canAdd && <Button className="rounded-2xl" onClick={() => navigate('/accounting-transformation/new')}><PlusCircle className="ml-2 h-4 w-4" />إضافة سجل</Button>}{canAdd && <Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation/import')}><FileSpreadsheet className="ml-2 h-4 w-4" />استيراد Excel</Button>}</div>
       </section>
 
+      {selectedCycle && <div className={`rounded-[22px] border p-4 ${selectedCycle.status === 'archived' ? 'border-slate-300 bg-slate-50' : selectedCycle.isCurrent ? 'border-emerald-200 bg-emerald-50/60' : 'border-sky-200 bg-sky-50/60'}`}><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold text-slate-500">عرض إصدار محدد من البيانات</p><p className="mt-1 font-black text-slate-900">#{selectedCycle.cycleNumber} — {selectedCycle.name}</p><p className="mt-1 text-xs text-slate-600">{selectedCycle.status === 'archived' ? 'نسخة تاريخية مؤرشفة — العرض فقط دون تعديل أو حذف.' : selectedCycle.isCurrent ? 'الدورة الحالية المعتمدة.' : 'دورة قيد العمل قبل الاعتماد.'}</p></div><Button variant="outline" onClick={() => navigate('/accounting-transformation/cycles')}>سجل الدورات</Button></div></div>}
+
       <div className="grid gap-3 md:grid-cols-3">
         {summaryCards.map(({ type, label, value, icon: Icon }) => <button key={type} onClick={() => setRecordType(type)} className={`rounded-[22px] border p-4 text-right shadow-[0_7px_0_rgba(30,64,95,.05),0_12px_24px_rgba(15,42,70,.06)] transition hover:-translate-y-0.5 ${recordType === type ? 'border-blue-400 bg-blue-50' : 'bg-white/85'}`}><div className="flex items-center justify-between"><div><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-3xl font-black text-slate-900">{value.toLocaleString('ar-SA')}</p></div><div className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-200 bg-white"><Icon className="h-5 w-5 text-blue-700" /></div></div></button>)}
       </div>
@@ -254,7 +266,7 @@ export const AccountingTransformationRecordsPage: React.FC = () => {
       {loading ? <div className="flex min-h-[320px] items-center justify-center text-sm text-slate-500">جاري تحميل المجموعات...</div> : groups.length ? <div className="space-y-3">{groups.map((group) => {
         const loaded = loadedGroups[group.key];
         const expanded = !!expandedGroups[group.key];
-        return <section key={group.key} className="space-y-4"><GroupHeader group={group} expanded={expanded} loading={!!loaded?.loading} onToggle={() => toggleGroup(group.key)} />{expanded && <div className="rounded-[26px] border border-slate-200/90 bg-slate-50/55 p-3 sm:p-4">{loaded?.loading && !loaded.items.length ? <div className="p-10 text-center text-sm text-slate-500">جاري تحميل سجلات المجموعة...</div> : loaded?.items?.length ? <><div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{loaded.items.map((item) => <RecordCard key={item.id} item={item} canEdit={canEdit} canDelete={canDelete} onView={() => navigate(`/accounting-transformation/${item.id}`)} onEdit={() => navigate(`/accounting-transformation/${item.id}/edit`)} onDelete={() => remove(item, group.key)} />)}</div>{loaded.page < loaded.totalPages && <div className="mt-4 flex justify-center"><Button variant="outline" className="rounded-xl" disabled={loaded.loading} onClick={() => loadGroup(group.key, loaded.page + 1, true)}>عرض المزيد ({loaded.items.length.toLocaleString('ar-SA')} من {loaded.total.toLocaleString('ar-SA')})</Button></div>}</> : <div className="p-10 text-center text-sm text-slate-500">لا توجد سجلات في هذه المجموعة.</div>}</div>}</section>;
+        return <section key={group.key} className="space-y-4"><GroupHeader group={group} expanded={expanded} loading={!!loaded?.loading} onToggle={() => toggleGroup(group.key)} />{expanded && <div className="rounded-[26px] border border-slate-200/90 bg-slate-50/55 p-3 sm:p-4">{loaded?.loading && !loaded.items.length ? <div className="p-10 text-center text-sm text-slate-500">جاري تحميل سجلات المجموعة...</div> : loaded?.items?.length ? <><div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{loaded.items.map((item) => <RecordCard key={item.id} item={item} canEdit={effectiveCanEdit} canDelete={effectiveCanDelete} onView={() => navigate(`/accounting-transformation/${item.id}`)} onEdit={() => navigate(`/accounting-transformation/${item.id}/edit`)} onDelete={() => remove(item, group.key)} />)}</div>{loaded.page < loaded.totalPages && <div className="mt-4 flex justify-center"><Button variant="outline" className="rounded-xl" disabled={loaded.loading} onClick={() => loadGroup(group.key, loaded.page + 1, true)}>عرض المزيد ({loaded.items.length.toLocaleString('ar-SA')} من {loaded.total.toLocaleString('ar-SA')})</Button></div>}</> : <div className="p-10 text-center text-sm text-slate-500">لا توجد سجلات في هذه المجموعة.</div>}</div>}</section>;
       })}</div> : <div className="rounded-[28px] border border-dashed bg-white/70 p-12 text-center text-slate-500">لا توجد مجموعات مطابقة.</div>}
     </div>
   );

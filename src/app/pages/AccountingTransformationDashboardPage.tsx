@@ -9,6 +9,8 @@ import {
   FileSpreadsheet,
   LandPlot,
   ListChecks,
+  History,
+  RefreshCcw,
   PlusCircle,
   Scale,
   Sparkles,
@@ -16,8 +18,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { usePermissions } from '../../context/PermissionsContext';
-import { getAccountingTransformationStats } from '../api/accountingTransformation';
-import type { AccountingTransformationStats } from '../../types/accountingTransformation';
+import { getAccountingTransformationCycles, getAccountingTransformationStats } from '../api/accountingTransformation';
+import type { AccountingTransformationCycle, AccountingTransformationStats } from '../../types/accountingTransformation';
 
 const EMPTY: AccountingTransformationStats = {
   total: 0,
@@ -36,8 +38,9 @@ const EMPTY: AccountingTransformationStats = {
 
 const quickActions = [
   { label: 'جميع السجلات', description: 'استعراض الأراضي والمباني والبحث في متطلبات التحول.', path: '/accounting-transformation/records', icon: FileSearch },
+  { label: 'دورات تحديث البيانات', description: 'إنشاء إصدار جديد، المقارنة مع السابق، الاعتماد والأرشفة دون حذف التاريخ.', path: '/accounting-transformation/cycles', icon: History },
   { label: 'إضافة سجل جديد', description: 'إدخال سجل أرض أو مبنى وفق حقول النموذج المعتمد.', path: '/accounting-transformation/new', icon: PlusCircle },
-  { label: 'استيراد Excel', description: 'استيراد ملف التحول المحاسبي المعتمد مباشرة مع تحليل الحقول.', path: '/accounting-transformation/import', icon: FileSpreadsheet },
+  { label: 'استيراد Excel', description: 'استيراد النموذج داخل دورة تحديث مستقلة قبل اعتمادها.', path: '/accounting-transformation/import', icon: FileSpreadsheet },
   { label: 'التقارير', description: 'تقارير الحصر والجرد والتقييم مع Excel والطباعة.', path: '/accounting-transformation/reports', icon: BarChart3 },
 ] as const;
 
@@ -57,16 +60,28 @@ export const AccountingTransformationDashboardPage: React.FC = () => {
   const { isAdmin, hasPermission } = usePermissions();
   const [stats, setStats] = useState<AccountingTransformationStats>(EMPTY);
   const [loading, setLoading] = useState(true);
+  const [cycles, setCycles] = useState<AccountingTransformationCycle[]>([]);
   const canAdd = isAdmin || hasPermission('accounting_transformation', 'canAdd');
 
   useEffect(() => {
     let active = true;
-    getAccountingTransformationStats()
-      .then((data) => active && setStats(data || EMPTY))
-      .catch(() => active && setStats(EMPTY))
+    Promise.all([getAccountingTransformationStats(), getAccountingTransformationCycles()])
+      .then(([data, cycleData]) => {
+        if (!active) return;
+        setStats(data || EMPTY);
+        setCycles(cycleData || []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setStats(EMPTY);
+        setCycles([]);
+      })
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, []);
+
+  const currentCycle = cycles.find((cycle) => cycle.isCurrent);
+  const openCycle = cycles.find((cycle) => ['draft', 'under_review'].includes(cycle.status));
 
   const hero = useMemo(() => [
     { label: 'إجمالي السجلات', value: stats.total, icon: ListChecks, tone: 'text-blue-100 border-blue-300/25 bg-blue-400/15' },
@@ -104,6 +119,15 @@ export const AccountingTransformationDashboardPage: React.FC = () => {
               </div>
             ))}
           </section>
+
+          {(currentCycle || openCycle) && <section className="grid gap-3 rounded-[24px] border border-white/15 bg-white/[.07] p-4 backdrop-blur md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <p className="text-xs font-bold text-cyan-100">{openCycle ? 'توجد دورة تحديث قيد العمل' : 'الدورة الحالية المعتمدة'}</p>
+              <p className="mt-1 font-black text-white">{openCycle ? `#${openCycle.cycleNumber} — ${openCycle.name}` : currentCycle ? `#${currentCycle.cycleNumber} — ${currentCycle.name}` : ''}</p>
+              <p className="mt-1 text-xs text-slate-300">{openCycle ? `${openCycle.recordCount.toLocaleString('ar-SA')} سجل · ${openCycle.status === 'under_review' ? 'تحت المراجعة' : 'مسودة'}` : `${currentCycle?.recordCount.toLocaleString('ar-SA') || 0} سجل محفوظ في الإصدار الحالي`}</p>
+            </div>
+            <Button variant="outline" className="border-white/15 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate(openCycle ? `/accounting-transformation/import?cycle=${encodeURIComponent(openCycle.id)}` : '/accounting-transformation/cycles')}><RefreshCcw className="ml-2 h-4 w-4" />{openCycle ? 'فتح دورة التحديث' : 'سجل الدورات'}</Button>
+          </section>}
 
           <section className="grid gap-5 xl:grid-cols-[.85fr_1.55fr]">
             <div className="space-y-5">
