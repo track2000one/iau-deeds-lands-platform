@@ -115,7 +115,7 @@ export const AccountingTransformationImportPage: React.FC = () => {
     getAccountingTransformationCycles()
       .then((data) => {
         if (!active) return;
-        const open = (data || []).filter((cycle) => ['draft', 'under_review'].includes(cycle.status));
+        const open = (data || []).filter((cycle) => cycle.status === 'draft');
         setCycles(open);
         const requested = searchParams.get('cycle');
         const selected = open.find((cycle) => cycle.id === requested) || open[0];
@@ -156,11 +156,11 @@ export const AccountingTransformationImportPage: React.FC = () => {
     ? 'كل السجلات'
     : `الدفعة ${Math.min(batchIndex + 1, maxBatch).toLocaleString('ar-SA')} من ${maxBatch.toLocaleString('ar-SA')}`;
 
-  const refreshScan = async (allItems: PreviewItem[]) => {
+  const refreshScan = async (allItems: PreviewItem[], sourceFileName = fileName) => {
     setScanning(true);
     try {
       if (!selectedCycleId) throw new Error('أنشئ دورة تحديث جديدة أولًا من صفحة دورات البيانات.');
-      const preview = await previewAccountingTransformationCycleImport(selectedCycleId, allItems.map(stripSource), fileName || undefined);
+      const preview = await previewAccountingTransformationCycleImport(selectedCycleId, allItems.map(stripSource), sourceFileName || undefined);
       setScan(preview);
       setMessage(`نتيجة المقارنة مع الدورة السابقة: ${(preview.new || 0).toLocaleString('ar-SA')} جديد، ${(preview.modified || 0).toLocaleString('ar-SA')} معدل، ${(preview.unchanged || 0).toLocaleString('ar-SA')} بدون تغيير، ${(preview.removed || 0).toLocaleString('ar-SA')} لم يظهر في الملف الجديد${preview.duplicate ? `، و${preview.duplicate.toLocaleString('ar-SA')} سبق إدخاله في هذه الدورة` : ''}.`);
       return preview;
@@ -189,7 +189,7 @@ export const AccountingTransformationImportPage: React.FC = () => {
       setItems(parsed);
       setFileName(file.name);
       setMessage(`تم تحليل الملف وإيجاد ${parsed.length.toLocaleString('ar-SA')} سجل. جارٍ فحص التكرار مع بيانات المنصة...`);
-      await refreshScan(parsed);
+      await refreshScan(parsed, file.name);
       toast.success(`تمت قراءة وفحص ${parsed.length.toLocaleString('ar-SA')} سجل`);
     } catch (error) {
       setItems([]);
@@ -205,8 +205,8 @@ export const AccountingTransformationImportPage: React.FC = () => {
   const performImport = async () => {
     if (!currentFreshRows.length || importing) return;
     const confirmed = window.confirm(
-      `سيتم استيراد ${currentFreshRows.length.toLocaleString('ar-SA')} سجل جديد من ${batchLabel}.\n\n` +
-      'السجلات المكررة أو التي سبق استيرادها سيتم تجاوزها تلقائيًا. هل ترغب بالمتابعة؟'
+      `سيتم حفظ ${currentFreshRows.length.toLocaleString('ar-SA')} سجل من ${batchLabel} داخل دورة التحديث الجديدة.\n\n` +
+      'سيحتفظ النظام بالنسخة السابقة كاملة، وسيصنف السجلات إلى جديد أو معدل أو بدون تغيير. هل ترغب بالمتابعة؟'
     );
     if (!confirmed) return;
 
@@ -217,7 +217,7 @@ export const AccountingTransformationImportPage: React.FC = () => {
       const response = await importAccountingTransformationCycleRecords(selectedCycleId, currentFreshRows.map(stripSource), fileName || undefined);
       setResult(response);
       toast.success(`اكتملت ${batchLabel}: ${response.created.toLocaleString('ar-SA')} سجل أضيف إلى الإصدار الجديد`);
-      await refreshScan(items);
+      await refreshScan(items, fileName);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر استيراد السجلات');
     } finally {
@@ -245,7 +245,7 @@ export const AccountingTransformationImportPage: React.FC = () => {
         <div className="flex flex-wrap gap-2"><Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation/cycles')}>دورات البيانات</Button><Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />العودة للوحة اللجنة</Button></div>
       </section>
 
-      <Card className="rounded-[24px] border-cyan-200 bg-cyan-50/50"><CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-end"><label className="text-xs font-bold text-slate-600">دورة التحديث المستهدفة<NativeSelect value={selectedCycleId} disabled={cyclesLoading || !cycles.length} onChange={(e) => { setSelectedCycleId(e.target.value); setItems([]); setScan(null); setResult(null); setFileName(''); setMessage(''); }} className="mt-1 h-11 rounded-xl bg-white">{cycles.length ? cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>#{cycle.cycleNumber} — {cycle.name} ({cycle.status === 'under_review' ? 'تحت المراجعة' : 'مسودة'})</option>) : <option value="">لا توجد دورة مفتوحة</option>}</NativeSelect></label><Button variant="outline" onClick={() => navigate('/accounting-transformation/cycles')}><PlusCircle className="ml-2 h-4 w-4" />{cycles.length ? 'إدارة الدورات' : 'إنشاء دورة جديدة'}</Button>{selectedCycle && <p className="md:col-span-2 text-xs text-slate-600">سيتم حفظ البيانات في: <strong>#{selectedCycle.cycleNumber} — {selectedCycle.name}</strong>. لن تصبح هذه البيانات رسمية حتى اعتماد الدورة.</p>}</CardContent></Card>
+      <Card className="rounded-[24px] border-cyan-200 bg-cyan-50/50"><CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-end"><label className="text-xs font-bold text-slate-600">دورة التحديث المستهدفة<NativeSelect value={selectedCycleId} disabled={cyclesLoading || !cycles.length} onChange={(e) => { setSelectedCycleId(e.target.value); setItems([]); setScan(null); setResult(null); setFileName(''); setMessage(''); }} className="mt-1 h-11 rounded-xl bg-white">{cycles.length ? cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>#{cycle.cycleNumber} — {cycle.name} (مسودة)</option>) : <option value="">لا توجد دورة مسودة قابلة للاستيراد</option>}</NativeSelect></label><Button variant="outline" onClick={() => navigate('/accounting-transformation/cycles')}><PlusCircle className="ml-2 h-4 w-4" />{cycles.length ? 'إدارة الدورات' : 'إنشاء دورة جديدة'}</Button>{selectedCycle && <p className="md:col-span-2 text-xs text-slate-600">سيتم حفظ البيانات في: <strong>#{selectedCycle.cycleNumber} — {selectedCycle.name}</strong>. لن تصبح هذه البيانات رسمية حتى اعتماد الدورة.</p>}</CardContent></Card>
 
       <Card className="rounded-[28px] border-dashed border-sky-300 bg-[linear-gradient(145deg,#fafeff,#eef9ff)] shadow-[0_9px_0_rgba(15,57,95,.05),0_16px_30px_rgba(15,42,70,.06)]">
         <CardHeader className="border-b"><CardTitle className="flex items-center gap-2 text-base"><UploadCloud className="h-5 w-5" />اختيار ملف التحول المحاسبي</CardTitle></CardHeader>

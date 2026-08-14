@@ -5,7 +5,6 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock3,
-  FileDiff,
   FileSpreadsheet,
   History,
   Loader2,
@@ -178,7 +177,7 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
       {openCycle && <section className="rounded-[26px] border border-amber-200 bg-amber-50/70 p-5 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div><p className="text-xs font-black text-amber-700">دورة قيد العمل</p><h2 className="mt-1 text-xl font-black text-slate-900">#{openCycle.cycleNumber} — {openCycle.name}</h2><p className="mt-1 text-sm text-slate-600">الحالة: {statusLabel[openCycle.status]} · {openCycle.recordCount.toLocaleString('ar-SA')} سجل</p></div>
-          <Button onClick={() => navigate(`/accounting-transformation/import?cycle=${encodeURIComponent(openCycle.id)}`)}><RefreshCcw className="ml-2 h-4 w-4" />فتح دورة التحديث</Button>
+          <Button onClick={() => navigate(openCycle.status === 'draft' ? `/accounting-transformation/import?cycle=${encodeURIComponent(openCycle.id)}` : '/accounting-transformation/cycles')}><RefreshCcw className="ml-2 h-4 w-4" />{openCycle.status === 'draft' ? 'فتح دورة التحديث' : 'الدورة تحت المراجعة'}</Button>
         </div>
       </section>}
 
@@ -205,7 +204,6 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
 
                 <div className="flex flex-wrap gap-2 border-t pt-4">
                   <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/records?cycle=${encodeURIComponent(cycle.id)}`)}><FileSpreadsheet className="ml-1 h-4 w-4" />عرض البيانات</Button>
-                  {cycle.basedOnCycleId && cycle.recordCount > 0 && <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/cycles?compare=${encodeURIComponent(cycle.id)}`)}><FileDiff className="ml-1 h-4 w-4" />المقارنة</Button>}
                   {cycle.status === 'draft' && canAdd && <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/import?cycle=${encodeURIComponent(cycle.id)}`)}><RefreshCcw className="ml-1 h-4 w-4" />استكمال الاستيراد</Button>}
                   {cycle.status === 'draft' && canEdit && cycle.recordCount > 0 && <Button size="sm" onClick={() => runAction(cycle, 'review')} disabled={busy}><Send className="ml-1 h-4 w-4" />إرسال للمراجعة</Button>}
                   {cycle.status === 'under_review' && canEdit && <Button size="sm" variant="outline" onClick={() => runAction(cycle, 'reopen')} disabled={busy}><RotateCcw className="ml-1 h-4 w-4" />إعادة للمسودة</Button>}

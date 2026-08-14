@@ -126,7 +126,7 @@ export const AccountingTransformationDashboardPage: React.FC = () => {
               <p className="mt-1 font-black text-white">{openCycle ? `#${openCycle.cycleNumber} — ${openCycle.name}` : currentCycle ? `#${currentCycle.cycleNumber} — ${currentCycle.name}` : ''}</p>
               <p className="mt-1 text-xs text-slate-300">{openCycle ? `${openCycle.recordCount.toLocaleString('ar-SA')} سجل · ${openCycle.status === 'under_review' ? 'تحت المراجعة' : 'مسودة'}` : `${currentCycle?.recordCount.toLocaleString('ar-SA') || 0} سجل محفوظ في الإصدار الحالي`}</p>
             </div>
-            <Button variant="outline" className="border-white/15 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate(openCycle ? `/accounting-transformation/import?cycle=${encodeURIComponent(openCycle.id)}` : '/accounting-transformation/cycles')}><RefreshCcw className="ml-2 h-4 w-4" />{openCycle ? 'فتح دورة التحديث' : 'سجل الدورات'}</Button>
+            <Button variant="outline" className="border-white/15 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate(openCycle?.status === 'draft' ? `/accounting-transformation/import?cycle=${encodeURIComponent(openCycle.id)}` : '/accounting-transformation/cycles')}><RefreshCcw className="ml-2 h-4 w-4" />{openCycle?.status === 'draft' ? 'فتح دورة التحديث' : 'سجل الدورات'}</Button>
           </section>}
 
           <section className="grid gap-5 xl:grid-cols-[.85fr_1.55fr]">
