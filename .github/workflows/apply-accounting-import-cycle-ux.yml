@@ -1,0 +1,32 @@
+name: Apply accounting import cycle UX
+# workflow trigger
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-accounting-import-cycle-ux.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply UX patch
+        run: python scripts/fix-accounting-import-cycle-ux.py
+      - name: Verify frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Commit fix and cleanup
+        run: |
+          git config user.name 'OpenAI Project Automation'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f .github/workflows/apply-accounting-import-cycle-ux.yml scripts/fix-accounting-import-cycle-ux.py
+          git add src/app/pages/AccountingTransformationImportPage.tsx .github/workflows/apply-accounting-import-cycle-ux.yml scripts/fix-accounting-import-cycle-ux.py
+          git commit -m 'fix: make accounting import cycle setup explicit and usable'
+          git push origin main
