@@ -1,6 +1,8 @@
 import { apiJson, authenticatedFetch } from '../../lib/http';
 import type {
+  AccountingCycleComparison,
   AccountingTransformationAttachment,
+  AccountingTransformationCycle,
   AccountingTransformationInput,
   AccountingTransformationPage,
   AccountingTransformationRecord,
@@ -13,6 +15,8 @@ export type AccountingTransformationQuery = {
   committeeStatus?: string;
   readinessStatus?: string;
   group?: string;
+  cycleId?: string;
+  includeHistory?: boolean;
   page?: number;
   limit?: number;
   all?: boolean;
@@ -37,6 +41,24 @@ export type AccountingTransformationImportPreview = {
   freshIndexes: number[];
   duplicateIndexes: number[];
   invalidIndexes: number[];
+  new?: number;
+  modified?: number;
+  unchanged?: number;
+  removed?: number;
+  newIndexes?: number[];
+  modifiedIndexes?: number[];
+  unchangedIndexes?: number[];
+};
+
+export type AccountingCycleImportResult = {
+  created: number;
+  updated: number;
+  skipped: number;
+  total: number;
+  new: number;
+  modified: number;
+  unchanged: number;
+  cycle: AccountingTransformationCycle;
 };
 
 const buildQuery = (query: AccountingTransformationQuery = {}) => {
@@ -46,17 +68,21 @@ const buildQuery = (query: AccountingTransformationQuery = {}) => {
   if (query.committeeStatus && query.committeeStatus !== 'all') params.set('committeeStatus', query.committeeStatus);
   if (query.readinessStatus && query.readinessStatus !== 'all') params.set('readinessStatus', query.readinessStatus);
   if (query.group && query.group !== 'all') params.set('group', query.group);
+  if (query.cycleId) params.set('cycleId', query.cycleId);
+  if (query.includeHistory) params.set('includeHistory', '1');
   if (query.page) params.set('page', String(query.page));
   if (query.limit) params.set('limit', String(query.limit));
   if (query.all) params.set('all', '1');
   return params;
 };
 
-export const getAccountingTransformationStats = () =>
-  apiJson<AccountingTransformationStats>('/api/accounting-transformation/stats');
+export const getAccountingTransformationStats = (cycleId?: string) => {
+  const suffix = cycleId ? `?cycleId=${encodeURIComponent(cycleId)}` : '';
+  return apiJson<AccountingTransformationStats>(`/api/accounting-transformation/stats${suffix}`);
+};
 
 export const getAccountingTransformationGroups = (
-  query: Pick<AccountingTransformationQuery, 'search' | 'recordType' | 'committeeStatus' | 'readinessStatus'> = {}
+  query: Pick<AccountingTransformationQuery, 'search' | 'recordType' | 'committeeStatus' | 'readinessStatus' | 'cycleId'> = {}
 ) => {
   const params = buildQuery(query);
   const suffix = params.toString();
@@ -89,6 +115,7 @@ export const updateAccountingTransformationRecord = (id: string, input: Accounti
 export const deleteAccountingTransformationRecord = (id: string) =>
   apiJson<void>(`/api/accounting-transformation/${id}`, { method: 'DELETE' });
 
+// Legacy import endpoints remain available for compatibility. New imports should use a draft cycle.
 export const previewAccountingTransformationImport = (items: AccountingTransformationInput[]) =>
   apiJson<AccountingTransformationImportPreview>('/api/accounting-transformation/bulk-preview', {
     method: 'POST',
@@ -99,6 +126,56 @@ export const bulkImportAccountingTransformationRecords = (items: AccountingTrans
   apiJson<{ created: number; updated: number; skipped: number; total: number }>(
     '/api/accounting-transformation/bulk-import',
     { method: 'POST', body: JSON.stringify({ items }) }
+  );
+
+export const getAccountingTransformationCycles = () =>
+  apiJson<AccountingTransformationCycle[]>('/api/accounting-transformation/cycles');
+
+export const getCurrentAccountingTransformationCycle = () =>
+  apiJson<AccountingTransformationCycle>('/api/accounting-transformation/cycles/current');
+
+export const createAccountingTransformationCycle = (input: { name: string; description?: string | null }) =>
+  apiJson<AccountingTransformationCycle>('/api/accounting-transformation/cycles', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+
+export const deleteAccountingTransformationCycle = (id: string) =>
+  apiJson<void>(`/api/accounting-transformation/cycles/${id}`, { method: 'DELETE' });
+
+export const sendAccountingTransformationCycleToReview = (id: string) =>
+  apiJson<AccountingTransformationCycle>(`/api/accounting-transformation/cycles/${id}/review`, { method: 'POST' });
+
+export const reopenAccountingTransformationCycle = (id: string) =>
+  apiJson<AccountingTransformationCycle>(`/api/accounting-transformation/cycles/${id}/reopen`, { method: 'POST' });
+
+export const approveAccountingTransformationCycle = (id: string) =>
+  apiJson<{ cycle: AccountingTransformationCycle; comparison: AccountingCycleComparison }>(
+    `/api/accounting-transformation/cycles/${id}/approve`,
+    { method: 'POST' }
+  );
+
+export const getAccountingTransformationCycleComparison = (id: string) =>
+  apiJson<AccountingCycleComparison>(`/api/accounting-transformation/cycles/${id}/comparison`);
+
+export const previewAccountingTransformationCycleImport = (
+  cycleId: string,
+  items: AccountingTransformationInput[],
+  fileName?: string
+) =>
+  apiJson<AccountingTransformationImportPreview>(
+    `/api/accounting-transformation/cycles/${cycleId}/import-preview`,
+    { method: 'POST', body: JSON.stringify({ items, fileName: fileName || null }) }
+  );
+
+export const importAccountingTransformationCycleRecords = (
+  cycleId: string,
+  items: AccountingTransformationInput[],
+  fileName?: string
+) =>
+  apiJson<AccountingCycleImportResult>(
+    `/api/accounting-transformation/cycles/${cycleId}/import`,
+    { method: 'POST', body: JSON.stringify({ items, fileName: fileName || null }) }
   );
 
 export const uploadAccountingTransformationFile = async (file: File): Promise<AccountingTransformationAttachment> => {
@@ -119,7 +196,6 @@ export const uploadAccountingTransformationFile = async (file: File): Promise<Ac
     mimeType: result.mimeType || file.type || null,
   };
 };
-
 
 export type AccountingExcelTemplateMeta = {
   id: string; templateKey: string; title: string; fileName: string; driveFileId: string; driveUrl: string; mimeType?: string | null; fileSize?: number | null; uploadedBy?: string | null; createdAt: string; updatedAt: string;
