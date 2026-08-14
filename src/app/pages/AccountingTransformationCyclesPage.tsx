@@ -204,6 +204,7 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
 
                 <div className="flex flex-wrap gap-2 border-t pt-4">
                   <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/records?cycle=${encodeURIComponent(cycle.id)}`)}><FileSpreadsheet className="ml-1 h-4 w-4" />عرض البيانات</Button>
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/reports?cycle=${encodeURIComponent(cycle.id)}`)}>تقرير الدورة</Button>
                   {cycle.status === 'draft' && canAdd && <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/import?cycle=${encodeURIComponent(cycle.id)}`)}><RefreshCcw className="ml-1 h-4 w-4" />استكمال الاستيراد</Button>}
                   {cycle.status === 'draft' && canEdit && cycle.recordCount > 0 && <Button size="sm" onClick={() => runAction(cycle, 'review')} disabled={busy}><Send className="ml-1 h-4 w-4" />إرسال للمراجعة</Button>}
                   {cycle.status === 'under_review' && canEdit && <Button size="sm" variant="outline" onClick={() => runAction(cycle, 'reopen')} disabled={busy}><RotateCcw className="ml-1 h-4 w-4" />إعادة للمسودة</Button>}

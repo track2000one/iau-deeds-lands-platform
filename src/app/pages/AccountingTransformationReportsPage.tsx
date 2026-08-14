@@ -13,7 +13,7 @@ import {
   Search,
   UploadCloud,
 } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -22,12 +22,13 @@ import { NativeSelect } from '../components/ui/native-select';
 import { usePermissions } from '../../context/PermissionsContext';
 import {
   downloadOfficialAccountingExcelTemplate,
+  getAccountingTransformationCycles,
   getAccountingTransformationRecords,
   getOfficialAccountingExcelTemplate,
   uploadOfficialAccountingExcelTemplate,
   type AccountingExcelTemplateMeta,
 } from '../api/accountingTransformation';
-import type { AccountingTransformationRecord } from '../../types/accountingTransformation';
+import type { AccountingTransformationCycle, AccountingTransformationRecord } from '../../types/accountingTransformation';
 import { buildOfficialAccountingTransformationExcel } from '../../utils/officialAccountingTransformationExcel';
 import {
   ACCOUNTING_COMMITTEE_STATUS_LABELS,
@@ -122,11 +123,14 @@ const openPrintHtml = (html: string) => {
 
 export const AccountingTransformationReportsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, hasPermission } = usePermissions();
   const canPrint = isAdmin || hasPermission('accounting_transformation', 'canPrint');
   const canAdd = isAdmin || hasPermission('accounting_transformation', 'canAdd');
 
   const [sourceItems, setSourceItems] = useState<AccountingTransformationRecord[]>([]);
+  const [cycles, setCycles] = useState<AccountingTransformationCycle[]>([]);
+  const [selectedCycleId, setSelectedCycleId] = useState(searchParams.get('cycle') || '');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
@@ -164,10 +168,20 @@ export const AccountingTransformationReportsPage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    getAccountingTransformationCycles()
+      .then((data) => { if (!cancelled) setCycles(data || []); })
+      .catch(() => { if (!cancelled) setCycles([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedCycle = cycles.find((cycle) => cycle.id === selectedCycleId) || null;
+
   const load = async () => {
     setLoading(true);
     try {
-      const response = await getAccountingTransformationRecords({ search: appliedSearch, recordType, committeeStatus, all: true });
+      const response = await getAccountingTransformationRecords({ search: appliedSearch, recordType, committeeStatus, cycleId: selectedCycleId || undefined, all: true });
       setSourceItems(response.items || []);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل التقرير');
@@ -176,8 +190,8 @@ export const AccountingTransformationReportsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); }, [appliedSearch, recordType, committeeStatus]);
-  useEffect(() => { setPage(1); }, [group, dateFrom, dateTo, sortKey, sortDirection, pageSize, selectedFields]);
+  useEffect(() => { load(); }, [appliedSearch, recordType, committeeStatus, selectedCycleId]);
+  useEffect(() => { setPage(1); }, [group, dateFrom, dateTo, sortKey, sortDirection, pageSize, selectedFields, selectedCycleId]);
 
   const datedItems = useMemo(() => sourceItems.filter((item) => {
     const time = new Date(item.createdAt).getTime();
@@ -264,7 +278,7 @@ export const AccountingTransformationReportsPage: React.FC = () => {
     const headers = selected.map(([, label]) => `<th>${escapeHtml(label)}</th>`).join('');
     const body = filteredItems.map((item, index) => `<tr><td>${index + 1}</td>${selected.map(([key]) => `<td>${escapeHtml(displayValue(item, key))}</td>`).join('')}</tr>`).join('');
     const groupLabel = group === 'all' ? 'جميع المجموعات' : groups.find((x) => x.key === group)?.label || '-';
-    openPrintHtml(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>${escapeHtml(settings.reportTitle)}</title><style>@page{size:A4 landscape;margin:6mm 4mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{text-align:center;border-bottom:1px solid #1f4e79;padding:2mm;margin-bottom:2mm}.head h1{font-size:15px;margin:0}.head p{font-size:9px;margin:1mm 0}.meta{font-size:8px;border:1px solid #dbe3ec;padding:1.5mm 2mm;margin-bottom:2mm}.statement{text-align:center;font-size:12px;font-weight:800;margin:2mm 0}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}th{background:#0d3156;color:white;border:1px solid #dbe3ec;padding:2px;font-size:9px}td{border:1px solid #dbe3ec;padding:1.5px;text-align:center;overflow-wrap:anywhere}tbody tr:nth-child(even){background:#f8fafc}thead{display:table-header-group}tr{break-inside:avoid}.foot{font-size:7px;color:#64748b;margin-top:2mm;display:flex;justify-content:space-between}</style></head><body><div class="head"><h1>${escapeHtml(settings.universityName)}</h1><p>${escapeHtml(settings.departmentName)}</p><h1>${escapeHtml(settings.reportTitle)}</h1></div><div class="meta">النوع: ${escapeHtml(recordType === 'all' ? 'الكل' : ACCOUNTING_RECORD_TYPE_LABELS[recordType as AccountingRecordType])} | حالة اللجنة: ${escapeHtml(committeeStatus === 'all' ? 'الكل' : ACCOUNTING_COMMITTEE_STATUS_LABELS[committeeStatus] || committeeStatus)} | المجموعة: ${escapeHtml(groupLabel)}${appliedSearch ? ' | البحث: ' + escapeHtml(appliedSearch) : ''} | إجمالي النتائج: ${filteredItems.length.toLocaleString('ar-SA')}</div><div class="statement">${escapeHtml(settings.statementTitle)}</div><table><thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table><div class="foot"><span>تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</span><span>لجنة متابعة متطلبات التحول المحاسبي</span></div><script>window.onload=()=>window.print()</script></body></html>`);
+    openPrintHtml(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>${escapeHtml(settings.reportTitle)}</title><style>@page{size:A4 landscape;margin:6mm 4mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{text-align:center;border-bottom:1px solid #1f4e79;padding:2mm;margin-bottom:2mm}.head h1{font-size:15px;margin:0}.head p{font-size:9px;margin:1mm 0}.meta{font-size:8px;border:1px solid #dbe3ec;padding:1.5mm 2mm;margin-bottom:2mm}.statement{text-align:center;font-size:12px;font-weight:800;margin:2mm 0}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}th{background:#0d3156;color:white;border:1px solid #dbe3ec;padding:2px;font-size:9px}td{border:1px solid #dbe3ec;padding:1.5px;text-align:center;overflow-wrap:anywhere}tbody tr:nth-child(even){background:#f8fafc}thead{display:table-header-group}tr{break-inside:avoid}.foot{font-size:7px;color:#64748b;margin-top:2mm;display:flex;justify-content:space-between}</style></head><body><div class="head"><h1>${escapeHtml(settings.universityName)}</h1><p>${escapeHtml(settings.departmentName)}</p><h1>${escapeHtml(settings.reportTitle)}</h1></div><div class="meta">الدورة: ${escapeHtml(selectedCycle ? `#${selectedCycle.cycleNumber} — ${selectedCycle.name}` : 'الدورة الحالية المعتمدة')} | النوع: ${escapeHtml(recordType === 'all' ? 'الكل' : ACCOUNTING_RECORD_TYPE_LABELS[recordType as AccountingRecordType])} | حالة اللجنة: ${escapeHtml(committeeStatus === 'all' ? 'الكل' : ACCOUNTING_COMMITTEE_STATUS_LABELS[committeeStatus] || committeeStatus)} | المجموعة: ${escapeHtml(groupLabel)}${appliedSearch ? ' | البحث: ' + escapeHtml(appliedSearch) : ''} | إجمالي النتائج: ${filteredItems.length.toLocaleString('ar-SA')}</div><div class="statement">${escapeHtml(settings.statementTitle)}</div><table><thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table><div class="foot"><span>تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</span><span>لجنة متابعة متطلبات التحول المحاسبي</span></div><script>window.onload=()=>window.print()</script></body></html>`);
   };
 
   const submitSearch = (event: React.FormEvent) => {
@@ -302,6 +316,19 @@ export const AccountingTransformationReportsPage: React.FC = () => {
           <div className="print-hidden flex flex-wrap gap-2"><Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />لوحة اللجنة</Button>{canAdd && <Button variant="outline" className="rounded-2xl" onClick={() => navigate('/accounting-transformation/import')}><FileSpreadsheet className="ml-2 h-4 w-4" />استيراد Excel</Button>}{canPrint && <><Button variant="outline" className="rounded-2xl" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />Excel</Button><Button className="rounded-2xl" onClick={printTabularReport}><Printer className="ml-2 h-4 w-4" />التقرير الجدولي / PDF</Button></>}</div>
         </div>
       </section>
+
+      <div className={`print-hidden rounded-[22px] border p-4 ${selectedCycle?.status === 'archived' ? 'border-slate-300 bg-slate-50' : 'border-sky-200 bg-sky-50/60'}`}>
+        <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <label className="text-xs font-bold text-slate-600">إصدار البيانات المستخدم في التقرير
+            <NativeSelect value={selectedCycleId} onChange={(e) => { const value = e.target.value; setSelectedCycleId(value); const next = new URLSearchParams(searchParams); if (value) next.set('cycle', value); else next.delete('cycle'); setSearchParams(next); setPage(1); }} className="mt-1 h-11 rounded-xl bg-white">
+              <option value="">الدورة الحالية المعتمدة</option>
+              {cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>#{cycle.cycleNumber} — {cycle.name} {cycle.isCurrent ? '(الحالية)' : cycle.status === 'archived' ? '(مؤرشفة)' : cycle.status === 'under_review' ? '(تحت المراجعة)' : '(مسودة)'}</option>)}
+            </NativeSelect>
+          </label>
+          <Button variant="outline" onClick={() => navigate('/accounting-transformation/cycles')}>سجل دورات البيانات</Button>
+        </div>
+        <p className="mt-2 text-xs text-slate-600">{selectedCycle ? `التقرير يعرض نسخة البيانات كما حُفظت في دورة: #${selectedCycle.cycleNumber} — ${selectedCycle.name}.` : 'التقرير يعرض آخر دورة معتمدة حاليًا.'}</p>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5"><ReportStat title="نتائج التصفية" value={summary.total.toLocaleString('ar-SA')} /><ReportStat title="الأراضي" value={summary.lands.toLocaleString('ar-SA')} /><ReportStat title="المباني" value={summary.buildings.toLocaleString('ar-SA')} /><ReportStat title="جاهز للتقييم" value={summary.valuationReady.toLocaleString('ar-SA')} /><ReportStat title="متوسط الاكتمال" value={`${summary.average}%`} /></div>
 
