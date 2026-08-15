@@ -150,100 +150,302 @@ export const ViewAssetPage: React.FC = () => {
     printWindow.document.write(`<!doctype html>
       <html lang="ar" dir="rtl">
         <head>
-          <meta charset="utf-8" />
-          <title>بطاقة أصل - ${escapeHtml(asset.assetNumber)}</title>
-          <style>
-            @page { size: A4; margin: 14mm; }
-            * { box-sizing: border-box; }
-            body { margin: 0; font-family: Tahoma, Arial, sans-serif; color: #102a43; background: #fff; }
-            .sheet { width: 100%; }
-            .header { border: 1.5px solid #173f6b; border-radius: 16px; padding: 18px 20px; margin-bottom: 14px; }
-            .eyebrow { font-size: 12px; font-weight: 700; color: #426786; margin-bottom: 6px; }
-            h1 { margin: 0; font-size: 24px; color: #123d73; }
-            .asset-no { margin-top: 7px; font-size: 12px; color: #526b7f; direction: ltr; text-align: right; }
-            .meta { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
-            .badge { border: 1px solid #b8c9d8; border-radius: 999px; padding: 5px 10px; font-size: 11px; font-weight: 700; background: #f6f9fc; }
-            .section { border: 1px solid #c8d5e0; border-radius: 14px; margin: 0 0 12px; overflow: hidden; page-break-inside: avoid; }
-            .section-title { padding: 10px 14px; font-size: 15px; font-weight: 800; background: #f3f7fb; border-bottom: 1px solid #c8d5e0; color: #173f6b; }
-            .grid { display: grid; grid-template-columns: repeat(3, 1fr); }
-            .field { padding: 11px 13px; min-height: 62px; border-bottom: 1px solid #e3ebf1; border-left: 1px solid #e3ebf1; }
-            .field:nth-child(3n) { border-left: 0; }
-            .label { font-size: 10px; color: #6c8193; margin-bottom: 5px; }
-            .value { font-size: 12px; font-weight: 700; line-height: 1.7; overflow-wrap: anywhere; white-space: pre-wrap; }
-            .notes { padding: 12px 14px; min-height: 66px; font-size: 12px; line-height: 1.9; white-space: pre-wrap; }
-            .attachments { margin: 0; padding: 10px 28px 12px 10px; font-size: 11px; line-height: 1.9; }
-            .footer { margin-top: 12px; padding-top: 8px; border-top: 1px solid #d9e2ea; display: flex; justify-content: space-between; gap: 12px; color: #7a8b99; font-size: 9px; }
-            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-          </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>بطاقة معلومات الأصل - ${escapeHtml(asset.assetNumber)}</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 9mm 10mm 10mm;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body {
+    font-family: Tahoma, Arial, sans-serif;
+    color: #18324a;
+    font-size: 10.5px;
+    line-height: 1.45;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet {
+    width: 190mm;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  .official-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 8px;
+    min-height: 22mm;
+    padding: 4mm 5mm;
+    border: 1.4px solid #153f69;
+    border-radius: 4mm;
+    background: linear-gradient(180deg, #f8fbfe 0%, #eef5fa 100%);
+    break-inside: avoid;
+  }
+  .university {
+    font-size: 11px;
+    font-weight: 800;
+    color: #153f69;
+  }
+  .unit {
+    margin-top: 2px;
+    color: #5e7487;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .document-title {
+    text-align: center;
+    min-width: 58mm;
+  }
+  .document-title h1 {
+    margin: 0;
+    color: #123d73;
+    font-size: 18px;
+    line-height: 1.2;
+  }
+  .document-title p {
+    margin: 3px 0 0;
+    font-size: 8.5px;
+    color: #75889a;
+  }
+  .print-meta {
+    text-align: left;
+    direction: rtl;
+    color: #667d90;
+    font-size: 8px;
+    line-height: 1.65;
+  }
+  .identity {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    margin-top: 3mm;
+    padding: 3mm 4mm;
+    border: 1px solid #b8cbdc;
+    border-radius: 3mm;
+    background: #fff;
+    break-inside: avoid;
+  }
+  .asset-name {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 900;
+    color: #102f50;
+  }
+  .asset-number {
+    margin-top: 2px;
+    color: #667b8f;
+    font-size: 8.5px;
+    direction: ltr;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2mm 3mm;
+    border: 1px solid #9eb5c9;
+    border-radius: 99px;
+    background: #f4f8fb;
+    color: #244a6a;
+    font-size: 9px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  .section {
+    margin-top: 3mm;
+    border: 1px solid #bfd0df;
+    border-radius: 3mm;
+    overflow: hidden;
+    background: #fff;
+  }
+  .section.keep { break-inside: avoid; page-break-inside: avoid; }
+  .section-title {
+    padding: 2.4mm 3.5mm;
+    border-bottom: 1px solid #bfd0df;
+    background: #edf4f9;
+    color: #173f66;
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .field {
+    min-height: 14mm;
+    padding: 2.6mm 3mm;
+    border-left: 1px solid #e0e8ef;
+    border-bottom: 1px solid #e0e8ef;
+    break-inside: avoid;
+  }
+  .field:nth-child(3n) { border-left: 0; }
+  .field:nth-last-child(-n + 3) { border-bottom: 0; }
+  .label {
+    color: #73889b;
+    font-size: 8px;
+    margin-bottom: 1mm;
+    font-weight: 700;
+  }
+  .value {
+    color: #142f49;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+  .additional-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .additional-grid .field:nth-child(2n) { border-left: 0; }
+  .notes-row {
+    padding: 2.8mm 3.5mm;
+    border-top: 1px solid #e0e8ef;
+    min-height: 14mm;
+    color: #243e55;
+    font-size: 9.5px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .attachments-summary {
+    padding: 2.5mm 3.5mm;
+    color: #526d84;
+    font-size: 8.5px;
+    background: #fbfdff;
+    border-bottom: 1px solid #e0e8ef;
+  }
+  .attachments {
+    margin: 0;
+    padding: 2.5mm 7mm 3mm 3mm;
+    font-size: 8.5px;
+    line-height: 1.55;
+  }
+  .attachments li {
+    margin-bottom: 1mm;
+    padding-right: 1mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    overflow-wrap: anywhere;
+  }
+  .empty { padding: 3mm 3.5mm; color: #74889a; font-size: 9px; }
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 3mm;
+    padding-top: 2mm;
+    border-top: 1px solid #ccd9e4;
+    color: #7b8d9d;
+    font-size: 7.5px;
+    break-inside: avoid;
+  }
+  .no-break { break-inside: avoid; page-break-inside: avoid; }
+  @media screen {
+    body { background: #edf2f6; padding: 18px 0; }
+    .sheet { background: #fff; padding: 10mm; box-shadow: 0 12px 40px rgba(15, 23, 42, .12); }
+  }
+  @media print {
+    html, body { width: 210mm; }
+    body { background: #fff; }
+    .sheet { width: 190mm; max-width: 190mm; margin: 0 auto; }
+    .section, .identity, .official-header { box-shadow: none; }
+  }
+</style>
         </head>
         <body>
-          <div class="sheet">
-            <div class="header">
-              <div class="eyebrow">جامعة الإمام عبدالرحمن بن فيصل — وحدة الأصول</div>
-              <h1>بطاقة معلومات الأصل</h1>
-              <div class="asset-no">${escapeHtml(asset.assetNumber)}</div>
-              <div class="meta">
-                <span class="badge">${escapeHtml(asset.name)}</span>
-                <span class="badge">الحالة: ${escapeHtml(ASSET_STATUS_LABELS[asset.status] || asset.status)}</span>
-              </div>
-            </div>
+<main class="sheet">
+  <header class="official-header">
+    <div>
+      <div class="university">جامعة الإمام عبدالرحمن بن فيصل</div>
+      <div class="unit">وحدة الأصول</div>
+    </div>
+    <div class="document-title">
+      <h1>بطاقة معلومات الأصل</h1>
+      <p>نسخة مخصصة للطباعة والحفظ ضمن ملف الأصل</p>
+    </div>
+    <div class="print-meta">
+      <div>تاريخ الطباعة</div>
+      <strong>${escapeHtml(printedAt)}</strong>
+    </div>
+  </header>
 
-            <div class="section">
-              <div class="section-title">البيانات الأساسية</div>
-              <div class="grid">${printRows([
-                ['رقم الأصل', asset.assetNumber],
-                ['الباركود', asset.barcode],
-                ['التصنيف', CATEGORY_LABELS[asset.category] || asset.category],
-                ['الماركة', asset.brand],
-                ['الموديل', asset.model],
-                ['الرقم التسلسلي', asset.serialNumber],
-              ])}</div>
-            </div>
+  <section class="identity">
+    <div>
+      <h2 class="asset-name">${escapeHtml(asset.name)}</h2>
+      <div class="asset-number">${escapeHtml(asset.assetNumber)}</div>
+    </div>
+    <span class="badge">الحالة: ${escapeHtml(ASSET_STATUS_LABELS[asset.status] || asset.status)}</span>
+  </section>
 
-            <div class="section">
-              <div class="section-title">الموقع والعهدة</div>
-              <div class="grid">${printRows([
-                ['الجهة / الإدارة', asset.department],
-                ['المبنى', asset.building],
-                ['الدور', asset.floor],
-                ['الغرفة / الموقع', asset.room],
-                ['صاحب العهدة', asset.custodian],
-              ])}</div>
-            </div>
+  <section class="section keep">
+    <div class="section-title">البيانات الأساسية</div>
+    <div class="grid">${printRows([
+      ['رقم الأصل', asset.assetNumber],
+      ['الباركود', asset.barcode],
+      ['التصنيف', CATEGORY_LABELS[asset.category] || asset.category],
+      ['الماركة', asset.brand],
+      ['الموديل', asset.model],
+      ['الرقم التسلسلي', asset.serialNumber],
+    ])}</div>
+  </section>
 
-            <div class="section">
-              <div class="section-title">بيانات إضافية</div>
-              <div class="grid">${printRows([
-                ['تاريخ الشراء', purchaseDate],
-                ['قيمة الشراء', purchaseValue],
-              ])}</div>
-              <div class="notes"><strong>الملاحظات:</strong><br />${escapeHtml(asset.notes)}</div>
-            </div>
+  <section class="section keep">
+    <div class="section-title">الموقع والعهدة</div>
+    <div class="grid">${printRows([
+      ['الجهة / الإدارة', asset.department],
+      ['المبنى', asset.building],
+      ['الدور', asset.floor],
+      ['الغرفة / الموقع', asset.room],
+      ['صاحب العهدة', asset.custodian],
+      ['حالة الأصل', ASSET_STATUS_LABELS[asset.status] || asset.status],
+    ])}</div>
+  </section>
 
-            <div class="section">
-              <div class="section-title">المرفقات والوثائق (${attachments.length.toLocaleString('ar-SA')})</div>
-              ${attachments.length
-                ? `<ol class="attachments">${attachments
-                    .map(
-                      (attachment) =>
-                        `<li>${escapeHtml(attachment.title)} — ${escapeHtml(
-                          ATTACHMENT_LABELS[String(attachment.notes || '')] || 'مرفق'
-                        )}</li>`
-                    )
-                    .join('')}</ol>`
-                : '<div class="notes">لا توجد مرفقات مرتبطة بهذا الأصل.</div>'}
-            </div>
+  <section class="section keep">
+    <div class="section-title">بيانات إضافية</div>
+    <div class="additional-grid">${printRows([
+      ['تاريخ الشراء', purchaseDate],
+      ['قيمة الشراء', purchaseValue],
+    ])}</div>
+    <div class="notes-row"><strong>الملاحظات:</strong> ${escapeHtml(asset.notes)}</div>
+  </section>
 
-            <div class="footer">
-              <span>طُبعت من منصة إدارة الصكوك والأراضي — وحدة الأصول</span>
-              <span>${escapeHtml(printedAt)}</span>
-            </div>
-          </div>
-          <script>
-            window.addEventListener('load', function () {
-              setTimeout(function () { window.print(); }, 250);
-            });
-          </script>
+  <section class="section">
+    <div class="section-title">المرفقات والوثائق</div>
+    <div class="attachments-summary">إجمالي المرفقات المرتبطة بالأصل: <strong>${attachments.length.toLocaleString('ar-SA')}</strong></div>
+    ${attachments.length
+      ? `<ol class="attachments">${attachments
+          .map(
+            (attachment, index) =>
+              `<li><strong>${index + 1}.</strong> ${escapeHtml(attachment.title)} — ${escapeHtml(
+                ATTACHMENT_LABELS[String(attachment.notes || '')] || 'مرفق'
+              )}</li>`
+          )
+          .join('')}</ol>`
+      : '<div class="empty">لا توجد مرفقات مرتبطة بهذا الأصل.</div>'}
+  </section>
+
+  <footer class="footer">
+    <span>منصة إدارة الصكوك والأراضي — وحدة الأصول</span>
+    <span>رقم الأصل: ${escapeHtml(asset.assetNumber)}</span>
+  </footer>
+</main>
+<script>
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      window.focus();
+      window.print();
+    }, 300);
+  });
+</script>
         </body>
       </html>`);
     printWindow.document.close();
