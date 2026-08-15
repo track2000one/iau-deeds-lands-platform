@@ -8,6 +8,7 @@ import {
   FileText,
   MapPin,
   Pencil,
+  Printer,
   Trash2,
   UserRound,
 } from 'lucide-react';
@@ -40,6 +41,14 @@ const displayValue = (value: unknown) => {
   return String(value);
 };
 
+const escapeHtml = (value: unknown) =>
+  displayValue(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
 export const ViewAssetPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,6 +61,7 @@ export const ViewAssetPage: React.FC = () => {
 
   const canEdit = isAdmin || hasPermission('assets', 'canEdit');
   const canDelete = isAdmin || hasPermission('assets', 'canDelete');
+  const canPrint = isAdmin || hasPermission('assets', 'canPrint');
   const assetGroupKey = String((location.state as { assetGroupKey?: string } | null)?.assetGroupKey || '').trim();
 
   const returnToAssetList = (replace = false) => {
@@ -106,6 +116,139 @@ export const ViewAssetPage: React.FC = () => {
     }
   };
 
+  const handlePrint = () => {
+    if (!asset || !canPrint) return;
+
+    const printWindow = window.open('', '_blank', 'width=1100,height=850');
+    if (!printWindow) {
+      setError('تعذر فتح نافذة الطباعة. يرجى السماح بالنوافذ المنبثقة ثم المحاولة مرة أخرى.');
+      return;
+    }
+
+    printWindow.opener = null;
+    const attachments = asset.attachments || [];
+    const purchaseDate = asset.purchaseDate
+      ? new Date(asset.purchaseDate).toLocaleDateString('ar-SA')
+      : '-';
+    const purchaseValue = asset.purchaseValue != null
+      ? `${Number(asset.purchaseValue).toLocaleString('ar-SA')} ر.س`
+      : '-';
+    const printedAt = new Date().toLocaleString('ar-SA');
+
+    const printRows = (items: Array<[string, unknown]>) =>
+      items
+        .map(
+          ([label, value]) => `
+            <div class="field">
+              <div class="label">${escapeHtml(label)}</div>
+              <div class="value">${escapeHtml(value)}</div>
+            </div>`
+        )
+        .join('');
+
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+      <html lang="ar" dir="rtl">
+        <head>
+          <meta charset="utf-8" />
+          <title>بطاقة أصل - ${escapeHtml(asset.assetNumber)}</title>
+          <style>
+            @page { size: A4; margin: 14mm; }
+            * { box-sizing: border-box; }
+            body { margin: 0; font-family: Tahoma, Arial, sans-serif; color: #102a43; background: #fff; }
+            .sheet { width: 100%; }
+            .header { border: 1.5px solid #173f6b; border-radius: 16px; padding: 18px 20px; margin-bottom: 14px; }
+            .eyebrow { font-size: 12px; font-weight: 700; color: #426786; margin-bottom: 6px; }
+            h1 { margin: 0; font-size: 24px; color: #123d73; }
+            .asset-no { margin-top: 7px; font-size: 12px; color: #526b7f; direction: ltr; text-align: right; }
+            .meta { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
+            .badge { border: 1px solid #b8c9d8; border-radius: 999px; padding: 5px 10px; font-size: 11px; font-weight: 700; background: #f6f9fc; }
+            .section { border: 1px solid #c8d5e0; border-radius: 14px; margin: 0 0 12px; overflow: hidden; page-break-inside: avoid; }
+            .section-title { padding: 10px 14px; font-size: 15px; font-weight: 800; background: #f3f7fb; border-bottom: 1px solid #c8d5e0; color: #173f6b; }
+            .grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+            .field { padding: 11px 13px; min-height: 62px; border-bottom: 1px solid #e3ebf1; border-left: 1px solid #e3ebf1; }
+            .field:nth-child(3n) { border-left: 0; }
+            .label { font-size: 10px; color: #6c8193; margin-bottom: 5px; }
+            .value { font-size: 12px; font-weight: 700; line-height: 1.7; overflow-wrap: anywhere; white-space: pre-wrap; }
+            .notes { padding: 12px 14px; min-height: 66px; font-size: 12px; line-height: 1.9; white-space: pre-wrap; }
+            .attachments { margin: 0; padding: 10px 28px 12px 10px; font-size: 11px; line-height: 1.9; }
+            .footer { margin-top: 12px; padding-top: 8px; border-top: 1px solid #d9e2ea; display: flex; justify-content: space-between; gap: 12px; color: #7a8b99; font-size: 9px; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>
+          <div class="sheet">
+            <div class="header">
+              <div class="eyebrow">جامعة الإمام عبدالرحمن بن فيصل — وحدة الأصول</div>
+              <h1>بطاقة معلومات الأصل</h1>
+              <div class="asset-no">${escapeHtml(asset.assetNumber)}</div>
+              <div class="meta">
+                <span class="badge">${escapeHtml(asset.name)}</span>
+                <span class="badge">الحالة: ${escapeHtml(ASSET_STATUS_LABELS[asset.status] || asset.status)}</span>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">البيانات الأساسية</div>
+              <div class="grid">${printRows([
+                ['رقم الأصل', asset.assetNumber],
+                ['الباركود', asset.barcode],
+                ['التصنيف', CATEGORY_LABELS[asset.category] || asset.category],
+                ['الماركة', asset.brand],
+                ['الموديل', asset.model],
+                ['الرقم التسلسلي', asset.serialNumber],
+              ])}</div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">الموقع والعهدة</div>
+              <div class="grid">${printRows([
+                ['الجهة / الإدارة', asset.department],
+                ['المبنى', asset.building],
+                ['الدور', asset.floor],
+                ['الغرفة / الموقع', asset.room],
+                ['صاحب العهدة', asset.custodian],
+              ])}</div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">بيانات إضافية</div>
+              <div class="grid">${printRows([
+                ['تاريخ الشراء', purchaseDate],
+                ['قيمة الشراء', purchaseValue],
+              ])}</div>
+              <div class="notes"><strong>الملاحظات:</strong><br />${escapeHtml(asset.notes)}</div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">المرفقات والوثائق (${attachments.length.toLocaleString('ar-SA')})</div>
+              ${attachments.length
+                ? `<ol class="attachments">${attachments
+                    .map(
+                      (attachment) =>
+                        `<li>${escapeHtml(attachment.title)} — ${escapeHtml(
+                          ATTACHMENT_LABELS[String(attachment.notes || '')] || 'مرفق'
+                        )}</li>`
+                    )
+                    .join('')}</ol>`
+                : '<div class="notes">لا توجد مرفقات مرتبطة بهذا الأصل.</div>'}
+            </div>
+
+            <div class="footer">
+              <span>طُبعت من منصة إدارة الصكوك والأراضي — وحدة الأصول</span>
+              <span>${escapeHtml(printedAt)}</span>
+            </div>
+          </div>
+          <script>
+            window.addEventListener('load', function () {
+              setTimeout(function () { window.print(); }, 250);
+            });
+          </script>
+        </body>
+      </html>`);
+    printWindow.document.close();
+  };
+
   if (loading) {
     return (
       <div className="mx-auto flex min-h-[420px] w-full max-w-[1500px] items-center justify-center text-sm text-muted-foreground">
@@ -154,6 +297,12 @@ export const ViewAssetPage: React.FC = () => {
             <ArrowRight className="ml-2 h-4 w-4" />
             العودة
           </Button>
+          {canPrint && (
+            <Button variant="outline" onClick={handlePrint} title="طباعة بطاقة معلومات الأصل">
+              <Printer className="ml-2 h-4 w-4" />
+              طباعة
+            </Button>
+          )}
           {canEdit && (
             <Button variant="outline" onClick={() => navigate(`/assets/${asset.id}/edit`, { state: assetGroupKey ? { assetGroupKey } : undefined })}>
               <Pencil className="ml-2 h-4 w-4" />
