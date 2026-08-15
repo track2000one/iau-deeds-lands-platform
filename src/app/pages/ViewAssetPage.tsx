@@ -355,7 +355,12 @@ export const ViewAssetPage: React.FC = () => {
   @media print {
     html, body { width: 210mm; }
     body { background: #fff; }
-    .sheet { width: 190mm; max-width: 190mm; margin: 0 auto; }
+    .sheet {
+      width: 190mm;
+      max-width: 190mm;
+      margin: 0 auto;
+      padding-top: 7mm;
+    }
     .section, .identity, .official-header { box-shadow: none; }
   }
 </style>
