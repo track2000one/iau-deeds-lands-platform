@@ -25,8 +25,8 @@ jobs:
           from pathlib import Path
           p = Path('src/app/pages/ViewAssetPage.tsx')
           s = p.read_text()
-          old = """            @media print {\n              html, body { width: 210mm; }\n              body { background: #fff; }\n              .sheet { width: 190mm; max-width: 190mm; margin: 0 auto; }\n              .section, .identity, .official-header { box-shadow: none; }\n            }"""
-          new = """            @media print {\n              html, body { width: 210mm; }\n              body { background: #fff; }\n              .sheet {\n                width: 190mm;\n                max-width: 190mm;\n                margin: 0 auto;\n                padding-top: 7mm;\n              }\n              .section, .identity, .official-header { box-shadow: none; }\n            }"""
+          old = """  @media print {\n    html, body { width: 210mm; }\n    body { background: #fff; }\n    .sheet { width: 190mm; max-width: 190mm; margin: 0 auto; }\n    .section, .identity, .official-header { box-shadow: none; }\n  }"""
+          new = """  @media print {\n    html, body { width: 210mm; }\n    body { background: #fff; }\n    .sheet {\n      width: 190mm;\n      max-width: 190mm;\n      margin: 0 auto;\n      padding-top: 7mm;\n    }\n    .section, .identity, .official-header { box-shadow: none; }\n  }"""
           if old not in s:
               raise SystemExit('print media block not found')
           p.write_text(s.replace(old, new, 1))
