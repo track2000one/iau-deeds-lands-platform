@@ -1,0 +1,45 @@
+name: Adjust asset print top spacing
+# Temporary helper to refine A4 print positioning.
+on:
+  push:
+    paths:
+      - '.github/workflows/adjust-asset-print-top-spacing.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Adjust top spacing for A4 print
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/app/pages/ViewAssetPage.tsx')
+          s = p.read_text()
+          old = """            @media print {\n              html, body { width: 210mm; }\n              body { background: #fff; }\n              .sheet { width: 190mm; max-width: 190mm; margin: 0 auto; }\n              .section, .identity, .official-header { box-shadow: none; }\n            }"""
+          new = """            @media print {\n              html, body { width: 210mm; }\n              body { background: #fff; }\n              .sheet {\n                width: 190mm;\n                max-width: 190mm;\n                margin: 0 auto;\n                padding-top: 7mm;\n              }\n              .section, .identity, .official-header { box-shadow: none; }\n            }"""
+          if old not in s:
+              raise SystemExit('print media block not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Verify frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Commit and remove helper
+        run: |
+          git config user.name "OpenAI Project Automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/adjust-asset-print-top-spacing.yml
+          git add src/app/pages/ViewAssetPage.tsx
+          git commit -m "fix: improve A4 asset print top spacing"
+          git push
