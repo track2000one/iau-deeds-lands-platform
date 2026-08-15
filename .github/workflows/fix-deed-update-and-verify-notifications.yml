@@ -1,6 +1,5 @@
 name: Fix deed update and verify notifications
 
-# Trigger this helper only when the helper itself changes.
 on:
   push:
     paths:
@@ -28,35 +27,35 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-
           p = Path('src/context/DeedContext.tsx')
           s = p.read_text()
-          old = """        const savedDeed = await api.updateDeed<Deed>(id, {
-          ...sanitizedData,
-          area:
-            sanitizedData.area !== undefined && sanitizedData.area !== null
-              ? Number(sanitizedData.area)
-              : sanitizedData.area,
-        });
-"""
-          new = """        // The backend PUT endpoint validates a complete deed payload. Merge the
-        // current record with the edited fields so partial UI updates (including
-        // attachment-only updates) never omit required fields such as deedNumber.
-        const apiPayload: Partial<Deed> = {
-          ...currentDeed,
-          ...sanitizedData,
-          area:
-            sanitizedData.area !== undefined && sanitizedData.area !== null
-              ? Number(sanitizedData.area)
-              : Number(currentDeed.area || 0),
-        };
-
-        const savedDeed = await api.updateDeed<Deed>(id, apiPayload);
-"""
+          old = "\n".join([
+              "        const savedDeed = await api.updateDeed<Deed>(id, {",
+              "          ...sanitizedData,",
+              "          area:",
+              "            sanitizedData.area !== undefined && sanitizedData.area !== null",
+              "              ? Number(sanitizedData.area)",
+              "              : sanitizedData.area,",
+              "        });",
+          ]) + "\n"
+          new = "\n".join([
+              "        // The backend PUT endpoint validates a complete deed payload. Merge the",
+              "        // current record with the edited fields so partial UI updates (including",
+              "        // attachment-only updates) never omit required fields such as deedNumber.",
+              "        const apiPayload: Partial<Deed> = {",
+              "          ...currentDeed,",
+              "          ...sanitizedData,",
+              "          area:",
+              "            sanitizedData.area !== undefined && sanitizedData.area !== null",
+              "              ? Number(sanitizedData.area)",
+              "              : Number(currentDeed.area || 0),",
+              "        };",
+              "",
+              "        const savedDeed = await api.updateDeed<Deed>(id, apiPayload);",
+          ]) + "\n"
           if old not in s:
               raise SystemExit('DeedContext update marker not found')
-          s = s.replace(old, new, 1)
-          p.write_text(s)
+          p.write_text(s.replace(old, new, 1))
           PY
 
       - name: Verify frontend
