@@ -42,7 +42,8 @@ const AddAssetPage = lazy(() => import('./pages/AddAssetPage').then((m) => ({ de
 const ViewAssetPage = lazy(() => import('./pages/ViewAssetPage').then((m) => ({ default: m.ViewAssetPage })));
 const EditAssetPage = lazy(() => import('./pages/EditAssetPage').then((m) => ({ default: m.EditAssetPage })));
 const AssetReportsPage = lazy(() => import('./pages/AssetReportsPage').then((m) => ({ default: m.AssetReportsPage })));
-const AssetExcelImportPage = lazy(() => import('./pages/AssetExcelImportPage').then((m) => ({ default: m.AssetExcelImportPage })));
+const AssetExcelImportPage = lazy(() => import('./pages/AssetCycleImportPage').then((m) => ({ default: m.AssetCycleImportPage })));
+const AssetCyclesPage = lazy(() => import('./pages/AssetCyclesPage').then((m) => ({ default: m.AssetCyclesPage })));
 const ContractsFollowUpPage = lazy(() => import('./pages/ContractsFollowUpPage').then((m) => ({ default: m.ContractsFollowUpPage })));
 const MosquesUnitPage = lazy(() => import('./pages/MosquesUnitPage').then((m) => ({ default: m.MosquesUnitPage })));
 const MosquesPublicPage = lazy(() => import('./pages/MosquesPublicPage').then((m) => ({ default: m.MosquesPublicPage })));
@@ -143,6 +144,7 @@ export const router = createHashRouter([
           { path: 'list', element: assetPermission(<AssetsPage />, 'canView') },
           { path: 'new', element: assetPermission(<AddAssetPage />, 'canAdd') },
           { path: 'import', element: assetPermission(<AssetExcelImportPage />, 'canAdd') },
+          { path: 'cycles', element: assetPermission(<AssetCyclesPage />, 'canView') },
           { path: 'reports', element: assetPermission(<AssetReportsPage />, 'canView') },
           { path: ':assetId', element: assetPermission(<ViewAssetPage />, 'canView') },
           { path: ':assetId/edit', element: assetPermission(<EditAssetPage />, 'canEdit') },

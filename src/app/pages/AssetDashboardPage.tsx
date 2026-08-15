@@ -70,8 +70,16 @@ const quickActions = [
     tone: 'cyan',
   },
   {
+    label: 'دورات تحديث البيانات',
+    description: 'إدارة الإصدارات التاريخية ومقارنة كل تحديث بالدورة السابقة قبل الاعتماد.',
+    path: '/assets/cycles',
+    icon: Database,
+    ready: true,
+    tone: 'cyan',
+  },
+  {
     label: 'استيراد Excel',
-    description: 'رفع بيانات الأصول من النماذج المعتمدة دفعة واحدة.',
+    description: 'رفع بيانات الأصول داخل دورة مسودة مستقلة للمقارنة والمراجعة قبل الاعتماد.',
     path: '/assets/import',
     icon: FileSpreadsheet,
     ready: true,
