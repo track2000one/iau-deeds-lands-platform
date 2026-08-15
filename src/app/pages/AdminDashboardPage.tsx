@@ -705,13 +705,13 @@ export const AdminDashboardPage: React.FC = () => {
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent
-          className="flex max-h-[92dvh] w-[calc(100vw-1.5rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100vw-3rem)] sm:max-w-5xl"
+          className="flex max-h-[94dvh] w-[calc(100vw-1rem)] max-w-[min(96vw,1400px)] flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100vw-2rem)]"
           dir="rtl"
         >
           <DialogHeader className="shrink-0 border-b bg-background px-5 py-4 text-right sm:px-6">
             <DialogTitle>تعديل بيانات المستخدم</DialogTitle>
             <DialogDescription>
-              حدّث الاسم والبريد والدور وحالة الحساب. ويمكنك التمرير داخل النافذة بعجلة الفأرة أو مفاتيح الأسهم.
+              حدّث الاسم والبريد والدور وحالة الحساب. جدول الصلاحيات مزود الآن بشريط تمرير أوضح وأسهل للسحب.
             </DialogDescription>
           </DialogHeader>
 
@@ -720,7 +720,7 @@ export const AdminDashboardPage: React.FC = () => {
             tabIndex={0}
             aria-label="محتوى تعديل المستخدم قابل للتمرير"
           >
-          <div className="grid gap-4 py-2">
+          <div className="grid gap-3 py-2 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>اسم المستخدم</Label>
               <Input
@@ -796,6 +796,7 @@ export const AdminDashboardPage: React.FC = () => {
 
           {editForm.role === 'employee' && (
             <PermissionMatrix
+              dialogMode
               value={editForm.permissions}
               onChange={(permissions) =>
                 setEditForm((current) => ({

@@ -45,7 +45,8 @@ export const PermissionMatrix: React.FC<{
   value: UserPermissions;
   onChange: (value: UserPermissions) => void;
   disabled?: boolean;
-}> = ({ value, onChange, disabled = false }) => {
+  dialogMode?: boolean;
+}> = ({ value, onChange, disabled = false, dialogMode = false }) => {
   const { i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
   const ui = (ar: string, en: string) => (isArabic ? ar : en);
@@ -96,8 +97,8 @@ export const PermissionMatrix: React.FC<{
   };
 
   return (
-    <Card className="overflow-hidden">
-      <div className="border-b p-4">
+    <Card className={`overflow-hidden ${dialogMode ? 'min-h-0' : ''}`}>
+      <div className={`border-b ${dialogMode ? 'p-3 sm:p-4' : 'p-4'}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h3 className="font-semibold">{ui('صلاحيات المستخدم التفصيلية', 'Detailed User Permissions')}</h3>
@@ -108,7 +109,7 @@ export const PermissionMatrix: React.FC<{
               {ui('صلاحية «إضافة مستخدم جديد» مخصصة لوحدة العناية بالمساجد والمصليات. أما «إنشاء دورة جديدة» و«اعتماد دورة» فهما مخصصتان لوحدة الأصول ولجنة متابعة متطلبات التحول المحاسبي لفصل إعداد البيانات عن اعتمادها الرسمي.', 'Create User is scoped to the Mosques & Prayer Rooms Care Unit. Create Cycle and Approve Cycle are scoped to the Assets Unit and Accounting Transformation Committee to separate data preparation from formal approval.')}
             </p>
             <p className="mt-2 text-xs font-medium text-primary">
-              {ui('يمكن تمرير الجدول بعجلة الفأرة، سحب شريط التمرير، أو استخدام مفاتيح الأسهم بعد النقر داخل الجدول.', 'Scroll with the mouse wheel, drag the scrollbar, or use the arrow keys after focusing the table.')}
+              {ui('يمكن تمرير الجدول بعجلة الفأرة أو بسحب شريط التمرير الواضح على طرف الجدول، كما يمكن استخدام زري أعلى وأسفل للانتقال السريع.', 'Scroll with the mouse wheel or drag the visible scrollbar at the edge of the table. You can also use the Top and Bottom buttons for quick navigation.')}
             </p>
           </div>
 
@@ -136,7 +137,7 @@ export const PermissionMatrix: React.FC<{
       <div
         ref={scrollAreaRef}
         tabIndex={0}
-        className="max-h-[62vh] min-h-[320px] overflow-auto overscroll-contain outline-none [scrollbar-gutter:stable] focus:ring-2 focus:ring-primary/20"
+        className={`${dialogMode ? 'h-[clamp(300px,42dvh,480px)] min-h-[300px]' : 'max-h-[62vh] min-h-[320px]'} overflow-auto overscroll-contain scroll-smooth outline-none [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 focus:ring-2 focus:ring-primary/20`}
         aria-label={ui('جدول صلاحيات المستخدم قابل للتمرير', 'Scrollable user permissions table')}
       >
         <table className="w-full min-w-[1180px] text-sm">
