@@ -1,0 +1,44 @@
+name: Run asset A4 print refinement
+"on":
+  push:
+    paths:
+      - '.github/workflows/run-refine-asset-a4-print.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply A4 print refinement
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          helper = Path('.github/workflows/refine-asset-a4-print.yml').read_text()
+          marker = "          python - <<'PY'\n"
+          start = helper.index(marker) + len(marker)
+          end = helper.index("\n          PY\n", start)
+          script = helper[start:end]
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in script.splitlines())
+          exec(compile(script, 'asset_a4_patch.py', 'exec'), {})
+          PY
+      - name: Verify frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Commit and clean helpers
+        run: |
+          git config user.name "OpenAI Project Automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/refine-asset-a4-print.yml .github/workflows/run-refine-asset-a4-print.yml
+          git add src/app/pages/ViewAssetPage.tsx
+          git commit -m "refactor: optimize asset card for A4 printing"
+          git push
