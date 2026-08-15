@@ -1,5 +1,6 @@
 name: Fix deed update and verify notifications
 
+# Trigger this helper only when the helper itself changes.
 on:
   push:
     paths:
