@@ -1,12 +1,10 @@
-# Temporary workflow: patch AssetCyclesPage styling, verify build, then remove itself.
+name: Fix asset cycles header
 on:
   push:
     paths:
       - '.github/workflows/fix-asset-cycles-light-header.yml'
-
 permissions:
   contents: write
-
 jobs:
   patch:
     runs-on: ubuntu-latest
@@ -14,45 +12,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
           cache: npm
-      - name: Patch asset cycles header colors
+      - name: Apply page fix
+        shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('src/app/pages/AssetCyclesPage.tsx')
-          s = p.read_text()
-          old = '''      <Card className="overflow-hidden rounded-[32px] border text-[color:var(--asset-dashboard-text,#fff)]" style={{ background: 'var(--asset-dashboard-overlay, linear-gradient(135deg,#23364a 0%,#122941 44%,#0a1f36 100%))', borderColor: 'var(--asset-dashboard-border,rgba(255,255,255,.20))', boxShadow: '0 26px 75px color-mix(in srgb, var(--asset-dashboard-base,#10243b) 32%, transparent)' }}>
-        <CardContent className="p-6 sm:p-8">'''
-          new = '''      <Card className="overflow-hidden rounded-[32px] border border-slate-200/90 bg-white/95 text-slate-900 shadow-[0_20px_55px_rgba(15,23,42,.10)]">
-        <CardContent className="p-6 sm:p-8">'''
-          if old not in s:
-              raise SystemExit('header card pattern not found')
-          s = s.replace(old, new, 1)
-          replacements = [
-            ('<Badge className="border-[color:var(--asset-dashboard-inner-border,rgba(255,255,255,.12))] bg-[var(--asset-dashboard-soft,rgba(255,255,255,.10))] text-[color:var(--asset-dashboard-text,#fff)]"><History className="ml-1 h-3.5 w-3.5" />سجل تاريخي كامل</Badge>', '<Badge className="border-sky-200 bg-sky-50 text-sky-800"><History className="ml-1 h-3.5 w-3.5" />سجل تاريخي كامل</Badge>'),
-            ('<Badge className="border-emerald-300/30 bg-emerald-300/15 text-[color:var(--asset-dashboard-text,#fff)]"><ShieldCheck className="ml-1 h-3.5 w-3.5 text-emerald-300" />لا حذف للبيانات القديمة</Badge>', '<Badge className="border-emerald-200 bg-emerald-50 text-emerald-800"><ShieldCheck className="ml-1 h-3.5 w-3.5" />لا حذف للبيانات القديمة</Badge>'),
-            ('<h1 className="text-3xl font-black sm:text-4xl">دورات تحديث بيانات الأصول</h1>', '<h1 className="text-3xl font-black text-[#123d73] sm:text-4xl">دورات تحديث بيانات الأصول</h1>'),
-            ('<p className="mt-2 max-w-3xl text-sm leading-7 text-[color:var(--asset-dashboard-muted,#cbd5e1)]">كل تحديث يحفظ كإصدار مستقل. الدورة الجديدة تمر بالاستيراد والمقارنة والمراجعة قبل أن تصبح هي البيانات الحالية، وتبقى الإصدارات السابقة مؤرشفة وقابلة للعرض والتقرير.</p>', '<p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">كل تحديث يحفظ كإصدار مستقل. الدورة الجديدة تمر بالاستيراد والمقارنة والمراجعة قبل أن تصبح هي البيانات الحالية، وتبقى الإصدارات السابقة مؤرشفة وقابلة للعرض والتقرير.</p>'),
-            ('<Button className="border-0 text-white shadow-lg hover:brightness-110" style={{ background: \'var(--asset-dashboard-button,#123d73)\' }}', '<Button className="border-0 bg-[#123d73] text-white shadow-md hover:bg-[#164b87]"'),
-            ('<Button variant="outline" className="border-[color:var(--asset-dashboard-inner-border,rgba(255,255,255,.12))] bg-[var(--asset-dashboard-soft,rgba(255,255,255,.10))] text-[color:var(--asset-dashboard-text,#fff)] hover:bg-[var(--asset-dashboard-soft,rgba(255,255,255,.10))] hover:text-[color:var(--asset-dashboard-text,#fff)]"', '<Button variant="outline" className="border-slate-300 bg-white text-[#123d73] hover:bg-slate-50 hover:text-[#123d73]"'),
-            ('{currentCycle && <div className="mt-6 rounded-2xl border p-4" style={{ background: \'var(--asset-dashboard-panel-strong,rgba(255,255,255,.105))\', borderColor: \'var(--asset-dashboard-inner-border,rgba(255,255,255,.12))\' }}><div className="text-xs font-bold text-[color:var(--asset-dashboard-muted,#cbd5e1)]">الدورة الحالية المعتمدة</div><div className="mt-1 text-lg font-black">#{currentCycle.cycleNumber} — {currentCycle.name}</div><div className="mt-2 text-xs text-[color:var(--asset-dashboard-muted,#cbd5e1)]">', '{currentCycle && <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/65 p-4"><div className="text-xs font-bold text-slate-500">الدورة الحالية المعتمدة</div><div className="mt-1 text-lg font-black text-slate-900">#{currentCycle.cycleNumber} — {currentCycle.name}</div><div className="mt-2 text-xs text-slate-500">'),
-          ]
-          for a,b in replacements:
-              if a not in s:
-                  raise SystemExit(f'pattern not found: {a[:80]}')
-              s = s.replace(a,b,1)
-          p.write_text(s)
-          PY
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnA9UGF0aCgic3JjL2FwcC9wYWdlcy9Bc3NldEN5Y2xlc1BhZ2UudHN4IikKcz1wLnJlYWRfdGV4dCgpCnBhaXJzPVsKKCIiIiAgICAgIDxDYXJkIGNsYXNzTmFtZT0ib3ZlcmZsb3ctaGlkZGVuIHJvdW5kZWQtWzMycHhdIGJvcmRlciB0ZXh0LVtjb2xvcjp2YXIoLS1hc3NldC1kYXNoYm9hcmQtdGV4dCwjZmZmKV0iIHN0eWxlPXt7IGJhY2tncm91bmQ6ICd2YXIoLS1hc3NldC1kYXNoYm9hcmQtb3ZlcmxheSwgbGluZWFyLWdyYWRpZW50KDEzNWRlZywjMjMzNjRhIDAlLCMxMjI5NDEgNDQlLCMwYTFmMzYgMTAwJSkpJywgYm9yZGVyQ29sb3I6ICd2YXIoLS1hc3NldC1kYXNoYm9hcmQtYm9yZGVyLHJnYmEoMjU1LDI1NSwyNTUsLjIwKSknLCBib3hTaGFkb3c6ICcwIDI2cHggNzVweCBjb2xvci1taXgoaW4gc3JnYiwgdmFyKC0tYXNzZXQtZGFzaGJvYXJkLWJhc2UsIzEwMjQzYikgMzIlLCB0cmFuc3BhcmVudCknIH19PgogICAgICAgIDxDYXJkQ29udGVudCBjbGFzc05hbWU9InAtNiBzbTpwLTgiPiIiIiwiIiIgICAgICA8Q2FyZCBjbGFzc05hbWU9Im92ZXJmbG93LWhpZGRlbiByb3VuZGVkLVszMnB4XSBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMC85MCBiZy13aGl0ZS85NSB0ZXh0LXNsYXRlLTkwMCBzaGFkb3ctWzBfMjBweF81NXB4X3JnYmEoMTUsMjMsNDIsLjEwKV0iPgogICAgICAgIDxDYXJkQ29udGVudCBjbGFzc05hbWU9InAtNiBzbTpwLTgiPiIiIiksCigiIiI8QmFkZ2UgY2xhc3NOYW1lPSJib3JkZXItW2NvbG9yOnZhcigtLWFzc2V0LWRhc2hib2FyZC1pbm5lci1ib3JkZXIscmdiYSgyNTUsMjU1LDI1NSwuMTIpKV0gYmctW3ZhcigtLWFzc2V0LWRhc2hib2FyZC1zb2Z0LHJnYmEoMjU1LDI1NSwyNTUsLjEwKSldIHRleHQtW2NvbG9yOnZhcigtLWFzc2V0LWRhc2hib2FyZC10ZXh0LCNmZmYpXSI+PEhpc3RvcnkgY2xhc3NOYW1lPSJtbC0xIGgtMy41IHctMy41IiAvPtiz2KzZhCDYqtin2LHZitiu2Yog2YPYp9mF2YQ8L0JhZGdlPiIiIiwiIiI8QmFkZ2UgY2xhc3NOYW1lPSJib3JkZXItc2t5LTIwMCBiZy1za3ktNTAgdGV4dC1za3ktODAwIj48SGlzdG9yeSBjbGFzc05hbWU9Im1sLTEgaC0zLjUgdy0zLjUiIC8+2LPYrNmEINiq2KfYsdmK2K7ZiiDZg9in2YXZhDwvQmFkZ2U+IiIiKSwKKCIiIjxCYWRnZSBjbGFzc05hbWU9ImJvcmRlci1lbWVyYWxkLTMwMC8zMCBiZy1lbWVyYWxkLTMwMC8xNSB0ZXh0LVtjb2xvcjp2YXIoLS1hc3NldC1kYXNoYm9hcmQtdGV4dCwjZmZmKV0iPjxTaGllbGRDaGVjayBjbGFzc05hbWU9Im1sLTEgaC0zLjUgdy0zLjUgdGV4dC1lbWVyYWxkLTMwMCIgLz7ZhNinINit2LDZgSDZhNmE2KjZitin2YbYp9iqINin2YTZgtiv2YrZhdipPC9CYWRnZT4iIiIsIiIiPEJhZGdlIGNsYXNzTmFtZT0iYm9yZGVyLWVtZXJhbGQtMjAwIGJnLWVtZXJhbGQtNTAgdGV4dC1lbWVyYWxkLTgwMCI+PFNoaWVsZENoZWNrIGNsYXNzTmFtZT0ibWwtMSBoLTMuNSB3LTMuNSIgLz7ZhNinINit2LDZgSDZhNmE2KjZitin2YbYp9iqINin2YTZgtiv2YrZhdipPC9CYWRnZT4iIiIpLAooIiIiPGgxIGNsYXNzTmFtZT0idGV4dC0zeGwgZm9udC1ibGFjayBzbTp0ZXh0LTR4bCI+2K/ZiNix2KfYqiDYqtit2K/ZitirINio2YrYp9mG2KfYqiDYp9mE2KPYtdmI2YQ8L2gxPiIiIiwiIiI8aDEgY2xhc3NOYW1lPSJ0ZXh0LTN4bCBmb250LWJsYWNrIHRleHQtWyMxMjNkNzNdIHNtOnRleHQtNHhsIj7Yr9mI2LHYp9iqINiq2K3Yr9mK2Ksg2KjZitin2YbYp9iqINin2YTYo9i12YjZhDwvaDE+IiIiKSwKKCIiIjxwIGNsYXNzTmFtZT0ibXQtMiBtYXgtdy0zeGwgdGV4dC1zbSBsZWFkaW5nLTcgdGV4dC1bY29sb3I6dmFyKC0tYXNzZXQtZGFzaGJvYXJkLW11dGVkLCNjYmQ1ZTEpXSI+2YPZhCDYqtit2K/ZitirINmK2K3Zgdi4INmD2KXYtdiv2KfYsSDZhdiz2KrZgtmELiDYp9mE2K/ZiNix2Kkg2KfZhNis2K/Zitiv2Kkg2KrZhdixINio2KfZhNin2LPYqtmK2LHYp9ivINmI2KfZhNmF2YLYp9ix2YbYqSDZiNin2YTZhdix2KfYrNi52Kkg2YLYqNmEINij2YYg2KrYtdio2K0g2YfZiiDYp9mE2KjZitin2YbYp9iqINin2YTYrdin2YTZitip2Iwg2YjYqtio2YLZiSDYp9mE2KXYtdiv2KfYsdin2Kog2KfZhNiz2KfYqNmC2Kkg2YXYpNix2LTZgdipINmI2YLYp9io2YTYqSDZhNmE2LnYsdi2INmI2KfZhNiq2YLYsdmK2LEuPC9wPiIiIiwiIiI8cCBjbGFzc05hbWU9Im10LTIgbWF4LXctM3hsIHRleHQtc20gbGVhZGluZy03IHRleHQtc2xhdGUtNjAwIj7Zg9mEINiq2K3Yr9mK2Ksg2YrYrdmB2Lgg2YPYpdi12K/Yp9ixINmF2LPYqtmC2YQuINin2YTYr9mI2LHYqSDYp9mE2KzYr9mK2K/YqSDYqtmF2LEg2KjYp9mE2KfYs9iq2YrYsdin2K8g2YjYp9mE2YXZgtin2LHZhtipINmI2KfZhNmF2LHYp9is2LnYqSDZgtio2YQg2KPZhiDYqti12KjYrSDZh9mKINin2YTYqNmK2KfZhtin2Kog2KfZhNit2KfZhNmK2KnYjCDZiNiq2KjZgtmJINin2YTYpdi12K/Yp9ix2KfYqiDYp9mE2LPYp9io2YLYqSDZhdik2LHYtNmB2Kkg2YjZgtin2KjZhNipINmE2YTYudix2LYg2YjYp9mE2KrZgtix2YrYsS48L3A+IiIiKSwKKCIiIjxCdXR0b24gY2xhc3NOYW1lPSJib3JkZXItMCB0ZXh0LXdoaXRlIHNoYWRvdy1sZyBob3ZlcjpicmlnaHRuZXNzLTExMCIgc3R5bGU9e3sgYmFja2dyb3VuZDogJ3ZhcigtLWFzc2V0LWRhc2hib2FyZC1idXR0b24sIzEyM2Q3MyknIH19IiIiLCIiIjxCdXR0b24gY2xhc3NOYW1lPSJib3JkZXItMCBiZy1bIzEyM2Q3M10gdGV4dC13aGl0ZSBzaGFkb3ctbWQgaG92ZXI6YmctWyMxNjRiODddIiAiIiIpLAooIiIiPEJ1dHRvbiB2YXJpYW50PSJvdXRsaW5lIiBjbGFzc05hbWU9ImJvcmRlci1bY29sb3I6dmFyKC0tYXNzZXQtZGFzaGJvYXJkLWlubmVyLWJvcmRlcixyZ2JhKDI1NSwyNTUsMjU1LC4xMikpXSBiZy1bdmFyKC0tYXNzZXQtZGFzaGJvYXJkLXNvZnQscmdiYSgyNTUsMjU1LDI1NSwuMTApKV0gdGV4dC1bY29sb3I6dmFyKC0tYXNzZXQtZGFzaGJvYXJkLXRleHQsI2ZmZildIGhvdmVyOmJnLVt2YXIoLS1hc3NldC1kYXNoYm9hcmQtc29mdCxyZ2JhKDI1NSwyNTUsMjU1LC4xMCkpXSBob3Zlcjp0ZXh0LVtjb2xvcjp2YXIoLS1hc3NldC1kYXNoYm9hcmQtdGV4dCwjZmZmKV0iICIiIiwiIiI8QnV0dG9uIHZhcmlhbnQ9Im91dGxpbmUiIGNsYXNzTmFtZT0iYm9yZGVyLXNsYXRlLTMwMCBiZy13aGl0ZSB0ZXh0LVsjMTIzZDczXSBob3ZlcjpiZy1zbGF0ZS01MCBob3Zlcjp0ZXh0LVsjMTIzZDczXSIgIiIiKSwKKCIiIntjdXJyZW50Q3ljbGUgJiYgPGRpdiBjbGFzc05hbWU9Im10LTYgcm91bmRlZC0yeGwgYm9yZGVyIHAtNCIgc3R5bGU9e3sgYmFja2dyb3VuZDogJ3ZhcigtLWFzc2V0LWRhc2hib2FyZC1wYW5lbC1zdHJvbmcscmdiYSgyNTUsMjU1LDI1NSwuMTA1KSknLCBib3JkZXJDb2xvcjogJ3ZhcigtLWFzc2V0LWRhc2hib2FyZC1pbm5lci1ib3JkZXIscmdiYSgyNTUsMjU1LDI1NSwuMTIpKScgfX0+PGRpdiBjbGFzc05hbWU9InRleHQteHMgZm9udC1ib2xkIHRleHQtW2NvbG9yOnZhcigtLWFzc2V0LWRhc2hib2FyZC1tdXRlZCwjY2JkNWUxKV0iPtin2YTYr9mI2LHYqSDYp9mE2K3Yp9mE2YrYqSDYp9mE2YXYudiq2YXYr9ipPC9kaXY+PGRpdiBjbGFzc05hbWU9Im10LTEgdGV4dC1sZyBmb250LWJsYWNrIj4je2N1cnJlbnRDeWNsZS5jeWNsZU51bWJlcn0g4oCUIHtjdXJyZW50Q3ljbGUubmFtZX08L2Rpdj48ZGl2IGNsYXNzTmFtZT0ibXQtMiB0ZXh0LXhzIHRleHQtW2NvbG9yOnZhcigtLWFzc2V0LWRhc2hib2FyZC1tdXRlZCwjY2JkNWUxKV0iPiIiIiwiIiJ7Y3VycmVudEN5Y2xlICYmIDxkaXYgY2xhc3NOYW1lPSJtdC02IHJvdW5kZWQtMnhsIGJvcmRlciBib3JkZXItc2t5LTEwMCBiZy1za3ktNTAvNjUgcC00Ij48ZGl2IGNsYXNzTmFtZT0idGV4dC14cyBmb250LWJvbGQgdGV4dC1zbGF0ZS01MDAiPtin2YTYr9mI2LHYqSDYp9mE2K3Yp9mE2YrYqSDYp9mE2YXYudiq2YXYr9ipPC9kaXY+PGRpdiBjbGFzc05hbWU9Im10LTEgdGV4dC1sZyBmb250LWJsYWNrIHRleHQtc2xhdGUtOTAwIj4je2N1cnJlbnRDeWNsZS5jeWNsZU51bWJlcn0g4oCUIHtjdXJyZW50Q3ljbGUubmFtZX08L2Rpdj48ZGl2IGNsYXNzTmFtZT0ibXQtMiB0ZXh0LXhzIHRleHQtLXNslYXRlLTUwMCI+IiIiKQpdCmZvciBvbGQsbmV3IGluIHBhaXJzOgogICAgaWYgb2xkIG5vdCBpbiBzOiByYWlzZSBTeXN0ZW1FeGl0KCJwYXR0ZXJuIG1pc3NpbmcgIitvbGRbOjgwXSkKICAgIHM9cy5yZXBsYWNlKG9sZCxuZXcsMSkKcC53cml0ZV90ZXh0KHMpCg==' | base64 -d > /tmp/patch_asset_cycles.py
+          python /tmp/patch_asset_cycles.py
       - name: Verify frontend
         run: |
           npm ci
           npm run build
-      - name: Commit fix and cleanup
+      - name: Commit and remove temporary workflow
         run: |
           rm .github/workflows/fix-asset-cycles-light-header.yml
-          git config user.name "OpenAI Project Automation"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name 'OpenAI Project Automation'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/app/pages/AssetCyclesPage.tsx .github/workflows/fix-asset-cycles-light-header.yml
-          git commit -m "fix: correct asset cycles page contrast"
+          git commit -m 'fix: correct asset cycles page contrast'
           git push
