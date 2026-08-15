@@ -180,13 +180,19 @@ export const DeedProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     try {
       if (isApiEnabled) {
-        const savedDeed = await api.updateDeed<Deed>(id, {
+        // The backend PUT endpoint validates a complete deed payload. Merge the
+        // current record with the edited fields so partial UI updates (including
+        // attachment-only updates) never omit required fields such as deedNumber.
+        const apiPayload: Partial<Deed> = {
+          ...currentDeed,
           ...sanitizedData,
           area:
             sanitizedData.area !== undefined && sanitizedData.area !== null
               ? Number(sanitizedData.area)
-              : sanitizedData.area,
-        });
+              : Number(currentDeed.area || 0),
+        };
+
+        const savedDeed = await api.updateDeed<Deed>(id, apiPayload);
 
         const normalized = normalizeDeed(savedDeed);
 
