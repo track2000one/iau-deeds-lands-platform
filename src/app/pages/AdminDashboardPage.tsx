@@ -705,7 +705,7 @@ export const AdminDashboardPage: React.FC = () => {
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent
-          className="flex max-h-[94dvh] w-[calc(100vw-1rem)] max-w-[min(96vw,1400px)] flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100vw-2rem)]"
+          className="flex max-h-[94dvh] w-[calc(100vw-1rem)] max-w-[min(96vw,1400px)] flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100vw-2rem)] sm:max-w-[min(96vw,1400px)]"
           dir="rtl"
         >
           <DialogHeader className="shrink-0 border-b bg-background px-5 py-4 text-right sm:px-6">
