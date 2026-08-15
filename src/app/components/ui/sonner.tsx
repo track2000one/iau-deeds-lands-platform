@@ -37,13 +37,13 @@ const Toaster = ({ toastOptions, ...props }: ToasterProps) => {
     <Sonner
       theme="light"
       dir="rtl"
-      position="top-center"
+      position="bottom-left"
       expand
       closeButton
       visibleToasts={4}
       gap={10}
-      offset={22}
-      mobileOffset={14}
+      offset={24}
+      mobileOffset={12}
       className="toaster group"
       icons={{
         success: (
