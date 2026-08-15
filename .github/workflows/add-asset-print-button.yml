@@ -1,5 +1,6 @@
 name: Add asset print button
 
+# Trigger this helper only when this temporary workflow changes.
 on:
   push:
     paths:
