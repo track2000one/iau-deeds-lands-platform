@@ -18,12 +18,7 @@ export default function App() {
           <PermissionsProvider>
             <LegacyEnglishBridge />
             <RouterProvider router={router} />
-            <Toaster
-              position="top-center"
-              richColors
-              closeButton
-              duration={5000}
-            />
+            <Toaster />
           </PermissionsProvider>
         </AuthProvider>
       </CustomThemeProvider>
