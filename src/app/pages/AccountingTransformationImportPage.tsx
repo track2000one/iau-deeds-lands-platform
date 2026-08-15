@@ -14,6 +14,7 @@ import {
   UploadCloud,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePermissions } from '../../context/PermissionsContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -99,6 +100,8 @@ const stripSource = (item: PreviewItem): AccountingTransformationInput => {
 export const AccountingTransformationImportPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { isAdmin, hasPermission } = usePermissions();
+  const canCreateCycle = isAdmin || hasPermission('accounting_transformation', 'canCreateCycle');
   const [fileName, setFileName] = useState('');
   const [items, setItems] = useState<PreviewItem[]>([]);
   const [parsing, setParsing] = useState(false);
@@ -133,6 +136,7 @@ export const AccountingTransformationImportPage: React.FC = () => {
   }, []);
 
   const createDraftCycle = async () => {
+    if (!canCreateCycle) return toast.error('لا تملك صلاحية «إنشاء دورة جديدة»');
     const name = cycleName.trim();
     if (!name) return toast.error('أدخل اسم دورة التحديث أولًا');
     setCreatingCycle(true);
@@ -288,7 +292,7 @@ export const AccountingTransformationImportPage: React.FC = () => {
             <Button variant="outline" onClick={() => navigate('/accounting-transformation/cycles')}><PlusCircle className="ml-2 h-4 w-4" />{cycles.length ? 'إدارة الدورات' : 'سجل الدورات'}</Button>
           </div>
           {selectedCycle && <p className="rounded-xl border border-cyan-200 bg-white/80 px-4 py-3 text-xs text-slate-600">سيتم حفظ البيانات في: <strong>#{selectedCycle.cycleNumber} — {selectedCycle.name}</strong>. لن تصبح هذه البيانات رسمية حتى اعتماد الدورة.</p>}
-          {!cyclesLoading && !cycles.length && <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+          {!cyclesLoading && !cycles.length && canCreateCycle && <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
             <div className="mb-3"><p className="font-black text-amber-950">يلزم إنشاء دورة تحديث قبل اختيار ملف Excel</p><p className="mt-1 text-xs leading-6 text-amber-800">أنشئ الدورة هنا مرة واحدة، وبعدها سيتفعّل اختيار الملف تلقائيًا دون مغادرة الصفحة.</p></div>
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
               <label className="text-xs font-bold text-slate-700">اسم الدورة
@@ -300,6 +304,7 @@ export const AccountingTransformationImportPage: React.FC = () => {
               <Button type="button" className="h-11 rounded-xl px-5" onClick={createDraftCycle} disabled={creatingCycle || !cycleName.trim()}>{creatingCycle ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <PlusCircle className="ml-2 h-4 w-4" />}{creatingCycle ? 'جاري الإنشاء...' : 'إنشاء الدورة والمتابعة'}</Button>
             </div>
           </div>}
+          {!cyclesLoading && !cycles.length && !canCreateCycle && <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm font-bold text-amber-900">لا توجد دورة مسودة قابلة للاستيراد، ولا يملك حسابك صلاحية «إنشاء دورة جديدة». اطلب من المسؤول إنشاء دورة أو منح الصلاحية لك.</div>}
         </CardContent>
       </Card>
 
@@ -316,7 +321,7 @@ export const AccountingTransformationImportPage: React.FC = () => {
             <div className="grid h-16 w-16 place-items-center rounded-3xl border border-slate-200 bg-white text-slate-400 shadow-sm"><FileSpreadsheet className="h-8 w-8" /></div>
             <h2 className="mt-4 text-lg font-black text-slate-700">اختيار الملف سيتفعّل بعد إنشاء دورة التحديث</h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">لن يرفع النظام الملف دون دورة مرتبطة به حتى تبقى كل نسخة من البيانات محفوظة ومؤرخة بشكل صحيح.</p>
-            <Button type="button" variant="outline" className="mt-4 rounded-xl" onClick={() => document.getElementById('accounting-cycle-name')?.focus()}><PlusCircle className="ml-2 h-4 w-4" />إنشاء دورة أولًا</Button>
+            {canCreateCycle ? <Button type="button" variant="outline" className="mt-4 rounded-xl" onClick={() => document.getElementById('accounting-cycle-name')?.focus()}><PlusCircle className="ml-2 h-4 w-4" />إنشاء دورة أولًا</Button> : <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800">يتطلب إنشاء دورة جديدة صلاحية مستقلة من لوحة التحكم.</div>}
           </div>}
           {(message || scanning) && <div className="mt-3 flex items-center justify-center gap-2 rounded-2xl border bg-white/85 px-4 py-3 text-sm font-bold text-slate-700">{scanning && <Loader2 className="h-4 w-4 animate-spin" />}{message || 'جاري فحص السجلات...'}</div>}
         </CardContent>

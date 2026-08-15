@@ -25,6 +25,8 @@ export interface ModulePermissions {
   canDelete: boolean;
   canPrint: boolean;
   canCreateUser: boolean;
+  canCreateCycle: boolean;
+  canApproveCycle: boolean;
 }
 
 export type UserPermissions = Record<ModuleName, ModulePermissions>;
@@ -90,6 +92,8 @@ const FULL: ModulePermissions = {
   canDelete: true,
   canPrint: true,
   canCreateUser: true,
+  canCreateCycle: true,
+  canApproveCycle: true,
 };
 
 const NONE: ModulePermissions = {
@@ -99,6 +103,8 @@ const NONE: ModulePermissions = {
   canDelete: false,
   canPrint: false,
   canCreateUser: false,
+  canCreateCycle: false,
+  canApproveCycle: false,
 };
 
 export const createEmptyPermissions = (): UserPermissions => ({
@@ -157,7 +163,9 @@ export const normalizePermissions = (
       output[moduleName].canEdit ||
       output[moduleName].canDelete ||
       output[moduleName].canPrint ||
-      output[moduleName].canCreateUser
+      output[moduleName].canCreateUser ||
+      output[moduleName].canCreateCycle ||
+      output[moduleName].canApproveCycle
     ) {
       output[moduleName].canView = true;
     }

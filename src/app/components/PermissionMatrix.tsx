@@ -37,6 +37,8 @@ const ACTIONS: Array<{
   { key: 'canDelete', ar: 'حذف', en: 'Delete' },
   { key: 'canPrint', ar: 'طباعة', en: 'Print' },
   { key: 'canCreateUser', ar: 'إضافة مستخدم جديد', en: 'Create User' },
+  { key: 'canCreateCycle', ar: 'إنشاء دورة جديدة', en: 'Create Cycle' },
+  { key: 'canApproveCycle', ar: 'اعتماد دورة', en: 'Approve Cycle' },
 ];
 
 export const PermissionMatrix: React.FC<{
@@ -85,6 +87,8 @@ export const PermissionMatrix: React.FC<{
         canDelete: false,
         canPrint: false,
         canCreateUser: false,
+        canCreateCycle: false,
+        canApproveCycle: false,
       };
     }
 
@@ -101,7 +105,7 @@ export const PermissionMatrix: React.FC<{
               {ui('الأقسام غير المفعلة ستختفي من القائمة الجانبية.', 'Disabled sections will be hidden from the sidebar.')}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {ui('صلاحية «إضافة مستخدم جديد» مخصصة حاليًا لوحدة العناية بالمساجد والمصليات، وتسمح بإنشاء أو ربط حساب المنسوب ضمن نفس عملية إضافته.', 'Create User is currently scoped to the Mosques & Prayer Rooms Care Unit and creates or links the personnel login in the same operation.')}
+              {ui('صلاحية «إضافة مستخدم جديد» مخصصة لوحدة العناية بالمساجد والمصليات. أما «إنشاء دورة جديدة» و«اعتماد دورة» فهما مخصصتان لوحدة الأصول ولجنة متابعة متطلبات التحول المحاسبي لفصل إعداد البيانات عن اعتمادها الرسمي.', 'Create User is scoped to the Mosques & Prayer Rooms Care Unit. Create Cycle and Approve Cycle are scoped to the Assets Unit and Accounting Transformation Committee to separate data preparation from formal approval.')}
             </p>
             <p className="mt-2 text-xs font-medium text-primary">
               {ui('يمكن تمرير الجدول بعجلة الفأرة، سحب شريط التمرير، أو استخدام مفاتيح الأسهم بعد النقر داخل الجدول.', 'Scroll with the mouse wheel, drag the scrollbar, or use the arrow keys after focusing the table.')}
@@ -135,7 +139,7 @@ export const PermissionMatrix: React.FC<{
         className="max-h-[62vh] min-h-[320px] overflow-auto overscroll-contain outline-none [scrollbar-gutter:stable] focus:ring-2 focus:ring-primary/20"
         aria-label={ui('جدول صلاحيات المستخدم قابل للتمرير', 'Scrollable user permissions table')}
       >
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="w-full min-w-[1180px] text-sm">
           <thead className="sticky top-0 z-10 bg-background shadow-sm">
             <tr className="border-b bg-muted/40">
               <th className={`p-3 ${isArabic ? 'text-right' : 'text-left'}`}>{ui('القسم', 'Section')}</th>
@@ -155,7 +159,12 @@ export const PermissionMatrix: React.FC<{
                 </td>
 
                 {ACTIONS.map((action) => {
-                  const supported = action.key !== 'canCreateUser' || moduleName === 'mosques';
+                  const isCyclePermission = action.key === 'canCreateCycle' || action.key === 'canApproveCycle';
+                  const supported = action.key === 'canCreateUser'
+                    ? moduleName === 'mosques'
+                    : isCyclePermission
+                      ? ['assets', 'accounting_transformation'].includes(moduleName)
+                      : true;
                   return (
                     <td key={action.key} className="p-3 text-center">
                       {supported ? (

@@ -68,6 +68,8 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
   const canAdd = isAdmin || hasPermission('accounting_transformation', 'canAdd');
   const canEdit = isAdmin || hasPermission('accounting_transformation', 'canEdit');
   const canDelete = isAdmin || hasPermission('accounting_transformation', 'canDelete');
+  const canCreateCycle = isAdmin || hasPermission('accounting_transformation', 'canCreateCycle');
+  const canApproveCycle = isAdmin || hasPermission('accounting_transformation', 'canApproveCycle');
 
   const [cycles, setCycles] = useState<AccountingTransformationCycle[]>([]);
   const [comparisons, setComparisons] = useState<Record<string, AccountingCycleComparison>>({});
@@ -103,6 +105,7 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
   useEffect(() => { void load(); }, []);
 
   const createCycle = async () => {
+    if (!canCreateCycle) return toast.error('لا تملك صلاحية «إنشاء دورة جديدة»');
     if (name.trim().length < 3) return toast.error('أدخل اسمًا واضحًا لدورة التحديث');
     setCreating(true);
     try {
@@ -155,7 +158,7 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />لوحة اللجنة</Button>
-            {canAdd && !openCycle && <Button className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" onClick={() => setShowCreate((value) => !value)}><PlusCircle className="ml-2 h-4 w-4" />إنشاء دورة جديدة</Button>}
+            {canCreateCycle && !openCycle && <Button className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" onClick={() => setShowCreate((value) => !value)}><PlusCircle className="ml-2 h-4 w-4" />إنشاء دورة جديدة</Button>}
           </div>
         </div>
 
@@ -165,7 +168,7 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
         </div>}
       </section>
 
-      {showCreate && !openCycle && <Card className="rounded-[26px] border-sky-200 bg-sky-50/50 shadow-sm">
+      {showCreate && canCreateCycle && !openCycle && <Card className="rounded-[26px] border-sky-200 bg-sky-50/50 shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><PlusCircle className="h-5 w-5 text-sky-700" />إنشاء دورة تحديث جديدة</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div><label className="mb-1.5 block text-sm font-bold text-slate-700">اسم الدورة</label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: تحديث بيانات الربع الثالث 2026" /></div>
@@ -208,7 +211,7 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
                   {cycle.status === 'draft' && canAdd && <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/import?cycle=${encodeURIComponent(cycle.id)}`)}><RefreshCcw className="ml-1 h-4 w-4" />استكمال الاستيراد</Button>}
                   {cycle.status === 'draft' && canEdit && cycle.recordCount > 0 && <Button size="sm" onClick={() => runAction(cycle, 'review')} disabled={busy}><Send className="ml-1 h-4 w-4" />إرسال للمراجعة</Button>}
                   {cycle.status === 'under_review' && canEdit && <Button size="sm" variant="outline" onClick={() => runAction(cycle, 'reopen')} disabled={busy}><RotateCcw className="ml-1 h-4 w-4" />إعادة للمسودة</Button>}
-                  {cycle.status === 'under_review' && canEdit && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => runAction(cycle, 'approve')} disabled={busy}><CheckCircle2 className="ml-1 h-4 w-4" />اعتماد الدورة</Button>}
+                  {cycle.status === 'under_review' && canApproveCycle && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => runAction(cycle, 'approve')} disabled={busy}><CheckCircle2 className="ml-1 h-4 w-4" />اعتماد الدورة</Button>}
                   {['draft', 'under_review'].includes(cycle.status) && canDelete && <Button size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => runAction(cycle, 'delete')} disabled={busy}><Trash2 className="ml-1 h-4 w-4" />حذف المسودة</Button>}
                   {cycle.status === 'archived' && <span className="mr-auto inline-flex items-center gap-1 text-xs font-bold text-slate-500"><Archive className="h-4 w-4" />محفوظة تاريخيًا</span>}
                   {cycle.status === 'under_review' && <span className="mr-auto inline-flex items-center gap-1 text-xs font-bold text-sky-700"><Clock3 className="h-4 w-4" />بانتظار الاعتماد</span>}

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, CheckCircle2, Database, FileSpreadsheet, History, Loader2, PlusCircle, RefreshCw, ShieldCheck, UploadCloud, XCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
+import { usePermissions } from '../../context/PermissionsContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -50,6 +51,8 @@ export const AssetCycleImportPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { isAdmin, hasPermission } = usePermissions();
+  const canCreateCycle = isAdmin || hasPermission('assets', 'canCreateCycle');
   const requestedCycleId = useMemo(() => new URLSearchParams(location.search).get('cycleId') || '', [location.search]);
 
   const [cycles, setCycles] = useState<AssetUpdateCycle[]>([]);
@@ -93,6 +96,10 @@ export const AssetCycleImportPage: React.FC = () => {
   const draftCycles = cycles.filter((cycle) => cycle.status === 'draft' && !cycle.isCurrent);
 
   const createCycle = async () => {
+    if (!canCreateCycle) {
+      toast.error('لا تملك صلاحية «إنشاء دورة جديدة»');
+      return;
+    }
     if (cycleName.trim().length < 3) {
       toast.error('أدخل اسمًا واضحًا لدورة التحديث');
       return;
@@ -224,12 +231,15 @@ export const AssetCycleImportPage: React.FC = () => {
             <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm font-bold text-amber-900">لا توجد دورة مسودة مفتوحة. أنشئ دورة جديدة ثم ارفع الملفات إليها.</div>
           )}
 
-          {!selectedCycleId && (
+          {!selectedCycleId && canCreateCycle && (
             <div className="grid gap-3 rounded-2xl border border-dashed border-sky-300 bg-sky-50/45 p-4 lg:grid-cols-2">
               <div><label className="mb-2 block text-xs font-bold">اسم دورة التحديث</label><Input value={cycleName} onChange={(event) => setCycleName(event.target.value)} placeholder="مثال: تحديث بيانات الأصول — أغسطس 2026" /></div>
               <div><label className="mb-2 block text-xs font-bold">وصف مختصر</label><Textarea value={cycleDescription} onChange={(event) => setCycleDescription(event.target.value)} className="min-h-10" placeholder="مصدر البيانات أو سبب التحديث" /></div>
               <Button className="lg:col-span-2" onClick={() => void createCycle()} disabled={creating}>{creating ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <PlusCircle className="ml-2 h-4 w-4" />}إنشاء الدورة والمتابعة</Button>
             </div>
+          )}
+          {!selectedCycleId && !canCreateCycle && !loadingCycles && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm font-bold text-amber-900">لا توجد دورة مسودة متاحة، ولا يملك حسابك صلاحية «إنشاء دورة جديدة». اطلب من المسؤول إنشاء الدورة أو منح الصلاحية لك.</div>
           )}
         </CardContent>
       </Card>
