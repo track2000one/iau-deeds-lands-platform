@@ -1,0 +1,149 @@
+name: Add cycle permissions UI
+on:
+  push:
+    paths:
+      - '.github/workflows/add-cycle-permissions-ui.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Apply frontend permission changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              if old not in s:
+                  raise SystemExit(f'pattern not found in {path}: {old[:140]!r}')
+              p.write_text(s.replace(old, new, 1))
+
+          # Permission types/defaults
+          path='src/types/permissions.ts'
+          replace_once(path,
+          '''  canPrint: boolean;\n  canCreateUser: boolean;\n}''',
+          '''  canPrint: boolean;\n  canCreateUser: boolean;\n  canCreateCycle: boolean;\n  canApproveCycle: boolean;\n}''')
+          replace_once(path,
+          '''  canPrint: true,\n  canCreateUser: true,\n};''',
+          '''  canPrint: true,\n  canCreateUser: true,\n  canCreateCycle: true,\n  canApproveCycle: true,\n};''')
+          replace_once(path,
+          '''  canPrint: false,\n  canCreateUser: false,\n};''',
+          '''  canPrint: false,\n  canCreateUser: false,\n  canCreateCycle: false,\n  canApproveCycle: false,\n};''')
+          replace_once(path,
+          '''      output[moduleName].canPrint ||\n      output[moduleName].canCreateUser\n''',
+          '''      output[moduleName].canPrint ||\n      output[moduleName].canCreateUser ||\n      output[moduleName].canCreateCycle ||\n      output[moduleName].canApproveCycle\n''')
+
+          # Admin permission matrix
+          path='src/app/components/PermissionMatrix.tsx'
+          replace_once(path,
+          '''  { key: 'canPrint', ar: 'طباعة', en: 'Print' },\n  { key: 'canCreateUser', ar: 'إضافة مستخدم جديد', en: 'Create User' },\n];''',
+          '''  { key: 'canPrint', ar: 'طباعة', en: 'Print' },\n  { key: 'canCreateUser', ar: 'إضافة مستخدم جديد', en: 'Create User' },\n  { key: 'canCreateCycle', ar: 'إنشاء دورة جديدة', en: 'Create Cycle' },\n  { key: 'canApproveCycle', ar: 'اعتماد دورة', en: 'Approve Cycle' },\n];''')
+          replace_once(path,
+          '''        canPrint: false,\n        canCreateUser: false,\n      };''',
+          '''        canPrint: false,\n        canCreateUser: false,\n        canCreateCycle: false,\n        canApproveCycle: false,\n      };''')
+          replace_once(path,
+          '''              {ui('صلاحية «إضافة مستخدم جديد» مخصصة حاليًا لوحدة العناية بالمساجد والمصليات، وتسمح بإنشاء أو ربط حساب المنسوب ضمن نفس عملية إضافته.', 'Create User is currently scoped to the Mosques & Prayer Rooms Care Unit and creates or links the personnel login in the same operation.')}''',
+          '''              {ui('صلاحية «إضافة مستخدم جديد» مخصصة لوحدة العناية بالمساجد والمصليات. أما «إنشاء دورة جديدة» و«اعتماد دورة» فهما مخصصتان لوحدة الأصول ولجنة متابعة متطلبات التحول المحاسبي لفصل إعداد البيانات عن اعتمادها الرسمي.', 'Create User is scoped to the Mosques & Prayer Rooms Care Unit. Create Cycle and Approve Cycle are scoped to the Assets Unit and Accounting Transformation Committee to separate data preparation from formal approval.')}''')
+          replace_once(path,
+          '''        <table className="w-full min-w-[900px] text-sm">''',
+          '''        <table className="w-full min-w-[1180px] text-sm">''')
+          replace_once(path,
+          '''                  const supported = action.key !== 'canCreateUser' || moduleName === 'mosques';\n''',
+          '''                  const isCyclePermission = action.key === 'canCreateCycle' || action.key === 'canApproveCycle';\n                  const supported = action.key === 'canCreateUser'\n                    ? moduleName === 'mosques'\n                    : isCyclePermission\n                      ? ['assets', 'accounting_transformation'].includes(moduleName)\n                      : true;\n''')
+
+          # Asset cycles page: dedicated create/approve permissions
+          path='src/app/pages/AssetCyclesPage.tsx'
+          replace_once(path,
+          '''  const canAdd = isAdmin || hasPermission('assets', 'canAdd');\n  const canEdit = isAdmin || hasPermission('assets', 'canEdit');\n  const canDelete = isAdmin || hasPermission('assets', 'canDelete');\n  const canPrint = isAdmin || hasPermission('assets', 'canPrint');\n''',
+          '''  const canAdd = isAdmin || hasPermission('assets', 'canAdd');\n  const canEdit = isAdmin || hasPermission('assets', 'canEdit');\n  const canDelete = isAdmin || hasPermission('assets', 'canDelete');\n  const canPrint = isAdmin || hasPermission('assets', 'canPrint');\n  const canCreateCycle = isAdmin || hasPermission('assets', 'canCreateCycle');\n  const canApproveCycle = isAdmin || hasPermission('assets', 'canApproveCycle');\n''')
+          replace_once(path,
+          '''  const handleCreate = async () => {\n    if (createName.trim().length < 3) return toast.error('أدخل اسم دورة واضحًا');''',
+          '''  const handleCreate = async () => {\n    if (!canCreateCycle) return toast.error('لا تملك صلاحية «إنشاء دورة جديدة»');\n    if (createName.trim().length < 3) return toast.error('أدخل اسم دورة واضحًا');''')
+          replace_once(path,
+          '''              {canAdd && <Button className="border-0 bg-[#123d73] text-white shadow-md hover:bg-[#164b87]" onClick={() => openCycle ? navigate(`/assets/import?cycleId=${openCycle.id}`) : setShowCreate(true)}><PlusCircle className="ml-2 h-4 w-4" />{openCycle ? 'استكمال الدورة المفتوحة' : 'إنشاء دورة جديدة'}</Button>}''',
+          '''              {openCycle\n                ? canAdd && <Button className="border-0 bg-[#123d73] text-white shadow-md hover:bg-[#164b87]" onClick={() => navigate(`/assets/import?cycleId=${openCycle.id}`)}><FileSpreadsheet className="ml-2 h-4 w-4" />استكمال الدورة المفتوحة</Button>\n                : canCreateCycle && <Button className="border-0 bg-[#123d73] text-white shadow-md hover:bg-[#164b87]" onClick={() => setShowCreate(true)}><PlusCircle className="ml-2 h-4 w-4" />إنشاء دورة جديدة</Button>}''')
+          replace_once(path,
+          '''      {showCreate && canAdd && !openCycle && <Card''',
+          '''      {showCreate && canCreateCycle && !openCycle && <Card''')
+          old = '''{cycle.status === 'under_review' && canEdit && <><Button size="sm" variant="outline" onClick={() => void lifecycle(cycle, 'reopen')}><RotateCcw className="ml-1.5 h-4 w-4" />إعادة للمسودة</Button><Button size="sm" className="bg-emerald-700 hover:bg-emerald-800" onClick={() => void lifecycle(cycle, 'approve')}><CheckCircle2 className="ml-1.5 h-4 w-4" />اعتماد الدورة</Button></>}'''
+          new = '''{cycle.status === 'under_review' && canEdit && <Button size="sm" variant="outline" onClick={() => void lifecycle(cycle, 'reopen')}><RotateCcw className="ml-1.5 h-4 w-4" />إعادة للمسودة</Button>}{cycle.status === 'under_review' && canApproveCycle && <Button size="sm" className="bg-emerald-700 hover:bg-emerald-800" onClick={() => void lifecycle(cycle, 'approve')}><CheckCircle2 className="ml-1.5 h-4 w-4" />اعتماد الدورة</Button>}'''
+          replace_once(path, old, new)
+
+          # Asset import page: create is separately authorized
+          path='src/app/pages/AssetCycleImportPage.tsx'
+          replace_once(path,
+          '''import { toast } from 'sonner';\n''',
+          '''import { toast } from 'sonner';\nimport { usePermissions } from '../../context/PermissionsContext';\n''')
+          replace_once(path,
+          '''  const inputRef = useRef<HTMLInputElement | null>(null);\n  const requestedCycleId''',
+          '''  const inputRef = useRef<HTMLInputElement | null>(null);\n  const { isAdmin, hasPermission } = usePermissions();\n  const canCreateCycle = isAdmin || hasPermission('assets', 'canCreateCycle');\n  const requestedCycleId''')
+          replace_once(path,
+          '''  const createCycle = async () => {\n    if (cycleName.trim().length < 3) {''',
+          '''  const createCycle = async () => {\n    if (!canCreateCycle) {\n      toast.error('لا تملك صلاحية «إنشاء دورة جديدة»');\n      return;\n    }\n    if (cycleName.trim().length < 3) {''')
+          replace_once(path,
+          '''          {!selectedCycleId && (\n            <div className="grid gap-3 rounded-2xl border border-dashed border-sky-300 bg-sky-50/45 p-4 lg:grid-cols-2">''',
+          '''          {!selectedCycleId && canCreateCycle && (\n            <div className="grid gap-3 rounded-2xl border border-dashed border-sky-300 bg-sky-50/45 p-4 lg:grid-cols-2">''')
+          replace_once(path,
+          '''          )}\n        </CardContent>\n      </Card>\n\n      <Card className={`rounded-[28px]''',
+          '''          )}\n          {!selectedCycleId && !canCreateCycle && !loadingCycles && (\n            <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm font-bold text-amber-900">لا توجد دورة مسودة متاحة، ولا يملك حسابك صلاحية «إنشاء دورة جديدة». اطلب من المسؤول إنشاء الدورة أو منح الصلاحية لك.</div>\n          )}\n        </CardContent>\n      </Card>\n\n      <Card className={`rounded-[28px]''')
+
+          # Accounting cycles page
+          path='src/app/pages/AccountingTransformationCyclesPage.tsx'
+          replace_once(path,
+          '''  const canAdd = isAdmin || hasPermission('accounting_transformation', 'canAdd');\n  const canEdit = isAdmin || hasPermission('accounting_transformation', 'canEdit');\n  const canDelete = isAdmin || hasPermission('accounting_transformation', 'canDelete');\n''',
+          '''  const canAdd = isAdmin || hasPermission('accounting_transformation', 'canAdd');\n  const canEdit = isAdmin || hasPermission('accounting_transformation', 'canEdit');\n  const canDelete = isAdmin || hasPermission('accounting_transformation', 'canDelete');\n  const canCreateCycle = isAdmin || hasPermission('accounting_transformation', 'canCreateCycle');\n  const canApproveCycle = isAdmin || hasPermission('accounting_transformation', 'canApproveCycle');\n''')
+          replace_once(path,
+          '''  const createCycle = async () => {\n    if (name.trim().length < 3) return toast.error('أدخل اسمًا واضحًا لدورة التحديث');''',
+          '''  const createCycle = async () => {\n    if (!canCreateCycle) return toast.error('لا تملك صلاحية «إنشاء دورة جديدة»');\n    if (name.trim().length < 3) return toast.error('أدخل اسمًا واضحًا لدورة التحديث');''')
+          replace_once(path,
+          '''            {canAdd && !openCycle && <Button className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"''',
+          '''            {canCreateCycle && !openCycle && <Button className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"''')
+          replace_once(path,
+          '''      {showCreate && !openCycle && <Card''',
+          '''      {showCreate && canCreateCycle && !openCycle && <Card''')
+          replace_once(path,
+          '''                  {cycle.status === 'under_review' && canEdit && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => runAction(cycle, 'approve')} disabled={busy}><CheckCircle2 className="ml-1 h-4 w-4" />اعتماد الدورة</Button>}''',
+          '''                  {cycle.status === 'under_review' && canApproveCycle && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => runAction(cycle, 'approve')} disabled={busy}><CheckCircle2 className="ml-1 h-4 w-4" />اعتماد الدورة</Button>}''')
+
+          # Accounting import page: no hidden bypass for cycle creation
+          path='src/app/pages/AccountingTransformationImportPage.tsx'
+          replace_once(path,
+          '''import { toast } from 'sonner';\n''',
+          '''import { toast } from 'sonner';\nimport { usePermissions } from '../../context/PermissionsContext';\n''')
+          replace_once(path,
+          '''  const navigate = useNavigate();\n  const [searchParams] = useSearchParams();''',
+          '''  const navigate = useNavigate();\n  const [searchParams] = useSearchParams();\n  const { isAdmin, hasPermission } = usePermissions();\n  const canCreateCycle = isAdmin || hasPermission('accounting_transformation', 'canCreateCycle');''')
+          replace_once(path,
+          '''  const createDraftCycle = async () => {\n    const name = cycleName.trim();''',
+          '''  const createDraftCycle = async () => {\n    if (!canCreateCycle) return toast.error('لا تملك صلاحية «إنشاء دورة جديدة»');\n    const name = cycleName.trim();''')
+          replace_once(path,
+          '''          {!cyclesLoading && !cycles.length && <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">''',
+          '''          {!cyclesLoading && !cycles.length && canCreateCycle && <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">''')
+          replace_once(path,
+          '''          </div>}\n        </CardContent>\n      </Card>\n\n      <Card className="rounded-[28px] border-dashed''',
+          '''          </div>}\n          {!cyclesLoading && !cycles.length && !canCreateCycle && <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm font-bold text-amber-900">لا توجد دورة مسودة قابلة للاستيراد، ولا يملك حسابك صلاحية «إنشاء دورة جديدة». اطلب من المسؤول إنشاء دورة أو منح الصلاحية لك.</div>}\n        </CardContent>\n      </Card>\n\n      <Card className="rounded-[28px] border-dashed''')
+          replace_once(path,
+          '''            <Button type="button" variant="outline" className="mt-4 rounded-xl" onClick={() => document.getElementById('accounting-cycle-name')?.focus()}><PlusCircle className="ml-2 h-4 w-4" />إنشاء دورة أولًا</Button>''',
+          '''            {canCreateCycle ? <Button type="button" variant="outline" className="mt-4 rounded-xl" onClick={() => document.getElementById('accounting-cycle-name')?.focus()}><PlusCircle className="ml-2 h-4 w-4" />إنشاء دورة أولًا</Button> : <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800">يتطلب إنشاء دورة جديدة صلاحية مستقلة من لوحة التحكم.</div>}''')
+          PY
+      - name: Verify frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Commit and clean helper
+        run: |
+          rm .github/workflows/add-cycle-permissions-ui.yml
+          git config user.name "OpenAI Project Automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/types/permissions.ts src/app/components/PermissionMatrix.tsx src/app/pages/AssetCyclesPage.tsx src/app/pages/AssetCycleImportPage.tsx src/app/pages/AccountingTransformationCyclesPage.tsx src/app/pages/AccountingTransformationImportPage.tsx .github/workflows/add-cycle-permissions-ui.yml
+          git commit -m "feat: expose dedicated cycle permissions"
+          git push
