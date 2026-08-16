@@ -30,6 +30,7 @@ const LeasedBuildingsInPage = lazy(() => import('./pages/LeasedBuildingsInPage')
 const AddLeasedBuildingInPage = lazy(() => import('./pages/AddLeasedBuildingInPage').then((m) => ({ default: m.AddLeasedBuildingInPage })));
 const UnifiedSearchPage = lazy(() => import('./pages/UnifiedSearchPage').then((m) => ({ default: m.UnifiedSearchPage })));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })));
+const OrganizationManagementPage = lazy(() => import('./pages/OrganizationManagementPage').then((m) => ({ default: m.OrganizationManagementPage })));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage })));
 const ArchivePage = lazy(() => import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage })));
 const AppearanceSettingsPage = lazy(() => import('./pages/AppearanceSettingsPage').then((m) => ({ default: m.AppearanceSettingsPage })));
@@ -179,6 +180,7 @@ export const router = createHashRouter([
       { path: 'settings', element: page(<SettingsPage />) },
       { path: 'appearance', element: page(<AppearanceSettingsPage />) },
       { path: 'search', element: page(<UnifiedSearchPage />) },
+      { path: 'admin/organization', element: adminOnly(<OrganizationManagementPage />) },
       { path: 'admin', element: adminOnly(<AdminDashboardPage />) },
       { path: 'audit', element: adminOnly(<AuditLogPage />) },
       {
