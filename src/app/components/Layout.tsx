@@ -31,6 +31,7 @@ import {
   Package,
   FileClock,
   Scale,
+  Network,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -147,6 +148,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'mosques', path: '/mosques', icon: Building, label: ui('وحدة العناية بالمساجد والمصليات', 'Mosques & Prayer Rooms Care'), module: 'mosques', action: 'canView' },
     { id: 'search', path: '/search', icon: Search, label: t('nav.search'), alwaysVisible: true },
     { id: 'reports', path: '/reports', icon: BarChart3, label: t('nav.reports'), module: 'reports', action: 'canView' },
+    { id: 'organization-admin', path: '/admin/organization', icon: Network, label: ui('الجهات والمستخدمون', 'Organizations & Users'), adminOnly: true },
     { id: 'admin', path: '/admin', icon: Shield, label: t('nav.admin'), adminOnly: true },
     { id: 'audit', path: '/audit', icon: History, label: ui('سجل العمليات', 'Audit Log'), adminOnly: true },
     { id: 'archive', path: '/archive', icon: Archive, label: ui('الأرشفة', 'Archive'), module: 'archive', action: 'canView' },
@@ -174,6 +176,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/reports')) return 'reports';
     if (path.startsWith('/archive')) return 'archive';
     if (path.startsWith('/appearance')) return 'appearance';
+    if (path.startsWith('/admin/organization')) return 'organization-admin';
     if (path.startsWith('/admin')) return 'admin';
     if (path.startsWith('/audit')) return 'audit';
     if (path.startsWith('/settings')) return 'settings';
