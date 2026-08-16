@@ -1,0 +1,354 @@
+name: Add deed A4 print report
+# Temporary workflow to patch and verify deed printing.
+on:
+  push:
+    paths:
+      - '.github/workflows/add-deed-a4-print.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Add professional A4 deed report
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/app/pages/ViewDeedPage.tsx')
+          s = p.read_text()
+
+          def replace_once(old, new, label):
+              global s
+              if old not in s:
+                  raise SystemExit(f'{label} not found')
+              s = s.replace(old, new, 1)
+
+          replace_once(
+              "  Loader2,\n} from 'lucide-react';",
+              "  Loader2,\n  Printer,\n} from 'lucide-react';",
+              'printer import',
+          )
+
+          replace_once(
+              "import { useDeeds } from '../../context/DeedContext';",
+              "import { useDeeds } from '../../context/DeedContext';\nimport { usePermissions } from '../../context/PermissionsContext';",
+              'permissions import',
+          )
+
+          replace_once(
+              "const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\\/$/, '') || '';",
+              "const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\\/$/, '') || '';\n\nconst displayPrintValue = (value: unknown) => {\n  if (value === null || value === undefined || value === '') return '-';\n  return String(value);\n};\n\nconst escapePrintHtml = (value: unknown) =>\n  displayPrintValue(value)\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\\\"/g, '&quot;')\n    .replace(/'/g, '&#039;');",
+              'print helpers',
+          )
+
+          replace_once(
+              "  const { t } = useTranslation();\n\n  const {",
+              "  const { t } = useTranslation();\n  const { isAdmin, hasPermission } = usePermissions();\n  const canPrint = isAdmin || hasPermission('deeds', 'canPrint');\n\n  const {",
+              'permission state',
+          )
+
+          marker = "  const formatFileSize = (bytes: number) => {"
+          if marker not in s:
+              raise SystemExit('formatFileSize marker not found')
+
+          print_handler = r'''  const handlePrintDeed = () => {
+    if (!deed || !canPrint) return;
+
+    const printWindow = window.open('', '_blank', 'width=1100,height=850');
+    if (!printWindow) {
+      toast.error('تعذر فتح نافذة الطباعة. يرجى السماح بالنوافذ المنبثقة ثم المحاولة مرة أخرى.');
+      return;
+    }
+
+    printWindow.opener = null;
+
+    const printedAt = new Date().toLocaleString('ar-SA');
+    const formattedDate = formatFlexibleDate(
+      deed.deedDate,
+      (deed as any).deedDateType || 'gregorian'
+    );
+    const coordinates = parseCoordinates((deed as any).coordinates);
+    const allAttachments = ([
+      ['صورة الصك', getAttachmentsByType('deed')],
+      ['صور الموقع', getAttachmentsByType('site')],
+      ['المخطط', getAttachmentsByType('plan')],
+      ['مرفقات إضافية', getAttachmentsByType('additional')],
+    ] as Array<[string, any[]]>).flatMap(([category, items]) =>
+      items.map((item) => ({ category, name: getAttachmentName(item) }))
+    );
+
+    const reportField = (label: string, value: unknown) => `
+      <div class="field">
+        <div class="label">${escapePrintHtml(label)}</div>
+        <div class="value">${escapePrintHtml(value)}</div>
+      </div>`;
+
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>تقرير الصك - ${escapePrintHtml(deed.deedNumber)}</title>
+  <style>
+    @page { size: A4 portrait; margin: 10mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #fff; }
+    body {
+      font-family: Tahoma, Arial, sans-serif;
+      color: #18324a;
+      font-size: 10.5px;
+      line-height: 1.45;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .sheet { width: 190mm; max-width: 100%; margin: 0 auto; }
+    .official-header {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+      padding: 4mm 5mm;
+      min-height: 23mm;
+      border: 1.4px solid #153f69;
+      border-radius: 4mm;
+      background: linear-gradient(180deg, #f8fbfe 0%, #edf5fb 100%);
+      break-inside: avoid;
+    }
+    .org { font-size: 11px; font-weight: 900; color: #153f69; }
+    .unit { margin-top: 2px; color: #61798d; font-size: 8.5px; font-weight: 700; }
+    .title { text-align: center; min-width: 58mm; }
+    .title h1 { margin: 0; color: #123d73; font-size: 18px; line-height: 1.2; }
+    .title p { margin: 3px 0 0; color: #718699; font-size: 8.3px; }
+    .print-meta { text-align: left; color: #677f92; font-size: 8px; line-height: 1.65; }
+    .identity {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      margin-top: 3mm;
+      padding: 3mm 4mm;
+      border: 1px solid #b8cbdc;
+      border-radius: 3mm;
+      break-inside: avoid;
+    }
+    .identity h2 { margin: 0; color: #102f50; font-size: 15px; font-weight: 900; }
+    .identity .sub { margin-top: 1.5mm; color: #6b8093; font-size: 8.5px; }
+    .badge {
+      padding: 2mm 3mm;
+      border: 1px solid #9eb5c9;
+      border-radius: 999px;
+      background: #f4f8fb;
+      color: #244a6a;
+      font-size: 9px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .section {
+      margin-top: 3mm;
+      border: 1px solid #bfd0df;
+      border-radius: 3mm;
+      overflow: hidden;
+      background: #fff;
+    }
+    .keep { break-inside: avoid; page-break-inside: avoid; }
+    .section-title {
+      padding: 2.4mm 3.5mm;
+      border-bottom: 1px solid #bfd0df;
+      background: #edf4f9;
+      color: #173f66;
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-four { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .field {
+      min-height: 14mm;
+      padding: 2.5mm 3mm;
+      border-left: 1px solid #e0e8ef;
+      border-bottom: 1px solid #e0e8ef;
+      break-inside: avoid;
+    }
+    .grid .field:nth-child(3n), .grid-four .field:nth-child(4n) { border-left: 0; }
+    .label { color: #73889b; font-size: 8px; margin-bottom: 1mm; font-weight: 700; }
+    .value {
+      color: #142f49;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    .description, .notes {
+      padding: 3mm 3.5mm;
+      color: #243e55;
+      font-size: 9.5px;
+      line-height: 1.7;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    .map-link {
+      display: flex;
+      justify-content: space-between;
+      gap: 6mm;
+      padding: 2.5mm 3.5mm;
+      border-top: 1px solid #e0e8ef;
+      color: #526d84;
+      font-size: 8px;
+      direction: rtl;
+    }
+    .attachments-summary {
+      padding: 2.5mm 3.5mm;
+      border-bottom: 1px solid #e0e8ef;
+      background: #fbfdff;
+      color: #526d84;
+      font-size: 8.5px;
+    }
+    .attachments { margin: 0; padding: 2.5mm 7mm 3mm 3mm; font-size: 8.5px; line-height: 1.55; }
+    .attachments li { margin-bottom: 1mm; break-inside: avoid; overflow-wrap: anywhere; }
+    .empty { padding: 3mm 3.5mm; color: #74889a; font-size: 9px; }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 3mm;
+      padding-top: 2mm;
+      border-top: 1px solid #ccd9e4;
+      color: #7b8d9d;
+      font-size: 7.5px;
+      break-inside: avoid;
+    }
+    @media screen {
+      body { background: #edf2f6; padding: 18px 0; }
+      .sheet { background: #fff; padding: 10mm; box-shadow: 0 12px 40px rgba(15,23,42,.12); }
+    }
+    @media print {
+      html, body { width: 210mm; }
+      body { background: #fff; }
+      .sheet { width: 190mm; max-width: 190mm; margin: 0 auto; padding-top: 5mm; }
+      .section, .identity, .official-header { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <header class="official-header">
+      <div>
+        <div class="org">جامعة الإمام عبدالرحمن بن فيصل</div>
+        <div class="unit">إدارة أوقاف وأملاك الجامعة</div>
+      </div>
+      <div class="title">
+        <h1>تقرير بيانات الصك</h1>
+        <p>نسخة مخصصة للطباعة والحفظ ضمن ملف العقار</p>
+      </div>
+      <div class="print-meta">
+        <div>تاريخ الطباعة</div>
+        <strong>${escapePrintHtml(printedAt)}</strong>
+      </div>
+    </header>
+
+    <section class="identity">
+      <div>
+        <h2>الصك رقم ${escapePrintHtml(deed.deedNumber)}</h2>
+        <div class="sub">${escapePrintHtml(deed.propertyDescription || 'بيانات العقار')}</div>
+      </div>
+      <span class="badge">${deed.isPlanned ? 'أرض مخططة' : 'أرض غير مخططة'}</span>
+    </section>
+
+    <section class="section keep">
+      <div class="section-title">المعلومات الأساسية</div>
+      <div class="grid">${[
+        reportField('رقم الصك', deed.deedNumber),
+        reportField('تاريخ الصك', formattedDate),
+        reportField('المساحة', `${Number(deed.area || 0).toLocaleString('ar-SA')} متر مربع`),
+      ].join('')}</div>
+      <div class="description"><strong>بيان العقار:</strong><br />${escapePrintHtml(deed.propertyDescription)}</div>
+      <div class="grid-four">${[
+        reportField('رقم القطعة', deed.plotNumber),
+        reportField('رقم المخطط', deed.planNumber),
+        reportField('الأرض مخططة', deed.isPlanned ? 'نعم' : 'لا'),
+        reportField('نوع الاستخدام', deed.usageType),
+      ].join('')}</div>
+    </section>
+
+    <section class="section keep">
+      <div class="section-title">معلومات الموقع</div>
+      <div class="grid-four">${[
+        reportField('المنطقة', deed.region),
+        reportField('المدينة', deed.city),
+        reportField('الحي', deed.district),
+        reportField('الموقع', deed.location),
+      ].join('')}</div>
+      <div class="grid">${[
+        reportField('خط العرض', coordinates ? formatCoordinate(coordinates.latitude) : '-'),
+        reportField('خط الطول', coordinates ? formatCoordinate(coordinates.longitude) : '-'),
+        reportField('الإحداثيات', coordinates ? `${formatCoordinate(coordinates.latitude)}, ${formatCoordinate(coordinates.longitude)}` : '-'),
+      ].join('')}</div>
+      ${coordinates ? `<div class="map-link"><span>رابط الموقع في Google Maps</span><span>https://www.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}</span></div>` : ''}
+    </section>
+
+    <section class="section keep">
+      <div class="section-title">الملاحظات</div>
+      <div class="notes">${escapePrintHtml(deed.notes)}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">المرفقات والوثائق</div>
+      <div class="attachments-summary">إجمالي المرفقات المرتبطة بالصك: <strong>${allAttachments.length.toLocaleString('ar-SA')}</strong></div>
+      ${allAttachments.length
+        ? `<ol class="attachments">${allAttachments.map((item, index) => `<li><strong>${index + 1}.</strong> ${escapePrintHtml(item.category)} — ${escapePrintHtml(item.name)}</li>`).join('')}</ol>`
+        : '<div class="empty">لا توجد مرفقات مرتبطة بهذا الصك.</div>'}
+    </section>
+
+    <footer class="footer">
+      <span>منصة إدارة الصكوك والأراضي — جامعة الإمام عبدالرحمن بن فيصل</span>
+      <span>رقم الصك: ${escapePrintHtml(deed.deedNumber)}</span>
+    </footer>
+  </main>
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        window.focus();
+        window.print();
+      }, 300);
+    });
+  </script>
+</body>
+</html>`);
+    printWindow.document.close();
+  };
+
+'''
+
+          s = s.replace(marker, print_handler + marker, 1)
+
+          replace_once(
+              "          ) : (\n            <>\n              <Button\n                variant=\"outline\"\n                onClick={startEdit}",
+              "          ) : (\n            <>\n              {canPrint && (\n                <Button\n                  variant=\"outline\"\n                  onClick={handlePrintDeed}\n                  className=\"text-sm md:text-base\"\n                  title=\"طباعة تقرير الصك بحجم A4\"\n                >\n                  <Printer className=\"h-3 w-3 md:h-4 md:w-4 mr-2\" />\n                  طباعة\n                </Button>\n              )}\n\n              <Button\n                variant=\"outline\"\n                onClick={startEdit}",
+              'print button',
+          )
+
+          p.write_text(s)
+          PY
+      - name: Verify frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Commit and clean helper
+        run: |
+          git config user.name "OpenAI Project Automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/add-deed-a4-print.yml
+          git add src/app/pages/ViewDeedPage.tsx
+          git commit -m "feat: add professional A4 deed report printing"
+          git push
