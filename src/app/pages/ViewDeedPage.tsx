@@ -750,18 +750,18 @@ export const ViewDeedPage: React.FC = () => {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>تقرير الصك - ${escapePrintHtml(deed.deedNumber)}</title>
   <style>
-    @page { size: A4 portrait; margin: 10mm; }
+    @page { size: A4 portrait; margin: 8mm; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #fff; }
     body {
       font-family: Tahoma, Arial, sans-serif;
       color: #18324a;
-      font-size: 10.5px;
-      line-height: 1.45;
+      font-size: 10.5pt;
+      line-height: 1.5;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    .sheet { width: 190mm; max-width: 100%; margin: 0 auto; }
+    .sheet { width: 100%; max-width: none; margin: 0 auto; }
     .official-header {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
@@ -774,12 +774,12 @@ export const ViewDeedPage: React.FC = () => {
       background: linear-gradient(180deg, #f8fbfe 0%, #edf5fb 100%);
       break-inside: avoid;
     }
-    .org { font-size: 11px; font-weight: 900; color: #153f69; }
-    .unit { margin-top: 2px; color: #61798d; font-size: 8.5px; font-weight: 700; }
+    .org { font-size: 11pt; font-weight: 900; color: #153f69; }
+    .unit { margin-top: 2px; color: #61798d; font-size: 8.5pt; font-weight: 700; }
     .title { text-align: center; min-width: 58mm; }
-    .title h1 { margin: 0; color: #123d73; font-size: 18px; line-height: 1.2; }
-    .title p { margin: 3px 0 0; color: #718699; font-size: 8.3px; }
-    .print-meta { text-align: left; color: #677f92; font-size: 8px; line-height: 1.65; }
+    .title h1 { margin: 0; color: #123d73; font-size: 17pt; line-height: 1.2; }
+    .title p { margin: 3px 0 0; color: #718699; font-size: 8.5pt; }
+    .print-meta { text-align: left; color: #677f92; font-size: 8pt; line-height: 1.65; }
     .identity {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -791,15 +791,15 @@ export const ViewDeedPage: React.FC = () => {
       border-radius: 3mm;
       break-inside: avoid;
     }
-    .identity h2 { margin: 0; color: #102f50; font-size: 15px; font-weight: 900; }
-    .identity .sub { margin-top: 1.5mm; color: #6b8093; font-size: 8.5px; }
+    .identity h2 { margin: 0; color: #102f50; font-size: 14pt; font-weight: 900; }
+    .identity .sub { margin-top: 1.5mm; color: #6b8093; font-size: 8.5pt; }
     .badge {
       padding: 2mm 3mm;
       border: 1px solid #9eb5c9;
       border-radius: 999px;
       background: #f4f8fb;
       color: #244a6a;
-      font-size: 9px;
+      font-size: 9pt;
       font-weight: 800;
       white-space: nowrap;
     }
@@ -816,7 +816,7 @@ export const ViewDeedPage: React.FC = () => {
       border-bottom: 1px solid #bfd0df;
       background: #edf4f9;
       color: #173f66;
-      font-size: 11px;
+      font-size: 10.5pt;
       font-weight: 900;
     }
     .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -829,10 +829,10 @@ export const ViewDeedPage: React.FC = () => {
       break-inside: avoid;
     }
     .grid .field:nth-child(3n), .grid-four .field:nth-child(4n) { border-left: 0; }
-    .label { color: #73889b; font-size: 8px; margin-bottom: 1mm; font-weight: 700; }
+    .label { color: #73889b; font-size: 8.5pt; margin-bottom: 1mm; font-weight: 700; }
     .value {
       color: #142f49;
-      font-size: 10px;
+      font-size: 10pt;
       font-weight: 800;
       line-height: 1.55;
       overflow-wrap: anywhere;
@@ -841,8 +841,8 @@ export const ViewDeedPage: React.FC = () => {
     .description, .notes {
       padding: 3mm 3.5mm;
       color: #243e55;
-      font-size: 9.5px;
-      line-height: 1.7;
+      font-size: 9.5pt;
+      line-height: 1.65;
       overflow-wrap: anywhere;
       white-space: pre-wrap;
     }
@@ -853,7 +853,7 @@ export const ViewDeedPage: React.FC = () => {
       padding: 2.5mm 3.5mm;
       border-top: 1px solid #e0e8ef;
       color: #526d84;
-      font-size: 8px;
+      font-size: 8pt;
       direction: rtl;
     }
     .attachments-summary {
@@ -861,11 +861,11 @@ export const ViewDeedPage: React.FC = () => {
       border-bottom: 1px solid #e0e8ef;
       background: #fbfdff;
       color: #526d84;
-      font-size: 8.5px;
+      font-size: 8.5pt;
     }
-    .attachments { margin: 0; padding: 2.5mm 7mm 3mm 3mm; font-size: 8.5px; line-height: 1.55; }
+    .attachments { margin: 0; padding: 2.5mm 7mm 3mm 3mm; font-size: 8.5pt; line-height: 1.55; }
     .attachments li { margin-bottom: 1mm; break-inside: avoid; overflow-wrap: anywhere; }
-    .empty { padding: 3mm 3.5mm; color: #74889a; font-size: 9px; }
+    .empty { padding: 3mm 3.5mm; color: #74889a; font-size: 9pt; }
     .footer {
       display: flex;
       justify-content: space-between;
@@ -874,17 +874,17 @@ export const ViewDeedPage: React.FC = () => {
       padding-top: 2mm;
       border-top: 1px solid #ccd9e4;
       color: #7b8d9d;
-      font-size: 7.5px;
+      font-size: 7.5pt;
       break-inside: avoid;
     }
     @media screen {
       body { background: #edf2f6; padding: 18px 0; }
-      .sheet { background: #fff; padding: 10mm; box-shadow: 0 12px 40px rgba(15,23,42,.12); }
+      .sheet { width: 190mm; max-width: calc(100% - 36px); background: #fff; padding: 10mm; box-shadow: 0 12px 40px rgba(15,23,42,.12); }
     }
     @media print {
-      html, body { width: 210mm; }
+      html, body { width: auto; min-width: 0; }
       body { background: #fff; }
-      .sheet { width: 190mm; max-width: 190mm; margin: 0 auto; padding-top: 5mm; }
+      .sheet { width: 100%; max-width: none; margin: 0; padding-top: 2mm; }
       .section, .identity, .official-header { box-shadow: none; }
     }
   </style>
