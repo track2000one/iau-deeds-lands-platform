@@ -188,7 +188,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const now = new Date();
 
   return (
-    <div className="future-app-shell min-h-dvh h-dvh w-full min-w-0 flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className="neo-platform-shell future-app-shell min-h-dvh h-dvh w-full min-w-0 flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
       <ThemeInitializer />
 
       <header className="future-topbar text-foreground z-30 relative shrink-0 min-h-[58px] sm:min-h-[64px]">
