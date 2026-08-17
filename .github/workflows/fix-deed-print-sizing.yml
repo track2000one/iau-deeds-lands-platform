@@ -1,0 +1,164 @@
+name: Fix deed print sizing
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-deed-print-sizing.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Improve deed report print sizing
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/app/pages/ViewDeedPage.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          def replace_once(old: str, new: str, label: str):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 match, found {count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              '@page { size: A4 portrait; margin: 10mm; }',
+              '@page { size: A4 portrait; margin: 8mm; }',
+              'page margins',
+          )
+          replace_once(
+              '      font-size: 10.5px;\n      line-height: 1.45;',
+              '      font-size: 10.5pt;\n      line-height: 1.5;',
+              'base typography',
+          )
+          replace_once(
+              '    .sheet { width: 190mm; max-width: 100%; margin: 0 auto; }',
+              '    .sheet { width: 100%; max-width: none; margin: 0 auto; }',
+              'sheet base width',
+          )
+          replace_once(
+              '    .org { font-size: 11px; font-weight: 900; color: #153f69; }',
+              '    .org { font-size: 11pt; font-weight: 900; color: #153f69; }',
+              'organization font',
+          )
+          replace_once(
+              '    .unit { margin-top: 2px; color: #61798d; font-size: 8.5px; font-weight: 700; }',
+              '    .unit { margin-top: 2px; color: #61798d; font-size: 8.5pt; font-weight: 700; }',
+              'unit font',
+          )
+          replace_once(
+              '    .title h1 { margin: 0; color: #123d73; font-size: 18px; line-height: 1.2; }',
+              '    .title h1 { margin: 0; color: #123d73; font-size: 17pt; line-height: 1.2; }',
+              'title font',
+          )
+          replace_once(
+              '    .title p { margin: 3px 0 0; color: #718699; font-size: 8.3px; }',
+              '    .title p { margin: 3px 0 0; color: #718699; font-size: 8.5pt; }',
+              'title subtitle font',
+          )
+          replace_once(
+              '    .print-meta { text-align: left; color: #677f92; font-size: 8px; line-height: 1.65; }',
+              '    .print-meta { text-align: left; color: #677f92; font-size: 8pt; line-height: 1.65; }',
+              'print meta font',
+          )
+          replace_once(
+              '    .identity h2 { margin: 0; color: #102f50; font-size: 15px; font-weight: 900; }',
+              '    .identity h2 { margin: 0; color: #102f50; font-size: 14pt; font-weight: 900; }',
+              'identity title font',
+          )
+          replace_once(
+              '    .identity .sub { margin-top: 1.5mm; color: #6b8093; font-size: 8.5px; }',
+              '    .identity .sub { margin-top: 1.5mm; color: #6b8093; font-size: 8.5pt; }',
+              'identity sub font',
+          )
+          replace_once(
+              '      font-size: 9px;\n      font-weight: 800;\n      white-space: nowrap;',
+              '      font-size: 9pt;\n      font-weight: 800;\n      white-space: nowrap;',
+              'badge font',
+          )
+          replace_once(
+              '      font-size: 11px;\n      font-weight: 900;',
+              '      font-size: 10.5pt;\n      font-weight: 900;',
+              'section title font',
+          )
+          replace_once(
+              '    .label { color: #73889b; font-size: 8px; margin-bottom: 1mm; font-weight: 700; }',
+              '    .label { color: #73889b; font-size: 8.5pt; margin-bottom: 1mm; font-weight: 700; }',
+              'label font',
+          )
+          replace_once(
+              '      font-size: 10px;\n      font-weight: 800;',
+              '      font-size: 10pt;\n      font-weight: 800;',
+              'value font',
+          )
+          replace_once(
+              '      font-size: 9.5px;\n      line-height: 1.7;',
+              '      font-size: 9.5pt;\n      line-height: 1.65;',
+              'description font',
+          )
+          replace_once(
+              '      font-size: 8px;\n      direction: rtl;',
+              '      font-size: 8pt;\n      direction: rtl;',
+              'map link font',
+          )
+          replace_once(
+              '      font-size: 8.5px;\n    }\n    .attachments { margin: 0; padding: 2.5mm 7mm 3mm 3mm; font-size: 8.5px; line-height: 1.55; }',
+              '      font-size: 8.5pt;\n    }\n    .attachments { margin: 0; padding: 2.5mm 7mm 3mm 3mm; font-size: 8.5pt; line-height: 1.55; }',
+              'attachments fonts',
+          )
+          replace_once(
+              '    .empty { padding: 3mm 3.5mm; color: #74889a; font-size: 9px; }',
+              '    .empty { padding: 3mm 3.5mm; color: #74889a; font-size: 9pt; }',
+              'empty state font',
+          )
+          replace_once(
+              '      font-size: 7.5px;\n      break-inside: avoid;',
+              '      font-size: 7.5pt;\n      break-inside: avoid;',
+              'footer font',
+          )
+          replace_once(
+              '      .sheet { background: #fff; padding: 10mm; box-shadow: 0 12px 40px rgba(15,23,42,.12); }',
+              '      .sheet { width: 190mm; max-width: calc(100% - 36px); background: #fff; padding: 10mm; box-shadow: 0 12px 40px rgba(15,23,42,.12); }',
+              'screen preview width',
+          )
+          replace_once(
+              '      html, body { width: 210mm; }\n      body { background: #fff; }\n      .sheet { width: 190mm; max-width: 190mm; margin: 0 auto; padding-top: 5mm; }',
+              '      html, body { width: auto; min-width: 0; }\n      body { background: #fff; }\n      .sheet { width: 100%; max-width: none; margin: 0; padding-top: 2mm; }',
+              'print page width',
+          )
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify frontend build
+        run: npm run build
+
+      - name: Commit verified fix and remove temporary workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/fix-deed-print-sizing.yml
+          git config user.name "OpenAI Project Automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/ViewDeedPage.tsx .github/workflows/fix-deed-print-sizing.yml
+          git diff --cached --check
+          git commit -m "fix: improve deed report print readability"
+          git push origin HEAD:main
