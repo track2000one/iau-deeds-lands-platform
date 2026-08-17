@@ -120,28 +120,159 @@ export const ResetPasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent p-4">
-      <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="space-y-4 text-center">
-          <div className="flex justify-center">
+    <div className="neo-reset-page" dir="rtl">
+      <style>{`
+        .neo-reset-page {
+          --neo-bg: #e8edf2;
+          --neo-text: #27313d;
+          --neo-muted: #75808c;
+          --neo-shadow: rgba(148, 163, 184, .46);
+          --neo-light: rgba(255, 255, 255, .96);
+          position: relative;
+          isolation: isolate;
+          display: flex;
+          min-height: 100dvh;
+          width: 100%;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          padding: 28px 18px;
+          background:
+            radial-gradient(circle at 50% 38%, rgba(255,255,255,.96) 0 12%, rgba(255,255,255,.32) 34%, transparent 58%),
+            linear-gradient(145deg, #eef3f7 0%, var(--neo-bg) 58%, #e2e8ee 100%);
+          color: var(--neo-text);
+        }
+
+        .neo-reset-page::before,
+        .neo-reset-page::after {
+          content: '';
+          position: absolute;
+          z-index: -1;
+          border-radius: 999px;
+          pointer-events: none;
+        }
+
+        .neo-reset-page::before {
+          width: min(46vw, 560px);
+          height: min(46vw, 560px);
+          inset-inline-start: -18vw;
+          top: -25vw;
+          background: rgba(255,255,255,.34);
+          box-shadow: 28px 28px 68px rgba(148,163,184,.16);
+        }
+
+        .neo-reset-page::after {
+          width: min(40vw, 500px);
+          height: min(40vw, 500px);
+          inset-inline-end: -16vw;
+          bottom: -24vw;
+          background: rgba(214,223,232,.44);
+          box-shadow: -22px -22px 56px rgba(255,255,255,.72);
+        }
+
+        .neo-reset-card {
+          width: min(100%, 480px) !important;
+          max-width: 480px !important;
+          gap: 0 !important;
+          overflow: hidden;
+          border: 1px solid rgba(255,255,255,.74) !important;
+          border-radius: 30px !important;
+          background: linear-gradient(145deg, #edf2f6 0%, #e5ebf0 100%) !important;
+          color: var(--neo-text) !important;
+          box-shadow:
+            -18px -18px 38px var(--neo-light),
+            18px 18px 40px var(--neo-shadow),
+            inset 1px 1px 0 rgba(255,255,255,.72) !important;
+        }
+
+        .neo-reset-logo {
+          width: 82px;
+          height: 82px;
+          display: grid;
+          place-items: center;
+          margin: 0 auto;
+          border-radius: 24px;
+          background: linear-gradient(145deg, #eef3f7, #e0e7ed);
+          box-shadow:
+            -8px -8px 18px rgba(255,255,255,.96),
+            8px 8px 18px rgba(148,163,184,.40);
+        }
+
+        .neo-reset-page [data-slot="card-title"] {
+          color: #173b60 !important;
+        }
+
+        .neo-reset-page [data-slot="card-description"] {
+          color: var(--neo-muted) !important;
+        }
+
+        .neo-reset-page [data-slot="input"] {
+          min-height: 50px;
+          border: 0 !important;
+          border-radius: 15px !important;
+          background: var(--neo-bg) !important;
+          color: var(--neo-text) !important;
+          box-shadow:
+            inset 5px 5px 11px rgba(148,163,184,.28),
+            inset -5px -5px 11px rgba(255,255,255,.90) !important;
+        }
+
+        .neo-reset-page [data-slot="input"]:focus {
+          box-shadow:
+            inset 4px 4px 9px rgba(148,163,184,.24),
+            inset -4px -4px 9px rgba(255,255,255,.92),
+            0 0 0 3px rgba(24,75,119,.10) !important;
+        }
+
+        .neo-reset-page [data-slot="button"] {
+          min-height: 48px;
+          border-radius: 15px !important;
+        }
+
+        .neo-reset-page [data-slot="button"][class*="bg-primary"] {
+          border: 0 !important;
+          background: linear-gradient(145deg, #1f5d8e, #153f66) !important;
+          color: white !important;
+          box-shadow:
+            0 7px 14px rgba(24,75,119,.22),
+            inset 1px 1px 0 rgba(255,255,255,.20) !important;
+        }
+
+        .neo-reset-page [data-slot="button"][class*="border"] {
+          background: linear-gradient(145deg, #eef3f7, #e1e8ee) !important;
+          border-color: rgba(96,115,132,.18) !important;
+          box-shadow:
+            -5px -5px 10px rgba(255,255,255,.84),
+            5px 5px 11px rgba(148,163,184,.26) !important;
+        }
+
+        @media (max-width: 520px) {
+          .neo-reset-page { padding: 18px 12px; }
+          .neo-reset-card { border-radius: 24px !important; }
+        }
+      `}</style>
+
+      <Card className="neo-reset-card">
+        <CardHeader className="space-y-4 px-6 pb-4 pt-7 text-center sm:px-8 sm:pt-8">
+          <div className="neo-reset-logo">
             <img
               src={PLATFORM_LOGO_URL}
-              alt="منصة إدارة الصكوك والأراضي"
-              className="h-20 w-20 object-contain drop-shadow-xl md:h-24 md:w-24"
+              alt="منصة إدارة الأصول والأملاك والأوقاف الجامعية"
+              className="h-16 w-16 object-contain"
             />
           </div>
 
           <div>
-            <CardTitle className="text-2xl font-bold text-primary">
+            <CardTitle className="text-2xl font-bold">
               إعادة تعيين كلمة المرور
             </CardTitle>
-            <CardDescription className="mt-2">
+            <CardDescription className="mt-2 leading-6">
               أنشئ كلمة مرور جديدة وآمنة لحسابك.
             </CardDescription>
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="px-6 pb-7 sm:px-8 sm:pb-8">
           {isValidating ? (
             <div className="flex min-h-44 flex-col items-center justify-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -172,9 +303,7 @@ export const ResetPasswordPage: React.FC = () => {
                 </p>
               </div>
               <Button asChild className="w-full">
-                <Link to="/forgot-password">
-                  طلب رابط جديد
-                </Link>
+                <Link to="/forgot-password">طلب رابط جديد</Link>
               </Button>
               <Button asChild variant="ghost" className="w-full">
                 <Link to="/login">العودة إلى تسجيل الدخول</Link>
@@ -183,7 +312,7 @@ export const ResetPasswordPage: React.FC = () => {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="new-password" className="flex items-center gap-2">
+                <Label htmlFor="new-password" className="flex items-center gap-2 font-semibold">
                   <LockKeyhole className="h-4 w-4" />
                   كلمة المرور الجديدة
                 </Label>
@@ -199,14 +328,14 @@ export const ResetPasswordPage: React.FC = () => {
                     maxLength={128}
                     autoComplete="new-password"
                     placeholder="8 أحرف على الأقل"
-                    className="pl-10"
+                    className="pl-11"
                   />
 
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute left-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                    className="absolute left-1 top-1/2 h-9 w-9 -translate-y-1/2"
                     onClick={() => setShowPassword((current) => !current)}
                   >
                     {showPassword ? (
@@ -219,7 +348,7 @@ export const ResetPasswordPage: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">
+                <Label htmlFor="confirm-password" className="font-semibold">
                   تأكيد كلمة المرور
                 </Label>
                 <Input
