@@ -14,6 +14,7 @@ import {
   PlusCircle,
   Scale,
   Sparkles,
+  Tags,
   TriangleAlert,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -39,6 +40,7 @@ const EMPTY: AccountingTransformationStats = {
 const quickActions = [
   { label: 'جميع السجلات', description: 'استعراض الأراضي والمباني والبحث في متطلبات التحول.', path: '/accounting-transformation/records', icon: FileSearch },
   { label: 'دورات تحديث البيانات', description: 'إنشاء إصدار جديد، المقارنة مع السابق، الاعتماد والأرشفة دون حذف التاريخ.', path: '/accounting-transformation/cycles', icon: History },
+  { label: 'تصنيف وترميز الأصول', description: 'الدليل المرجعي للترميز والحسابات المحاسبية والأعمار الإنتاجية وحدود الرسملة.', path: '/accounting-transformation/asset-classification', icon: Tags },
   { label: 'إضافة سجل جديد', description: 'إدخال سجل أرض أو مبنى وفق حقول النموذج المعتمد.', path: '/accounting-transformation/new', icon: PlusCircle },
   { label: 'استيراد Excel', description: 'استيراد النموذج داخل دورة تحديث مستقلة قبل اعتمادها.', path: '/accounting-transformation/import', icon: FileSpreadsheet },
   { label: 'التقارير', description: 'تقارير الحصر والجرد والتقييم مع Excel والطباعة.', path: '/accounting-transformation/reports', icon: BarChart3 },
