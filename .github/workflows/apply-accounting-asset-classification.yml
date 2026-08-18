@@ -1,0 +1,78 @@
+name: Apply accounting asset classification frontend
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-accounting-asset-classification.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-verify-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Wire page into committee routes and dashboard
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          routes_path = Path('src/app/routes.tsx')
+          routes = routes_path.read_text(encoding='utf-8')
+          lazy_anchor = "const AccountingTransformationCyclesPage = lazy(() => import('./pages/AccountingTransformationCyclesPage').then((m) => ({ default: m.AccountingTransformationCyclesPage })));\n"
+          lazy_line = "const AccountingAssetClassificationPage = lazy(() => import('./pages/AccountingAssetClassificationPage').then((m) => ({ default: m.AccountingAssetClassificationPage })));\n"
+          if lazy_line not in routes:
+              if lazy_anchor not in routes:
+                  raise SystemExit('accounting lazy import anchor not found')
+              routes = routes.replace(lazy_anchor, lazy_anchor + lazy_line, 1)
+
+          child_anchor = "          { path: 'cycles', element: accountingTransformationPermission(<AccountingTransformationCyclesPage />, 'canView') },\n"
+          child_line = "          { path: 'asset-classification', element: accountingTransformationPermission(<AccountingAssetClassificationPage />, 'canView') },\n"
+          if child_line not in routes:
+              if child_anchor not in routes:
+                  raise SystemExit('accounting route anchor not found')
+              routes = routes.replace(child_anchor, child_anchor + child_line, 1)
+          routes_path.write_text(routes, encoding='utf-8')
+
+          dashboard_path = Path('src/app/pages/AccountingTransformationDashboardPage.tsx')
+          dashboard = dashboard_path.read_text(encoding='utf-8')
+          icon_anchor = "  TriangleAlert,\n"
+          if "  Tags,\n" not in dashboard:
+              if icon_anchor not in dashboard:
+                  raise SystemExit('dashboard icon anchor not found')
+              dashboard = dashboard.replace(icon_anchor, "  Tags,\n" + icon_anchor, 1)
+
+          action_anchor = "  { label: 'دورات تحديث البيانات', description: 'إنشاء إصدار جديد، المقارنة مع السابق، الاعتماد والأرشفة دون حذف التاريخ.', path: '/accounting-transformation/cycles', icon: History },\n"
+          action_line = "  { label: 'تصنيف وترميز الأصول', description: 'الدليل المرجعي للترميز والحسابات المحاسبية والأعمار الإنتاجية وحدود الرسملة.', path: '/accounting-transformation/asset-classification', icon: Tags },\n"
+          if action_line not in dashboard:
+              if action_anchor not in dashboard:
+                  raise SystemExit('dashboard quick action anchor not found')
+              dashboard = dashboard.replace(action_anchor, action_anchor + action_line, 1)
+          dashboard_path.write_text(dashboard, encoding='utf-8')
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify frontend build
+        run: npm run build
+
+      - name: Commit verified frontend feature
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-accounting-asset-classification.yml
+          git config user.name "OpenAI Project Automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/routes.tsx src/app/pages/AccountingTransformationDashboardPage.tsx src/app/pages/AccountingAssetClassificationPage.tsx src/app/api/accountingAssetClassification.ts src/utils/accountingAssetClassificationExcel.ts .github/workflows/apply-accounting-asset-classification.yml
+          git commit -m "feat: add accounting asset classification catalog"
+          git push origin HEAD:main
