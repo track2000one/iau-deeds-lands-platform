@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: frontend-build-${{ github.ref }}
   cancel-in-progress: true
@@ -14,9 +17,97 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+      - name: Apply mosque leadership visibility boundary
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/app/pages/MosquesUnitPage.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          old = """        const [requestRows, ticketRows, leaveRows, personRows, staffRows] = await Promise.all([\n          mosqueApi.requests(), mosqueApi.tickets(), mosqueApi.leaves(), mosqueApi.personnel(), mosqueApi.staffDirectory(),\n        ]);"""
+          new = """        const [requestRows, ticketRows, leaveRows, personRows, staffRows] = await Promise.all([\n          mosqueApi.requests(),\n          mosqueApi.tickets(),\n          mosqueApi.leaves(),\n          mosqueApi.personnel(),\n          isAdmin ? mosqueApi.staffDirectory() : Promise.resolve([] as MosqueStaffUser[]),\n        ]);"""
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          old = '        setPersonnel(personRows);'
+          new = "        setPersonnel(personRows.filter((item) => ['imam', 'muezzin', 'khateeb', 'collaborating_khateeb'].includes(item.role)));"
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          old = "        if (me.role === 'head') {"
+          if old in s:
+              s = s.replace(old, '        if (isAdmin) {', 1)
+
+          old = "{role === 'head' && <TabsTrigger value=\"roles\">الأدوار التشغيلية</TabsTrigger>}"
+          if old in s:
+              s = s.replace(old, "{isAdmin && <TabsTrigger value=\"roles\">الأدوار التشغيلية</TabsTrigger>}", 1)
+
+          old = "{role === 'head' && <Field label=\"المشرف المسؤول عن الموقع\">"
+          if old in s:
+              s = s.replace(old, "{isAdmin && <Field label=\"المشرف المسؤول عن الموقع\">", 1)
+
+          old = '<Rule title="المنسوبون" text="إدارة المشرفين ومنسوبي المساجد وربطهم بالمواقع." />'
+          if old in s:
+              s = s.replace(old, '<Rule title="منسوبو المساجد" text="إدارة ومتابعة الإمام والمؤذن والخطيب والخطيب المتعاون فقط." />', 1)
+
+          effect = "  useEffect(() => { loadAll(); }, []);\n"
+          if effect in s and "activeTab === 'roles'" not in s:
+              s = s.replace(effect, effect + "\n  useEffect(() => {\n    if (!isAdmin && activeTab === 'roles') setActiveTab('team');\n  }, [isAdmin, activeTab]);\n", 1)
+
+          fn = "  const setUserAssignment = async (userId: string, roleValue: MosqueModuleRole, siteId?: string, personnelRole?: string) => {\n"
+          if fn in s and 'إدارة أدوار مستخدمي المنصة متاحة لمسؤول النظام فقط' not in s:
+              s = s.replace(fn, fn + "    if (!isAdmin) {\n      toast.error('إدارة أدوار مستخدمي المنصة متاحة لمسؤول النظام فقط');\n      return;\n    }\n", 1)
+
+          required = [
+              'isAdmin ? mosqueApi.staffDirectory()',
+              "personRows.filter((item) => ['imam', 'muezzin', 'khateeb', 'collaborating_khateeb'].includes(item.role))",
+              '{isAdmin && <TabsTrigger value="roles">الأدوار التشغيلية</TabsTrigger>}',
+              'إدارة أدوار مستخدمي المنصة متاحة لمسؤول النظام فقط',
+          ]
+          missing = [x for x in required if x not in s]
+          if missing:
+              raise SystemExit('Missing required permission guards: ' + repr(missing))
+          p.write_text(s, encoding='utf-8')
+          PY
       - run: npm ci
       - run: npm run build
+      - name: Commit verified fix and restore build workflow
+        shell: bash
+        run: |
+          cat > .github/workflows/frontend-build.yml <<'EOF'
+          name: Frontend Build Verification
+
+          on:
+            push:
+              branches: [main]
+            workflow_dispatch:
+
+          concurrency:
+            group: frontend-build-${{ github.ref }}
+            cancel-in-progress: true
+
+          jobs:
+            build:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: 20
+                    cache: npm
+                - run: npm ci
+                - run: npm run build
+          EOF
+          rm -f .github/workflows/apply-mosque-user-scope-20260818.yml .github/workflows/mosque-permission-hotfix-v2.yml
+          git config user.name "OpenAI Project Automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/MosquesUnitPage.tsx .github/workflows/frontend-build.yml .github/workflows/apply-mosque-user-scope-20260818.yml .github/workflows/mosque-permission-hotfix-v2.yml
+          git commit -m "fix: restrict mosque leadership to mosque personnel"
+          git push origin HEAD:main
