@@ -198,15 +198,19 @@ export const MosquesUnitPage: React.FC = () => {
 
       if (me.role === 'head' || me.role === 'supervisor') {
         const [requestRows, ticketRows, leaveRows, personRows, staffRows] = await Promise.all([
-          mosqueApi.requests(), mosqueApi.tickets(), mosqueApi.leaves(), mosqueApi.personnel(), mosqueApi.staffDirectory(),
+          mosqueApi.requests(),
+          mosqueApi.tickets(),
+          mosqueApi.leaves(),
+          mosqueApi.personnel(),
+          isAdmin ? mosqueApi.staffDirectory() : Promise.resolve([] as MosqueStaffUser[]),
         ]);
         setRequests(requestRows);
         setTickets(ticketRows);
         setLeaves(leaveRows);
-        setPersonnel(personRows);
+        setPersonnel(personRows.filter((item) => ['imam', 'muezzin', 'khateeb', 'collaborating_khateeb'].includes(item.role)));
         setStaffUsers(staffRows);
         try { setJobs(await mosqueApi.jobs()); } catch { setJobs([]); }
-        if (me.role === 'head') {
+        if (isAdmin) {
           try {
             const rows = await mosqueApi.assignments();
             setAssignments(rows);
@@ -243,6 +247,10 @@ export const MosquesUnitPage: React.FC = () => {
 
 
   useEffect(() => { loadAll(); }, []);
+
+  useEffect(() => {
+    if (!isAdmin && activeTab === 'roles') setActiveTab('team');
+  }, [isAdmin, activeTab]);
 
   const visibleSites = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -462,6 +470,10 @@ export const MosquesUnitPage: React.FC = () => {
   };
 
   const setUserAssignment = async (userId: string, roleValue: MosqueModuleRole, siteId?: string, personnelRole?: string) => {
+    if (!isAdmin) {
+      toast.error('إدارة أدوار مستخدمي المنصة متاحة لمسؤول النظام فقط');
+      return;
+    }
     try {
       if (roleValue === 'personnel' && !siteId) {
         toast.error('حدد المسجد أو المصلى المرتبط بالمنسوب');
@@ -588,7 +600,7 @@ export const MosquesUnitPage: React.FC = () => {
           <TabsTrigger value="map">الخريطة</TabsTrigger>
           {['head', 'supervisor'].includes(role) && <TabsTrigger value="reports">التقارير</TabsTrigger>}
           {['head', 'supervisor'].includes(role) && <TabsTrigger value="team">منسوبو المساجد</TabsTrigger>}
-          {role === 'head' && <TabsTrigger value="roles">الأدوار التشغيلية</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="roles">الأدوار التشغيلية</TabsTrigger>}
           {role !== 'university_member' && role !== 'viewer' && <TabsTrigger value="notifications" className="gap-1">الإشعارات {unreadNotifications > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{unreadNotifications}</span>}</TabsTrigger>}
         </TabsList>
 
@@ -598,7 +610,7 @@ export const MosquesUnitPage: React.FC = () => {
               <Card className={card3d}><CardHeader><CardTitle>آخر طلبات الصيانة والاحتياج</CardTitle><CardDescription>أحدث العمليات داخل منظومة الوحدة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد طلبات حتى الآن" />}</CardContent></Card>
               <Card className={card3d}><CardHeader><CardTitle>آخر البلاغات</CardTitle><CardDescription>بلاغات الزوار ومنسوبي الجامعة التي تحتاج متابعة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد بلاغات حتى الآن" />}</CardContent></Card>
             </div>
-            <Card className={card3d}><CardHeader><CardTitle>إدارة المنظومة</CardTitle><CardDescription>رئيس الوحدة يملك الرؤية الشاملة والتقارير والإعدادات واعتماد الإجراءات.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="الإشراف الشامل" text="متابعة جميع المساجد والمصليات والطلبات والبلاغات." /><Rule title="الاعتماد" text="اعتماد الطلبات والإجازات والقرارات النهائية." /><Rule title="المؤشرات" text="متابعة الأداء والطلبات المتأخرة والحالات العاجلة." /><Rule title="المنسوبون" text="إدارة المشرفين ومنسوبي المساجد وربطهم بالمواقع." /></CardContent></Card>
+            <Card className={card3d}><CardHeader><CardTitle>إدارة المنظومة</CardTitle><CardDescription>رئيس الوحدة يملك الرؤية الشاملة والتقارير والإعدادات واعتماد الإجراءات.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="الإشراف الشامل" text="متابعة جميع المساجد والمصليات والطلبات والبلاغات." /><Rule title="الاعتماد" text="اعتماد الطلبات والإجازات والقرارات النهائية." /><Rule title="المؤشرات" text="متابعة الأداء والطلبات المتأخرة والحالات العاجلة." /><Rule title="منسوبو المساجد" text="إدارة ومتابعة الإمام والمؤذن والخطيب والخطيب المتعاون فقط." /></CardContent></Card>
           </>}
 
           {role === 'supervisor' && <>
@@ -752,7 +764,7 @@ export const MosquesUnitPage: React.FC = () => {
                 <Field label="المدينة"><Input className="h-11" value={siteForm.city} onChange={(e) => setSiteForm({ ...siteForm, city: e.target.value })} /></Field>
                 <Field label="الحي"><Input className="h-11" value={siteForm.district} onChange={(e) => setSiteForm({ ...siteForm, district: e.target.value })} /></Field>
                 <Field label="الموقع داخل الجامعة"><Input className="h-11" value={siteForm.campusLocation} onChange={(e) => setSiteForm({ ...siteForm, campusLocation: e.target.value })} placeholder="الحرم / المبنى / الكلية" /></Field>
-                {role === 'head' && <Field label="المشرف المسؤول عن الموقع"><NativeSelect className="h-11" value={siteForm.supervisorUserId || ''} onChange={(e) => setSiteForm({ ...siteForm, supervisorUserId: e.target.value })}><option value="">بدون إسناد حالي</option>{staffUsers.filter((user) => user.moduleRole === 'supervisor').map((user) => <option key={user.uid} value={user.uid}>{user.username}</option>)}</NativeSelect></Field>}
+                {isAdmin && <Field label="المشرف المسؤول عن الموقع"><NativeSelect className="h-11" value={siteForm.supervisorUserId || ''} onChange={(e) => setSiteForm({ ...siteForm, supervisorUserId: e.target.value })}><option value="">بدون إسناد حالي</option>{staffUsers.filter((user) => user.moduleRole === 'supervisor').map((user) => <option key={user.uid} value={user.uid}>{user.username}</option>)}</NativeSelect></Field>}
               </CardContent>
             </Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
