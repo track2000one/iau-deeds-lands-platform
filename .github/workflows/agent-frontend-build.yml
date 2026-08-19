@@ -1,9 +1,9 @@
 name: Agent Frontend Build Verification
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/excel-import-reconciliation
+      - main
 
 concurrency:
   group: agent-frontend-build-${{ github.ref }}
