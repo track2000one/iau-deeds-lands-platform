@@ -79,17 +79,17 @@ const structuralScore = (workbook: XLSX.WorkBook, sheetName: string, type: Accou
   const rows = getSheetMatrix(workbook, sheetName).slice(0, 7);
   const flattened = rows.flat().map(normalizeArabicText).filter(Boolean);
   if (!flattened.length) return 0;
-  const fieldLabels = ACCOUNTING_FIELDS[type].map((field) => normalizeArabicText(field.a)).filter(Boolean);
-  let score = fieldLabels.reduce((count, field) => count + (flattened.some((cell) => cell === field || cell.includes(field)) ? 1 : 0), 0);
 
   const uValues = rows.map((row) => normalizeArabicText(row[excelColumnToIndex('U')])).filter(Boolean);
-  if (type === 'building') {
-    if (uValues.some((value) => value.includes('العمر الانتاجي') || value.includes('useful life'))) score += 12;
-    if (flattened.some((value) => value.includes('building') || value.includes('مباني') || value.includes('المباني'))) score += 2;
-  } else {
-    if (uValues.some((value) => value.includes('مساحه الارض') || value.includes('land area'))) score += 12;
-    if (flattened.some((value) => value.includes('land') || value.includes('الاراضي') || value.includes('ارض'))) score += 2;
-  }
+  const hasTypeMarker = type === 'building'
+    ? uValues.some((value) => value.includes('العمر الانتاجي') || value.includes('useful life'))
+    : uValues.some((value) => value.includes('مساحه الارض') || value.includes('land area'));
+  if (!hasTypeMarker) return 0;
+
+  const fieldLabels = ACCOUNTING_FIELDS[type].map((field) => normalizeArabicText(field.a)).filter(Boolean);
+  let score = 20 + fieldLabels.reduce((count, field) => count + (flattened.some((cell) => cell === field || cell.includes(field)) ? 1 : 0), 0);
+  if (type === 'building' && flattened.some((value) => value.includes('building') || value.includes('مباني') || value.includes('المباني'))) score += 2;
+  if (type === 'land' && flattened.some((value) => value.includes('land') || value.includes('الاراضي') || value.includes('ارض'))) score += 2;
   return score;
 };
 
@@ -105,7 +105,7 @@ export const findAccountingTemplateSheet = (workbook: XLSX.WorkBook, type: Accou
 
   const scored = names
     .map((name) => ({ name, score: structuralScore(workbook, name, type) }))
-    .filter((item) => item.score >= 10)
+    .filter((item) => item.score >= 20)
     .sort((a, b) => b.score - a.score);
   return scored[0]?.name;
 };
@@ -216,7 +216,11 @@ const classificationPayload = (row: AccountingAssetClassificationRow): Record<(t
   T: row.accountingAssetCode || '',
 });
 
-const unique = <T,>(items: T[]) => items.length === 1 ? items[0] : null;
+const chooseCurrent = <T extends { lifecycleStatus?: string | null },>(items: T[]) => {
+  const current = items.filter((item) => /new|جديد/i.test(String(item.lifecycleStatus || '')));
+  if (current.length === 1) return current[0];
+  return items.length === 1 ? items[0] : null;
+};
 
 const matchClassification = (
   payload: Record<string, unknown>,
@@ -225,7 +229,7 @@ const matchClassification = (
   const tCode = normalizeCode(payload.T, 8);
   if (tCode) {
     const byAssetCode = classifications.filter((row) => normalizeCode(row.accountingAssetCode, 8) === tCode);
-    const exact = unique(byAssetCode);
+    const exact = chooseCurrent(byAssetCode);
     if (exact) return exact;
   }
 
@@ -241,7 +245,7 @@ const matchClassification = (
       && normalizeCode(row.level2Code, 2) === codeParts[1]
       && normalizeCode(row.level3Code, 2) === codeParts[2]
       && normalizeCode(row.accountingGroupCode, 2) === codeParts[3]);
-    const exact = unique(byCodes);
+    const exact = chooseCurrent(byCodes);
     if (exact) return exact;
   }
 
@@ -252,7 +256,7 @@ const matchClassification = (
       && normalizeArabicText(row.level2Ar) === textParts[1]
       && normalizeArabicText(row.level3Ar) === textParts[2]
       && normalizeArabicText(row.accountingGroupAr) === textParts[3]);
-    const exact = unique(byHierarchy);
+    const exact = chooseCurrent(byHierarchy);
     if (exact) return exact;
   }
 
@@ -262,7 +266,7 @@ const matchClassification = (
       normalizeArabicText(row.level1Ar) === hierarchyWithoutGroup[0]
       && normalizeArabicText(row.level2Ar) === hierarchyWithoutGroup[1]
       && normalizeArabicText(row.level3Ar) === hierarchyWithoutGroup[2]);
-    const exact = unique(matches);
+    const exact = chooseCurrent(matches);
     if (exact) return exact;
   }
   return null;
@@ -276,8 +280,7 @@ const matchUsefulLife = (
     normalizeArabicText(row.level1Ar) === normalizeArabicText(classification.level1Ar)
     && normalizeArabicText(row.level2Ar) === normalizeArabicText(classification.level2Ar)
     && normalizeArabicText(row.level3Ar) === normalizeArabicText(classification.level3Ar));
-  const current = matches.filter((row) => /new|جديد/i.test(String(row.lifecycleStatus || '')));
-  return unique(current) || unique(matches);
+  return chooseCurrent(matches);
 };
 
 const parseNumber = (value: unknown) => {
