@@ -1,0 +1,22 @@
+name: Agent Frontend Build Verification
+
+on:
+  push:
+    branches:
+      - agent/excel-import-reconciliation
+
+concurrency:
+  group: agent-frontend-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
