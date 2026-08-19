@@ -12,6 +12,7 @@ import {
   getAssetCycleComparison,
   getAssetCycles,
   importAssetCycleRows,
+  previewAssetCycleRows,
   type AssetCycleComparison,
   type AssetCycleImportRow,
   type AssetUpdateCycle,
@@ -23,6 +24,7 @@ import {
 } from '../../utils/assetExcelImport';
 
 const IMPORT_BATCH_SIZE = 200;
+type AssetCycleImportPreview = Awaited<ReturnType<typeof previewAssetCycleRows>>;
 
 const statusLabel: Record<string, string> = {
   draft: 'مسودة',
@@ -64,6 +66,8 @@ export const AssetCycleImportPage: React.FC = () => {
   const [files, setFiles] = useState<ParsedAssetExcelFile[]>([]);
   const [rows, setRows] = useState<AssetCycleImportRow[]>([]);
   const [parsing, setParsing] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [preview, setPreview] = useState<AssetCycleImportPreview | null>(null);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState('');
@@ -129,6 +133,7 @@ export const AssetCycleImportPage: React.FC = () => {
     setParsing(true);
     setFiles([]);
     setRows([]);
+    setPreview(null);
     setComparison(null);
     setImportStats({ created: 0, skipped: 0, invalid: 0 });
     setMessage('جارٍ قراءة ملفات Excel والتعرف على النماذج المعتمدة...');
@@ -144,7 +149,28 @@ export const AssetCycleImportPage: React.FC = () => {
       })));
       setFiles(parsed);
       setRows(stagedRows);
-      setMessage(`تم تحليل ${parsed.length.toLocaleString('ar-SA')} ملف وإيجاد ${stagedRows.length.toLocaleString('ar-SA')} سجل. الاستيراد التالي سيحفظها داخل مسودة الدورة فقط ولن يغيّر البيانات الحالية.`);
+
+      if (!stagedRows.length) {
+        setMessage('تمت قراءة الملف، لكن لم يتم العثور على سجلات أصول قابلة للمطابقة.');
+        return;
+      }
+
+      setPreviewing(true);
+      setMessage(`تم تحليل ${parsed.length.toLocaleString('ar-SA')} ملف وإيجاد ${stagedRows.length.toLocaleString('ar-SA')} سجل. جارٍ الآن فحص الأرقام الفريدة ومطابقة كل سجل تلقائيًا مع البيانات الحالية...`);
+      try {
+        const analysis = await previewAssetCycleRows(selectedCycleId, stagedRows);
+        setPreview(analysis);
+        setMessage(
+          `اكتمل الفحص التلقائي قبل الاستيراد: ${(analysis.new || 0).toLocaleString('ar-SA')} سجل جديد، ${(analysis.modified || 0).toLocaleString('ar-SA')} سجل موجود تغيّر فيه حقل واحد أو أكثر، ${(analysis.unchanged || 0).toLocaleString('ar-SA')} سجل مطابق دون تغيير${analysis.duplicate ? `، و${analysis.duplicate.toLocaleString('ar-SA')} سجل مكرر/مدخل مسبقًا في الدورة` : ''}${analysis.needsReview ? `، و${analysis.needsReview.toLocaleString('ar-SA')} سجل يحتاج مراجعة للهوية` : ''}. لن تتغير البيانات الحالية قبل حفظ المسودة ثم مراجعتها واعتمادها.`
+        );
+      } catch (previewError) {
+        setPreview(null);
+        const text = previewError instanceof Error ? previewError.message : 'تعذر إجراء المطابقة التلقائية';
+        setMessage(`تمت قراءة الملف، لكن تعذر تنفيذ الفحص التلقائي قبل الاستيراد: ${text}`);
+        toast.error(text);
+      } finally {
+        setPreviewing(false);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'تعذر قراءة ملفات Excel');
       toast.error(error instanceof Error ? error.message : 'تعذر قراءة ملفات Excel');
@@ -155,12 +181,17 @@ export const AssetCycleImportPage: React.FC = () => {
   };
 
   const importIntoCycle = async () => {
-    if (!selectedCycle || !rows.length || importing) return;
-    if (!window.confirm(`سيتم حفظ ${rows.length.toLocaleString('ar-SA')} سجل داخل مسودة «${selectedCycle.name}» للمقارنة والمراجعة. لن تتغير بيانات الأصول الحالية قبل اعتماد الدورة. هل ترغب بالمتابعة؟`)) return;
+    if (!selectedCycle || !rows.length || importing || previewing) return;
+    if (!preview) {
+      toast.error('يجب إكمال الفحص التلقائي والمطابقة قبل حفظ الملف في دورة التحديث.');
+      return;
+    }
+    const summary = `نتيجة المطابقة: ${(preview.new || 0).toLocaleString('ar-SA')} جديد، ${(preview.modified || 0).toLocaleString('ar-SA')} يحتاج تحديثًا، ${(preview.unchanged || 0).toLocaleString('ar-SA')} بدون تغيير${preview.duplicate ? `، ${preview.duplicate.toLocaleString('ar-SA')} مكرر` : ''}${preview.invalid ? `، ${preview.invalid.toLocaleString('ar-SA')} غير صالح` : ''}.`;
+    if (!window.confirm(`${summary}\n\nسيتم حفظ نتائج المطابقة داخل مسودة «${selectedCycle.name}». السجل الموجود بنفس الرقم الفريد سيبقى نفس الأصل ويصنف «معدل» إذا تغيّر أي حقل، ولن تصبح البيانات الحالية إلا بعد المراجعة والاعتماد. هل ترغب بالمتابعة؟`)) return;
     setImporting(true);
     setProgress(0);
     setImportStats({ created: 0, skipped: 0, invalid: 0 });
-    setMessage('جارٍ حفظ البيانات داخل مسودة الدورة ومقارنتها بالدورة السابقة...');
+    setMessage('جارٍ حفظ البيانات داخل مسودة الدورة وفق نتيجة المطابقة ومقارنتها بالدورة السابقة...');
     try {
       let created = 0;
       let skipped = 0;
@@ -177,7 +208,7 @@ export const AssetCycleImportPage: React.FC = () => {
       }
       const freshComparison = await getAssetCycleComparison(selectedCycle.id);
       setComparison(freshComparison);
-      setMessage('اكتمل حفظ مسودة دورة الأصول. راجع ملخص التغييرات قبل إرسال الدورة للمراجعة والاعتماد.');
+      setMessage('اكتمل حفظ مسودة دورة الأصول. راجع السجلات المعدلة والحقول المتغيرة قبل إرسال الدورة للمراجعة والاعتماد.');
       toast.success('تم استيراد البيانات إلى مسودة دورة الأصول بنجاح');
       await loadCycles();
     } catch (error) {
@@ -196,11 +227,11 @@ export const AssetCycleImportPage: React.FC = () => {
             <div>
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-bold">
                 <ShieldCheck className="h-4 w-4" />
-                استيراد آمن بنظام الإصدارات
+                استيراد آمن بنظام الإصدارات والمطابقة التلقائية
               </div>
               <h1 className="text-3xl font-black">استيراد دورة تحديث جديدة للأصول</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-300">
-                ملفات Excel تحفظ أولًا داخل دورة مستقلة، ثم تقارن بالبيانات السابقة. لا تصبح البيانات الحالية إلا بعد المراجعة والاعتماد.
+                يحلل النظام ملف Excel أولًا، ويطابق السجلات بالرقم الفريد، ثم يصنفها إلى جديد أو معدل أو مطابق أو يحتاج مراجعة. لا تصبح البيانات الحالية إلا بعد المراجعة والاعتماد.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -222,7 +253,20 @@ export const AssetCycleImportPage: React.FC = () => {
             <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />جارٍ تحميل الدورات...</div>
           ) : draftCycles.length > 0 ? (
             <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
-              <select value={selectedCycleId} onChange={(event) => { setSelectedCycleId(event.target.value); setComparison(cycles.find((cycle) => cycle.id === event.target.value)?.comparison || null); }} className="h-11 rounded-xl border bg-white px-3 text-sm font-bold">
+              <select
+                value={selectedCycleId}
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  setSelectedCycleId(nextId);
+                  setComparison(cycles.find((cycle) => cycle.id === nextId)?.comparison || null);
+                  setPreview(null);
+                  setFiles([]);
+                  setRows([]);
+                  setImportStats({ created: 0, skipped: 0, invalid: 0 });
+                  setMessage('تم تغيير دورة التحديث. اختر ملف Excel لإجراء مطابقة جديدة مع الدورة المحددة.');
+                }}
+                className="h-11 rounded-xl border bg-white px-3 text-sm font-bold"
+              >
                 {draftCycles.map((cycle) => <option key={cycle.id} value={cycle.id}>#{cycle.cycleNumber} — {cycle.name} — {statusLabel[cycle.status] || cycle.status}</option>)}
               </select>
               <Button variant="outline" onClick={() => void loadCycles()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button>
@@ -247,10 +291,17 @@ export const AssetCycleImportPage: React.FC = () => {
       <Card className={`rounded-[28px] border bg-white/90 shadow-sm ${!selectedCycleId ? 'opacity-60' : ''}`}>
         <CardHeader><CardTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-emerald-700" />اختيار ملفات الأصول بصيغة XLSX</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <button type="button" disabled={!selectedCycleId || parsing || importing} onClick={() => inputRef.current?.click()} className="flex min-h-[180px] w-full flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-sky-300 bg-gradient-to-b from-sky-50/70 to-white p-6 text-center transition hover:border-sky-500 disabled:cursor-not-allowed">
-            {parsing ? <Loader2 className="mb-3 h-9 w-9 animate-spin text-sky-700" /> : <UploadCloud className="mb-3 h-10 w-10 text-sky-700" />}
-            <div className="font-black">{selectedCycleId ? 'اضغط لاختيار ملف أو عدة ملفات Excel' : 'أنشئ دورة مسودة أولًا لتفعيل رفع الملفات'}</div>
-            <div className="mt-2 text-xs text-muted-foreground">سيتم تحليل النماذج محليًا ثم حفظ السجلات في مسودة الدورة فقط.</div>
+          <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-7 text-sky-950">
+            <div className="flex items-center gap-2 font-black"><ShieldCheck className="h-5 w-5 text-sky-700" />قاعدة المطابقة والاستيراد</div>
+            <p className="mt-2">
+              لا يحتاج المستخدم إلى اختيار «تحديث» أو «تجديد». عند رفع الملف يفحص النظام السجلات تلقائيًا بالرقم الفريد/التعريفي المتاح للسجل؛ فإذا وجد نفس الأصل ووجد اختلافًا في حقل واحد أو أكثر يصنف السجل «معدل»، وإذا لم يوجد اختلاف يصنف «بدون تغيير»، وإذا لم يجد الرقم في البيانات الحالية يصنفه «جديد». الهوية غير الكافية أو المكررة تظهر للمراجعة ولا تعتمد بصمت.
+            </p>
+          </div>
+
+          <button type="button" disabled={!selectedCycleId || parsing || previewing || importing} onClick={() => inputRef.current?.click()} className="flex min-h-[180px] w-full flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-sky-300 bg-gradient-to-b from-sky-50/70 to-white p-6 text-center transition hover:border-sky-500 disabled:cursor-not-allowed">
+            {parsing || previewing ? <Loader2 className="mb-3 h-9 w-9 animate-spin text-sky-700" /> : <UploadCloud className="mb-3 h-10 w-10 text-sky-700" />}
+            <div className="font-black">{selectedCycleId ? (previewing ? 'جارٍ مطابقة السجلات مع البيانات الحالية...' : 'اضغط لاختيار ملف أو عدة ملفات Excel') : 'أنشئ دورة مسودة أولًا لتفعيل رفع الملفات'}</div>
+            <div className="mt-2 text-xs text-muted-foreground">تتم القراءة والمطابقة قبل أي حفظ، ثم تعرض النتيجة للمستخدم للمراجعة.</div>
           </button>
           <input ref={inputRef} type="file" accept=".xlsx" multiple className="hidden" onChange={(event) => void handleFiles(event.target.files)} />
 
@@ -268,17 +319,47 @@ export const AssetCycleImportPage: React.FC = () => {
 
           {message && <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm leading-7">{message}</div>}
 
+          {preview && (
+            <div className="space-y-4 rounded-[24px] border border-sky-200 bg-white p-4 shadow-sm">
+              <div>
+                <div className="flex items-center gap-2 font-black text-sky-900"><CheckCircle2 className="h-5 w-5 text-sky-700" />نتيجة المطابقة التلقائية قبل الاستيراد</div>
+                <div className="mt-1 text-xs leading-6 text-slate-600">هذه النتيجة هي التي تحدد ما إذا كان الصف سجلًا جديدًا أو تحديثًا لنفس الأصل أو مطابقًا دون تغيير. لا يعتمد القرار على ترتيب الصف في Excel.</div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+                <SummaryCard label="إجمالي الملف" value={preview.total} />
+                <SummaryCard label="سجلات جديدة" value={preview.new} tone="emerald" />
+                <SummaryCard label="تحتاج تحديث" value={preview.modified} tone="amber" />
+                <SummaryCard label="بدون تغيير" value={preview.unchanged} tone="sky" />
+                <SummaryCard label="مكرر/مدخل مسبقًا" value={preview.duplicate} tone="rose" />
+                <SummaryCard label="غير صالح" value={preview.invalid} tone="rose" />
+                <SummaryCard label="تحتاج مراجعة هوية" value={preview.needsReview} tone="amber" />
+              </div>
+              {preview.modified > 0 && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-7 text-amber-950">
+                  يوجد {preview.modified.toLocaleString('ar-SA')} سجل معروف للنظام تغيّر فيه حقل واحد أو أكثر. سيبقى نفس الأصل، وتظهر الحقول المتغيرة ضمن مراجعة دورة الأصول قبل الاعتماد، مع الاحتفاظ بالسجل السابق تاريخيًا.
+                </div>
+              )}
+              {(preview.duplicate > 0 || preview.invalid > 0 || preview.needsReview > 0) && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-sm leading-7 text-rose-950">
+                  تنبيه رقابي: السجلات المكررة أو غير الصالحة أو التي لا تتوافر لها هوية موثوقة لا تعامل كتحديث عادي. سيجري تجاوز غير الصالح/المكرر، وتبقى السجلات ذات الهوية غير الكافية بحاجة إلى مراجعة وتأكيد قبل اعتماد الدورة.
+                </div>
+              )}
+            </div>
+          )}
+
           {rows.length > 0 && (
             <>
               {importing && <div className="overflow-hidden rounded-full bg-slate-200"><div className="h-2 bg-sky-600 transition-all" style={{ width: `${progress}%` }} /></div>}
-              <div className="grid grid-cols-3 gap-3">
-                <SummaryCard label="تم حفظه في المسودة" value={importStats.created} tone="emerald" />
-                <SummaryCard label="تم تجاوزه" value={importStats.skipped} tone="slate" />
-                <SummaryCard label="يحتاج تصحيحًا" value={importStats.invalid} tone="rose" />
-              </div>
-              <Button className="h-12 w-full rounded-2xl" onClick={() => void importIntoCycle()} disabled={importing || !selectedCycleId}>
+              {(importStats.created > 0 || importStats.skipped > 0 || importStats.invalid > 0) && (
+                <div className="grid grid-cols-3 gap-3">
+                  <SummaryCard label="تم حفظه في المسودة" value={importStats.created} tone="emerald" />
+                  <SummaryCard label="تم تجاوزه" value={importStats.skipped} tone="slate" />
+                  <SummaryCard label="يحتاج تصحيحًا" value={importStats.invalid} tone="rose" />
+                </div>
+              )}
+              <Button className="h-12 w-full rounded-2xl" onClick={() => void importIntoCycle()} disabled={importing || previewing || !selectedCycleId || !preview}>
                 {importing ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <UploadCloud className="ml-2 h-5 w-5" />}
-                {importing ? `جارٍ الاستيراد إلى المسودة — ${progress}%` : `استيراد ${rows.length.toLocaleString('ar-SA')} سجل إلى مسودة الدورة`}
+                {importing ? `جارٍ الاستيراد إلى المسودة — ${progress}%` : preview ? `اعتماد نتيجة الفحص وحفظ ${rows.length.toLocaleString('ar-SA')} سجل في مسودة الدورة` : 'بانتظار اكتمال الفحص التلقائي'}
               </Button>
             </>
           )}
@@ -297,6 +378,9 @@ export const AssetCycleImportPage: React.FC = () => {
               <SummaryCard label="لم تظهر بالتحديث" value={comparison.removed} tone="rose" />
               <SummaryCard label="تحتاج مراجعة" value={comparison.needsReview} tone="amber" />
               <SummaryCard label="الدورة السابقة" value={comparison.totalBase} />
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm leading-7 text-emerald-950">
+              السجلات المعدلة تحتفظ بمرجع السجل السابق وبقائمة الحقول التي تغيرت، ويمكن مراجعتها في «سجل الدورات». لا ينفذ التحديث على سجل الأصول الحالي إلا عند اعتماد الدورة.
             </div>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => navigate('/assets/cycles')}>الانتقال إلى المراجعة واعتماد الدورة</Button>
