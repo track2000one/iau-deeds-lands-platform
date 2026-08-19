@@ -24,7 +24,101 @@ import {
 } from '../../utils/assetExcelImport';
 
 const IMPORT_BATCH_SIZE = 200;
+const PREVIEW_BATCH_SIZE = 900;
 type AssetCycleImportPreview = Awaited<ReturnType<typeof previewAssetCycleRows>>;
+
+const normalizeIdentityPart = (value: unknown) => String(value ?? '')
+  .trim()
+  .replace(/\s+/g, ' ')
+  .toLowerCase()
+  .replace(/[ـ]/g, '')
+  .replace(/[\u064B-\u065F\u0670]/g, '')
+  .replace(/[^\p{L}\p{N}]+/gu, '-');
+
+const cleanIdentity = (value: unknown) => {
+  const text = String(value ?? '').trim().replace(/\s+/g, ' ');
+  if (!text || /^(?:-|--|0|غير متوفر|غير متاح|لا يوجد|n\/?a|null|undefined)$/i.test(text)) return '';
+  return text;
+};
+
+const excelIdentity = (payload: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = cleanIdentity(payload[key]);
+    if (value) return value;
+  }
+  return '';
+};
+
+const getStrongIdentityKey = (row: AssetCycleImportRow) => {
+  const input = row.input || {};
+  const payload = input.excelPayload && typeof input.excelPayload === 'object' && !Array.isArray(input.excelPayload)
+    ? input.excelPayload as Record<string, unknown>
+    : {};
+  const mof = excelIdentity(payload, [
+    'رقم الأصل الفريد في نظام وزارة المالية (الرقم التعريفي)',
+    'Unique Asset Number in MoF system',
+    'رقم أصل وزارة المالية',
+  ]);
+  const entityUnique = excelIdentity(payload, [
+    'رقم الأصل الفريد بالجهة (الرقم المستخدم حاليا للأصل او الرقم تسلسلي)',
+    'Unique Asset Number in the entity',
+    'رقم الأصل الفريد بالجهة',
+  ]);
+  const candidates: Array<[string, unknown]> = [
+    ['mof', mof],
+    ['serial', input.serialNumber],
+    ['barcode', input.barcode],
+    ['card', input.cardNumber],
+    ['entity', entityUnique],
+    ['item', input.itemNumber || input.assetNumber],
+  ];
+  for (const [kind, value] of candidates) {
+    const normalized = normalizeIdentityPart(cleanIdentity(value));
+    if (normalized) return `asset:${kind}:${normalized}`;
+  }
+  return null;
+};
+
+const previewRowsInBatches = async (cycleId: string, items: AssetCycleImportRow[]): Promise<AssetCycleImportPreview> => {
+  const seenStrongIds = new Set<string>();
+  const uniqueItems: AssetCycleImportRow[] = [];
+  let localDuplicates = 0;
+
+  for (const row of items) {
+    const identity = getStrongIdentityKey(row);
+    if (identity && seenStrongIds.has(identity)) {
+      localDuplicates += 1;
+      continue;
+    }
+    if (identity) seenStrongIds.add(identity);
+    uniqueItems.push(row);
+  }
+
+  const aggregate: AssetCycleImportPreview = {
+    total: items.length,
+    fresh: 0,
+    duplicate: localDuplicates,
+    invalid: 0,
+    new: 0,
+    modified: 0,
+    unchanged: 0,
+    needsReview: 0,
+  };
+
+  for (let start = 0; start < uniqueItems.length; start += PREVIEW_BATCH_SIZE) {
+    const batch = uniqueItems.slice(start, start + PREVIEW_BATCH_SIZE);
+    const result = await previewAssetCycleRows(cycleId, batch);
+    aggregate.fresh += result.fresh;
+    aggregate.duplicate += result.duplicate;
+    aggregate.invalid += result.invalid;
+    aggregate.new += result.new;
+    aggregate.modified += result.modified;
+    aggregate.unchanged += result.unchanged;
+    aggregate.needsReview += result.needsReview;
+  }
+
+  return aggregate;
+};
 
 const statusLabel: Record<string, string> = {
   draft: 'مسودة',
@@ -158,7 +252,7 @@ export const AssetCycleImportPage: React.FC = () => {
       setPreviewing(true);
       setMessage(`تم تحليل ${parsed.length.toLocaleString('ar-SA')} ملف وإيجاد ${stagedRows.length.toLocaleString('ar-SA')} سجل. جارٍ الآن فحص الأرقام الفريدة ومطابقة كل سجل تلقائيًا مع البيانات الحالية...`);
       try {
-        const analysis = await previewAssetCycleRows(selectedCycleId, stagedRows);
+        const analysis = await previewRowsInBatches(selectedCycleId, stagedRows);
         setPreview(analysis);
         setMessage(
           `اكتمل الفحص التلقائي قبل الاستيراد: ${(analysis.new || 0).toLocaleString('ar-SA')} سجل جديد، ${(analysis.modified || 0).toLocaleString('ar-SA')} سجل موجود تغيّر فيه حقل واحد أو أكثر، ${(analysis.unchanged || 0).toLocaleString('ar-SA')} سجل مطابق دون تغيير${analysis.duplicate ? `، و${analysis.duplicate.toLocaleString('ar-SA')} سجل مكرر/مدخل مسبقًا في الدورة` : ''}${analysis.needsReview ? `، و${analysis.needsReview.toLocaleString('ar-SA')} سجل يحتاج مراجعة للهوية` : ''}. لن تتغير البيانات الحالية قبل حفظ المسودة ثم مراجعتها واعتمادها.`
