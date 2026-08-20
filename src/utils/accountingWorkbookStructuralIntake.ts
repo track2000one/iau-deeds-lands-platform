@@ -64,7 +64,7 @@ const meaningfulHeader = (value: unknown) => {
 const matrixFor = (workbook: XLSX.WorkBook, sheetName: string) => sheetToResolvedMatrix(workbook, sheetName);
 
 const headerMatrixFor = (workbook: XLSX.WorkBook, sheetName: string) =>
-  sheetToResolvedMatrix(workbook, sheetName).slice(0, HEADER_SCAN_ROWS);
+  sheetToResolvedMatrix(workbook, sheetName, HEADER_SCAN_ROWS);
 
 const sheetDimensions = (sheet: XLSX.WorkSheet) => {
   const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
