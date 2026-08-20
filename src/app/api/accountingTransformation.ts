@@ -33,6 +33,18 @@ export type AccountingTransformationGroupSummary = {
   averageValuation: number;
 };
 
+export type AccountingTransformationHierarchyLeaf = AccountingTransformationGroupSummary & {
+  accountingGroupLabel?: string | null;
+  accountingGroupCode?: string | null;
+  recordType: 'land' | 'building' | 'fixed_asset';
+};
+
+export type AccountingTransformationHierarchyNode = AccountingTransformationGroupSummary & {
+  recordType: 'land' | 'building' | 'fixed_asset';
+  legacy: boolean;
+  children: AccountingTransformationHierarchyLeaf[];
+};
+
 export type AccountingTransformationImportPreview = {
   total: number;
   fresh: number;
@@ -88,6 +100,23 @@ export const getAccountingTransformationGroups = (
   const params = buildQuery(query);
   const suffix = params.toString();
   return apiJson<AccountingTransformationGroupSummary[]>(`/api/accounting-transformation/groups${suffix ? `?${suffix}` : ''}`);
+};
+
+export const getAccountingTransformationHierarchy = (
+  query: Pick<AccountingTransformationQuery, 'search' | 'recordType' | 'committeeStatus' | 'readinessStatus' | 'cycleId'> = {}
+) => {
+  const params = buildQuery(query);
+  const suffix = params.toString();
+  return apiJson<AccountingTransformationHierarchyNode[]>(`/api/accounting-transformation/hierarchy${suffix ? `?${suffix}` : ''}`);
+};
+
+export const getAccountingTransformationHierarchyRecords = (
+  key: string,
+  query: Pick<AccountingTransformationQuery, 'search' | 'recordType' | 'committeeStatus' | 'readinessStatus' | 'cycleId' | 'page' | 'limit'> = {}
+) => {
+  const params = buildQuery(query);
+  params.set('key', key);
+  return apiJson<AccountingTransformationPage>(`/api/accounting-transformation/hierarchy/records?${params.toString()}`);
 };
 
 export const getAccountingTransformationRecords = (query: AccountingTransformationQuery = {}) => {
