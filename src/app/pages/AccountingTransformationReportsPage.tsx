@@ -7,9 +7,11 @@ import {
   Download,
   FileSpreadsheet,
   Filter,
+  History,
   Printer,
   RotateCcw,
   Search,
+  ShieldCheck,
   UploadCloud,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -18,12 +20,15 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { NativeSelect } from '../components/ui/native-select';
+import { Badge } from '../components/ui/badge';
 import { usePermissions } from '../../context/PermissionsContext';
 import {
+  downloadAccountingCycleOfficialTemplate,
   downloadOfficialAccountingExcelTemplate,
   getAccountingTransformationCycles,
   getAccountingTransformationRecords,
   getOfficialAccountingExcelTemplate,
+  getOfficialAccountingExcelTemplateHistory,
   uploadOfficialAccountingExcelTemplate,
   type AccountingExcelTemplateMeta,
 } from '../api/accountingTransformation';
@@ -115,6 +120,7 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(50);
   const [selectedFields, setSelectedFields] = useState<FieldKey[]>(printableFields.map(([key]) => key));
   const [officialTemplate, setOfficialTemplate] = useState<AccountingExcelTemplateMeta | null>(null);
+  const [templateHistory, setTemplateHistory] = useState<AccountingExcelTemplateMeta[]>([]);
   const [templateLoading, setTemplateLoading] = useState(true); const [templateUploading, setTemplateUploading] = useState(false);
   const [officialExporting, setOfficialExporting] = useState(false); const [officialExcelMessage, setOfficialExcelMessage] = useState('');
   const [settings, setSettings] = useState<ReportSettings>(() => {
@@ -123,7 +129,15 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   });
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* session only */ } }, [settings]);
-  useEffect(() => { let cancelled = false; setTemplateLoading(true); getOfficialAccountingExcelTemplate().then((template) => { if (!cancelled) setOfficialTemplate(template); }).catch(() => { if (!cancelled) setOfficialTemplate(null); }).finally(() => { if (!cancelled) setTemplateLoading(false); }); return () => { cancelled = true; }; }, []);
+  useEffect(() => {
+    let cancelled = false;
+    setTemplateLoading(true);
+    Promise.all([getOfficialAccountingExcelTemplate(), getOfficialAccountingExcelTemplateHistory()])
+      .then(([template, history]) => { if (!cancelled) { setOfficialTemplate(template); setTemplateHistory(history || []); } })
+      .catch(() => { if (!cancelled) { setOfficialTemplate(null); setTemplateHistory([]); } })
+      .finally(() => { if (!cancelled) setTemplateLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => { let cancelled = false; getAccountingTransformationCycles().then((data) => { if (!cancelled) setCycles(data || []); }).catch(() => { if (!cancelled) setCycles([]); }); return () => { cancelled = true; }; }, []);
   const selectedCycle = cycles.find((cycle) => cycle.id === selectedCycleId) || null;
 
@@ -178,24 +192,43 @@ export const AccountingTransformationReportsPage: React.FC = () => {
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), 'ملخص المتابعة');
       const sheets: Array<[AccountingRecordType, string]> = [['fixed_asset','سجل الأصول - نموذج ب'], ['land','Legacy - الأراضي'], ['building','Legacy - المباني']];
       sheets.forEach(([type, name]) => { const rows = detailedSheetRows(filteredItems, type); if (rows.length) XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), name.slice(0,31)); });
-      XLSX.writeFile(workbook, `accounting-transformation-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      const prefix = selectedCycle ? `cycle-${selectedCycle.cycleNumber}` : 'current';
+      XLSX.writeFile(workbook, `accounting-transformation-${prefix}-${new Date().toISOString().slice(0, 10)}.xlsx`);
       toast.success('تم تجهيز تقرير Excel حسب التصفية الحالية');
     } catch { toast.error('تعذر إنشاء ملف Excel'); }
   };
 
+  const refreshTemplateMeta = async () => {
+    const [template, history] = await Promise.all([getOfficialAccountingExcelTemplate(), getOfficialAccountingExcelTemplateHistory()]);
+    setOfficialTemplate(template); setTemplateHistory(history || []);
+  };
+
   const handleOfficialTemplateUpload = async (file: File | null) => {
     if (!file) return; if (!file.name.toLowerCase().endsWith('.xlsx')) return setOfficialExcelMessage('النموذج الرسمي يجب أن يكون بصيغة XLSX.');
-    try { setTemplateUploading(true); setOfficialExcelMessage('جارٍ رفع النموذج الرسمي واعتماده...'); const template = await uploadOfficialAccountingExcelTemplate(file); setOfficialTemplate(template); setOfficialExcelMessage('تم اعتماد نموذج Excel الرسمي بنجاح.'); }
+    try {
+      setTemplateUploading(true); setOfficialExcelMessage('جارٍ رفع إصدار جديد من النموذج الرسمي...');
+      const template = await uploadOfficialAccountingExcelTemplate(file); setOfficialTemplate(template); await refreshTemplateMeta();
+      setOfficialExcelMessage(`تم اعتماد الإصدار ${template.versionNumber || ''} من نموذج Excel الرسمي. الدورات السابقة ستظل مرتبطة بنسخها التاريخية.`);
+    }
     catch (error) { setOfficialExcelMessage(error instanceof Error ? error.message : 'تعذر رفع النموذج الرسمي.'); } finally { setTemplateUploading(false); }
   };
 
   const exportOfficialExcel = async () => {
-    if (!officialTemplate || !filteredItems.length) return;
+    if (!filteredItems.length) return;
+    if (selectedCycle && !selectedCycle.officialTemplate) {
+      return setOfficialExcelMessage('لا توجد نسخة نموذج رسمي مثبتة تاريخيًا على هذه الدورة. لا يستخدم النظام النموذج الحالي بأثر رجعي.');
+    }
+    if (!selectedCycle && !officialTemplate) return;
     try {
-      setOfficialExporting(true); setOfficialExcelMessage('جارٍ تعبئة نتائج التصفية داخل النموذج الرسمي...');
-      const buffer = await downloadOfficialAccountingExcelTemplate(); const result = await buildOfficialAccountingTransformationExcel(buffer, filteredItems);
-      saveAs(result.blob, `نموذج-ب-سجل-الأصول-الثابتة-${new Date().toISOString().slice(0, 10)}.xlsx`);
-      setOfficialExcelMessage(`تم تجهيز ${result.exportedCount.toLocaleString('ar-SA')} سجل داخل النموذج الرسمي.${result.skippedCount ? ` تم تجاوز ${result.skippedCount.toLocaleString('ar-SA')} سجل غير متوافق مع نوع القالب الحالي.` : ''}`);
+      setOfficialExporting(true);
+      setOfficialExcelMessage(selectedCycle ? `جارٍ تجهيز نموذج Excel الخاص بالدورة #${selectedCycle.cycleNumber}...` : 'جارٍ تعبئة البيانات الحالية داخل النموذج الرسمي...');
+      const buffer = selectedCycle
+        ? await downloadAccountingCycleOfficialTemplate(selectedCycle.id)
+        : await downloadOfficialAccountingExcelTemplate();
+      const result = await buildOfficialAccountingTransformationExcel(buffer, filteredItems);
+      const cyclePart = selectedCycle ? `الدورة-${selectedCycle.cycleNumber}` : 'الحالية-المعتمدة';
+      saveAs(result.blob, `نموذج-ب-${cyclePart}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      setOfficialExcelMessage(`تم تجهيز ${result.exportedCount.toLocaleString('ar-SA')} سجل في نموذج ${selectedCycle ? `الدورة #${selectedCycle.cycleNumber}` : 'البيانات الحالية'}.${result.skippedCount ? ` تم تجاوز ${result.skippedCount.toLocaleString('ar-SA')} سجل غير متوافق مع نوع القالب.` : ''}`);
     } catch (error) { setOfficialExcelMessage(error instanceof Error ? error.message : 'تعذر تجهيز النموذج الرسمي.'); }
     finally { setOfficialExporting(false); }
   };
@@ -207,7 +240,8 @@ export const AccountingTransformationReportsPage: React.FC = () => {
     const body = filteredItems.map((item, index) => `<tr><td>${index + 1}</td>${selected.map(([key]) => `<td>${escapeHtml(displayValue(item, key))}</td>`).join('')}</tr>`).join('');
     const groupLabel = group === 'all' ? 'جميع المجموعات' : groups.find((x) => x.key === group)?.label || '-';
     const typeLabel = recordType === 'all' ? 'الكل' : getAccountingRecordTypeLabel(recordType as AccountingRecordType);
-    openPrintHtml(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>${escapeHtml(settings.reportTitle)}</title><style>@page{size:A4 landscape;margin:6mm 4mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{text-align:center;border-bottom:1px solid #1f4e79;padding:2mm;margin-bottom:2mm}.head h1{font-size:15px;margin:0}.head p{font-size:9px;margin:1mm 0}.meta{font-size:8px;border:1px solid #dbe3ec;padding:1.5mm 2mm;margin-bottom:2mm}.statement{text-align:center;font-size:12px;font-weight:800;margin:2mm 0}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}th{background:#0d3156;color:white;border:1px solid #dbe3ec;padding:2px}td{border:1px solid #dbe3ec;padding:1.5px;text-align:center;overflow-wrap:anywhere}tbody tr:nth-child(even){background:#f8fafc}thead{display:table-header-group}tr{break-inside:avoid}.foot{font-size:7px;color:#64748b;margin-top:2mm;display:flex;justify-content:space-between}</style></head><body><div class="head"><h1>${escapeHtml(settings.universityName)}</h1><p>${escapeHtml(settings.departmentName)}</p><h1>${escapeHtml(settings.reportTitle)}</h1></div><div class="meta">الدورة: ${escapeHtml(selectedCycle ? `#${selectedCycle.cycleNumber} — ${selectedCycle.name}` : 'الدورة الحالية المعتمدة')} | النوع: ${escapeHtml(typeLabel)} | حالة اللجنة: ${escapeHtml(committeeStatus === 'all' ? 'الكل' : ACCOUNTING_COMMITTEE_STATUS_LABELS[committeeStatus] || committeeStatus)} | المجموعة: ${escapeHtml(groupLabel)} | إجمالي النتائج: ${filteredItems.length.toLocaleString('ar-SA')}</div><div class="statement">${escapeHtml(settings.statementTitle)}</div><table><thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table><div class="foot"><span>تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</span><span>لجنة متابعة متطلبات التحول المحاسبي</span></div><script>window.onload=()=>window.print()</script></body></html>`);
+    const templateMeta = selectedCycle?.officialTemplate ? ` | النموذج: الإصدار ${selectedCycle.officialTemplate.versionNumber}` : '';
+    openPrintHtml(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>${escapeHtml(settings.reportTitle)}</title><style>@page{size:A4 landscape;margin:6mm 4mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{text-align:center;border-bottom:1px solid #1f4e79;padding:2mm;margin-bottom:2mm}.head h1{font-size:15px;margin:0}.head p{font-size:9px;margin:1mm 0}.meta{font-size:8px;border:1px solid #dbe3ec;padding:1.5mm 2mm;margin-bottom:2mm}.statement{text-align:center;font-size:12px;font-weight:800;margin:2mm 0}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}th{background:#0d3156;color:white;border:1px solid #dbe3ec;padding:2px}td{border:1px solid #dbe3ec;padding:1.5px;text-align:center;overflow-wrap:anywhere}tbody tr:nth-child(even){background:#f8fafc}thead{display:table-header-group}tr{break-inside:avoid}.foot{font-size:7px;color:#64748b;margin-top:2mm;display:flex;justify-content:space-between}</style></head><body><div class="head"><h1>${escapeHtml(settings.universityName)}</h1><p>${escapeHtml(settings.departmentName)}</p><h1>${escapeHtml(settings.reportTitle)}</h1></div><div class="meta">الدورة: ${escapeHtml(selectedCycle ? `#${selectedCycle.cycleNumber} — ${selectedCycle.name}` : 'الدورة الحالية المعتمدة')} | النوع: ${escapeHtml(typeLabel)} | حالة اللجنة: ${escapeHtml(committeeStatus === 'all' ? 'الكل' : ACCOUNTING_COMMITTEE_STATUS_LABELS[committeeStatus] || committeeStatus)} | المجموعة: ${escapeHtml(groupLabel)} | إجمالي النتائج: ${filteredItems.length.toLocaleString('ar-SA')}${escapeHtml(templateMeta)}</div><div class="statement">${escapeHtml(settings.statementTitle)}</div><table><thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table><div class="foot"><span>تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</span><span>لجنة متابعة متطلبات التحول المحاسبي</span></div><script>window.onload=()=>window.print()</script></body></html>`);
   };
 
   const submitSearch = (event: React.FormEvent) => { event.preventDefault(); setAppliedSearch(search.trim()); setPage(1); };
@@ -215,15 +249,17 @@ export const AccountingTransformationReportsPage: React.FC = () => {
 
   return (
     <div className="accounting-report mx-auto w-full max-w-[1780px] space-y-5 p-1 sm:p-3 md:p-5" dir="rtl">
-      <section className="rounded-[28px] border bg-white/90 p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><div className="mb-2 flex items-center gap-2 text-sky-700"><BarChart3 className="h-5 w-5" /><span className="text-xs font-bold">لجنة متابعة متطلبات التحول المحاسبي</span></div><h1 className="text-2xl font-black md:text-3xl">{settings.reportTitle}</h1><p className="mt-1 text-sm text-slate-500">نموذج ب هو المخرج الرسمي المفضل، مع بقاء تقارير Legacy للرجوع التاريخي.</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />لوحة اللجنة</Button>{canAdd && <Button variant="outline" onClick={() => navigate('/accounting-transformation/import')}><FileSpreadsheet className="ml-2 h-4 w-4" />استيراد Excel</Button>}{canPrint && <><Button variant="outline" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />Excel</Button><Button onClick={printTabularReport}><Printer className="ml-2 h-4 w-4" />PDF / طباعة</Button></>}</div></div></section>
+      <section className="rounded-[28px] border bg-white/90 p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><div className="mb-2 flex items-center gap-2 text-sky-700"><BarChart3 className="h-5 w-5" /><span className="text-xs font-bold">لجنة متابعة متطلبات التحول المحاسبي</span></div><h1 className="text-2xl font-black md:text-3xl">{settings.reportTitle}</h1><p className="mt-1 text-sm text-slate-500">كل دورة لها تقريرها ونسخة نموذجها الرسمي المستقلة، مع بقاء الدورات السابقة محفوظة تاريخيًا.</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />لوحة اللجنة</Button>{canAdd && <Button variant="outline" onClick={() => navigate('/accounting-transformation/import')}><FileSpreadsheet className="ml-2 h-4 w-4" />استيراد Excel</Button>}{canPrint && <><Button variant="outline" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />Excel</Button><Button onClick={printTabularReport}><Printer className="ml-2 h-4 w-4" />PDF / طباعة</Button></>}</div></div></section>
 
-      <div className="rounded-[22px] border border-sky-200 bg-sky-50/60 p-4"><div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end"><label className="text-xs font-bold">إصدار البيانات<NativeSelect value={selectedCycleId} onChange={(e) => { const value = e.target.value; setSelectedCycleId(value); const next = new URLSearchParams(searchParams); if (value) next.set('cycle', value); else next.delete('cycle'); setSearchParams(next); }} className="mt-1 h-11 bg-white"><option value="">الدورة الحالية المعتمدة</option>{cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>#{cycle.cycleNumber} — {cycle.name}{cycle.isCurrent ? ' (الحالية)' : cycle.status === 'archived' ? ' (مؤرشفة)' : ''}</option>)}</NativeSelect></label><Button variant="outline" onClick={() => navigate('/accounting-transformation/cycles')}>سجل الدورات</Button></div></div>
+      <div className="rounded-[22px] border border-sky-200 bg-sky-50/60 p-4"><div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end"><label className="text-xs font-bold">إصدار البيانات<NativeSelect value={selectedCycleId} onChange={(e) => { const value = e.target.value; setSelectedCycleId(value); const next = new URLSearchParams(searchParams); if (value) next.set('cycle', value); else next.delete('cycle'); setSearchParams(next); }} className="mt-1 h-11 bg-white"><option value="">الدورة الحالية المعتمدة</option>{cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>#{cycle.cycleNumber} — {cycle.name}{cycle.isCurrent ? ' (الحالية)' : cycle.status === 'archived' ? ' (مؤرشفة)' : cycle.status === 'under_review' ? ' (تحت المراجعة)' : ''}</option>)}</NativeSelect></label><Button variant="outline" onClick={() => navigate('/accounting-transformation/cycles')}>مركز إدارة الدورات</Button></div></div>
+
+      {selectedCycle && <div className="rounded-[22px] border border-violet-200 bg-violet-50/50 p-4"><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><p className="text-xs font-black text-violet-700">تقرير مستقل للدورة</p><h2 className="mt-1 text-lg font-black">#{selectedCycle.cycleNumber} — {selectedCycle.name}</h2><p className="mt-1 text-xs text-slate-600">{selectedCycle.recordCount.toLocaleString('ar-SA')} سجل · حالة الدورة: {selectedCycle.status}{selectedCycle.officialTemplate ? ` · نموذج رسمي إصدار ${selectedCycle.officialTemplate.versionNumber}` : ' · بدون نسخة نموذج تاريخية مثبتة'}</p></div>{selectedCycle.officialTemplate && <Badge className="border-violet-200 bg-white text-violet-800">{selectedCycle.officialTemplate.fileName}</Badge>}</div></div>}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5"><ReportStat title="نتائج التصفية" value={summary.total.toLocaleString('ar-SA')} /><ReportStat title="نموذج ب" value={summary.fixedAssets.toLocaleString('ar-SA')} /><ReportStat title="Legacy" value={summary.legacy.toLocaleString('ar-SA')} /><ReportStat title="جاهز للتقييم" value={summary.valuationReady.toLocaleString('ar-SA')} /><ReportStat title="متوسط الاكتمال" value={`${summary.average}%`} /></div>
 
       <Card className="rounded-[24px]"><CardHeader className="border-b"><CardTitle className="flex items-center gap-2 text-base"><Filter className="h-4 w-4" />البحث والتصفية</CardTitle></CardHeader><CardContent className="space-y-4 p-4"><form onSubmit={submitSearch} className="grid gap-3 xl:grid-cols-[1fr_210px_210px_auto]"><div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(e) => setSearch(e.target.value)} className="h-11 pr-9" placeholder="رقم السجل أو الأصل أو الوصف أو المدينة..." /></div><NativeSelect value={recordType} onChange={(e) => { setRecordType(e.target.value); setPage(1); }} className="h-11"><option value="all">كل الأنواع</option><option value="fixed_asset">نموذج ب — سجل الأصول</option><option value="land">Legacy — الأراضي</option><option value="building">Legacy — المباني</option></NativeSelect><NativeSelect value={committeeStatus} onChange={(e) => { setCommitteeStatus(e.target.value); setPage(1); }} className="h-11"><option value="all">كل حالات اللجنة</option>{Object.entries(ACCOUNTING_COMMITTEE_STATUS_LABELS).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect><div className="flex gap-2"><Button type="submit">بحث</Button><Button type="button" variant="outline" onClick={resetFilters}><RotateCcw className="ml-1 h-4 w-4" />إعادة</Button></div></form><div className="grid gap-3 md:grid-cols-4"><label className="text-xs font-bold">المجموعة<NativeSelect value={group} onChange={(e) => { setGroup(e.target.value); setPage(1); }} className="mt-1"><option value="all">كل المجموعات</option>{groups.map((item) => <option key={item.key} value={item.key}>{item.label} ({item.count})</option>)}</NativeSelect></label><label className="text-xs font-bold">من تاريخ<Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="mt-1" /></label><label className="text-xs font-bold">إلى تاريخ<Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="mt-1" /></label><label className="text-xs font-bold">حجم الصفحة<NativeSelect value={String(pageSize)} onChange={(e) => setPageSize(Number(e.target.value))} className="mt-1"><option value="25">25</option><option value="50">50</option><option value="100">100</option></NativeSelect></label></div></CardContent></Card>
 
-      <Card className="rounded-[24px] border-violet-200 bg-violet-50/30"><CardHeader><CardTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5" />النموذج الرسمي</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-slate-600">{templateLoading ? 'جاري التحقق من النموذج...' : officialTemplate ? `المعتمد: ${officialTemplate.fileName}` : 'لم يتم رفع نموذج رسمي بعد.'}</p>{isAdmin && <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-bold"><UploadCloud className="h-4 w-4" />{templateUploading ? 'جاري الرفع...' : 'رفع / استبدال النموذج الرسمي'}<input type="file" accept=".xlsx" className="hidden" disabled={templateUploading} onChange={(e) => { const input = e.currentTarget; void handleOfficialTemplateUpload(input.files?.[0] || null).finally(() => { input.value=''; }); }} /></label>}{officialTemplate && <Button disabled={officialExporting || !filteredItems.length} onClick={exportOfficialExcel}>{officialExporting ? 'جاري التجهيز...' : 'تعبئة النموذج الرسمي من نتائج التصفية'}</Button>}{officialExcelMessage && <p className="rounded-xl border bg-white p-3 text-xs leading-6 text-slate-700">{officialExcelMessage}</p>}</CardContent></Card>
+      {!selectedCycle ? <Card className="rounded-[24px] border-emerald-200 bg-emerald-50/30"><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-emerald-700" />إدارة النموذج الرسمي المركزي</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-slate-600">{templateLoading ? 'جاري التحقق من النموذج...' : officialTemplate ? `الإصدار الحالي ${officialTemplate.versionNumber || 1}: ${officialTemplate.fileName}` : 'لم يتم رفع نموذج رسمي بعد.'}</p><p className="text-xs leading-6 text-slate-500">رفع إصدار جديد هنا لا يغيّر نموذج أي دورة سابقة؛ كل دورة تحتفظ بنسختها المرتبطة بها.</p><div className="flex flex-wrap gap-2">{isAdmin && <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-800 shadow-sm transition hover:-translate-y-0.5"><UploadCloud className="h-4 w-4" />{templateUploading ? 'جاري الرفع...' : officialTemplate ? 'رفع إصدار جديد' : 'رفع النموذج الرسمي'}<input type="file" accept=".xlsx" className="hidden" disabled={templateUploading} onChange={(e) => { const input = e.currentTarget; void handleOfficialTemplateUpload(input.files?.[0] || null).finally(() => { input.value=''; }); }} /></label>}{officialTemplate && <Button className="bg-emerald-700 hover:bg-emerald-800" disabled={officialExporting || !filteredItems.length} onClick={exportOfficialExcel}>{officialExporting ? 'جاري التجهيز...' : 'تعبئة النموذج للبيانات الحالية'}</Button>}</div>{templateHistory.length > 0 && <div className="rounded-xl border bg-white p-3"><div className="flex items-center gap-2 text-xs font-black text-slate-700"><History className="h-4 w-4" />سجل إصدارات النموذج ({templateHistory.length.toLocaleString('ar-SA')})</div><div className="mt-2 flex flex-wrap gap-2">{templateHistory.slice(0,5).map((item) => <Badge key={item.id} variant="outline" className={item.isCurrent ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'bg-slate-50'}>إصدار {item.versionNumber || '-'} · {item.fileName}</Badge>)}</div></div>}{officialExcelMessage && <p className="rounded-xl border bg-white p-3 text-xs leading-6 text-slate-700">{officialExcelMessage}</p>}</CardContent></Card> : <Card className="rounded-[24px] border-violet-200 bg-violet-50/30"><CardHeader><CardTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-violet-700" />نموذج Excel الخاص بالدورة #{selectedCycle.cycleNumber}</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-slate-700">{selectedCycle.officialTemplate ? `النسخة المثبتة: الإصدار ${selectedCycle.officialTemplate.versionNumber} — ${selectedCycle.officialTemplate.fileName}` : 'لم تُسجل لهذه الدورة نسخة نموذج رسمي تاريخية.'}</p><p className="text-xs leading-6 text-slate-500">لا يمكن استبدال النموذج من داخل الدورة. إدارة الإصدارات تتم مركزيًا، بينما تبقى هذه الدورة مرتبطة بنسختها الأصلية.</p>{selectedCycle.officialTemplate && <Button className="bg-violet-700 hover:bg-violet-800" disabled={officialExporting || !filteredItems.length} onClick={exportOfficialExcel}>{officialExporting ? 'جاري التجهيز...' : `إنشاء نموذج Excel للدورة #${selectedCycle.cycleNumber}`}</Button>}{officialExcelMessage && <p className="rounded-xl border bg-white p-3 text-xs leading-6 text-slate-700">{officialExcelMessage}</p>}</CardContent></Card>}
 
       <Card className="rounded-[24px]"><CardContent className="p-4">{loading ? <div className="py-16 text-center text-sm text-slate-500">جاري تحميل التقرير...</div> : !pageRows.length ? <div className="py-16 text-center text-slate-500">لا توجد نتائج.</div> : <><div className="overflow-x-auto rounded-xl border"><table className="w-full min-w-[1100px] text-xs"><thead className="bg-slate-50"><tr>{printableFields.filter(([key]) => selectedFields.includes(key)).map(([key,label]) => <th key={key} className="p-3 text-right">{label}</th>)}</tr></thead><tbody>{pageRows.map((item) => <tr key={item.id} className="border-t">{printableFields.filter(([key]) => selectedFields.includes(key)).map(([key]) => <td key={key} className="p-3">{displayValue(item,key)}</td>)}</tr>)}</tbody></table></div><div className="mt-4 flex items-center justify-between"><Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p-1)}>السابق</Button><span className="text-xs">صفحة {page} من {totalPages}</span><Button variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => p+1)}>التالي</Button></div></>}</CardContent></Card>
     </div>
