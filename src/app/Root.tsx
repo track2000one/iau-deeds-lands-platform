@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Outlet, Navigate } from 'react-router';
+import { Outlet, Navigate, useLocation } from 'react-router';
 import { DeedProvider } from '../context/DeedContext';
 import { DataProvider } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -78,15 +78,11 @@ const lightGlassShells: Record<
 
 const applyLightShellForGlassTheme = (themeId?: string | null) => {
   if (!themeId) return;
-
   const shell = lightGlassShells[themeId];
   if (!shell) return;
-
   const root = document.documentElement;
-
   root.classList.remove('dark');
   root.dataset.appearanceMode = 'light';
-
   root.style.setProperty('--background', '220 35% 98%');
   root.style.setProperty('--foreground', '214 43% 20%');
   root.style.setProperty('--card', '0 0% 100%');
@@ -112,7 +108,6 @@ const applyLightShellForGlassTheme = (themeId?: string | null) => {
   root.style.setProperty('--sidebar-accent-foreground', shell.primary);
   root.style.setProperty('--sidebar-border', '214 26% 85%');
   root.style.setProperty('--sidebar-ring', shell.ring);
-
   root.style.setProperty('--appearance-body-bg', shell.body);
   root.style.setProperty('--appearance-glass', 'rgba(255,255,255,.88)');
   root.style.setProperty('--appearance-glass-strong', 'rgba(255,255,255,.97)');
@@ -124,15 +119,32 @@ const applyLightShellForGlassTheme = (themeId?: string | null) => {
   root.style.setProperty('--appearance-sidebar', shell.sidebar);
 };
 
+const propertyDataPath = (pathname: string) => {
+  if (pathname === '/') return true;
+  return [
+    '/deeds',
+    '/maps',
+    '/lands',
+    '/buildings',
+    '/reports',
+    '/search',
+  ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+};
+
+const PageShell = () => (
+  <Layout>
+    <Outlet />
+  </Layout>
+);
+
 export const Root = () => {
   const { isAuthenticated, username } = useAuth();
+  const { pathname } = useLocation();
 
   useEffect(() => {
     document.documentElement.dir = 'rtl';
     document.documentElement.lang = 'ar';
-
     const viewport = document.querySelector('meta[name="viewport"]');
-
     if (viewport) {
       viewport.setAttribute(
         'content',
@@ -143,24 +155,20 @@ export const Root = () => {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-
     const root = document.documentElement;
     const safeUser = username?.trim() || 'guest';
     const storedTheme = localStorage.getItem(`iau-appearance-theme:${safeUser}`);
     const theme = getThemeById(storedTheme);
-
     applyAppearanceTheme(theme.id);
     applyLightShellForGlassTheme(theme.id);
 
     const observer = new MutationObserver(() => {
       applyLightShellForGlassTheme(root.dataset.appearanceTheme);
     });
-
     observer.observe(root, {
       attributes: true,
       attributeFilter: ['data-appearance-theme'],
     });
-
     return () => observer.disconnect();
   }, [isAuthenticated, username]);
 
@@ -168,12 +176,14 @@ export const Root = () => {
     return <Navigate to="/login" replace />;
   }
 
+  if (!propertyDataPath(pathname)) {
+    return <PageShell />;
+  }
+
   return (
     <DeedProvider>
       <DataProvider>
-        <Layout>
-          <Outlet />
-        </Layout>
+        <PageShell />
       </DataProvider>
     </DeedProvider>
   );
