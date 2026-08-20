@@ -21,6 +21,18 @@ export type AccountingTransformationAttachment = {
   notes?: string | null;
 };
 
+export type AccountingCycleTemplateSnapshot = {
+  id: string;
+  cycleId: string;
+  templateId: string;
+  fileName: string;
+  versionNumber: number;
+  driveFileId: string;
+  attachedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AccountingTransformationCycle = {
   id: string;
   cycleNumber: number;
@@ -41,6 +53,7 @@ export type AccountingTransformationCycle = {
   createdAt: string;
   updatedAt: string;
   recordCount: number;
+  officialTemplate?: AccountingCycleTemplateSnapshot | null;
 };
 
 export type AccountingCycleComparison = {
