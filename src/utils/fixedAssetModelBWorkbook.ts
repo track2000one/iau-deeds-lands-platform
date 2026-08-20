@@ -52,12 +52,13 @@ const labelToColumns = (() => {
 })();
 
 const matrixFor = (workbook: XLSX.WorkBook, sheetName: string) => sheetToResolvedMatrix(workbook, sheetName);
+const headerMatrixFor = (workbook: XLSX.WorkBook, sheetName: string) => sheetToResolvedMatrix(workbook, sheetName, HEADER_SCAN_ROWS);
 
 const inspectSheet = (workbook: XLSX.WorkBook, sheetName: string): ModelBSheetInspection | null => {
-  const matrix = matrixFor(workbook, sheetName);
+  const matrix = headerMatrixFor(workbook, sheetName);
   let best: { rowIndex: number; mapping: Record<number, string>; matches: number; distinctiveMatches: number } | null = null;
 
-  matrix.slice(0, HEADER_SCAN_ROWS).forEach((row, rowIndex) => {
+  matrix.forEach((row, rowIndex) => {
     const mapping: Record<number, string> = {};
     const used = new Set<string>();
     row.forEach((cell, columnIndex) => {
