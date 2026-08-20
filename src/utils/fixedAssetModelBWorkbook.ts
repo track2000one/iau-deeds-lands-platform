@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { MODEL_B_FIELDS, MODEL_B_SHEET_NAME } from '../app/config/fixedAssetModelB';
 import { isMeaningfulAccountingValue } from '../app/config/accountingTransformationFields';
+import { sheetToResolvedMatrix } from './excelWorkbookValues';
 
 export type ModelBWorkbookRow = {
   recordType: 'fixed_asset';
@@ -20,6 +21,7 @@ export type ModelBSheetInspection = {
 
 const HEADER_SCAN_ROWS = 18;
 const MIN_EXACT_MATCHES = 4;
+const MODEL_B_DISTINCTIVE_COLUMNS = new Set(['C', 'AC', 'AD', 'AE', 'AY', 'AZ', 'BA', 'BB']);
 
 const normalize = (value: unknown) => String(value ?? '')
   .trim()
@@ -49,14 +51,11 @@ const labelToColumns = (() => {
   return map;
 })();
 
-const matrixFor = (workbook: XLSX.WorkBook, sheetName: string) => XLSX.utils.sheet_to_json<unknown[]>(
-  workbook.Sheets[sheetName],
-  { header: 1, defval: '', raw: false },
-);
+const matrixFor = (workbook: XLSX.WorkBook, sheetName: string) => sheetToResolvedMatrix(workbook, sheetName);
 
 const inspectSheet = (workbook: XLSX.WorkBook, sheetName: string): ModelBSheetInspection | null => {
   const matrix = matrixFor(workbook, sheetName);
-  let best: { rowIndex: number; mapping: Record<number, string>; matches: number } | null = null;
+  let best: { rowIndex: number; mapping: Record<number, string>; matches: number; distinctiveMatches: number } | null = null;
 
   matrix.slice(0, HEADER_SCAN_ROWS).forEach((row, rowIndex) => {
     const mapping: Record<number, string> = {};
@@ -68,16 +67,26 @@ const inspectSheet = (workbook: XLSX.WorkBook, sheetName: string): ModelBSheetIn
       mapping[columnIndex] = available[0];
       used.add(available[0]);
     });
-    if (!best || used.size > best.matches) best = { rowIndex, mapping, matches: used.size };
+    const distinctiveMatches = Array.from(used).filter((column) => MODEL_B_DISTINCTIVE_COLUMNS.has(column)).length;
+    if (!best || used.size > best.matches || (used.size === best.matches && distinctiveMatches > best.distinctiveMatches)) {
+      best = { rowIndex, mapping, matches: used.size, distinctiveMatches };
+    }
   });
 
-  const nameMatches = normalize(sheetName).includes(normalizedModelBSheetName) || normalizedModelBSheetName.includes(normalize(sheetName));
-  if (!best || best.matches < MIN_EXACT_MATCHES || (!nameMatches && best.matches < 8)) return null;
+  const normalizedSheetName = normalize(sheetName);
+  const nameMatches = normalizedSheetName.includes(normalizedModelBSheetName) || normalizedModelBSheetName.includes(normalizedSheetName);
+  if (!best || best.matches < MIN_EXACT_MATCHES) return null;
+
+  // Legacy land/building templates share many labels with Model B. A sheet is only
+  // treated as Model B when its official sheet name matches, or when the header
+  // contains multiple fields that are distinctive to the unified A:BB Model B.
+  if (!nameMatches && best.distinctiveMatches < 2) return null;
+  if (!nameMatches && best.matches < 8) return null;
 
   return {
     sheetName,
     matchedFields: best.matches,
-    confidence: Math.min(100, best.matches * 2 + (nameMatches ? 20 : 0)),
+    confidence: Math.min(100, best.matches * 2 + best.distinctiveMatches * 8 + (nameMatches ? 20 : 0)),
     headerRow: best.rowIndex + 1,
     dataStartRow: best.rowIndex + 2,
     mapping: best.mapping,
@@ -102,7 +111,7 @@ export const parseModelBWorkbook = (
         if (isMeaningfulAccountingValue(value)) payload[modelBColumn] = String(value).trim();
       });
       const meaningful = Object.values(payload).filter(isMeaningfulAccountingValue).length;
-      const hasIdentity = ['Y','Z','AA','AB'].some((column) => isMeaningfulAccountingValue(payload[column]));
+      const hasIdentity = ['Y', 'Z', 'AA', 'AB'].some((column) => isMeaningfulAccountingValue(payload[column]));
       if (meaningful < 2 || !hasIdentity) continue;
       rows.push({ recordType: 'fixed_asset', sourceSheet: inspection.sheetName, sourceRow: rowIndex + 1, payload });
     }
