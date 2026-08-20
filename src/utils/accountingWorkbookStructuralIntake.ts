@@ -5,6 +5,7 @@ import {
   isMeaningfulAccountingValue,
   type AccountingRecordType,
 } from '../app/config/accountingTransformationFields';
+import { sheetToResolvedMatrix } from './excelWorkbookValues';
 
 export type StructuralAccountingSheetInspection = {
   sheetName: string;
@@ -60,15 +61,10 @@ const meaningfulHeader = (value: unknown) => {
   return text.length >= 2 && text.length <= 420;
 };
 
-const matrixFor = (workbook: XLSX.WorkBook, sheetName: string) => XLSX.utils.sheet_to_json<unknown[]>(
-  workbook.Sheets[sheetName],
-  { header: 1, defval: '', raw: false },
-);
+const matrixFor = (workbook: XLSX.WorkBook, sheetName: string) => sheetToResolvedMatrix(workbook, sheetName);
 
-const headerMatrixFor = (workbook: XLSX.WorkBook, sheetName: string) => XLSX.utils.sheet_to_json<unknown[]>(
-  workbook.Sheets[sheetName],
-  { header: 1, defval: '', raw: false, range: 0 },
-).slice(0, HEADER_SCAN_ROWS);
+const headerMatrixFor = (workbook: XLSX.WorkBook, sheetName: string) =>
+  sheetToResolvedMatrix(workbook, sheetName).slice(0, HEADER_SCAN_ROWS);
 
 const sheetDimensions = (sheet: XLSX.WorkSheet) => {
   const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
