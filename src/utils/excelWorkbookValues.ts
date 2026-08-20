@@ -81,15 +81,13 @@ export const sheetToResolvedMatrix = (
   const lastRow = maxRows
     ? Math.min(decodedRange.e.r, Math.max(0, maxRows - 1))
     : decodedRange.e.r;
-  const range = maxRows
-    ? { s: { r: 0, c: 0 }, e: { r: lastRow, c: decodedRange.e.c } }
-    : undefined;
+  const range = { s: { r: 0, c: 0 }, e: { r: lastRow, c: decodedRange.e.c } };
 
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
     header: 1,
     defval: '',
     raw: false,
-    ...(range ? { range } : {}),
+    range,
   });
 
   for (const [address, rawCell] of Object.entries(sheet)) {
@@ -97,7 +95,7 @@ export const sheetToResolvedMatrix = (
     const cell = rawCell as FormulaCell;
     if (!cell?.f) continue;
     const decoded = XLSX.utils.decode_cell(address);
-    if (maxRows && decoded.r >= maxRows) continue;
+    if (decoded.r > lastRow) continue;
 
     const directReference = parseDirectReference(cell.f, sheetName);
     if (!directReference && meaningful(matrix[decoded.r]?.[decoded.c])) continue;
