@@ -48,21 +48,26 @@ const resolveCell = (
   const cell = sheet[address] as FormulaCell | undefined;
   if (!cell) return '';
 
-  const cached = cellDisplayValue(cell);
-  if (meaningful(cached)) return cached;
-  if (!cell.f) return '';
+  // For direct-reference formulas, follow the referenced source first. Excel's
+  // cached value may be stale (for example E15 displays a new AJ15 value after
+  // recalculation while the XLSX cache still contains "غير متوفر").
+  if (cell.f) {
+    const reference = parseDirectReference(cell.f, sheetName);
+    if (reference) {
+      const liveReference = resolveCell(workbook, reference.sheetName, reference.address, visited);
+      if (meaningful(liveReference)) return liveReference;
+    }
+  }
 
-  const reference = parseDirectReference(cell.f, sheetName);
-  if (!reference) return '';
-  return resolveCell(workbook, reference.sheetName, reference.address, visited);
+  return cellDisplayValue(cell);
 };
 
 /**
- * Converts a sheet to a display-value matrix and fills formula cells whose cached
- * result is missing when the formula is a direct cell reference (including
- * cross-sheet references and IFERROR(reference, "")). Complex formulas are not
- * guessed: when Excel did not save their calculated value they remain unresolved.
- * maxRows is used for fast header-only scans without materializing the full sheet.
+ * Converts a sheet to a display-value matrix and resolves direct-reference
+ * formulas (including cross-sheet references and IFERROR(reference, "")).
+ * Direct references deliberately override stale cached formula values. Complex
+ * formulas are never guessed and keep their saved Excel result when available.
+ * maxRows enables fast header-only scans without materializing the full sheet.
  */
 export const sheetToResolvedMatrix = (
   workbook: XLSX.WorkBook,
@@ -77,7 +82,7 @@ export const sheetToResolvedMatrix = (
     ? Math.min(decodedRange.e.r, Math.max(0, maxRows - 1))
     : decodedRange.e.r;
   const range = maxRows
-    ? { s: { r: decodedRange.s.r, c: decodedRange.s.c }, e: { r: lastRow, c: decodedRange.e.c } }
+    ? { s: { r: 0, c: 0 }, e: { r: lastRow, c: decodedRange.e.c } }
     : undefined;
 
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
@@ -93,8 +98,9 @@ export const sheetToResolvedMatrix = (
     if (!cell?.f) continue;
     const decoded = XLSX.utils.decode_cell(address);
     if (maxRows && decoded.r >= maxRows) continue;
-    const current = matrix[decoded.r]?.[decoded.c];
-    if (meaningful(current)) continue;
+
+    const directReference = parseDirectReference(cell.f, sheetName);
+    if (!directReference && meaningful(matrix[decoded.r]?.[decoded.c])) continue;
 
     const resolved = resolveCell(workbook, sheetName, address, new Set());
     if (!meaningful(resolved)) continue;
