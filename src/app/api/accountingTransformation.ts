@@ -45,6 +45,7 @@ export type AccountingTransformationImportPreview = {
   modified?: number;
   unchanged?: number;
   removed?: number;
+  notSupplied?: number;
   newIndexes?: number[];
   modifiedIndexes?: number[];
   unchangedIndexes?: number[];
@@ -86,9 +87,7 @@ export const getAccountingTransformationGroups = (
 ) => {
   const params = buildQuery(query);
   const suffix = params.toString();
-  return apiJson<AccountingTransformationGroupSummary[]>(
-    `/api/accounting-transformation/groups${suffix ? `?${suffix}` : ''}`
-  );
+  return apiJson<AccountingTransformationGroupSummary[]>(`/api/accounting-transformation/groups${suffix ? `?${suffix}` : ''}`);
 };
 
 export const getAccountingTransformationRecords = (query: AccountingTransformationQuery = {}) => {
@@ -97,113 +96,43 @@ export const getAccountingTransformationRecords = (query: AccountingTransformati
   return apiJson<AccountingTransformationPage>(`/api/accounting-transformation${suffix ? `?${suffix}` : ''}`);
 };
 
-export const getAccountingTransformationRecord = (id: string) =>
-  apiJson<AccountingTransformationRecord>(`/api/accounting-transformation/${id}`);
+export const getAccountingTransformationRecord = (id: string) => apiJson<AccountingTransformationRecord>(`/api/accounting-transformation/${id}`);
+export const createAccountingTransformationRecord = (input: AccountingTransformationInput) => apiJson<AccountingTransformationRecord>('/api/accounting-transformation', { method: 'POST', body: JSON.stringify(input) });
+export const updateAccountingTransformationRecord = (id: string, input: AccountingTransformationInput) => apiJson<AccountingTransformationRecord>(`/api/accounting-transformation/${id}`, { method: 'PUT', body: JSON.stringify(input) });
+export const deleteAccountingTransformationRecord = (id: string) => apiJson<void>(`/api/accounting-transformation/${id}`, { method: 'DELETE' });
 
-export const createAccountingTransformationRecord = (input: AccountingTransformationInput) =>
-  apiJson<AccountingTransformationRecord>('/api/accounting-transformation', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
+export const previewAccountingTransformationImport = (items: AccountingTransformationInput[]) => apiJson<AccountingTransformationImportPreview>('/api/accounting-transformation/bulk-preview', { method: 'POST', body: JSON.stringify({ items }) });
+export const bulkImportAccountingTransformationRecords = (items: AccountingTransformationInput[]) => apiJson<{ created: number; updated: number; skipped: number; total: number }>('/api/accounting-transformation/bulk-import', { method: 'POST', body: JSON.stringify({ items }) });
+export const getAccountingTransformationCycles = () => apiJson<AccountingTransformationCycle[]>('/api/accounting-transformation/cycles');
+export const getCurrentAccountingTransformationCycle = () => apiJson<AccountingTransformationCycle>('/api/accounting-transformation/cycles/current');
+export const createAccountingTransformationCycle = (input: { name: string; description?: string | null }) => apiJson<AccountingTransformationCycle>('/api/accounting-transformation/cycles', { method: 'POST', body: JSON.stringify(input) });
+export const deleteAccountingTransformationCycle = (id: string) => apiJson<void>(`/api/accounting-transformation/cycles/${id}`, { method: 'DELETE' });
+export const sendAccountingTransformationCycleToReview = (id: string) => apiJson<AccountingTransformationCycle>(`/api/accounting-transformation/cycles/${id}/review`, { method: 'POST' });
+export const reopenAccountingTransformationCycle = (id: string) => apiJson<AccountingTransformationCycle>(`/api/accounting-transformation/cycles/${id}/reopen`, { method: 'POST' });
+export const approveAccountingTransformationCycle = (id: string) => apiJson<{ cycle: AccountingTransformationCycle; comparison: AccountingCycleComparison }>(`/api/accounting-transformation/cycles/${id}/approve`, { method: 'POST' });
+export const getAccountingTransformationCycleComparison = (id: string) => apiJson<AccountingCycleComparison>(`/api/accounting-transformation/cycles/${id}/comparison`);
 
-export const updateAccountingTransformationRecord = (id: string, input: AccountingTransformationInput) =>
-  apiJson<AccountingTransformationRecord>(`/api/accounting-transformation/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(input),
-  });
+export const previewAccountingTransformationCycleImport = (cycleId: string, items: AccountingTransformationInput[], fileName?: string) =>
+  apiJson<AccountingTransformationImportPreview>(`/api/accounting-transformation/cycles/${cycleId}/import-preview`, { method: 'POST', body: JSON.stringify({ items, fileName: fileName || null }) });
 
-export const deleteAccountingTransformationRecord = (id: string) =>
-  apiJson<void>(`/api/accounting-transformation/${id}`, { method: 'DELETE' });
-
-// Legacy import endpoints remain available for compatibility. New imports should use a draft cycle.
-export const previewAccountingTransformationImport = (items: AccountingTransformationInput[]) =>
-  apiJson<AccountingTransformationImportPreview>('/api/accounting-transformation/bulk-preview', {
-    method: 'POST',
-    body: JSON.stringify({ items }),
-  });
-
-export const bulkImportAccountingTransformationRecords = (items: AccountingTransformationInput[]) =>
-  apiJson<{ created: number; updated: number; skipped: number; total: number }>(
-    '/api/accounting-transformation/bulk-import',
-    { method: 'POST', body: JSON.stringify({ items }) }
-  );
-
-export const getAccountingTransformationCycles = () =>
-  apiJson<AccountingTransformationCycle[]>('/api/accounting-transformation/cycles');
-
-export const getCurrentAccountingTransformationCycle = () =>
-  apiJson<AccountingTransformationCycle>('/api/accounting-transformation/cycles/current');
-
-export const createAccountingTransformationCycle = (input: { name: string; description?: string | null }) =>
-  apiJson<AccountingTransformationCycle>('/api/accounting-transformation/cycles', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-
-export const deleteAccountingTransformationCycle = (id: string) =>
-  apiJson<void>(`/api/accounting-transformation/cycles/${id}`, { method: 'DELETE' });
-
-export const sendAccountingTransformationCycleToReview = (id: string) =>
-  apiJson<AccountingTransformationCycle>(`/api/accounting-transformation/cycles/${id}/review`, { method: 'POST' });
-
-export const reopenAccountingTransformationCycle = (id: string) =>
-  apiJson<AccountingTransformationCycle>(`/api/accounting-transformation/cycles/${id}/reopen`, { method: 'POST' });
-
-export const approveAccountingTransformationCycle = (id: string) =>
-  apiJson<{ cycle: AccountingTransformationCycle; comparison: AccountingCycleComparison }>(
-    `/api/accounting-transformation/cycles/${id}/approve`,
-    { method: 'POST' }
-  );
-
-export const getAccountingTransformationCycleComparison = (id: string) =>
-  apiJson<AccountingCycleComparison>(`/api/accounting-transformation/cycles/${id}/comparison`);
-
-export const previewAccountingTransformationCycleImport = (
-  cycleId: string,
-  items: AccountingTransformationInput[],
-  fileName?: string
-) =>
-  apiJson<AccountingTransformationImportPreview>(
-    `/api/accounting-transformation/cycles/${cycleId}/import-preview`,
-    { method: 'POST', body: JSON.stringify({ items, fileName: fileName || null }) }
-  );
-
-export const importAccountingTransformationCycleRecords = (
-  cycleId: string,
-  items: AccountingTransformationInput[],
-  fileName?: string
-) =>
-  apiJson<AccountingCycleImportResult>(
-    `/api/accounting-transformation/cycles/${cycleId}/import`,
-    { method: 'POST', body: JSON.stringify({ items, fileName: fileName || null }) }
-  );
+export const importAccountingTransformationCycleRecords = (cycleId: string, items: AccountingTransformationInput[], fileName?: string) =>
+  apiJson<AccountingCycleImportResult>(`/api/accounting-transformation/cycles/${cycleId}/import`, { method: 'POST', body: JSON.stringify({ items, fileName: fileName || null }) });
 
 export const uploadAccountingTransformationFile = async (file: File): Promise<AccountingTransformationAttachment> => {
   const body = new FormData();
   body.append('file', file);
-  const response = await authenticatedFetch('/api/uploads', {
-    method: 'POST',
-    headers: { 'X-Upload-Module': 'accounting_transformation' },
-    body,
-  });
+  const response = await authenticatedFetch('/api/uploads', { method: 'POST', headers: { 'X-Upload-Module': 'accounting_transformation' }, body });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(String(result?.message || result?.error || `تعذر رفع الملف: ${file.name}`));
   if (!result?.driveUrl) throw new Error(`تم رفع الملف دون إرجاع رابط: ${file.name}`);
-  return {
-    title: file.name,
-    driveUrl: result.driveUrl,
-    driveFileId: result.driveFileId || null,
-    mimeType: result.mimeType || file.type || null,
-  };
+  return { title: file.name, driveUrl: result.driveUrl, driveFileId: result.driveFileId || null, mimeType: result.mimeType || file.type || null };
 };
 
 export type AccountingExcelTemplateMeta = {
   id: string; templateKey: string; title: string; fileName: string; driveFileId: string; driveUrl: string; mimeType?: string | null; fileSize?: number | null; uploadedBy?: string | null; createdAt: string; updatedAt: string;
 };
 
-export const getOfficialAccountingExcelTemplate = () =>
-  apiJson<AccountingExcelTemplateMeta | null>('/api/accounting-transformation/excel-template');
-
+export const getOfficialAccountingExcelTemplate = () => apiJson<AccountingExcelTemplateMeta | null>('/api/accounting-transformation/excel-template');
 export const uploadOfficialAccountingExcelTemplate = async (file: File) => {
   const body = new FormData(); body.append('file', file);
   const response = await authenticatedFetch('/api/accounting-transformation/excel-template', { method: 'POST', body });
@@ -211,7 +140,6 @@ export const uploadOfficialAccountingExcelTemplate = async (file: File) => {
   if (!response.ok) throw new Error(String(result?.message || result?.error || 'تعذر رفع نموذج Excel الرسمي.'));
   return result as AccountingExcelTemplateMeta;
 };
-
 export const downloadOfficialAccountingExcelTemplate = async () => {
   const response = await authenticatedFetch('/api/accounting-transformation/excel-template/file');
   if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(String(result?.message || result?.error || 'تعذر تنزيل نموذج Excel الرسمي.')); }
