@@ -491,3 +491,148 @@ label[for="isPlanned"] {
     min-height: 2.75rem;
   }
 }
+
+/* ===== Accounting official Excel actions: tactile 3D treatment ===== */
+.accounting-report .border-violet-200 {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(22, 101, 52, 0.28) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 253, 244, 0.94)),
+    repeating-linear-gradient(0deg, rgba(22, 101, 52, 0.025) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(90deg, rgba(22, 101, 52, 0.025) 0 1px, transparent 1px 72px) !important;
+  box-shadow:
+    0 8px 0 rgba(15, 23, 42, 0.055),
+    0 18px 34px rgba(15, 23, 42, 0.075),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.accounting-report .border-violet-200::after {
+  content: "XLSX";
+  position: absolute;
+  left: 1.25rem;
+  top: 1.05rem;
+  z-index: 0;
+  padding: 0.28rem 0.65rem;
+  border: 1px solid rgba(22, 101, 52, 0.18);
+  border-radius: 999px;
+  background: rgba(240, 253, 244, 0.92);
+  color: #166534;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  box-shadow: inset 0 1px 0 #fff, 0 4px 10px rgba(22, 101, 52, 0.08);
+  pointer-events: none;
+}
+
+.accounting-report .border-violet-200 [data-slot="card-header"],
+.accounting-report .border-violet-200 [data-slot="card-content"] {
+  position: relative;
+  z-index: 1;
+}
+
+.accounting-report .border-violet-200 [data-slot="card-title"] svg,
+.accounting-report .border-violet-200 label svg,
+.accounting-report .border-violet-200 button svg {
+  color: #15803d;
+  filter: drop-shadow(0 2px 3px rgba(21, 128, 61, 0.18));
+}
+
+.accounting-report .border-violet-200 label.inline-flex {
+  min-height: 2.85rem;
+  border: 1px solid #15803d !important;
+  border-radius: 0.9rem !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%) !important;
+  color: #14532d !important;
+  padding: 0.7rem 1.1rem !important;
+  font-weight: 900 !important;
+  box-shadow:
+    0 4px 0 #bbf7d0,
+    0 9px 18px rgba(21, 128, 61, 0.13),
+    inset 0 1px 0 #fff !important;
+  transform: translateY(0);
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
+  user-select: none;
+}
+
+.accounting-report .border-violet-200 label.inline-flex:hover {
+  border-color: #166534 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #dcfce7 100%) !important;
+  box-shadow:
+    0 6px 0 #86efac,
+    0 13px 24px rgba(21, 128, 61, 0.18),
+    inset 0 1px 0 #fff !important;
+  transform: translateY(-2px);
+}
+
+.accounting-report .border-violet-200 label.inline-flex:active {
+  box-shadow:
+    0 1px 0 #86efac,
+    0 4px 9px rgba(21, 128, 61, 0.15),
+    inset 0 1px 0 #fff !important;
+  transform: translateY(3px);
+}
+
+.accounting-report .border-violet-200 label.inline-flex:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.72;
+  filter: saturate(0.75);
+  transform: none;
+}
+
+.accounting-report .border-violet-200 button {
+  min-height: 2.85rem;
+  border: 1px solid #14532d !important;
+  border-radius: 0.9rem !important;
+  background: linear-gradient(180deg, #22a65a 0%, #15803d 55%, #166534 100%) !important;
+  color: #fff !important;
+  padding-inline: 1.2rem !important;
+  font-weight: 900 !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+  box-shadow:
+    0 5px 0 #14532d,
+    0 12px 22px rgba(21, 128, 61, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32) !important;
+  transform: translateY(0);
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+
+.accounting-report .border-violet-200 button:hover:not(:disabled) {
+  filter: brightness(1.05) saturate(1.04);
+  box-shadow:
+    0 7px 0 #14532d,
+    0 16px 28px rgba(21, 128, 61, 0.27),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-2px);
+}
+
+.accounting-report .border-violet-200 button:active:not(:disabled) {
+  box-shadow:
+    0 1px 0 #14532d,
+    0 5px 10px rgba(21, 128, 61, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+  transform: translateY(4px);
+}
+
+.accounting-report .border-violet-200 button:disabled {
+  border-color: #94a3b8 !important;
+  background: linear-gradient(180deg, #e2e8f0, #cbd5e1) !important;
+  color: #64748b !important;
+  text-shadow: none;
+  box-shadow: 0 3px 0 #94a3b8, inset 0 1px 0 rgba(255, 255, 255, 0.75) !important;
+  cursor: not-allowed;
+  opacity: 0.78;
+}
+
+@media (max-width: 767px) {
+  .accounting-report .border-violet-200::after {
+    left: 0.9rem;
+    top: 0.8rem;
+  }
+
+  .accounting-report .border-violet-200 label.inline-flex,
+  .accounting-report .border-violet-200 button {
+    width: 100%;
+    justify-content: center;
+  }
+}
