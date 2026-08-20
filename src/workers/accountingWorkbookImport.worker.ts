@@ -44,8 +44,11 @@ scope.onmessage = async (event: MessageEvent<AnalyzeRequest>) => {
 
     progress('جاري تحويل السجلات إلى المخطط الموحد دون تجميد الصفحة...');
     const modelBRows = parseModelBWorkbook(workbook, modelBSheets);
-    const legacyRows = parseAccountingWorkbookStructure(workbook, inspection)
-      .filter((row) => !modelBSheetNames.has(row.sourceSheet));
+    const legacyInspection = {
+      ...inspection,
+      sheets: inspection.sheets.filter((sheet) => !modelBSheetNames.has(sheet.sheetName)),
+    };
+    const legacyRows = parseAccountingWorkbookStructure(workbook, legacyInspection);
 
     scope.postMessage({
       type: 'done',
