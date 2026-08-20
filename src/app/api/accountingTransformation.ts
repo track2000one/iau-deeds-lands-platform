@@ -1,6 +1,7 @@
 import { apiJson, authenticatedFetch } from '../../lib/http';
 import type {
   AccountingCycleComparison,
+  AccountingCycleTemplateSnapshot,
   AccountingTransformationAttachment,
   AccountingTransformationCycle,
   AccountingTransformationInput,
@@ -140,6 +141,7 @@ export const sendAccountingTransformationCycleToReview = (id: string) => apiJson
 export const reopenAccountingTransformationCycle = (id: string) => apiJson<AccountingTransformationCycle>(`/api/accounting-transformation/cycles/${id}/reopen`, { method: 'POST' });
 export const approveAccountingTransformationCycle = (id: string) => apiJson<{ cycle: AccountingTransformationCycle; comparison: AccountingCycleComparison }>(`/api/accounting-transformation/cycles/${id}/approve`, { method: 'POST' });
 export const getAccountingTransformationCycleComparison = (id: string) => apiJson<AccountingCycleComparison>(`/api/accounting-transformation/cycles/${id}/comparison`);
+export const getAccountingCycleOfficialTemplate = (id: string) => apiJson<AccountingCycleTemplateSnapshot | null>(`/api/accounting-transformation/cycles/${id}/template`);
 
 export const previewAccountingTransformationCycleImport = (cycleId: string, items: AccountingTransformationInput[], fileName?: string) =>
   apiJson<AccountingTransformationImportPreview>(`/api/accounting-transformation/cycles/${cycleId}/import-preview`, { method: 'POST', body: JSON.stringify({ items, fileName: fileName || null }) });
@@ -158,10 +160,23 @@ export const uploadAccountingTransformationFile = async (file: File): Promise<Ac
 };
 
 export type AccountingExcelTemplateMeta = {
-  id: string; templateKey: string; title: string; fileName: string; driveFileId: string; driveUrl: string; mimeType?: string | null; fileSize?: number | null; uploadedBy?: string | null; createdAt: string; updatedAt: string;
+  id: string;
+  templateKey: string;
+  title: string;
+  fileName: string;
+  driveFileId: string;
+  driveUrl: string;
+  mimeType?: string | null;
+  fileSize?: number | null;
+  uploadedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  versionNumber?: number;
+  isCurrent?: boolean;
 };
 
 export const getOfficialAccountingExcelTemplate = () => apiJson<AccountingExcelTemplateMeta | null>('/api/accounting-transformation/excel-template');
+export const getOfficialAccountingExcelTemplateHistory = () => apiJson<AccountingExcelTemplateMeta[]>('/api/accounting-transformation/excel-template/history');
 export const uploadOfficialAccountingExcelTemplate = async (file: File) => {
   const body = new FormData(); body.append('file', file);
   const response = await authenticatedFetch('/api/accounting-transformation/excel-template', { method: 'POST', body });
@@ -169,8 +184,13 @@ export const uploadOfficialAccountingExcelTemplate = async (file: File) => {
   if (!response.ok) throw new Error(String(result?.message || result?.error || 'تعذر رفع نموذج Excel الرسمي.'));
   return result as AccountingExcelTemplateMeta;
 };
-export const downloadOfficialAccountingExcelTemplate = async () => {
-  const response = await authenticatedFetch('/api/accounting-transformation/excel-template/file');
-  if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(String(result?.message || result?.error || 'تعذر تنزيل نموذج Excel الرسمي.')); }
+const downloadArrayBuffer = async (url: string, fallbackMessage: string) => {
+  const response = await authenticatedFetch(url);
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(String(result?.message || result?.error || fallbackMessage));
+  }
   return response.arrayBuffer();
 };
+export const downloadOfficialAccountingExcelTemplate = () => downloadArrayBuffer('/api/accounting-transformation/excel-template/file', 'تعذر تنزيل نموذج Excel الرسمي.');
+export const downloadAccountingCycleOfficialTemplate = (cycleId: string) => downloadArrayBuffer(`/api/accounting-transformation/cycles/${cycleId}/template/file`, 'تعذر تنزيل النموذج المثبت على الدورة.');
