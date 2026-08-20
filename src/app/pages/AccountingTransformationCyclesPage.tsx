@@ -5,13 +5,16 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock3,
+  FileDown,
   FileSpreadsheet,
+  Files,
   History,
   Loader2,
   PlusCircle,
   RefreshCcw,
   RotateCcw,
   Send,
+  ShieldCheck,
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -62,6 +65,14 @@ const Metric: React.FC<{ label: string; value: number; tone?: string }> = ({ lab
   </div>
 );
 
+const CenterMetric: React.FC<{ label: string; value: string | number; hint?: string }> = ({ label, value, hint }) => (
+  <div className="rounded-[20px] border border-slate-200 bg-white/85 p-4 shadow-[0_6px_0_rgba(15,42,70,.04)]">
+    <p className="text-[11px] font-bold text-slate-500">{label}</p>
+    <p className="mt-1 text-2xl font-black text-slate-900">{value}</p>
+    {hint && <p className="mt-1 text-[10px] leading-5 text-slate-500">{hint}</p>}
+  </div>
+);
+
 export const AccountingTransformationCyclesPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, hasPermission } = usePermissions();
@@ -82,6 +93,9 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
 
   const current = useMemo(() => cycles.find((cycle) => cycle.isCurrent), [cycles]);
   const openCycle = useMemo(() => cycles.find((cycle) => ['draft', 'under_review'].includes(cycle.status)), [cycles]);
+  const archivedCount = useMemo(() => cycles.filter((cycle) => cycle.status === 'archived').length, [cycles]);
+  const templateVersions = useMemo(() => new Set(cycles.map((cycle) => cycle.officialTemplate?.versionNumber).filter(Boolean)).size, [cycles]);
+  const totalRecordsAcrossCycles = useMemo(() => cycles.reduce((sum, cycle) => sum + Number(cycle.recordCount || 0), 0), [cycles]);
 
   const load = async () => {
     setLoading(true);
@@ -154,7 +168,7 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
           <div>
             <Badge className="mb-3 border-white/20 bg-white/10 text-white hover:bg-white/10"><History className="ml-1 h-3.5 w-3.5" />سجل تاريخي كامل</Badge>
             <h1 className="text-2xl font-black md:text-3xl">دورات تحديث بيانات التحول المحاسبي</h1>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-slate-200">كل تحديث جديد يُحفظ كإصدار مستقل. لا تُحذف البيانات السابقة؛ بل تُقارن الدورة الجديدة بالدورة المعتمدة ثم تصبح الحالية بعد الاعتماد فقط.</p>
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-slate-200">كل دورة مستقلة ببياناتها وتقريرها ونسخة النموذج الرسمي التي استخدمتها. لا تتغير مخرجات دورة تاريخية عند رفع إصدار جديد من النموذج.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />لوحة اللجنة</Button>
@@ -168,6 +182,17 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
         </div>}
       </section>
 
+      <Card className="rounded-[28px] border-sky-200 bg-[linear-gradient(135deg,#f8fcff,#edf7ff)] shadow-[0_10px_0_rgba(15,57,95,.05)]">
+        <CardHeader className="border-b border-sky-100"><CardTitle className="flex items-center gap-2"><Files className="h-5 w-5 text-sky-700" />مركز إدارة دورات التحول المحاسبي</CardTitle><p className="text-xs leading-6 text-slate-500">نقطة موحدة لجمع بيانات الدورات، تقاريرها، مخرجات Excel، وحالة النموذج الرسمي المستخدم في كل دورة.</p></CardHeader>
+        <CardContent className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-5">
+          <CenterMetric label="إجمالي الدورات" value={cycles.length.toLocaleString('ar-SA')} hint="معتمدة ومؤرشفة وقيد العمل" />
+          <CenterMetric label="الدورة الحالية" value={current ? `#${current.cycleNumber}` : '-'} hint={current?.name || 'لا توجد'} />
+          <CenterMetric label="قيد العمل" value={openCycle ? `#${openCycle.cycleNumber}` : '-'} hint={openCycle ? statusLabel[openCycle.status] : 'لا توجد دورة مفتوحة'} />
+          <CenterMetric label="الدورات المؤرشفة" value={archivedCount.toLocaleString('ar-SA')} hint="محفوظة للمقارنة والرجوع" />
+          <CenterMetric label="إصدارات النماذج المستخدمة" value={templateVersions.toLocaleString('ar-SA')} hint={`${totalRecordsAcrossCycles.toLocaleString('ar-SA')} سجل تاريخي عبر الدورات`} />
+        </CardContent>
+      </Card>
+
       {showCreate && canCreateCycle && !openCycle && <Card className="rounded-[26px] border-sky-200 bg-sky-50/50 shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><PlusCircle className="h-5 w-5 text-sky-700" />إنشاء دورة تحديث جديدة</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
@@ -178,14 +203,14 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
       </Card>}
 
       {openCycle && <section className="rounded-[26px] border border-amber-200 bg-amber-50/70 p-5 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div><p className="text-xs font-black text-amber-700">دورة قيد العمل</p><h2 className="mt-1 text-xl font-black text-slate-900">#{openCycle.cycleNumber} — {openCycle.name}</h2><p className="mt-1 text-sm text-slate-600">الحالة: {statusLabel[openCycle.status]} · {openCycle.recordCount.toLocaleString('ar-SA')} سجل</p></div>
-          <Button onClick={() => navigate(openCycle.status === 'draft' ? `/accounting-transformation/import?cycle=${encodeURIComponent(openCycle.id)}` : '/accounting-transformation/cycles')}><RefreshCcw className="ml-2 h-4 w-4" />{openCycle.status === 'draft' ? 'فتح دورة التحديث' : 'الدورة تحت المراجعة'}</Button>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div><p className="text-xs font-black text-amber-700">دورة قيد العمل</p><h2 className="mt-1 text-xl font-black text-slate-900">#{openCycle.cycleNumber} — {openCycle.name}</h2><p className="mt-1 text-sm text-slate-600">الحالة: {statusLabel[openCycle.status]} · {openCycle.recordCount.toLocaleString('ar-SA')} سجل</p><p className="mt-2 text-xs text-slate-600">{openCycle.officialTemplate ? `النموذج المثبت: الإصدار ${openCycle.officialTemplate.versionNumber} — ${openCycle.officialTemplate.fileName}` : 'لم يتم تثبيت نموذج رسمي على الدورة بعد.'}</p></div>
+          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => navigate(`/accounting-transformation/reports?cycle=${encodeURIComponent(openCycle.id)}`)}><FileDown className="ml-2 h-4 w-4" />تقرير ونموذج الدورة</Button><Button onClick={() => navigate(openCycle.status === 'draft' ? `/accounting-transformation/import?cycle=${encodeURIComponent(openCycle.id)}` : `/accounting-transformation/records?cycle=${encodeURIComponent(openCycle.id)}`)}><RefreshCcw className="ml-2 h-4 w-4" />{openCycle.status === 'draft' ? 'فتح دورة التحديث' : 'عرض بيانات المراجعة'}</Button></div>
         </div>
       </section>}
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between"><div><h2 className="text-xl font-black text-slate-900">سجل الدورات</h2><p className="mt-1 text-xs text-slate-500">الدورات المؤرشفة محفوظة للعرض والمقارنة ولا يمكن حذفها.</p></div>{loading && <Loader2 className="h-5 w-5 animate-spin text-slate-500" />}</div>
+        <div className="flex items-center justify-between"><div><h2 className="text-xl font-black text-slate-900">سجل الدورات</h2><p className="mt-1 text-xs text-slate-500">لكل دورة بياناتها وتقريرها ونموذج Excel التاريخي الخاص بها.</p></div>{loading && <Loader2 className="h-5 w-5 animate-spin text-slate-500" />}</div>
 
         {!loading && !cycles.length && <div className="rounded-3xl border border-dashed bg-white p-10 text-center text-sm text-slate-500">لا توجد دورات حتى الآن.</div>}
 
@@ -203,11 +228,13 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
               <CardContent className="space-y-4 p-5">
                 <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><div><span className="text-slate-500">السجلات</span><p className="mt-1 font-black text-slate-900">{cycle.recordCount.toLocaleString('ar-SA')}</p></div><div><span className="text-slate-500">تاريخ الإنشاء</span><p className="mt-1 font-bold text-slate-800">{formatDate(cycle.createdAt)}</p></div><div><span className="text-slate-500">ملف المصدر</span><p className="mt-1 truncate font-bold text-slate-800">{cycle.sourceFileName || '-'}</p></div><div><span className="text-slate-500">آخر استيراد</span><p className="mt-1 font-bold text-slate-800">{formatDate(cycle.importedAt)}</p></div></div>
 
+                {cycle.officialTemplate ? <div className="flex items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50/60 p-3"><div><p className="text-[11px] font-black text-violet-700">النموذج الرسمي للدورة</p><p className="mt-1 truncate text-xs font-bold text-slate-800">الإصدار {cycle.officialTemplate.versionNumber} — {cycle.officialTemplate.fileName}</p></div><ShieldCheck className="h-5 w-5 shrink-0 text-violet-700" /></div> : <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">لا توجد نسخة نموذج تاريخية مثبتة لهذه الدورة.</div>}
+
                 {comparison && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Metric label="جديد" value={comparison.new} tone="text-emerald-700" /><Metric label="معدل" value={comparison.modified} tone="text-sky-700" /><Metric label="بدون تغيير" value={comparison.unchanged} /><Metric label="لم يظهر بالتحديث" value={comparison.removed} tone="text-amber-700" /></div>}
 
                 <div className="flex flex-wrap gap-2 border-t pt-4">
                   <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/records?cycle=${encodeURIComponent(cycle.id)}`)}><FileSpreadsheet className="ml-1 h-4 w-4" />عرض البيانات</Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/reports?cycle=${encodeURIComponent(cycle.id)}`)}>تقرير الدورة</Button>
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/reports?cycle=${encodeURIComponent(cycle.id)}`)}><FileDown className="ml-1 h-4 w-4" />تقرير ونموذج الدورة</Button>
                   {cycle.status === 'draft' && canAdd && <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/import?cycle=${encodeURIComponent(cycle.id)}`)}><RefreshCcw className="ml-1 h-4 w-4" />استكمال الاستيراد</Button>}
                   {cycle.status === 'draft' && canEdit && cycle.recordCount > 0 && <Button size="sm" onClick={() => runAction(cycle, 'review')} disabled={busy}><Send className="ml-1 h-4 w-4" />إرسال للمراجعة</Button>}
                   {cycle.status === 'under_review' && canEdit && <Button size="sm" variant="outline" onClick={() => runAction(cycle, 'reopen')} disabled={busy}><RotateCcw className="ml-1 h-4 w-4" />إعادة للمسودة</Button>}
