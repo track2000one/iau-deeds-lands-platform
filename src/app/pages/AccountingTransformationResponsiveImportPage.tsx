@@ -60,6 +60,13 @@ type ImportResult = {
   unchanged?: number;
 };
 
+type ExtendedImportPreview = AccountingTransformationImportPreview & {
+  cycleUpdate?: number;
+  alreadyImported?: number;
+  cycleUpdateIndexes?: number[];
+  alreadyImportedIndexes?: number[];
+};
+
 const IMPORT_LIMIT_OPTIONS = [50, 100, 250, 500, 0] as const;
 let officialTemplateBufferPromise: Promise<ArrayBuffer | undefined> | null = null;
 
@@ -103,9 +110,17 @@ const stripSource = (item: PreviewItem): AccountingTransformationInput => ({
   notes: item.notes || null,
 });
 
-const comparisonMessage = (preview: AccountingTransformationImportPreview) => {
+const comparisonMessage = (previewInput: AccountingTransformationImportPreview) => {
+  const preview = previewInput as ExtendedImportPreview;
   const notSupplied = preview.notSupplied ?? preview.removed ?? 0;
-  return `نتيجة المقارنة: ${(preview.new || 0).toLocaleString('ar-SA')} جديد، ${(preview.modified || 0).toLocaleString('ar-SA')} معدل، ${(preview.unchanged || 0).toLocaleString('ar-SA')} بدون تغيير، ${notSupplied.toLocaleString('ar-SA')} من النسخة السابقة لم يرد في الملف الحالي${preview.duplicate ? `، و${preview.duplicate.toLocaleString('ar-SA')} مكرر داخل الدورة` : ''}.`;
+  const cycleUpdate = preview.cycleUpdate || 0;
+  const alreadyImported = preview.alreadyImported || 0;
+  const cycleText = cycleUpdate || alreadyImported
+    ? ` داخل الدورة الحالية: ${cycleUpdate.toLocaleString('ar-SA')} يحتاج تحديثًا و${alreadyImported.toLocaleString('ar-SA')} موجود دون تغيير.`
+    : preview.duplicate
+      ? ` ويوجد ${preview.duplicate.toLocaleString('ar-SA')} سجل مكرر/مدخل مسبقًا.`
+      : '';
+  return `مقارنة مع النسخة السابقة: ${(preview.new || 0).toLocaleString('ar-SA')} جديد، ${(preview.modified || 0).toLocaleString('ar-SA')} معدل، ${(preview.unchanged || 0).toLocaleString('ar-SA')} بدون تغيير، ${notSupplied.toLocaleString('ar-SA')} من النسخة السابقة لم يرد في الملف الحالي.${cycleText}`;
 };
 
 const sourceBadge = (item: PreviewItem) => item.recordType === 'fixed_asset'
@@ -198,12 +213,15 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
   const modelBSheetNames = useMemo(() => new Set(modelBSheets.map((sheet) => sheet.sheetName)), [modelBSheets]);
   const modelBByName = useMemo(() => new Map(modelBSheets.map((sheet) => [sheet.sheetName, sheet])), [modelBSheets]);
 
+  const extendedScan = scan as ExtendedImportPreview | null;
   const freshIndexSet = useMemo(() => new Set(scan?.freshIndexes || []), [scan]);
   const duplicateIndexSet = useMemo(() => new Set(scan?.duplicateIndexes || []), [scan]);
   const invalidIndexSet = useMemo(() => new Set(scan?.invalidIndexes || []), [scan]);
   const newIndexSet = useMemo(() => new Set(scan?.newIndexes || []), [scan]);
   const modifiedIndexSet = useMemo(() => new Set(scan?.modifiedIndexes || []), [scan]);
   const unchangedIndexSet = useMemo(() => new Set(scan?.unchangedIndexes || []), [scan]);
+  const cycleUpdateIndexSet = useMemo(() => new Set(extendedScan?.cycleUpdateIndexes || []), [scan]);
+  const alreadyImportedIndexSet = useMemo(() => new Set(extendedScan?.alreadyImportedIndexes || []), [scan]);
 
   const maxBatch = useMemo(() => !items.length || limitPerBatch === 0 ? 1 : Math.max(1, Math.ceil(items.length / limitPerBatch)), [items.length, limitPerBatch]);
   const batchRange = useMemo(() => {
@@ -215,6 +233,14 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
   const currentFreshRows = useMemo(
     () => items.filter((_, index) => index >= batchRange.start && index < batchRange.end && freshIndexSet.has(index)),
     [items, batchRange, freshIndexSet],
+  );
+  const currentCycleUpdateCount = useMemo(
+    () => items.reduce((count, _, index) => count + (index >= batchRange.start && index < batchRange.end && cycleUpdateIndexSet.has(index) ? 1 : 0), 0),
+    [items, batchRange, cycleUpdateIndexSet],
+  );
+  const currentAlreadyImportedCount = useMemo(
+    () => items.reduce((count, _, index) => count + (index >= batchRange.start && index < batchRange.end && alreadyImportedIndexSet.has(index) ? 1 : 0), 0),
+    [items, batchRange, alreadyImportedIndexSet],
   );
   const batchLabel = limitPerBatch === 0
     ? 'كل السجلات'
@@ -291,7 +317,7 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
         return;
       }
 
-      setMessage(`${intakeMessage} جارٍ مقارنة ${parsed.length.toLocaleString('ar-SA')} سجل مع الدورة السابقة...`);
+      setMessage(`${intakeMessage} جارٍ مقارنة ${parsed.length.toLocaleString('ar-SA')} سجل مع الدورة السابقة والمسودة الحالية...`);
       const preview = await refreshScan(parsed, file.name);
       if (controller.signal.aborted) return;
       setMessage(`${intakeMessage} ${comparisonMessage(preview)}`);
@@ -314,8 +340,8 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
   const performImport = async () => {
     if (importing || scanning || !currentFreshRows.length) return;
     const confirmed = window.confirm(
-      `سيتم حفظ ${currentFreshRows.length.toLocaleString('ar-SA')} سجل من ${batchLabel} داخل دورة التحديث.\n\n` +
-      'الملف الوارد مصدر بيانات متغير، بينما نموذج ب الرسمي هو مخطط المخرجات الثابت. هل ترغب بالمتابعة؟',
+      `سيتم تنفيذ ${currentFreshRows.length.toLocaleString('ar-SA')} إجراء من ${batchLabel}: ${currentCycleUpdateCount.toLocaleString('ar-SA')} تحديث داخل الدورة والباقي إضافات جديدة.\n\n` +
+      'السجل المطابق تمامًا لن يعاد إدخاله، أما السجل الموجود في المسودة وتغيرت حقوله فسيتم تحديثه. هل ترغب بالمتابعة؟',
     );
     if (!confirmed) return;
 
@@ -324,7 +350,7 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
     try {
       const response = await importAccountingTransformationCycleRecords(selectedCycleId, currentFreshRows.map(stripSource), fileName || undefined);
       setResult(response);
-      toast.success(`تم إدخال ${response.created.toLocaleString('ar-SA')} سجل إلى دورة التحديث`);
+      toast.success(`اكتملت المصالحة: ${response.created.toLocaleString('ar-SA')} إضافة و${response.updated.toLocaleString('ar-SA')} تحديث داخل الدورة`);
       await refreshScan(items, fileName);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر استيراد السجلات');
@@ -334,10 +360,12 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
   };
 
   const statusForIndex = (index: number) => {
-    if (duplicateIndexSet.has(index)) return { label: 'مدخل بالدورة', className: 'border-amber-300 bg-amber-50 text-amber-800' };
     if (invalidIndexSet.has(index)) return { label: 'غير صالح', className: 'border-red-300 bg-red-50 text-red-700' };
-    if (modifiedIndexSet.has(index)) return { label: 'معدل', className: 'border-sky-300 bg-sky-50 text-sky-800' };
-    if (unchangedIndexSet.has(index)) return { label: 'بدون تغيير', className: 'border-slate-300 bg-slate-50 text-slate-700' };
+    if (cycleUpdateIndexSet.has(index)) return { label: 'تحديث داخل الدورة', className: 'border-violet-300 bg-violet-50 text-violet-800' };
+    if (alreadyImportedIndexSet.has(index)) return { label: 'موجود دون تغيير', className: 'border-slate-300 bg-slate-50 text-slate-700' };
+    if (duplicateIndexSet.has(index)) return { label: 'مكرر', className: 'border-amber-300 bg-amber-50 text-amber-800' };
+    if (modifiedIndexSet.has(index)) return { label: 'معدل عن السابق', className: 'border-sky-300 bg-sky-50 text-sky-800' };
+    if (unchangedIndexSet.has(index)) return { label: 'بدون تغيير عن السابق', className: 'border-slate-300 bg-slate-50 text-slate-700' };
     if (newIndexSet.has(index)) return { label: 'جديد', className: 'border-emerald-300 bg-emerald-50 text-emerald-700' };
     return { label: 'جاهز', className: 'border-emerald-300 bg-emerald-50 text-emerald-700' };
   };
@@ -346,6 +374,7 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
     ? modelBSheets.length + inspection.sheets.filter((sheet) => sheet.recordType && !modelBSheetNames.has(sheet.sheetName)).length
     : 0;
   const unmappedSheetCount = inspection ? Math.max(0, inspection.sheets.length - mappedSheetCount) : 0;
+  const noActionableRows = Boolean(scan && !currentFreshRows.length);
 
   return (
     <div className="mx-auto w-full max-w-[1550px] space-y-5 p-1 pb-10 sm:p-3 md:p-5" dir="rtl">
@@ -388,7 +417,7 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
           <div className="grid h-12 w-12 place-items-center rounded-2xl border border-violet-200 bg-white text-violet-700"><ShieldCheck className="h-6 w-6" /></div>
           <div>
             <p className="font-black text-slate-900">الاستيراد مرن — والمخرجات الرسمية ثابتة</p>
-            <p className="mt-1 text-sm leading-7 text-slate-700">لا تعتمد المعالجة على لون أو عمود ثابت. يقرأ النظام بنية جميع الأوراق وعناوين الحقول، يربطها بنموذج ب أو محولات Legacy، ثم يقارن هوية السجل وحقوله مع الدورة السابقة. أي قاعدة طارئة مستقبلية تُضاف مستقلة عن محرك القراءة الأساسي.</p>
+            <p className="mt-1 text-sm leading-7 text-slate-700">لا تعتمد المعالجة على لون أو عمود ثابت. يقرأ النظام بنية جميع الأوراق وعناوين الحقول، يربطها بنموذج ب أو محولات Legacy، ثم يقارن هوية السجل وحقوله مع الدورة السابقة والمسودة الحالية. إذا وصل ملف أحدث لنفس الأصل، يُحدّث السجل الموجود في المسودة بدل إنشاء نسخة مكررة.</p>
           </div>
         </CardContent>
       </Card>
@@ -431,20 +460,21 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
       </Card>}
 
       {items.length > 0 && <>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <div className="rounded-[22px] border bg-white p-4"><p className="text-xs text-slate-500">سجلات مرتبطة</p><p className="mt-1 text-3xl font-black">{items.length.toLocaleString('ar-SA')}</p><p className="text-[11px] text-slate-500">نموذج ب {fixedAssets.length.toLocaleString('ar-SA')} · Legacy أراضٍ {lands.length.toLocaleString('ar-SA')} · مبانٍ {buildings.length.toLocaleString('ar-SA')}</p></div>
-          <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/60 p-4"><p className="text-xs text-emerald-700">جديد</p><p className="mt-1 text-3xl font-black">{(scan?.new || 0).toLocaleString('ar-SA')}</p></div>
-          <div className="rounded-[22px] border border-sky-200 bg-sky-50/60 p-4"><p className="text-xs text-sky-700">معدل</p><p className="mt-1 text-3xl font-black">{(scan?.modified || 0).toLocaleString('ar-SA')}</p></div>
-          <div className="rounded-[22px] border bg-slate-50 p-4"><p className="text-xs">بدون تغيير</p><p className="mt-1 text-3xl font-black">{(scan?.unchanged || 0).toLocaleString('ar-SA')}</p></div>
+          <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/60 p-4"><p className="text-xs text-emerald-700">جديد عن السابق</p><p className="mt-1 text-3xl font-black">{(scan?.new || 0).toLocaleString('ar-SA')}</p></div>
+          <div className="rounded-[22px] border border-sky-200 bg-sky-50/60 p-4"><p className="text-xs text-sky-700">معدل عن السابق</p><p className="mt-1 text-3xl font-black">{(scan?.modified || 0).toLocaleString('ar-SA')}</p></div>
+          <div className="rounded-[22px] border border-violet-200 bg-violet-50/60 p-4"><p className="text-xs text-violet-700">تحديث داخل المسودة</p><p className="mt-1 text-3xl font-black">{(extendedScan?.cycleUpdate || 0).toLocaleString('ar-SA')}</p></div>
+          <div className="rounded-[22px] border bg-slate-50 p-4"><p className="text-xs">موجود بالمسودة دون تغيير</p><p className="mt-1 text-3xl font-black">{(extendedScan?.alreadyImported || 0).toLocaleString('ar-SA')}</p></div>
           <div className="rounded-[22px] border border-amber-200 bg-amber-50/60 p-4"><p className="text-xs text-amber-700">من السابق لم يرد هنا</p><p className="mt-1 text-3xl font-black">{(scan?.notSupplied ?? scan?.removed ?? 0).toLocaleString('ar-SA')}</p></div>
         </div>
 
         <Card className="rounded-[24px]">
-          <CardHeader><CardTitle>الدفعات</CardTitle><p className="text-xs text-slate-500">القيمة الافتراضية 250 سجلًا لتقليل حجم الطلب والحفاظ على استقرار الاستيراد.</p></CardHeader>
+          <CardHeader><CardTitle>الدفعات</CardTitle><p className="text-xs text-slate-500">القيمة الافتراضية 250 سجلًا لتقليل حجم الطلب والحفاظ على استقرار الاستيراد. السجل الموجود في المسودة لا يمنع الاستيراد إذا كانت بياناته الواردة أحدث.</p></CardHeader>
           <CardContent className="grid gap-3 lg:grid-cols-[1fr_1.2fr_1fr]">
             <label className="text-xs font-bold">عدد السجلات<NativeSelect value={String(limitPerBatch)} onChange={(event) => { setLimitPerBatch(Number(event.target.value)); setBatchIndex(0); setResult(null); }} className="mt-1 h-11">{IMPORT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value === 0 ? 'كل السجلات' : `${value} سجل`}</option>)}</NativeSelect></label>
             <div><p className="text-xs font-bold">الدفعة الحالية</p><div className="mt-1 flex gap-2"><Button variant="outline" size="icon" disabled={batchIndex <= 0} onClick={() => setBatchIndex((value) => Math.max(0, value - 1))}><ChevronRight /></Button><div className="flex h-10 flex-1 items-center justify-center rounded-xl border bg-white font-black">{batchLabel}</div><Button variant="outline" size="icon" disabled={batchIndex + 1 >= maxBatch} onClick={() => setBatchIndex((value) => Math.min(maxBatch - 1, value + 1))}><ChevronLeft /></Button></div></div>
-            <div className="rounded-xl border bg-slate-50 p-3"><p className="text-xs">جاهز للاستيراد: <strong>{currentFreshRows.length.toLocaleString('ar-SA')}</strong> من {currentRows.length.toLocaleString('ar-SA')}</p></div>
+            <div className={`rounded-xl border p-3 ${noActionableRows ? 'border-slate-200 bg-slate-50' : 'border-emerald-200 bg-emerald-50/50'}`}><p className="text-xs">قابل للتنفيذ: <strong>{currentFreshRows.length.toLocaleString('ar-SA')}</strong> من {currentRows.length.toLocaleString('ar-SA')}</p><p className="mt-1 text-[11px] text-slate-500">تحديث داخل الدورة: {currentCycleUpdateCount.toLocaleString('ar-SA')} · موجود دون تغيير: {currentAlreadyImportedCount.toLocaleString('ar-SA')}</p></div>
           </CardContent>
         </Card>
 
@@ -460,13 +490,16 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
           })}</tbody></table></div></CardContent>
         </Card>
 
-        <div className="flex flex-col gap-3 rounded-[24px] border bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div><p className="font-black">جاهز للحفظ في دورة التحديث</p><p className="mt-1 text-xs text-slate-500">السجلات غير الواردة في ملف جزئي لا تُحذف، وتبقى النسخة السابقة محفوظة حتى اعتماد الدورة.</p></div>
-          <Button disabled={importing || scanning || !currentFreshRows.length} onClick={performImport}>{importing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <UploadCloud className="ml-2 h-4 w-4" />}{importing ? 'جاري الاستيراد...' : `استيراد ${currentFreshRows.length.toLocaleString('ar-SA')} سجل`}</Button>
+        <div className={`flex flex-col gap-3 rounded-[24px] border p-4 sm:flex-row sm:items-center sm:justify-between ${noActionableRows ? 'border-slate-200 bg-slate-50/80' : 'border-emerald-200 bg-white'}`}>
+          <div>
+            <p className="font-black">{noActionableRows ? 'لا توجد تغييرات متبقية للحفظ في هذه الدفعة' : 'جاهز للمصالحة داخل دورة التحديث'}</p>
+            <p className="mt-1 text-xs text-slate-500">{noActionableRows ? 'السجلات الموجودة في هذه الدفعة سبق إدخالها إلى المسودة بنفس البيانات، لذلك لا يعيد النظام إنشاءها.' : 'سيضيف النظام السجل الجديد ويحدّث السجل الموجود في المسودة إذا تغير حقل أو أكثر، مع الاحتفاظ بالنسخة السابقة حتى الاعتماد.'}</p>
+          </div>
+          <Button disabled={importing || scanning || !currentFreshRows.length} onClick={performImport}>{importing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <UploadCloud className="ml-2 h-4 w-4" />}{importing ? 'جاري التنفيذ...' : currentFreshRows.length ? `إضافة/تحديث ${currentFreshRows.length.toLocaleString('ar-SA')} سجل` : 'لا توجد تغييرات للاستيراد'}</Button>
         </div>
       </>}
 
-      {result && <Card className="rounded-[24px] border-emerald-200 bg-emerald-50/60"><CardContent className="flex items-center justify-between p-5"><div className="flex items-start gap-3"><CheckCircle2 className="h-6 w-6 text-emerald-700" /><div><p className="font-black text-emerald-900">تم الاستيراد</p><p className="text-sm text-emerald-800">أضيف: {result.created.toLocaleString('ar-SA')} · متجاوز: {result.skipped.toLocaleString('ar-SA')} · الإجمالي: {result.total.toLocaleString('ar-SA')}</p></div></div><Button variant="outline" onClick={() => navigate(`/accounting-transformation/records?cycle=${encodeURIComponent(selectedCycleId)}`)}>عرض سجلات الدورة</Button></CardContent></Card>}
+      {result && <Card className="rounded-[24px] border-emerald-200 bg-emerald-50/60"><CardContent className="flex items-center justify-between p-5"><div className="flex items-start gap-3"><CheckCircle2 className="h-6 w-6 text-emerald-700" /><div><p className="font-black text-emerald-900">اكتملت المصالحة داخل الدورة</p><p className="text-sm text-emerald-800">أضيف: {result.created.toLocaleString('ar-SA')} · حُدّث: {result.updated.toLocaleString('ar-SA')} · بدون إجراء: {result.skipped.toLocaleString('ar-SA')} · الإجمالي المعالج: {result.total.toLocaleString('ar-SA')}</p></div></div><Button variant="outline" onClick={() => navigate(`/accounting-transformation/records?cycle=${encodeURIComponent(selectedCycleId)}`)}>عرض سجلات الدورة</Button></CardContent></Card>}
     </div>
   );
 };
