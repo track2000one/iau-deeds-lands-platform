@@ -1,267 +1,150 @@
 import React, { useMemo } from 'react';
-import { FileSpreadsheet, Landmark, Layers3, MapPin, PackageSearch } from 'lucide-react';
+import { Calculator, FileSpreadsheet, Landmark, MapPin, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { AppDateField } from './AppDateField';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import type { AssetInput } from '../../types/asset';
+import {
+  MODEL_B_ISSUE_DATE,
+  MODEL_B_PROCEDURES,
+  MODEL_B_VALUATION_METHODS,
+  MODEL_B_VERSION,
+  modelBPayloadOf,
+  modelBValuesFromAsset,
+  setModelBPayload,
+  validateModelBValues,
+} from '../config/fixedAssetModelB';
 
-type TemplateType = 'ppe' | 'transport' | 'furniture' | 'infrastructure' | 'intangible' | 'land';
-type ExtraFieldType = 'text' | 'number' | 'date' | 'select';
-
-type ExtraField = {
-  key: string;
-  label: string;
-  type?: ExtraFieldType;
-  placeholder?: string;
-  options?: string[];
-};
-
-const TEMPLATE_OPTIONS: Array<{ value: TemplateType; label: string; description: string }> = [
-  { value: 'ppe', label: 'الآلات والمعدات', description: 'نموذج PPE المعتمد' },
-  { value: 'transport', label: 'أصول النقل العام', description: 'المركبات وأصول النقل' },
-  { value: 'furniture', label: 'الأثاث', description: 'الأثاث والتجهيزات المكتبية' },
-  { value: 'infrastructure', label: 'البنية التحتية', description: 'شبكات وأعمال البنية التحتية' },
-  { value: 'intangible', label: 'الأصول غير الملموسة', description: 'البرامج والرخص والحقوق' },
-  { value: 'land', label: 'الأراضي', description: 'بيانات الأصول العقارية وفق النموذج المالي' },
-];
-
-const COMMON_EXTRAS: ExtraField[] = [
-  { key: 'country', label: 'الدولة', placeholder: 'المملكة العربية السعودية' },
-  { key: 'assetOwner', label: 'مالك الأصل', placeholder: 'جامعة الإمام عبدالرحمن بن فيصل' },
-  { key: 'acquisitionMethod', label: 'آلية الاستحواذ' },
-  { key: 'mofUniqueAssetNumber', label: 'رقم الأصل الفريد في نظام وزارة المالية' },
-  { key: 'entityUniqueAssetNumber', label: 'رقم الأصل الفريد بالجهة' },
-  { key: 'classification1English', label: 'تصنيف المستوى الأول - إنجليزي' },
-  { key: 'classification1Code', label: 'رمز تصنيف المستوى الأول' },
-  { key: 'classification2English', label: 'تصنيف المستوى الثاني - إنجليزي' },
-  { key: 'classification2Code', label: 'رمز تصنيف المستوى الثاني' },
-  { key: 'classification3English', label: 'تصنيف المستوى الثالث - إنجليزي' },
-  { key: 'classification3Code', label: 'رمز تصنيف المستوى الثالث' },
-  { key: 'accountingGroupEnglish', label: 'المجموعة المحاسبية - إنجليزي' },
-  { key: 'valuationMethod', label: 'طريقة التقييم' },
-  { key: 'valuationReportDate', label: 'تاريخ تقرير التقييم', type: 'date' },
-  { key: 'openingBalanceDate', label: 'تاريخ القوائم الافتتاحية', type: 'date' },
-  { key: 'openingValue', label: 'القيمة الافتتاحية', type: 'number' },
-  { key: 'valuationReportReference', label: 'رقم وثيقة تقرير التقييم' },
-  { key: 'glAccount', label: 'رقم شجرة الحسابات' },
-  { key: 'costCenter', label: 'مركز التكلفة' },
-];
-
-const TEMPLATE_FIELDS: Record<TemplateType, ExtraField[]> = {
-  ppe: [
-    { key: 'maintenanceFunctionalCode', label: 'رمز الأصل لغرض الصيانة' },
-    { key: 'capacityUnit', label: 'وحدة قياس السعة' },
-    { key: 'capacityMeasurementType', label: 'نوع معامل السعة' },
-    { key: 'capacityValue', label: 'قيمة معامل السعة', type: 'number' },
-    { key: 'assetUtilization', label: 'حالة استغلال الأصل', options: ['يعمل بشكل دائم', 'احتياطي', 'غير مستخدم'] , type: 'select'},
-    { key: 'replacementValue', label: 'تكلفة استبدال الأصل', type: 'number' },
-    { key: 'insurancePolicyNumber', label: 'رقم بوليصة التأمين' },
-  ],
-  transport: [
-    { key: 'yearOfManufacture', label: 'سنة الصنع', type: 'number' },
-    { key: 'registrationPlateNumber', label: 'رقم التسجيل / اللوحة' },
-    { key: 'capacityUnit', label: 'وحدة قياس السعة' },
-    { key: 'capacityMeasurementType', label: 'نوع معامل السعة' },
-    { key: 'capacityValue', label: 'قيمة معامل السعة', type: 'number' },
-    { key: 'consumptionUnit', label: 'وحدة معامل الاستهلاك' },
-    { key: 'consumptionMeasurementType', label: 'نوع معامل الاستهلاك' },
-    { key: 'consumptionValue', label: 'قيمة معامل الاستهلاك', type: 'number' },
-    { key: 'assetUtilization', label: 'حالة استغلال الأصل', options: ['يعمل بشكل دائم', 'احتياطي', 'غير مستخدم'], type: 'select' },
-    { key: 'replacementValue', label: 'تكلفة استبدال الأصل', type: 'number' },
-    { key: 'insurancePolicyNumber', label: 'رقم بوليصة التأمين' },
-  ],
-  furniture: [
-    { key: 'nationalAddressId', label: 'العنوان الوطني' },
-    { key: 'oldTagNumber', label: 'رقم البطاقة القديم' },
-    { key: 'retirementPlanDate', label: 'تاريخ الاستبعاد / التطوير', type: 'date' },
-    { key: 'supportingDocumentType', label: 'نوع الوثائق الداعمة' },
-    { key: 'supportingDocumentNumber', label: 'رقم الوثيقة الداعمة' },
-    { key: 'assetPhotoArchiveNumber', label: 'رقم أرشفة صورة الأصل' },
-    { key: 'officialLocation', label: 'Location / الموقع الرسمي' },
-    { key: 'depreciationAmount', label: 'قسط الإهلاك', type: 'number' },
-    { key: 'accumulatedDepreciation', label: 'الاستهلاك المتراكم', type: 'number' },
-    { key: 'residualValue', label: 'القيمة المتبقية في نهاية العمر', type: 'number' },
-    { key: 'netBookValue', label: 'القيمة الدفترية', type: 'number' },
-  ],
-  infrastructure: [
-    { key: 'geographicalCoordinates2', label: 'الإحداثيات الإضافية' },
-    { key: 'nationalAddressId', label: 'العنوان الوطني' },
-    { key: 'linkedAssetNumber', label: 'رقم الأصل المرتبط به' },
-    { key: 'retirementPlanDate', label: 'تاريخ الاستبعاد / التطوير', type: 'date' },
-    { key: 'supportingDocumentType', label: 'نوع الوثائق الداعمة' },
-    { key: 'supportingDocumentNumber', label: 'رقم الوثيقة الداعمة' },
-  ],
-  intangible: [
-    { key: 'version', label: 'النسخة' },
-    { key: 'developer', label: 'المطور' },
-    { key: 'licenseExpirationDate', label: 'تاريخ انتهاء الرخصة', type: 'date' },
-    { key: 'assetUtilization', label: 'حالة استغلال الأصل', options: ['مستخدم', 'غير مستخدم', 'مستخدم جزئيًا'], type: 'select' },
-    { key: 'retirementPlanDate', label: 'تاريخ الاستبعاد / التطوير', type: 'date' },
-    { key: 'indefiniteLifeReason', label: 'أسباب العمر الخدمي غير المحدود' },
-    { key: 'supportingDocumentType', label: 'نوع الوثائق الداعمة' },
-    { key: 'supportingDocumentNumber', label: 'رقم الوثيقة الداعمة' },
-    { key: 'linkedAssetNumber', label: 'رقم الأصل المرتبط به' },
-    { key: 'officialLocation', label: 'Location / الموقع الرسمي' },
-    { key: 'depreciationAmount', label: 'قسط الإهلاك', type: 'number' },
-    { key: 'accumulatedDepreciation', label: 'الاستهلاك المتراكم', type: 'number' },
-    { key: 'residualValue', label: 'القيمة المتبقية في نهاية العمر', type: 'number' },
-    { key: 'netBookValue', label: 'القيمة الدفترية', type: 'number' },
-  ],
-  land: [
-    { key: 'linkedAssetNumber', label: 'الأصل المرتبط به' },
-    { key: 'landArea', label: 'مساحة الأرض م²', type: 'number' },
-    { key: 'landUseType', label: 'نوع استخدام الأرض' },
-    { key: 'leaseTerminationPlan', label: 'خطة إنهاء عقد الاستئجار', options: ['نعم', 'لا'], type: 'select' },
-    { key: 'nationalAddressId', label: 'العنوان الوطني' },
-    { key: 'ownershipDocumentType', label: 'نوع وثيقة الملكية / الإثبات' },
-    { key: 'ownershipCertificateDate', label: 'تاريخ وثيقة التملك', type: 'date' },
-    { key: 'deedLandArea', label: 'المساحة حسب الصك', type: 'number' },
-    { key: 'allowedFloors', label: 'عدد الأدوار المسموح بناؤها', type: 'number' },
-    { key: 'landLength', label: 'طول الأرض', type: 'number' },
-    { key: 'landWidth', label: 'عرض الأرض', type: 'number' },
-    { key: 'district', label: 'الحي / المخطط' },
-    { key: 'plotNumber', label: 'رقم القطعة' },
-    { key: 'streetName', label: 'اسم الشارع' },
-    { key: 'streetFrontsCount', label: 'عدد الواجهات', type: 'number' },
-    { key: 'streetFrontsDirection', label: 'اتجاه الواجهات' },
-    { key: 'hasLeaseRevenue', label: 'هل يوجد إيراد سنوي من التأجير؟', options: ['نعم', 'لا'], type: 'select' },
-    { key: 'leasedAssetType', label: 'نوع الأصل / الجزء المؤجر' },
-    { key: 'annualRevenue', label: 'إجمالي الإيرادات السنوية', type: 'number' },
-    { key: 'mainLessee', label: 'المستأجر الرئيسي' },
-    { key: 'leaseStartDate', label: 'تاريخ بداية عقد الإيجار', type: 'date' },
-    { key: 'leaseDuration', label: 'مدة عقد الإيجار' },
-  ],
-};
-
-const numberValue = (value: unknown) => (value === null || value === undefined ? '' : String(value));
+const numberValue = (value: unknown) => value === null || value === undefined ? '' : String(value);
 
 export const AssetOfficialTemplateFields: React.FC<{
   value: AssetInput;
   onChange: (next: AssetInput) => void;
 }> = ({ value, onChange }) => {
-  const payload = (value.excelPayload || {}) as Record<string, unknown>;
-  const templateType = (String(payload.templateType || 'ppe') as TemplateType);
-  const template = TEMPLATE_OPTIONS.find((item) => item.value === templateType) || TEMPLATE_OPTIONS[0];
+  const modelB = modelBPayloadOf(value);
+  const values = useMemo(() => modelBValuesFromAsset(value), [value]);
+  const validation = useMemo(() => validateModelBValues(values), [values]);
 
-  const setField = <K extends keyof AssetInput>(key: K, fieldValue: AssetInput[K]) => {
-    onChange({ ...value, [key]: fieldValue });
-  };
+  const setField = <K extends keyof AssetInput>(key: K, fieldValue: AssetInput[K]) => onChange({ ...value, [key]: fieldValue });
+  const setModelB = (column: string, fieldValue: unknown) => onChange(setModelBPayload(value, { [column]: fieldValue }));
+  const setNumericModelB = (column: string, raw: string) => setModelB(column, raw === '' ? '' : Number(raw));
 
-  const setExtra = (key: string, fieldValue: unknown) => {
-    onChange({
-      ...value,
-      excelPayload: {
-        ...payload,
-        [key]: fieldValue,
-      },
-    });
-  };
-
-  const extras = useMemo(() => [...COMMON_EXTRAS, ...TEMPLATE_FIELDS[templateType]], [templateType]);
+  const derived = modelBValuesFromAsset(value);
+  const missingPreview = [...validation.missingMandatory, ...validation.conditionalMissing].slice(0, 8);
 
   return (
-    <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-[0_16px_48px_rgba(15,23,42,0.07)] backdrop-blur-xl">
-      <CardHeader className="border-b bg-white/40">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
-          بيانات النموذج الرسمي للأصول
+    <Card className="rounded-[28px] border-violet-200/70 bg-white/76 shadow-[0_16px_48px_rgba(15,23,42,0.07)] backdrop-blur-xl">
+      <CardHeader className="border-b bg-violet-50/45">
+        <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
+          <FileSpreadsheet className="h-5 w-5 text-violet-700" />
+          نموذج (ب - استدامة) سجل الأصول الثابتة
+          <span className="rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-bold text-violet-700">{MODEL_B_VERSION} · {MODEL_B_ISSUE_DATE}</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 p-5 sm:p-6">
-        <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/60 p-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr] lg:items-end">
-            <div className="space-y-2">
-              <Label>نوع النموذج المعتمد *</Label>
-              <Select
-                value={templateType}
-                onValueChange={(next) => setExtra('templateType', next as TemplateType)}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TEMPLATE_OPTIONS.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <section className={`rounded-2xl border p-4 ${validation.complete ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/60'}`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3">
+              {validation.complete ? <ShieldCheck className="mt-0.5 h-6 w-6 text-emerald-700" /> : <TriangleAlert className="mt-0.5 h-6 w-6 text-amber-700" />}
+              <div><p className="font-black">جاهزية نموذج ب: {validation.completion}%</p><p className="mt-1 text-xs leading-6 text-slate-600">الحفظ التشغيلي متاح للبيانات الحالية، لكن الاعتماد المحاسبي النهائي يتطلب استكمال الحقول الإلزامية وشروط الإجراء.</p></div>
             </div>
-            <div>
-              <p className="font-bold text-emerald-900">{template.label}</p>
-              <p className="mt-1 text-sm text-emerald-800/80">{template.description}. الحقول أدناه مستمدة من ملفات Excel المعتمدة، وتحفظ مع سجل الأصل لاستخدامها في التقارير والتصدير الرسمي.</p>
-            </div>
+            <div className="text-xs font-bold text-slate-600">إلزامي ناقص: {validation.missingMandatory.length} · شرطي ناقص: {validation.conditionalMissing.length}</div>
           </div>
-        </div>
+          {missingPreview.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{missingPreview.map((item) => <span key={`${item.column}-${item.label}`} className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[11px] text-amber-800">{item.column} — {item.label}</span>)}</div>}
+        </section>
 
         <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Landmark className="h-5 w-5 text-primary" />
-            <h3 className="font-black">البيانات المؤسسية والتصنيف المالي</h3>
-          </div>
+          <div className="flex items-center gap-2"><Landmark className="h-5 w-5 text-primary" /><h3 className="font-black">بيانات الجهة وإجراء الاستدامة</h3></div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="space-y-2"><Label>اسم الجهة</Label><Input value={value.entityName || ''} onChange={(e) => setField('entityName', e.target.value)} placeholder="جامعة الإمام عبدالرحمن بن فيصل" /></div>
-            <div className="space-y-2"><Label>رمز الجهة</Label><Input value={value.entityCode || ''} onChange={(e) => setField('entityCode', e.target.value)} placeholder="29" /></div>
-            <div className="space-y-2"><Label>وصف الأصل الرسمي</Label><Input value={value.assetDescription || ''} onChange={(e) => setField('assetDescription', e.target.value)} /></div>
-            <div className="space-y-2"><Label>رقم البطاقة</Label><Input value={value.cardNumber || ''} onChange={(e) => setField('cardNumber', e.target.value)} /></div>
-            <div className="space-y-2"><Label>الإدارة / القسم المسؤول</Label><Input value={value.responsibleDepartment || ''} onChange={(e) => setField('responsibleDepartment', e.target.value)} /></div>
-            <div className="space-y-2"><Label>الحالة الفنية للأصل</Label><Input value={value.technicalCondition || ''} onChange={(e) => setField('technicalCondition', e.target.value)} placeholder="ممتاز / جيد جداً / جيد ..." /></div>
-            <div className="space-y-2"><Label>التصنيف المستوى الأول - عربي</Label><Input value={value.classification1 || ''} onChange={(e) => setField('classification1', e.target.value)} /></div>
-            <div className="space-y-2"><Label>التصنيف المستوى الثاني - عربي</Label><Input value={value.classification2 || ''} onChange={(e) => setField('classification2', e.target.value)} /></div>
-            <div className="space-y-2"><Label>التصنيف المستوى الثالث - عربي</Label><Input value={value.classification3 || ''} onChange={(e) => setField('classification3', e.target.value)} /></div>
-            <div className="space-y-2"><Label>المجموعة المحاسبية - عربي</Label><Input value={value.accountingGroup || ''} onChange={(e) => setField('accountingGroup', e.target.value)} /></div>
-            <div className="space-y-2"><Label>رمز المجموعة المحاسبية</Label><Input value={value.accountingGroupCode || ''} onChange={(e) => setField('accountingGroupCode', e.target.value)} /></div>
-            <div className="space-y-2"><Label>رمز الأصل للغرض المحاسبي</Label><Input value={value.assetCode || ''} onChange={(e) => setField('assetCode', e.target.value)} /></div>
-            <div className="space-y-2"><Label>العمر المتبقي</Label><Input type="number" value={numberValue(value.remainingLife)} onChange={(e) => setField('remainingLife', e.target.value === '' ? null : Number(e.target.value))} /></div>
-            <div className="space-y-2"><Label>العمر الإنتاجي</Label><Input type="number" value={numberValue(value.usefulLife)} onChange={(e) => setField('usefulLife', e.target.value === '' ? null : Number(e.target.value))} /></div>
+            <div className="space-y-2"><Label>اسم الجهة A *</Label><Input value={value.entityName || ''} onChange={(e) => setField('entityName', e.target.value)} placeholder="جامعة الإمام عبدالرحمن بن فيصل" /></div>
+            <div className="space-y-2"><Label>رمز الجهة B *</Label><Input value={value.entityCode || ''} onChange={(e) => setField('entityCode', e.target.value)} /></div>
+            <div className="space-y-2"><Label>نوع الإجراء C</Label><Select value={String(modelB.C || '')} onValueChange={(next) => setModelB('C', next)}><SelectTrigger><SelectValue placeholder="إضافة / نقل / بيع / تحديث / إتلاف" /></SelectTrigger><SelectContent>{MODEL_B_PROCEDURES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select></div>
           </div>
         </section>
 
         <section className="space-y-4">
-          <div className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" /><h3 className="font-black">الموقع والتكلفة والتوثيق</h3></div>
+          <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h3 className="font-black">التصنيف والترميز D:T</h3></div>
+          <p className="text-xs leading-6 text-muted-foreground">المسميات العربية تُراجع من دليل التصنيف، بينما الرموز والمسميات الإنجليزية والحسابات حقول آلية/مرجعية. لا يُستخدم رمز التصنيف كهوية فريدة للأصل.</p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="space-y-2"><Label>المنطقة</Label><Input value={value.region || ''} onChange={(e) => setField('region', e.target.value)} /></div>
-            <div className="space-y-2"><Label>المدينة</Label><Input value={value.city || ''} onChange={(e) => setField('city', e.target.value)} /></div>
-            <div className="space-y-2"><Label>رقم المبنى</Label><Input value={value.buildingNumber || ''} onChange={(e) => setField('buildingNumber', e.target.value)} /></div>
-            <div className="space-y-2"><Label>الإحداثيات</Label><Input value={value.coordinates || ''} onChange={(e) => setField('coordinates', e.target.value)} placeholder="26.000000, 50.000000" /></div>
-            <AppDateField id="asset-official-service-date" label="تاريخ الدخول في الخدمة" value={String(value.serviceDate || '')} dateType={value.serviceDateType || 'gregorian'} onValueChange={(date) => setField('serviceDate', date)} onDateTypeChange={(type) => setField('serviceDateType', type)} />
-            <AppDateField id="asset-official-purchase-date" label="تاريخ الاقتناء" value={String(value.purchaseDate || '')} dateType={value.purchaseDateType || 'gregorian'} onValueChange={(date) => setField('purchaseDate', date)} onDateTypeChange={(type) => setField('purchaseDateType', type)} />
-            <div className="space-y-2"><Label>تكلفة الاقتناء</Label><Input type="number" value={numberValue(value.acquisitionCost)} onChange={(e) => setField('acquisitionCost', e.target.value === '' ? null : Number(e.target.value))} /></div>
-            <div className="space-y-2"><Label>الوثائق الداعمة لتكلفة الاقتناء</Label><Input value={value.supportingCostDocument || ''} onChange={(e) => setField('supportingCostDocument', e.target.value)} /></div>
-            <div className="space-y-2"><Label>رقم الأرشفة لوثيقة إثبات الأصل</Label><Input value={value.archiveDocumentNumber || ''} onChange={(e) => setField('archiveDocumentNumber', e.target.value)} /></div>
-            <div className="space-y-2"><Label>المصنع</Label><Input value={value.manufacturer || ''} onChange={(e) => setField('manufacturer', e.target.value)} /></div>
-            <AppDateField id="asset-official-inventory-date" label="تاريخ التحقق الميداني" value={String(value.lastInventoryDate || '')} dateType={value.lastInventoryDateType || 'gregorian'} onValueChange={(date) => setField('lastInventoryDate', date)} onDateTypeChange={(type) => setField('lastInventoryDateType', type)} />
-            <div className="space-y-2"><Label>وحدة القياس</Label><Input value={value.unitOfMeasure || ''} onChange={(e) => setField('unitOfMeasure', e.target.value)} /></div>
-            <div className="space-y-2"><Label>العدد / الكمية</Label><Input type="number" value={numberValue(value.quantity)} onChange={(e) => setField('quantity', e.target.value === '' ? null : Number(e.target.value))} /></div>
+            <div className="space-y-2"><Label>المستوى الأول - عربي E *</Label><Input value={value.classification1 || ''} onChange={(e) => setField('classification1', e.target.value)} /></div>
+            <div className="space-y-2"><Label>رمز المستوى الأول D — آلي</Label><Input value={String(modelB.D || '')} onChange={(e) => setModelB('D', e.target.value)} /></div>
+            <div className="space-y-2"><Label>المستوى الأول - إنجليزي F — آلي</Label><Input value={String(modelB.F || '')} onChange={(e) => setModelB('F', e.target.value)} /></div>
+            <div className="space-y-2"><Label>المستوى الثاني - عربي H *</Label><Input value={value.classification2 || ''} onChange={(e) => setField('classification2', e.target.value)} /></div>
+            <div className="space-y-2"><Label>رمز المستوى الثاني G — آلي</Label><Input value={String(modelB.G || '')} onChange={(e) => setModelB('G', e.target.value)} /></div>
+            <div className="space-y-2"><Label>المستوى الثاني - إنجليزي I — آلي</Label><Input value={String(modelB.I || '')} onChange={(e) => setModelB('I', e.target.value)} /></div>
+            <div className="space-y-2"><Label>المستوى الثالث - عربي K *</Label><Input value={value.classification3 || ''} onChange={(e) => setField('classification3', e.target.value)} /></div>
+            <div className="space-y-2"><Label>رمز المستوى الثالث J — آلي</Label><Input value={String(modelB.J || '')} onChange={(e) => setModelB('J', e.target.value)} /></div>
+            <div className="space-y-2"><Label>المستوى الثالث - إنجليزي L — آلي</Label><Input value={String(modelB.L || '')} onChange={(e) => setModelB('L', e.target.value)} /></div>
+            <div className="space-y-2"><Label>المجموعة المحاسبية N *</Label><Input value={value.accountingGroup || ''} onChange={(e) => setField('accountingGroup', e.target.value)} /></div>
+            <div className="space-y-2"><Label>رمز المجموعة M — آلي</Label><Input value={value.accountingGroupCode || ''} onChange={(e) => setField('accountingGroupCode', e.target.value)} /></div>
+            <div className="space-y-2"><Label>رمز الأصل المحاسبي P — آلي</Label><Input value={value.assetCode || ''} onChange={(e) => setField('assetCode', e.target.value)} /></div>
+            <div className="space-y-2"><Label>GL Account — S آلي</Label><Input value={String(modelB.S || '')} onChange={(e) => setModelB('S', e.target.value)} /></div>
+            <div className="space-y-2"><Label>مركز التكلفة T — آلي</Label><Input value={String(modelB.T || '')} onChange={(e) => setModelB('T', e.target.value)} /></div>
+            <div className="space-y-2"><Label>وصف الصيانة Q</Label><Input value={String(modelB.Q || '')} onChange={(e) => setModelB('Q', e.target.value)} /></div>
           </div>
         </section>
 
         <section className="space-y-4">
-          <div className="flex items-center gap-2"><Layers3 className="h-5 w-5 text-primary" /><h3 className="font-black">الحقول الإضافية حسب النموذج المعتمد</h3></div>
+          <h3 className="font-black">البيانات التعريفية U:AE</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {extras.map((field) => (
-              <div key={field.key} className="space-y-2">
-                <Label>{field.label}</Label>
-                {field.type === 'select' ? (
-                  <Select value={String(payload[field.key] || '')} onValueChange={(next) => setExtra(field.key, next)}>
-                    <SelectTrigger><SelectValue placeholder="اختر" /></SelectTrigger>
-                    <SelectContent>{(field.options || []).map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                    value={String(payload[field.key] ?? '')}
-                    onChange={(e) => setExtra(field.key, field.type === 'number' && e.target.value !== '' ? Number(e.target.value) : e.target.value)}
-                    placeholder={field.placeholder}
-                  />
-                )}
-              </div>
-            ))}
+            <div className="space-y-2"><Label>مالك الأصل U *</Label><Input value={String(modelB.U || '')} onChange={(e) => setModelB('U', e.target.value)} placeholder="جامعة الإمام عبدالرحمن بن فيصل" /></div>
+            <div className="space-y-2"><Label>القسم / الإدارة المسؤولة V</Label><Input value={value.responsibleDepartment || value.department || ''} onChange={(e) => setField('responsibleDepartment', e.target.value)} /></div>
+            <div className="space-y-2"><Label>الأصل المرتبط X</Label><Input value={String(modelB.X || '')} onChange={(e) => setModelB('X', e.target.value)} placeholder="الرقم الفريد للأصل الأب" /></div>
+            <div className="space-y-2"><Label>رقم وزارة المالية Y — آلي</Label><Input value={String(modelB.Y || '')} onChange={(e) => setModelB('Y', e.target.value)} /></div>
+            <div className="space-y-2"><Label>الرقم الفريد بالجهة Z — آلي</Label><Input value={String(modelB.Z || value.itemNumber || '')} onChange={(e) => setModelB('Z', e.target.value)} /></div>
+            <div className="space-y-2"><Label>وصف الأصل AA *</Label><Input value={value.assetDescription || value.name || ''} onChange={(e) => setField('assetDescription', e.target.value)} /></div>
+            <div className="space-y-2"><Label>رقم البطاقة AB *</Label><Input value={value.cardNumber || value.barcode || ''} onChange={(e) => setField('cardNumber', e.target.value)} /></div>
+            <div className="space-y-2"><Label>وحدة القياس AC *</Label><Input value={value.unitOfMeasure || ''} onChange={(e) => setField('unitOfMeasure', e.target.value)} /></div>
+            <div className="space-y-2"><Label>العدد AD *</Label><Input type="number" value={numberValue(value.quantity)} onChange={(e) => setField('quantity', e.target.value === '' ? null : Number(e.target.value))} /></div>
+            <div className="space-y-2"><Label>المصنّع AE *</Label><Input value={value.manufacturer || value.brand || ''} onChange={(e) => setField('manufacturer', e.target.value)} /></div>
           </div>
         </section>
 
-        <div className="flex items-start gap-3 rounded-2xl border border-dashed bg-background/55 p-4 text-sm text-muted-foreground">
-          <PackageSearch className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-          <p>هذه الحقول مبنية على ملفات Excel المعتمدة: الآلات والمعدات، أصول النقل العام، الأثاث، البنية التحتية، الأصول غير الملموسة، والأراضي. تحفظ البيانات الإضافية داخل سجل الأصل لتكون جاهزة لاحقًا للتعبئة الآلية في نفس قوالب Excel دون تغيير تصميمها.</p>
+        <section className="space-y-4">
+          <div className="flex items-center gap-2"><Calculator className="h-5 w-5 text-primary" /><h3 className="font-black">البيانات المحاسبية AF:AP</h3></div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <AppDateField id="asset-modelb-service-date" label="تاريخ الدخول في الخدمة AF *" value={String(value.serviceDate || '')} dateType={value.serviceDateType || 'gregorian'} onValueChange={(date) => setField('serviceDate', date)} onDateTypeChange={(type) => setField('serviceDateType', type)} />
+            <div className="space-y-2"><Label>طريقة التقييم AG *</Label><Select value={String(modelB.AG || '')} onValueChange={(next) => setModelB('AG', next)}><SelectTrigger><SelectValue placeholder="اختر طريقة التقييم" /></SelectTrigger><SelectContent>{MODEL_B_VALUATION_METHODS.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label>التكلفة AH *</Label><Input type="number" value={numberValue(value.acquisitionCost ?? value.purchaseValue)} onChange={(e) => setField('acquisitionCost', e.target.value === '' ? null : Number(e.target.value))} /></div>
+            <div className="space-y-2"><Label>العمر الإنتاجي AO — مرجعي</Label><Input type="number" value={numberValue(value.usefulLife)} onChange={(e) => setField('usefulLife', e.target.value === '' ? null : Number(e.target.value))} /></div>
+            <div className="space-y-2"><Label>العمر المتبقي AP — محسوب/مرجعي</Label><Input type="number" value={numberValue(value.remainingLife)} onChange={(e) => setField('remainingLife', e.target.value === '' ? null : Number(e.target.value))} /></div>
+            <div className="space-y-2"><Label>القيمة المتبقية AM</Label><Input type="number" value={numberValue(modelB.AM)} onChange={(e) => setNumericModelB('AM', e.target.value)} /></div>
+            <div className="space-y-2"><Label>مصروف الهبوط AK — عند الانطباق</Label><Input type="number" value={numberValue(modelB.AK)} onChange={(e) => setNumericModelB('AK', e.target.value)} /></div>
+            <div className="space-y-2"><Label>مجمع الهبوط AL — عند الانطباق</Label><Input type="number" value={numberValue(modelB.AL)} onChange={(e) => setNumericModelB('AL', e.target.value)} /></div>
+            <div className="space-y-2"><Label>قسط الاستهلاك AI — آلي</Label><Input readOnly value={numberValue(derived.AI)} className="bg-slate-50" /></div>
+            <div className="space-y-2"><Label>الاستهلاك المتراكم AJ — آلي</Label><Input readOnly value={numberValue(derived.AJ)} className="bg-slate-50" /></div>
+            <div className="space-y-2"><Label>القيمة الدفترية AN — آلي</Label><Input readOnly value={numberValue(derived.AN)} className="bg-slate-50" /></div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" /><h3 className="font-black">الموقع الجغرافي AQ:AX</h3></div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="space-y-2"><Label>الدولة AQ *</Label><Input value={String(modelB.AQ || 'المملكة العربية السعودية')} onChange={(e) => setModelB('AQ', e.target.value)} /></div>
+            <div className="space-y-2"><Label>المنطقة AR *</Label><Input value={value.region || ''} onChange={(e) => setField('region', e.target.value)} /></div>
+            <div className="space-y-2"><Label>المدينة AS *</Label><Input value={value.city || ''} onChange={(e) => setField('city', e.target.value)} /></div>
+            <div className="space-y-2"><Label>الإحداثيات AT</Label><Input value={value.coordinates || ''} onChange={(e) => setField('coordinates', e.target.value)} /></div>
+            <div className="space-y-2"><Label>العنوان الوطني AU *</Label><Input value={String(modelB.AU || '')} onChange={(e) => setModelB('AU', e.target.value)} /></div>
+            <div className="space-y-2"><Label>رقم المبنى AV *</Label><Input value={value.buildingNumber || value.building || ''} onChange={(e) => setField('buildingNumber', e.target.value)} /></div>
+            <div className="space-y-2"><Label>رقم الدور AW</Label><Input value={value.floor || ''} onChange={(e) => setField('floor', e.target.value)} /></div>
+            <div className="space-y-2"><Label>الغرفة / المكتب AX</Label><Input value={value.room || ''} onChange={(e) => setField('room', e.target.value)} /></div>
+          </div>
+        </section>
+
+        {(String(modelB.C || '') === 'بيع' || String(modelB.C || '') === 'إتلاف' || modelB.AY || modelB.BA) && <section className="space-y-4 rounded-2xl border border-red-200 bg-red-50/35 p-4">
+          <h3 className="font-black text-red-900">استبعاد الأصل AY:BB — إلزامي عند البيع أو الإتلاف</h3>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-2"><Label>تاريخ الاستبعاد AY</Label><Input type="date" value={String(modelB.AY || '')} onChange={(e) => setModelB('AY', e.target.value)} /></div>
+            <div className="space-y-2"><Label>صافي القيمة الدفترية AZ</Label><Input type="number" value={numberValue(modelB.AZ)} onChange={(e) => setNumericModelB('AZ', e.target.value)} /></div>
+            <div className="space-y-2"><Label>قيمة الاستبعاد BA</Label><Input type="number" value={numberValue(modelB.BA)} onChange={(e) => setNumericModelB('BA', e.target.value)} /></div>
+            <div className="space-y-2"><Label>الربح / الخسارة BB — آلي</Label><Input readOnly value={numberValue(derived.BB)} className="bg-white" /></div>
+          </div>
+        </section>}
+
+        <div className="rounded-2xl border border-dashed bg-background/55 p-4 text-sm leading-7 text-muted-foreground">
+          البيانات الإضافية تحفظ داخل سجل الأصل تحت نسخة نموذج ب، بينما تبقى هوية الأصل ودورة حياته في سجل الأصول المركزي. ملفات الإدارات اللاحقة تُطابق على الرقم الفريد وتُعامل كتحديثات جزئية؛ الخانة غير المرسلة لا تعني حذف القيمة السابقة.
         </div>
       </CardContent>
     </Card>
