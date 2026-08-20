@@ -1,4 +1,6 @@
-import type { AccountingRecordType } from '../app/config/accountingTransformationFields';
+import type { AccountingRecordType as LegacyAccountingRecordType } from '../app/config/accountingTransformationFields';
+
+export type AccountingRecordType = LegacyAccountingRecordType | 'fixed_asset';
 
 export type AccountingCommitteeStatus =
   | 'not_reviewed'
@@ -52,6 +54,7 @@ export type AccountingCycleComparison = {
   baseline: number;
   manual: number;
   removed: number;
+  notSupplied?: number;
   removedRecords?: Array<{
     id: string;
     stableKey?: string | null;
@@ -109,6 +112,7 @@ export type AccountingTransformationInput = {
 
 export type AccountingTransformationStats = {
   total: number;
+  fixedAssets?: number;
   lands: number;
   buildings: number;
   censusReady: number;
@@ -128,4 +132,5 @@ export type AccountingTransformationPage = {
   limit: number;
   total: number;
   totalPages: number;
+  truncated?: boolean;
 };
