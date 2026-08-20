@@ -1,6 +1,7 @@
 import { authStorage } from './authStorage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+const DEFAULT_REQUEST_TIMEOUT_MS = 25_000;
 
 export const getApiBaseUrl = () => API_BASE_URL;
 
@@ -28,17 +29,38 @@ export const authenticatedFetch = async (
     ? path
     : `${API_BASE_URL}${path}`;
 
-  const response = await fetch(normalizedPath, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const callerSignal = options.signal;
+  const forwardAbort = () => controller.abort(callerSignal?.reason);
+  if (callerSignal?.aborted) forwardAbort();
+  else callerSignal?.addEventListener('abort', forwardAbort, { once: true });
 
-  if (response.status === 401) {
-    authStorage.clear();
-    window.dispatchEvent(new CustomEvent('iau-auth-expired'));
+  const timeout = window.setTimeout(() => {
+    controller.abort(new DOMException('Request timeout', 'TimeoutError'));
+  }, DEFAULT_REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(normalizedPath, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+
+    if (response.status === 401) {
+      authStorage.clear();
+      window.dispatchEvent(new CustomEvent('iau-auth-expired'));
+    }
+
+    return response;
+  } catch (error) {
+    if (controller.signal.aborted && !callerSignal?.aborted) {
+      throw new Error('انتهت مهلة الاتصال بالخادم. حاول مرة أخرى بدل إبقاء الصفحة في حالة انتظار.');
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+    callerSignal?.removeEventListener('abort', forwardAbort);
   }
-
-  return response;
 };
 
 export const apiJson = async <T,>(
