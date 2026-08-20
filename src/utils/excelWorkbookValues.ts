@@ -62,18 +62,29 @@ const resolveCell = (
  * result is missing when the formula is a direct cell reference (including
  * cross-sheet references and IFERROR(reference, "")). Complex formulas are not
  * guessed: when Excel did not save their calculated value they remain unresolved.
+ * maxRows is used for fast header-only scans without materializing the full sheet.
  */
 export const sheetToResolvedMatrix = (
   workbook: XLSX.WorkBook,
   sheetName: string,
+  maxRows?: number,
 ): unknown[][] => {
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) return [];
+
+  const decodedRange = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
+  const lastRow = maxRows
+    ? Math.min(decodedRange.e.r, Math.max(0, maxRows - 1))
+    : decodedRange.e.r;
+  const range = maxRows
+    ? { s: { r: decodedRange.s.r, c: decodedRange.s.c }, e: { r: lastRow, c: decodedRange.e.c } }
+    : undefined;
 
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
     header: 1,
     defval: '',
     raw: false,
+    ...(range ? { range } : {}),
   });
 
   for (const [address, rawCell] of Object.entries(sheet)) {
@@ -81,6 +92,7 @@ export const sheetToResolvedMatrix = (
     const cell = rawCell as FormulaCell;
     if (!cell?.f) continue;
     const decoded = XLSX.utils.decode_cell(address);
+    if (maxRows && decoded.r >= maxRows) continue;
     const current = matrix[decoded.r]?.[decoded.c];
     if (meaningful(current)) continue;
 
