@@ -175,6 +175,11 @@ export type AccountingExcelTemplateMeta = {
   isCurrent?: boolean;
 };
 
+export type AccountingCycleTemplateVersionUploadResult = {
+  template: AccountingExcelTemplateMeta;
+  snapshot: AccountingCycleTemplateSnapshot;
+};
+
 export const getOfficialAccountingExcelTemplate = () => apiJson<AccountingExcelTemplateMeta | null>('/api/accounting-transformation/excel-template');
 export const getOfficialAccountingExcelTemplateHistory = () => apiJson<AccountingExcelTemplateMeta[]>('/api/accounting-transformation/excel-template/history');
 export const uploadOfficialAccountingExcelTemplate = async (file: File) => {
@@ -183,6 +188,13 @@ export const uploadOfficialAccountingExcelTemplate = async (file: File) => {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(String(result?.message || result?.error || 'تعذر رفع نموذج Excel الرسمي.'));
   return result as AccountingExcelTemplateMeta;
+};
+export const uploadAccountingCycleOfficialTemplateVersion = async (cycleId: string, file: File) => {
+  const body = new FormData(); body.append('file', file);
+  const response = await authenticatedFetch(`/api/accounting-transformation/cycles/${cycleId}/template/new-version`, { method: 'POST', body });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(String(result?.message || result?.error || 'تعذر رفع الإصدار الجديد للدورة.'));
+  return result as AccountingCycleTemplateVersionUploadResult;
 };
 const downloadArrayBuffer = async (url: string, fallbackMessage: string) => {
   const response = await authenticatedFetch(url);
