@@ -1,1 +1,1 @@
-export { AccountingTransformationResponsiveImportPage as AccountingTransformationImportPage } from './AccountingTransformationResponsiveImportPage';
+export { AccountingTransformationScopedImportPage as AccountingTransformationImportPage } from './AccountingTransformationScopedImportPage';
