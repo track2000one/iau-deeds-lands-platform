@@ -1,0 +1,33 @@
+name: Verify Contract Follow-up Data Provider
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify provider routing guard
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const root = fs.readFileSync('src/app/Root.tsx', 'utf8');
+          const page = fs.readFileSync('src/app/pages/ContractsFollowUpPage.tsx', 'utf8');
+          if (!page.includes('useData()')) throw new Error('ContractsFollowUpPage no longer uses useData; review test assumptions');
+          if (!root.includes("'/contracts'")) throw new Error('/contracts is not included in DataProvider route scope');
+          if (!root.includes('<DataProvider>')) throw new Error('Root does not mount DataProvider');
+          console.log('Contract follow-up route is covered by DataProvider scope.');
+          NODE
+      - name: Build frontend
+        run: npm run build
