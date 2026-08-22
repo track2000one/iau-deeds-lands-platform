@@ -1,5 +1,6 @@
 name: Verify Mosque Preview Action
 
+# Synchronization commit to trigger the base-branch PR verifier.
 on:
   push:
     branches: [agent/mosque-preview-action]
