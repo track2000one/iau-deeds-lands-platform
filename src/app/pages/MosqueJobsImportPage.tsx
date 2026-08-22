@@ -148,7 +148,7 @@ export const MosqueJobsImportPage: React.FC = () => {
 
   const readWorkbook = async (selected: File) => {
     const buffer = await selected.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: 'array', raw: false });
+    const workbook = XLSX.read(buffer, { type: 'array' });
     if (!workbook.SheetNames.length) throw new Error('ملف Excel لا يحتوي على أوراق قابلة للقراءة');
     const resolvedSheet = workbook.SheetNames.includes(EXPECTED_SHEET) ? EXPECTED_SHEET : workbook.SheetNames[0];
     const worksheet = workbook.Sheets[resolvedSheet];
@@ -179,7 +179,6 @@ export const MosqueJobsImportPage: React.FC = () => {
   const runPreview = async () => {
     if (!file || !rows.length) return;
     setLoading(true);
-    setCommitResult(null);
     try {
       const result = await apiJson<PreviewResponse>('/api/mosques/job-import/preview', {
         method: 'POST',
