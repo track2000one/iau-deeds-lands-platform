@@ -1,30 +1,26 @@
-name: One-time add mosque preview action
+name: Verify Mosque Preview PR
 
 on:
-  push:
-    paths:
-      - '.github/workflows/one-time-add-mosque-preview.yml'
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
-  patch-and-verify:
+  patch-build-commit:
+    if: github.head_ref == 'agent/mosque-preview-action'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout main
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: agent/mosque-preview-action
           fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
           cache: npm
-
-      - name: Add mosque site preview action
+      - name: Apply preview UI patch
         shell: bash
         run: |
           python3 - <<'PY'
@@ -109,19 +105,17 @@ jobs:
 
           path.write_text(text, encoding='utf-8')
           PY
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Verify production build
-        run: npm run build
-
-      - name: Commit verified change
+      - run: npm ci
+      - run: npm run build
+      - name: Commit verified UI change
         shell: bash
         run: |
+          if git diff --quiet -- src/app/pages/MosquesUnitPage.tsx; then
+            echo "No code changes to commit."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/app/pages/MosquesUnitPage.tsx
-          git rm --quiet .github/workflows/one-time-add-mosque-preview.yml
           git commit -m "feat(mosques): add mosque site preview action"
-          git push origin HEAD:main
+          git push origin HEAD:agent/mosque-preview-action
