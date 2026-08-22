@@ -1,19 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
+  AlertTriangle,
   Archive,
   ArrowRight,
+  CheckCheck,
   CheckCircle2,
   Clock3,
   FileDown,
   FileSpreadsheet,
   Files,
   History,
+  ListChecks,
   Loader2,
   PlusCircle,
   RefreshCcw,
   RotateCcw,
   Send,
+  ShieldAlert,
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
@@ -25,8 +29,10 @@ import { Badge } from '../components/ui/badge';
 import { usePermissions } from '../../context/PermissionsContext';
 import {
   approveAccountingTransformationCycle,
+  bulkApproveAccountingCycleReviewedRecords,
   createAccountingTransformationCycle,
   deleteAccountingTransformationCycle,
+  getAccountingCycleReviewCenter,
   getAccountingTransformationCycleComparison,
   getAccountingTransformationCycles,
   reopenAccountingTransformationCycle,
@@ -34,6 +40,7 @@ import {
 } from '../api/accountingTransformation';
 import type {
   AccountingCycleComparison,
+  AccountingCycleReviewCenter,
   AccountingTransformationCycle,
 } from '../../types/accountingTransformation';
 
@@ -84,8 +91,11 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
 
   const [cycles, setCycles] = useState<AccountingTransformationCycle[]>([]);
   const [comparisons, setComparisons] = useState<Record<string, AccountingCycleComparison>>({});
+  const [reviewCenters, setReviewCenters] = useState<Record<string, AccountingCycleReviewCenter>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkBusyId, setBulkBusyId] = useState<string | null>(null);
+  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -109,6 +119,18 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
         if (result.status === 'fulfilled') next[result.value[0]] = result.value[1];
       }
       setComparisons(next);
+
+      if (canEdit || canApproveCycle) {
+        const reviewCandidates = (data || []).filter((cycle) => cycle.status === 'under_review' && !cycle.isCurrent);
+        const reviewResults = await Promise.allSettled(reviewCandidates.map(async (cycle) => [cycle.id, await getAccountingCycleReviewCenter(cycle.id)] as const));
+        const nextReview: Record<string, AccountingCycleReviewCenter> = {};
+        for (const result of reviewResults) {
+          if (result.status === 'fulfilled') nextReview[result.value[0]] = result.value[1];
+        }
+        setReviewCenters(nextReview);
+      } else {
+        setReviewCenters({});
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل دورات تحديث البيانات');
     } finally {
@@ -157,6 +179,26 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
       toast.error(error instanceof Error ? error.message : 'تعذر تنفيذ الإجراء');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const runBulkReview = async (cycle: AccountingTransformationCycle) => {
+    const center = reviewCenters[cycle.id];
+    if (!center?.bulkEligible) return toast.info('لا توجد سجلات مؤهلة للاعتماد الجماعي حاليًا');
+    const accepted = window.confirm(
+      `سيتم اعتماد ${center.bulkEligible.toLocaleString('ar-SA')} سجلًا منخفض المخاطر دفعة واحدة.\n\n` +
+      'باستمرارك أنت تقر بأن ملف المصدر تمت مراجعته مسبقًا من الجهة المختصة، وأن الحالات عالية الأثر ستبقى للمراجعة الفردية.\n\nهل تريد المتابعة؟'
+    );
+    if (!accepted) return;
+    setBulkBusyId(cycle.id);
+    try {
+      const result = await bulkApproveAccountingCycleReviewedRecords(cycle.id);
+      toast.success(result.message);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تنفيذ الاعتماد الجماعي');
+    } finally {
+      setBulkBusyId(null);
     }
   };
 
@@ -217,7 +259,10 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
         <div className="grid gap-4 xl:grid-cols-2">
           {cycles.map((cycle) => {
             const comparison = comparisons[cycle.id];
+            const reviewCenter = reviewCenters[cycle.id];
             const busy = busyId === cycle.id;
+            const bulkBusy = bulkBusyId === cycle.id;
+            const reviewExpanded = expandedReviewId === cycle.id;
             return <Card key={cycle.id} className={`overflow-hidden rounded-[26px] ${cycle.isCurrent ? 'border-emerald-300 ring-2 ring-emerald-100' : ''}`}>
               <CardHeader className="border-b bg-slate-50/70 pb-4">
                 <div className="flex items-start justify-between gap-3">
@@ -232,16 +277,43 @@ export const AccountingTransformationCyclesPage: React.FC = () => {
 
                 {comparison && <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Metric label="جديد" value={comparison.new} tone="text-emerald-700" /><Metric label="معدل" value={comparison.modified} tone="text-sky-700" /><Metric label="بدون تغيير" value={comparison.unchanged} /><Metric label="لم يظهر بالتحديث" value={comparison.removed} tone="text-amber-700" /></div>}
 
+                {cycle.status === 'under_review' && reviewCenter && <div className="space-y-3 rounded-[20px] border border-sky-200 bg-[linear-gradient(135deg,#f8fcff,#eef8ff)] p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div><p className="flex items-center gap-2 text-sm font-black text-slate-900"><ListChecks className="h-4 w-4 text-sky-700" />مركز المراجعة الذكية</p><p className="mt-1 text-[11px] leading-5 text-slate-500">السجلات بدون تغيير تُعتمد تلقائيًا، والسجلات منخفضة المخاطر من الملف المراجع مسبقًا يمكن اعتمادها جماعيًا، والاستثناءات فقط تراجع فرديًا.</p></div>
+                    {reviewCenter.unresolved === 0 && <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700"><CheckCheck className="ml-1 h-3.5 w-3.5" />جاهزة لاعتماد الدورة</Badge>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                    <Metric label="اعتماد تلقائي" value={comparison?.unchanged || 0} tone="text-teal-700" />
+                    <Metric label="جاهز جماعيًا" value={reviewCenter.bulkEligible} tone="text-emerald-700" />
+                    <Metric label="مراجعة فردية" value={reviewCenter.individualReview} tone="text-violet-700" />
+                    <Metric label="يحتاج تحديثًا" value={reviewCenter.needsUpdate} tone="text-amber-700" />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {canApproveCycle && reviewCenter.bulkEligible > 0 && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => runBulkReview(cycle)} disabled={bulkBusy}><CheckCheck className="ml-1 h-4 w-4" />{bulkBusy ? 'جاري الاعتماد...' : `اعتماد السجلات السليمة (${reviewCenter.bulkEligible.toLocaleString('ar-SA')})`}</Button>}
+                    {(reviewCenter.individualReview > 0 || reviewCenter.needsUpdate > 0) && <Button size="sm" variant="outline" onClick={() => setExpandedReviewId(reviewExpanded ? null : cycle.id)}><ShieldAlert className="ml-1 h-4 w-4" />{reviewExpanded ? 'إخفاء الاستثناءات' : `عرض الاستثناءات (${(reviewCenter.individualReview + reviewCenter.needsUpdate).toLocaleString('ar-SA')})`}</Button>}
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/records?cycle=${encodeURIComponent(cycle.id)}&status=under_review`)}><ListChecks className="ml-1 h-4 w-4" />عرض سجلات المراجعة</Button>
+                  </div>
+
+                  {reviewExpanded && <div className="space-y-2 border-t border-sky-100 pt-3">
+                    {!reviewCenter.exceptionItems.length && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-700">لا توجد استثناءات تحتاج مراجعة فردية.</div>}
+                    {reviewCenter.exceptionItems.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-xl border bg-white/90 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-xs font-black text-slate-900">{item.assetDescription}</p><Badge variant="outline" className={item.committeeStatus === 'needs_update' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-violet-200 bg-violet-50 text-violet-700'}>{item.committeeStatus === 'needs_update' ? 'يحتاج تحديثًا' : 'مراجعة فردية'}</Badge></div><p className="mt-1 font-mono text-[10px] text-slate-500">{item.recordNumber}{item.entityAssetNumber ? ` · ${item.entityAssetNumber}` : ''}</p><p className="mt-1 text-[11px] leading-5 text-slate-600">{item.reasons.join(' — ')}</p>{item.changedFields.length > 0 && <p className="mt-1 text-[10px] text-slate-500">الحقول المتغيرة: {item.changedFields.join('، ')}</p>}</div>
+                      <Button size="sm" variant="outline" className="shrink-0" onClick={() => navigate(`/accounting-transformation/${encodeURIComponent(item.id)}`)}>فتح السجل</Button>
+                    </div>)}
+                    {reviewCenter.exceptionItemsTruncated && <p className="text-[10px] text-slate-500">تم عرض أول 100 استثناء فقط. استخدم «عرض سجلات المراجعة» للوصول إلى بقية السجلات.</p>}
+                  </div>}
+                </div>}
+
                 <div className="flex flex-wrap gap-2 border-t pt-4">
                   <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/records?cycle=${encodeURIComponent(cycle.id)}`)}><FileSpreadsheet className="ml-1 h-4 w-4" />عرض البيانات</Button>
                   <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/reports?cycle=${encodeURIComponent(cycle.id)}`)}><FileDown className="ml-1 h-4 w-4" />تقرير ونموذج الدورة</Button>
                   {cycle.status === 'draft' && canAdd && <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/import?cycle=${encodeURIComponent(cycle.id)}`)}><RefreshCcw className="ml-1 h-4 w-4" />استكمال الاستيراد</Button>}
                   {cycle.status === 'draft' && canEdit && cycle.recordCount > 0 && <Button size="sm" onClick={() => runAction(cycle, 'review')} disabled={busy}><Send className="ml-1 h-4 w-4" />إرسال للمراجعة</Button>}
                   {cycle.status === 'under_review' && canEdit && <Button size="sm" variant="outline" onClick={() => runAction(cycle, 'reopen')} disabled={busy}><RotateCcw className="ml-1 h-4 w-4" />إعادة للمسودة</Button>}
-                  {cycle.status === 'under_review' && canApproveCycle && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => runAction(cycle, 'approve')} disabled={busy}><CheckCircle2 className="ml-1 h-4 w-4" />اعتماد الدورة</Button>}
+                  {cycle.status === 'under_review' && canApproveCycle && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => runAction(cycle, 'approve')} disabled={busy || Boolean(reviewCenter && reviewCenter.unresolved > 0)} title={reviewCenter?.unresolved ? 'يجب حسم السجلات في مركز المراجعة الذكية أولًا' : undefined}><CheckCircle2 className="ml-1 h-4 w-4" />اعتماد الدورة</Button>}
                   {['draft', 'under_review'].includes(cycle.status) && canDelete && <Button size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => runAction(cycle, 'delete')} disabled={busy}><Trash2 className="ml-1 h-4 w-4" />حذف المسودة</Button>}
                   {cycle.status === 'archived' && <span className="mr-auto inline-flex items-center gap-1 text-xs font-bold text-slate-500"><Archive className="h-4 w-4" />محفوظة تاريخيًا</span>}
-                  {cycle.status === 'under_review' && <span className="mr-auto inline-flex items-center gap-1 text-xs font-bold text-sky-700"><Clock3 className="h-4 w-4" />بانتظار الاعتماد</span>}
+                  {cycle.status === 'under_review' && reviewCenter?.unresolved ? <span className="mr-auto inline-flex items-center gap-1 text-xs font-bold text-amber-700"><AlertTriangle className="h-4 w-4" />متبقي {reviewCenter.unresolved.toLocaleString('ar-SA')} للحسم</span> : cycle.status === 'under_review' ? <span className="mr-auto inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-4 w-4" />جاهزة للاعتماد النهائي</span> : null}
                 </div>
               </CardContent>
             </Card>;
