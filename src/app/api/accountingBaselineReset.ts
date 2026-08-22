@@ -1,6 +1,11 @@
 import { apiJson } from '../../lib/http';
 import type { AccountingTransformationCycle, AccountingTransformationInput } from '../../types/accountingTransformation';
 
+export type AccountingBaselineResetItem = AccountingTransformationInput & {
+  sourceSheet: string;
+  sourceRow: number;
+};
+
 export type AccountingBaselineResetImpact = {
   destructive: {
     cycles: number;
@@ -33,6 +38,11 @@ export type AccountingBaselineResetPreview = {
     building: number;
     fixed_asset: number;
   };
+  sourceSheetCounts: Record<string, number>;
+  baselineSourceSheets: {
+    land: string;
+    building: string;
+  };
   datasetFingerprint: string;
   suggestedCycleName: string;
   impact: AccountingBaselineResetImpact;
@@ -59,12 +69,13 @@ export type AccountingBaselineResetResult = {
     building: number;
     fixed_asset: number;
   };
+  sourceSheetCounts?: Record<string, number>;
   officialTemplate?: unknown;
 };
 
 export const previewAccountingTransformationBaselineReset = (input: {
   fileName: string;
-  items: AccountingTransformationInput[];
+  items: AccountingBaselineResetItem[];
 }) => apiJson<AccountingBaselineResetPreview>('/api/accounting-transformation/admin/reset-baseline/preview', {
   method: 'POST',
   body: JSON.stringify(input),
@@ -74,7 +85,7 @@ export const resetAccountingTransformationBaseline = (input: {
   confirmation: string;
   fileName: string;
   cycleName: string;
-  items: AccountingTransformationInput[];
+  items: AccountingBaselineResetItem[];
   expectedImpact: AccountingBaselineResetImpact['destructive'];
   expectedDatasetFingerprint: string;
 }) => apiJson<AccountingBaselineResetResult>('/api/accounting-transformation/admin/reset-baseline', {
