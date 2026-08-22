@@ -46,7 +46,8 @@ const AssetReportsPage = lazy(() => import('./pages/AssetReportsPage').then((m) 
 const AssetExcelImportPage = lazy(() => import('./pages/AssetCycleImportPage').then((m) => ({ default: m.AssetCycleImportPage })));
 const AssetCyclesPage = lazy(() => import('./pages/AssetCyclesPage').then((m) => ({ default: m.AssetCyclesPage })));
 const ContractsFollowUpPage = lazy(() => import('./pages/ContractsFollowUpPage').then((m) => ({ default: m.ContractsFollowUpPage })));
-const MosquesUnitPage = lazy(() => import('./pages/MosquesUnitPage').then((m) => ({ default: m.MosquesUnitPage })));
+const MosquesWorkspacePage = lazy(() => import('./pages/MosquesWorkspacePage').then((m) => ({ default: m.MosquesWorkspacePage })));
+const MosqueJobsImportPage = lazy(() => import('./pages/MosqueJobsImportPage').then((m) => ({ default: m.MosqueJobsImportPage })));
 const MosquesPublicPage = lazy(() => import('./pages/MosquesPublicPage').then((m) => ({ default: m.MosquesPublicPage })));
 const AccountingTransformationDashboardPage = lazy(() => import('./pages/AccountingTransformationDashboardPage').then((m) => ({ default: m.AccountingTransformationDashboardPage })));
 const AccountingTransformationRecordsPage = lazy(() => import('./pages/AccountingTransformationRecordsPage').then((m) => ({ default: m.AccountingTransformationRecordsPage })));
@@ -175,7 +176,13 @@ export const router = createHashRouter([
           { path: ':recordId', element: accountingTransformationPermission(<AccountingTransformationViewPage />, 'canView') },
         ],
       },
-      { path: 'mosques', element: mosquePermission(<MosquesUnitPage />, 'canView') },
+      {
+        path: 'mosques',
+        children: [
+          { index: true, element: mosquePermission(<MosquesWorkspacePage />, 'canView') },
+          { path: 'import-jobs', element: mosquePermission(<MosqueJobsImportPage />, 'canAdd') },
+        ],
+      },
       { path: 'contracts/follow-up', element: <PermissionGuard module="contracts_follow_up" action="canView">{page(<ContractsFollowUpPage />)}</PermissionGuard> },
       { path: 'reports', element: page(<ReportsPage />) },
       { path: 'archive', element: page(<ArchivePage />) },
