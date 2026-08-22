@@ -6,6 +6,10 @@ import {
   inspectAccountingWorkbookStructure,
   parseAccountingWorkbookStructure,
 } from '../utils/accountingWorkbookStructuralIntake';
+import {
+  accountingSheetRoleIsData,
+  detectAccountingExcelTemplateProfile,
+} from '../utils/accountingExcelTemplateProfiles';
 
 type AnalyzeRequest = {
   sourceBuffer: ArrayBuffer;
@@ -37,16 +41,35 @@ scope.onmessage = async (event: MessageEvent<AnalyzeRequest>) => {
       });
     }
 
-    progress('جاري التعرف على أوراق نموذج ب والأوراق الانتقالية...');
-    const modelBSheets = inspectModelBWorkbook(workbook);
-    const modelBSheetNames = new Set(modelBSheets.map((sheet) => sheet.sheetName));
+    progress('جاري تحديد نوع قالب Excel ووظيفة كل ورقة...');
+    const templateDetection = detectAccountingExcelTemplateProfile(workbook);
+    const sheetProfileByName = new Map(templateDetection.sheets.map((sheet) => [sheet.sheetName, sheet]));
+
+    progress(`تم التعرف على: ${templateDetection.profileName} — ثقة ${templateDetection.confidence}%`);
     const inspection = inspectAccountingWorkbookStructure(workbook, officialWorkbook);
 
-    progress('جاري تحويل السجلات إلى المخطط الموحد دون تجميد الصفحة...');
+    // Model B is parsed only from sheets classified as actual fixed-asset data.
+    // Reference/lookup sheets are never converted to records, even if some labels overlap.
+    const modelBSheets = templateDetection.safeForAutomaticImport
+      ? inspectModelBWorkbook(workbook).filter((sheet) => sheetProfileByName.get(sheet.sheetName)?.role === 'data-fixed-asset')
+      : [];
+    const modelBSheetNames = new Set(modelBSheets.map((sheet) => sheet.sheetName));
+
+    progress('جاري تحويل أوراق البيانات فقط إلى المخطط الموحد دون تجميد الصفحة...');
     const modelBRows = parseModelBWorkbook(workbook, modelBSheets);
+
     const legacyInspection = {
       ...inspection,
-      sheets: inspection.sheets.filter((sheet) => !modelBSheetNames.has(sheet.sheetName)),
+      sheets: templateDetection.safeForAutomaticImport
+        ? inspection.sheets.filter((sheet) => {
+            if (modelBSheetNames.has(sheet.sheetName)) return false;
+            const profile = sheetProfileByName.get(sheet.sheetName);
+            if (!profile || !accountingSheetRoleIsData(profile.role)) return false;
+            if (profile.role === 'data-land') return sheet.recordType === 'land';
+            if (profile.role === 'data-building') return sheet.recordType === 'building';
+            return false;
+          })
+        : [],
     };
     const legacyRows = parseAccountingWorkbookStructure(workbook, legacyInspection);
 
@@ -54,6 +77,7 @@ scope.onmessage = async (event: MessageEvent<AnalyzeRequest>) => {
       type: 'done',
       result: {
         inspection,
+        templateDetection,
         modelBSheets,
         modelBRows,
         legacyRows,
