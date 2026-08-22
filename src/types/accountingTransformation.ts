@@ -79,6 +79,32 @@ export type AccountingCycleComparison = {
   }>;
 };
 
+export type AccountingReviewExceptionItem = {
+  id: string;
+  recordNumber: string;
+  recordType: AccountingRecordType;
+  changeType?: AccountingRecordChangeType;
+  committeeStatus: AccountingCommitteeStatus;
+  assetDescription: string;
+  entityAssetNumber?: string | null;
+  changedFields: string[];
+  reasons: string[];
+};
+
+export type AccountingCycleReviewCenter = {
+  total: number;
+  autoEligible: number;
+  bulkEligible: number;
+  individualReview: number;
+  needsUpdate: number;
+  resolved: number;
+  unresolved: number;
+  cycleStatus: AccountingCycleStatus;
+  sourceFileName?: string | null;
+  exceptionItems: AccountingReviewExceptionItem[];
+  exceptionItemsTruncated?: boolean;
+};
+
 export type AccountingTransformationRecord = {
   id: string;
   recordNumber: string;
