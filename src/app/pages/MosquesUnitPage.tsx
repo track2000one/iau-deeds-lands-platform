@@ -172,6 +172,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [statusValue, setStatusValue] = useState('');
   const [statusNote, setStatusNote] = useState('');
   const [statusEvidence, setStatusEvidence] = useState<File | null>(null);
+  const [previewSite, setPreviewSite] = useState<MosqueSite | null>(null);
   const [qrSite, setQrSite] = useState<MosqueSite | null>(null);
   const [personnelDialog, setPersonnelDialog] = useState(false);
   const [editingPersonnel, setEditingPersonnel] = useState<MosquePersonnel | null>(null);
@@ -634,7 +635,7 @@ export const MosquesUnitPage: React.FC = () => {
 
         <TabsContent value="sites" className="space-y-4">
           <Card className={card3d}><CardContent className="p-4"><div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pr-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم المسجد أو المدينة أو الحي أو الموقع..." /></div></CardContent></Card>
-          {visibleSites.length === 0 ? <Empty text="لا توجد مساجد أو مصليات مسجلة" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{visibleSites.map((site) => <SiteCard key={site.id} site={site} canEdit={canEdit && ['head', 'supervisor'].includes(role)} canDelete={canDelete && role === 'head'} onEdit={() => openSiteDialog(site)} onDelete={() => deleteSite(site)} onQr={() => setQrSite(site)} />)}</div>}
+          {visibleSites.length === 0 ? <Empty text="لا توجد مساجد أو مصليات مسجلة" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{visibleSites.map((site) => <SiteCard key={site.id} site={site} canEdit={canEdit && ['head', 'supervisor'].includes(role)} canDelete={canDelete && role === 'head'} onPreview={() => setPreviewSite(site)} onEdit={() => openSiteDialog(site)} onDelete={() => deleteSite(site)} onQr={() => setQrSite(site)} />)}</div>}
         </TabsContent>
 
         <TabsContent value="requests" className="space-y-4">
@@ -871,6 +872,33 @@ export const MosquesUnitPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={Boolean(previewSite)} onOpenChange={(open) => !open && setPreviewSite(null)}>
+        <DialogContent dir="rtl" className="sm:max-w-[720px]">
+          <DialogHeader className="text-right">
+            <DialogTitle className="flex items-center gap-2 text-xl font-black"><Eye className="h-5 w-5 text-sky-700" />معاينة — {previewSite?.name}</DialogTitle>
+            <DialogDescription>عرض بيانات المسجد أو الجامع أو المصلى دون الدخول في وضع التعديل.</DialogDescription>
+          </DialogHeader>
+          {previewSite && <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-slate-50 p-4">
+              <div><p className="text-xs text-muted-foreground">الموقع داخل الجامعة</p><p className="mt-1 font-black text-slate-800">{[previewSite.campusLocation, previewSite.city, previewSite.district].filter(Boolean).join(' — ') || '-'}</p></div>
+              <Badge variant="outline" className={previewSite.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : previewSite.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-50'}>{siteStatusLabels[previewSite.status] || previewSite.status}</Badge>
+            </div>
+            <div className="grid gap-4 rounded-2xl border bg-white p-4 sm:grid-cols-2">
+              <Info label="النوع" value={siteTypeLabels[previewSite.siteType] || previewSite.siteType} />
+              <Info label="المساحة" value={previewSite.area ? `${previewSite.area.toLocaleString('ar-SA')} م²` : '-'} />
+              <Info label="الطاقة الاستيعابية" value={previewSite.capacity ? previewSite.capacity.toLocaleString('ar-SA') : '-'} />
+              <Info label="الإمام" value={previewSite.imamName || '-'} />
+              <Info label="المؤذن" value={previewSite.muezzinName || '-'} />
+              <Info label="الخطيب" value={previewSite.khateebName || '-'} />
+              <Info label="رقم التواصل" value={previewSite.contactPhone || '-'} />
+              <Info label="الإحداثيات" value={previewSite.latitude != null && previewSite.longitude != null ? `${previewSite.latitude}, ${previewSite.longitude}` : '-'} />
+            </div>
+            {previewSite.notes && <div className="rounded-2xl border bg-slate-50 p-4"><p className="text-xs text-muted-foreground">ملاحظات</p><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{previewSite.notes}</p></div>}
+            {previewSite.latitude != null && previewSite.longitude != null && <div className="flex justify-end"><Button variant="outline" className={button3d} onClick={() => window.open(`https://www.google.com/maps?q=${previewSite.latitude},${previewSite.longitude}`, '_blank')}><MapPin className="ml-2 h-4 w-4" />فتح الموقع على الخريطة</Button></div>}
+          </div>}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={Boolean(qrSite)} onOpenChange={(open) => !open && setQrSite(null)}>
         <DialogContent dir="rtl" className="sm:max-w-[620px]">
           <DialogHeader><DialogTitle>QR / الباركود التلقائي — {qrSite?.name}</DialogTitle><DialogDescription>يُنشأ الرمز تلقائيًا مع سجل المسجد أو الجامع أو المصلى، ويرتبط بالسجل الدائم لعرض أحدث بياناته وتقديم البلاغات.</DialogDescription></DialogHeader>
@@ -934,7 +962,7 @@ const Rule = ({ title, text }: { title: string; text: string }) => <div classNam
 const ReportMetric = ({ label, value }: { label: string; value: number }) => <div className="rounded-2xl border bg-gradient-to-b from-white to-sky-50 p-5 text-center shadow-sm"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-3xl font-black text-slate-800">{value}</p></div>;
 const MiniRow = ({ title, subtitle, status }: { title: string; subtitle: string; status: string }) => <div className="flex items-start justify-between gap-3 rounded-2xl border bg-white p-3"><div className="min-w-0"><p className="truncate font-bold">{title}</p><p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{subtitle}</p></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>;
 
-const SiteCard = ({ site, canEdit, canDelete, onEdit, onDelete, onQr }: { site: MosqueSite; canEdit: boolean; canDelete: boolean; onEdit: () => void; onDelete: () => void; onQr: () => void }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-emerald-400 via-sky-500 to-blue-800" /><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2">{siteTypeLabels[site.siteType]}</Badge><h3 className="text-lg font-black text-slate-800">{site.name}</h3><p className="mt-1 text-sm text-muted-foreground">{site.city || '-'} — {site.district || '-'}</p></div><Badge variant="outline" className={site.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : site.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-50'}>{siteStatusLabels[site.status]}</Badge></div><div className="my-4 grid grid-cols-2 gap-3 rounded-2xl border bg-slate-50/70 p-3 text-sm"><Info label="الموقع داخل الجامعة" value={site.campusLocation || '-'} /><Info label="المساحة" value={site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'} /><Info label="الإمام" value={site.imamName || '-'} /><Info label="المؤذن" value={site.muezzinName || '-'} /><Info label="الطلبات" value={site._count?.requests || 0} /><Info label="البلاغات" value={site._count?.tickets || 0} /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Button variant="outline" className={button3d} onClick={onQr}><QrCode className="ml-1 h-4 w-4" />QR</Button>{site.latitude != null && site.longitude != null && <Button variant="outline" className={button3d} onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')}><MapPin className="ml-1 h-4 w-4" />الخريطة</Button>}{canEdit && <Button variant="outline" className={button3d} onClick={onEdit}>تعديل</Button>}{canDelete && <Button variant="outline" className="border-red-300 text-red-600" onClick={onDelete}>حذف</Button>}</div></CardContent></Card>;
+const SiteCard = ({ site, canEdit, canDelete, onPreview, onEdit, onDelete, onQr }: { site: MosqueSite; canEdit: boolean; canDelete: boolean; onPreview: () => void; onEdit: () => void; onDelete: () => void; onQr: () => void }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-emerald-400 via-sky-500 to-blue-800" /><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2">{siteTypeLabels[site.siteType]}</Badge><h3 className="text-lg font-black text-slate-800">{site.name}</h3><p className="mt-1 text-sm text-muted-foreground">{site.city || '-'} — {site.district || '-'}</p></div><Badge variant="outline" className={site.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : site.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-50'}>{siteStatusLabels[site.status]}</Badge></div><div className="my-4 grid grid-cols-2 gap-3 rounded-2xl border bg-slate-50/70 p-3 text-sm"><Info label="الموقع داخل الجامعة" value={site.campusLocation || '-'} /><Info label="المساحة" value={site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'} /><Info label="الإمام" value={site.imamName || '-'} /><Info label="المؤذن" value={site.muezzinName || '-'} /><Info label="الطلبات" value={site._count?.requests || 0} /><Info label="البلاغات" value={site._count?.tickets || 0} /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-5"><Button variant="outline" className={button3d} onClick={onQr}><QrCode className="ml-1 h-4 w-4" />QR</Button>{site.latitude != null && site.longitude != null && <Button variant="outline" className={button3d} onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')}><MapPin className="ml-1 h-4 w-4" />الخريطة</Button>}<Button variant="outline" className={button3d} onClick={onPreview}><Eye className="ml-1 h-4 w-4" />معاينة</Button>{canEdit && <Button variant="outline" className={button3d} onClick={onEdit}>تعديل</Button>}{canDelete && <Button variant="outline" className="border-red-300 text-red-600" onClick={onDelete}>حذف</Button>}</div></CardContent></Card>;
 
 const QuickFilterBar = ({ label, onClear }: { label: string; onClear: () => void }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm"><span>العرض الحالي: <strong>{label}</strong></span><Button variant="outline" size="sm" className={button3d} onClick={onClear}>عرض الكل</Button></div>;
 
