@@ -126,6 +126,7 @@ const propertyDataPath = (pathname: string) => {
     '/maps',
     '/lands',
     '/buildings',
+    '/contracts',
     '/reports',
     '/search',
   ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
