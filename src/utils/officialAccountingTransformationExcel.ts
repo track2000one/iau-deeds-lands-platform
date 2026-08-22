@@ -6,13 +6,20 @@ import { MODEL_B_FIELDS, MODEL_B_SHEET_NAME } from '../app/config/fixedAssetMode
 const XML_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const PKG_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships';
-const MODEL_B_FALLBACK_DATA_ROW = 5;
+const MODEL_B_FALLBACK_DATA_ROW = 8;
 const LEGACY_FALLBACK_DATA_ROW = 8;
 const HEADER_SCAN_LIMIT = 40;
+const DATA_START_MARKERS = [
+  'System Requirements for Fields',
+  'متطلبات النظام للحقول',
+  'متطلبات النظام للحقول الاجبارية',
+  'تعليمات الحقول',
+];
 
 const normalize = (value: string) => value.toLowerCase().replace(/[ـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim();
 const text = (value: unknown) => value === null || value === undefined ? '' : String(value).trim();
 const colFromRef = (ref: string) => (ref.match(/^[A-Z]+/) || [''])[0];
+const rowFromRef = (ref: string) => Number((ref.replace(/\$/g, '').match(/\d+/) || ['0'])[0]) || null;
 const directChild = (parent: Element, name: string) => Array.from(parent.children).find((child) => child.localName === name) || null;
 const rowElement = (sheetData: Element, row: number) => Array.from(sheetData.children).find((child) => child.localName === 'row' && child.getAttribute('r') === String(row)) || null;
 const cellElement = (row: Element, ref: string) => Array.from(row.children).find((child) => child.localName === 'c' && child.getAttribute('r') === ref) || null;
@@ -100,6 +107,43 @@ const findHeaderRowNumber = (
   return best && best.matches >= minimumMatches ? best.row : null;
 };
 
+const findAutoFilterDataStartRow = (doc: XMLDocument) => {
+  const autoFilter = doc.getElementsByTagNameNS(XML_NS, 'autoFilter')[0];
+  const ref = autoFilter?.getAttribute('ref') || '';
+  const firstRef = ref.split(':')[0] || '';
+  const headerRow = rowFromRef(firstRef);
+  return headerRow ? headerRow + 1 : null;
+};
+
+const findInstructionDataStartRow = (sheetData: Element, sharedStrings: SharedStrings) => {
+  const markers = DATA_START_MARKERS.map(normalize);
+  let markerRow: number | null = null;
+  for (const row of Array.from(sheetData.children)) {
+    if (row.localName !== 'row') continue;
+    const rowNumber = Number(row.getAttribute('r') || 0);
+    if (!rowNumber || rowNumber > HEADER_SCAN_LIMIT) continue;
+    const values = rowTexts(row, sharedStrings);
+    if (values.some((value) => markers.some((marker) => value.includes(marker) || marker.includes(value)))) markerRow = rowNumber;
+  }
+  return markerRow ? markerRow + 1 : null;
+};
+
+const resolveDataStartRow = (
+  doc: XMLDocument,
+  sheetData: Element,
+  sharedStrings: SharedStrings,
+  labels: string[],
+  minimumMatches: number,
+  fallback: number,
+) => {
+  const autoFilterStart = findAutoFilterDataStartRow(doc);
+  if (autoFilterStart) return autoFilterStart;
+  const instructionStart = findInstructionDataStartRow(sheetData, sharedStrings);
+  if (instructionStart) return instructionStart;
+  const headerRow = findHeaderRowNumber(sheetData, sharedStrings, labels, minimumMatches);
+  return headerRow ? headerRow + 1 : fallback;
+};
+
 const firstTemplateRowAtOrAfter = (sheetData: Element, rowNumber: number) => Array.from(sheetData.children)
   .filter((child) => child.localName === 'row' && Number(child.getAttribute('r') || 0) >= rowNumber)
   .sort((a, b) => Number(a.getAttribute('r') || 0) - Number(b.getAttribute('r') || 0))[0] as Element | undefined;
@@ -135,8 +179,8 @@ const fillLegacySheet = async (zip: JSZip, sheet: SheetInfo, items: AccountingTr
   const file = zip.file(sheet.path); if (!file) return 0;
   const parser = new DOMParser(); const serializer = new XMLSerializer(); const doc = parser.parseFromString(await file.async('string'), 'application/xml');
   const sheetData = doc.getElementsByTagNameNS(XML_NS, 'sheetData')[0]; if (!sheetData) return 0;
-  const headerRow = findHeaderRowNumber(sheetData, sharedStrings, ACCOUNTING_FIELDS[type].map((field) => field.a), 6);
-  const dataStartRow = headerRow ? headerRow + 1 : LEGACY_FALLBACK_DATA_ROW;
+  const labels = ACCOUNTING_FIELDS[type].map((field) => field.a);
+  const dataStartRow = resolveDataStartRow(doc, sheetData, sharedStrings, labels, 6, LEGACY_FALLBACK_DATA_ROW);
   const templateRow = rowElement(sheetData, dataStartRow) || firstTemplateRowAtOrAfter(sheetData, dataStartRow);
   if (!templateRow) throw new Error(`تعذر العثور على صف البيانات في ورقة ${sheet.name}`);
   const protectedSnapshot = protectedRowsSnapshot(sheetData, dataStartRow);
@@ -180,10 +224,9 @@ const fillModelBSheet = async (zip: JSZip, sheet: SheetInfo, items: AccountingTr
   const parser = new DOMParser(); const serializer = new XMLSerializer(); const doc = parser.parseFromString(await file.async('string'), 'application/xml');
   const sheetData = doc.getElementsByTagNameNS(XML_NS, 'sheetData')[0]; if (!sheetData) throw new Error('ورقة سجل الأصول لا تحتوي منطقة بيانات.');
   const modelBLabels = MODEL_B_FIELDS.flatMap((field) => [field.arabic, field.english]);
-  const headerRow = findHeaderRowNumber(sheetData, sharedStrings, modelBLabels, 8);
-  const dataStartRow = headerRow ? headerRow + 1 : MODEL_B_FALLBACK_DATA_ROW;
+  const dataStartRow = resolveDataStartRow(doc, sheetData, sharedStrings, modelBLabels, 8, MODEL_B_FALLBACK_DATA_ROW);
   const templateRow = rowElement(sheetData, dataStartRow) || firstTemplateRowAtOrAfter(sheetData, dataStartRow);
-  if (!templateRow) throw new Error(`تعذر العثور على صف البيانات الأول في نموذج ب بعد صف العناوين${headerRow ? ` (${headerRow})` : ''}.`);
+  if (!templateRow) throw new Error(`تعذر العثور على صف البيانات الأول في نموذج ب عند الصف ${dataStartRow}.`);
   const protectedSnapshot = protectedRowsSnapshot(sheetData, dataStartRow);
   const pristine = templateRow.cloneNode(true) as Element;
   Array.from(sheetData.children).forEach((child) => { if (child.localName === 'row' && Number(child.getAttribute('r')) >= dataStartRow) sheetData.removeChild(child); });
