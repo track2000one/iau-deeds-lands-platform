@@ -4,11 +4,15 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Database,
   FileSpreadsheet,
   Loader2,
+  LockKeyhole,
+  RefreshCcw,
   ShieldAlert,
   Trash2,
   UploadCloud,
+  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -19,7 +23,9 @@ import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { downloadOfficialAccountingExcelTemplate } from '../api/accountingTransformation';
 import {
+  previewAccountingTransformationBaselineReset,
   resetAccountingTransformationBaseline,
+  type AccountingBaselineResetPreview,
   type AccountingBaselineResetResult,
 } from '../api/accountingBaselineReset';
 import { analyzeAccountingWorkbookOffThread } from '../../utils/accountingWorkbookWorkerClient';
@@ -56,12 +62,15 @@ const toInput = (row: IntakeRow): AccountingTransformationInput => ({
   notes: null,
 });
 
-const deriveCycleName = (fileName: string) => {
-  const match = fileName.match(/(20\d{2})[.\-_](\d{2})[.\-_](\d{2})/);
-  return match
-    ? `البيانات الأساسية المعتمدة - ${match[1]}.${match[2]}.${match[3]}`
-    : 'البيانات الأساسية المعتمدة';
-};
+const currentYearBaselineName = () => `البيانات الأساسية المعتمدة ${new Date().getFullYear()}`;
+
+const Metric: React.FC<{ label: string; value: number | string; tone?: string; hint?: string }> = ({ label, value, tone = 'text-slate-950', hint }) => (
+  <div className="rounded-2xl border bg-white/90 p-4 shadow-sm">
+    <p className="text-[11px] font-bold text-slate-500">{label}</p>
+    <p className={`mt-1 text-2xl font-black ${tone}`}>{typeof value === 'number' ? value.toLocaleString('ar-SA') : value}</p>
+    {hint && <p className="mt-1 text-[10px] leading-5 text-slate-500">{hint}</p>}
+  </div>
+);
 
 export const AccountingTransformationBaselineResetPage: React.FC = () => {
   const navigate = useNavigate();
@@ -69,19 +78,47 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
   const controllerRef = useRef<AbortController | null>(null);
 
   const [fileName, setFileName] = useState('');
-  const [cycleName, setCycleName] = useState('البيانات الأساسية المعتمدة');
+  const [cycleName, setCycleName] = useState(currentYearBaselineName());
   const [confirmation, setConfirmation] = useState('');
   const [summary, setSummary] = useState<AnalysisSummary | null>(null);
+  const [serverPreview, setServerPreview] = useState<AccountingBaselineResetPreview | null>(null);
   const [message, setMessage] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [result, setResult] = useState<AccountingBaselineResetResult | null>(null);
 
   const confirmationReady = confirmation.trim() === CONFIRMATION_PHRASE;
   const expectedUniversityBaseline = useMemo(
-    () => Boolean(summary && summary.typeCounts.building === 626 && summary.typeCounts.land === 11 && summary.items.length === 637),
-    [summary],
+    () => Boolean(serverPreview
+      && serverPreview.typeCounts.building === 626
+      && serverPreview.typeCounts.land === 11
+      && serverPreview.willImport === 637),
+    [serverPreview],
   );
+
+  const requestServerPreview = async (nextSummary: AnalysisSummary, nextFileName: string) => {
+    setPreviewing(true);
+    setServerPreview(null);
+    setMessage('جاري مطابقة الملف مع حالة قاعدة البيانات الحالية قبل السماح بالحذف...');
+    try {
+      const preview = await previewAccountingTransformationBaselineReset({
+        fileName: nextFileName,
+        items: nextSummary.items,
+      });
+      setServerPreview(preview);
+      setCycleName(preview.suggestedCycleName || currentYearBaselineName());
+      setMessage(`المعاينة النهائية جاهزة: سيُعتمد ${preview.willImport.toLocaleString('ar-SA')} سجلًا في دورة أساس واحدة.`);
+      return preview;
+    } catch (error) {
+      setServerPreview(null);
+      setMessage('تعذرت المعاينة الخادمية. لم يتم حذف أي بيانات.');
+      toast.error(error instanceof Error ? error.message : 'تعذر تجهيز معاينة إعادة التأسيس');
+      return null;
+    } finally {
+      setPreviewing(false);
+    }
+  };
 
   const chooseFile = async (file?: File) => {
     if (!file) return;
@@ -93,9 +130,10 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
     setAnalyzing(true);
     setResult(null);
     setSummary(null);
+    setServerPreview(null);
     setConfirmation('');
     setFileName(file.name);
-    setCycleName(deriveCycleName(file.name));
+    setCycleName(currentYearBaselineName());
     setMessage('جاري تحليل جميع أوراق الملف قبل السماح بإعادة التأسيس...');
 
     try {
@@ -123,18 +161,20 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
         { land: 0, building: 0, fixed_asset: 0 } as AnalysisSummary['typeCounts'],
       );
       const linkedSheets = analyzed.inspection.sheets.filter((sheet) => Boolean(sheet.recordType)).length + analyzed.modelBSheets.length;
-      setSummary({
+      const nextSummary: AnalysisSummary = {
         sheets: analyzed.inspection.sheets.length,
         linkedSheets,
         modelBSheets: analyzed.modelBSheets.length,
         items,
         typeCounts,
-      });
-      setMessage(`اكتمل التحليل: ${items.length.toLocaleString('ar-SA')} سجلًا صالحًا مبدئيًا لإعادة التأسيس.`);
-      toast.success('تم تحليل ملف الأساس دون تغيير أي بيانات في المنصة');
+      };
+      setSummary(nextSummary);
+      setMessage(`اكتمل التحليل المحلي: ${items.length.toLocaleString('ar-SA')} سجلًا. جاري طلب المعاينة النهائية من الخادم...`);
+      await requestServerPreview(nextSummary, file.name);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       setSummary(null);
+      setServerPreview(null);
       setMessage('');
       toast.error(error instanceof Error ? error.message : 'تعذر تحليل ملف Excel');
     } finally {
@@ -143,16 +183,27 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
     }
   };
 
+  const refreshImpact = async () => {
+    if (!summary || !fileName) return;
+    setConfirmation('');
+    await requestServerPreview(summary, fileName);
+  };
+
   const executeReset = async () => {
     if (!isAdmin) return toast.error('إعادة تأسيس بيانات اللجنة متاحة لمسؤول النظام فقط');
-    if (!summary?.items.length) return toast.error('حلل ملف Excel أولًا');
+    if (!summary?.items.length || !serverPreview) return toast.error('أكمل المعاينة النهائية أولًا');
     if (!confirmationReady) return toast.error(`اكتب عبارة التأكيد حرفيًا: ${CONFIRMATION_PHRASE}`);
 
+    const current = serverPreview.impact.currentCycle;
     const accepted = window.confirm(
-      `سيتم حذف جميع دورات وسجلات لجنة متابعة متطلبات التحول المحاسبي الحالية، ثم إنشاء دورة أساس واحدة معتمدة من الملف:\n${fileName}\n\n` +
-      `السجلات التي سيتم اعتمادها: ${summary.items.length.toLocaleString('ar-SA')}\n` +
-      `المباني: ${summary.typeCounts.building.toLocaleString('ar-SA')} · الأراضي: ${summary.typeCounts.land.toLocaleString('ar-SA')} · نموذج ب: ${summary.typeCounts.fixed_asset.toLocaleString('ar-SA')}\n\n` +
-      'المستخدمون والصلاحيات وسجل التدقيق وإصدارات النموذج الرسمي لن تُحذف. هل تريد تنفيذ إعادة التأسيس الآن؟',
+      `تأكيد نهائي لإعادة تأسيس لجنة متابعة متطلبات التحول المحاسبي\n\n` +
+      `سيتم حذف: ${serverPreview.impact.destructive.cycles.toLocaleString('ar-SA')} دورة و${serverPreview.impact.destructive.records.toLocaleString('ar-SA')} سجل حالي.\n` +
+      `${current ? `الدورة الحالية: #${current.cycleNumber} — ${current.name}\n` : ''}` +
+      `سيتم إنشاء: دورة #1 — ${cycleName.trim() || serverPreview.suggestedCycleName}\n` +
+      `سيتم اعتماد: ${serverPreview.willImport.toLocaleString('ar-SA')} سجل من ${fileName}\n` +
+      `المباني: ${serverPreview.typeCounts.building.toLocaleString('ar-SA')} · الأراضي: ${serverPreview.typeCounts.land.toLocaleString('ar-SA')} · نموذج ب: ${serverPreview.typeCounts.fixed_asset.toLocaleString('ar-SA')}\n\n` +
+      `لن يتم حذف المستخدمين أو الصلاحيات أو Audit Log أو إصدارات النموذج الرسمي.\n\n` +
+      'هل تريد تنفيذ إعادة التأسيس الآن؟',
     );
     if (!accepted) return;
 
@@ -161,13 +212,19 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       const response = await resetAccountingTransformationBaseline({
         confirmation: confirmation.trim(),
         fileName,
-        cycleName: cycleName.trim() || 'البيانات الأساسية المعتمدة',
+        cycleName: cycleName.trim() || serverPreview.suggestedCycleName,
         items: summary.items,
+        expectedImpact: serverPreview.impact.destructive,
+        expectedDatasetFingerprint: serverPreview.datasetFingerprint,
       });
       setResult(response);
-      toast.success(`تم اعتماد ${response.imported.toLocaleString('ar-SA')} سجلًا كأساس جديد للجنة`);
+      setConfirmation('');
+      toast.success(`تم اعتماد ${response.imported.toLocaleString('ar-SA')} سجلًا كأساس رسمي جديد للجنة`);
     } catch (error) {
+      setConfirmation('');
+      setServerPreview(null);
       toast.error(error instanceof Error ? error.message : 'تعذر إعادة تأسيس بيانات اللجنة');
+      toast.info('لم يتم اعتماد أي حذف غير مؤكد. حدّث المعاينة قبل المحاولة مرة أخرى.');
     } finally {
       setResetting(false);
     }
@@ -184,13 +241,13 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1300px] space-y-5 p-2 pb-12 sm:p-5" dir="rtl">
+    <div className="mx-auto w-full max-w-[1380px] space-y-5 p-2 pb-12 sm:p-5" dir="rtl">
       <section className="rounded-[28px] border border-red-200 bg-[linear-gradient(135deg,#fff,#fff7f7)] p-5 shadow-[0_14px_40px_rgba(127,29,29,.08)] md:p-7">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <Badge className="mb-3 border-red-200 bg-red-50 text-red-700"><ShieldAlert className="ml-1 h-4 w-4" />إجراء إداري عالي الحساسية</Badge>
             <h1 className="text-2xl font-black text-slate-950 md:text-3xl">إعادة تأسيس بيانات لجنة التحول المحاسبي</h1>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-slate-600">يستبدل هذا الإجراء جميع دورات وسجلات اللجنة بدورة أساس واحدة معتمدة من ملف Excel. لا يتم رفع ملف البيانات إلى GitHub.</p>
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-slate-600">يستبدل هذا الإجراء السجل التشغيلي للجنة بدورة أساس واحدة معتمدة من ملف Excel، مع الاحتفاظ بالحوكمة والنماذج الرسمية وسجل التدقيق.</p>
           </div>
           <Button variant="outline" onClick={() => navigate('/accounting-transformation/import')}><ArrowRight className="ml-2 h-4 w-4" />العودة للاستيراد</Button>
         </div>
@@ -199,7 +256,7 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       <Card className="rounded-[24px] border-amber-300 bg-amber-50/70">
         <CardContent className="flex gap-3 p-5 text-sm leading-7 text-amber-950">
           <AlertTriangle className="mt-1 h-6 w-6 shrink-0" />
-          <div><strong>ما سيتم حذفه:</strong> دورات اللجنة، سجلاتها، وربط النماذج بالدورات القديمة. <strong>ما سيبقى محفوظًا:</strong> المستخدمون، الصلاحيات، سجل التدقيق، وإصدارات نموذج Excel الرسمي. إذا فشلت عملية إنشاء الأساس الجديد تُلغى معاملة قاعدة البيانات ولا تبقى اللجنة فارغة.</div>
+          <div><strong>لا يبدأ الحذف عند اختيار الملف.</strong> يقرأ النظام المصنف ثم يطلب معاينة خادمية لحالة اللجنة الحالية. إذا تغيرت البيانات بعد المعاينة يُرفض التنفيذ تلقائيًا ولا يتم حذف شيء.</div>
         </CardContent>
       </Card>
 
@@ -211,30 +268,72 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
             <p className="mt-3 font-black">اختر ملف Excel الذي سيصبح المصدر الأساسي</p>
             <p className="mt-1 text-xs text-slate-500">سيتم تحليل جميع الأوراق أولًا دون حذف أي شيء.</p>
             <span className="mt-4 rounded-xl border bg-white px-4 py-2 text-xs font-bold text-emerald-800">{analyzing ? 'جاري التحليل...' : fileName || 'اختيار XLSX / XLS'}</span>
-            <input type="file" accept=".xlsx,.xls" className="hidden" disabled={analyzing || resetting} onChange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; void chooseFile(file).finally(() => { input.value = ''; }); }} />
+            <input type="file" accept=".xlsx,.xls" className="hidden" disabled={analyzing || previewing || resetting} onChange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; void chooseFile(file).finally(() => { input.value = ''; }); }} />
           </label>
-          {message && <div className="flex items-center gap-2 rounded-xl border bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">{analyzing && <Loader2 className="h-4 w-4 animate-spin" />}{message}</div>}
+          {message && <div className="flex items-center gap-2 rounded-xl border bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">{(analyzing || previewing) && <Loader2 className="h-4 w-4 animate-spin" />}{message}</div>}
         </CardContent>
       </Card>
 
-      {summary && <>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="rounded-2xl border bg-white p-4"><p className="text-xs text-slate-500">إجمالي السجلات</p><p className="mt-1 text-3xl font-black">{summary.items.length.toLocaleString('ar-SA')}</p></div>
-          <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4"><p className="text-xs text-sky-700">المباني</p><p className="mt-1 text-3xl font-black">{summary.typeCounts.building.toLocaleString('ar-SA')}</p></div>
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs text-emerald-700">الأراضي</p><p className="mt-1 text-3xl font-black">{summary.typeCounts.land.toLocaleString('ar-SA')}</p></div>
-          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4"><p className="text-xs text-violet-700">نموذج ب</p><p className="mt-1 text-3xl font-black">{summary.typeCounts.fixed_asset.toLocaleString('ar-SA')}</p></div>
-          <div className="rounded-2xl border bg-slate-50 p-4"><p className="text-xs text-slate-500">أوراق المصنف</p><p className="mt-1 text-3xl font-black">{summary.sheets.toLocaleString('ar-SA')}</p></div>
+      {summary && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Metric label="الصفوف المكتشفة محليًا" value={summary.items.length} />
+        <Metric label="المباني المكتشفة" value={summary.typeCounts.building} tone="text-sky-800" />
+        <Metric label="الأراضي المكتشفة" value={summary.typeCounts.land} tone="text-emerald-800" />
+        <Metric label="نموذج ب" value={summary.typeCounts.fixed_asset} tone="text-violet-800" />
+        <Metric label="أوراق المصنف" value={summary.sheets} />
+      </div>}
+
+      {summary && !serverPreview && !previewing && <Card className="rounded-[24px] border-amber-300 bg-amber-50">
+        <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="font-black text-amber-950">المعاينة النهائية غير صالحة للتنفيذ</p><p className="mt-1 text-xs text-amber-800">حدّث المعاينة للتأكد من حالة قاعدة البيانات وعدد السجلات الفعلي قبل الحذف.</p></div>
+          <Button variant="outline" onClick={refreshImpact}><RefreshCcw className="ml-2 h-4 w-4" />تحديث المعاينة</Button>
+        </CardContent>
+      </Card>}
+
+      {serverPreview && <>
+        {expectedUniversityBaseline && <div className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"><CheckCircle2 className="h-5 w-5" />المعاينة الخادمية مطابقة للملف المعتمد: 637 سجلًا = 626 مبنى + 11 أرضًا.</div>}
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="rounded-[26px] border-red-200 bg-red-50/50">
+            <CardHeader className="border-b border-red-100"><CardTitle className="flex items-center gap-2 text-red-900"><Trash2 className="h-5 w-5" />سيُحذف من سجل اللجنة</CardTitle></CardHeader>
+            <CardContent className="grid gap-3 p-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              <Metric label="الدورات الحالية" value={serverPreview.impact.destructive.cycles} tone="text-red-800" />
+              <Metric label="السجلات الحالية" value={serverPreview.impact.destructive.records} tone="text-red-800" />
+              <Metric label="ربط النماذج بالدورات" value={serverPreview.impact.destructive.cycleTemplateSnapshots} tone="text-red-800" />
+              {serverPreview.impact.currentCycle && <div className="sm:col-span-3 lg:col-span-1 xl:col-span-3 rounded-2xl border border-red-200 bg-white p-3 text-xs leading-6 text-red-900">الدورة الحالية: <strong>#{serverPreview.impact.currentCycle.cycleNumber} — {serverPreview.impact.currentCycle.name}</strong></div>}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[26px] border-emerald-200 bg-emerald-50/50">
+            <CardHeader className="border-b border-emerald-100"><CardTitle className="flex items-center gap-2 text-emerald-900"><Database className="h-5 w-5" />سيُنشأ من ملف الأساس</CardTitle></CardHeader>
+            <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
+              <Metric label="دورة أساس جديدة" value={1} tone="text-emerald-800" hint="#1 — معتمدة وحالية" />
+              <Metric label="السجلات التي ستُعتمد" value={serverPreview.willImport} tone="text-emerald-800" />
+              <Metric label="المباني" value={serverPreview.typeCounts.building} tone="text-sky-800" />
+              <Metric label="الأراضي" value={serverPreview.typeCounts.land} tone="text-emerald-800" />
+              {(serverPreview.invalid > 0 || serverPreview.duplicate > 0) && <div className="sm:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">سيُستبعد قبل التأسيس: {serverPreview.invalid.toLocaleString('ar-SA')} غير صالح و{serverPreview.duplicate.toLocaleString('ar-SA')} مكرر.</div>}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[26px] border-sky-200 bg-sky-50/50">
+            <CardHeader className="border-b border-sky-100"><CardTitle className="flex items-center gap-2 text-sky-900"><LockKeyhole className="h-5 w-5" />سيبقى محفوظًا</CardTitle></CardHeader>
+            <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
+              <Metric label="المستخدمون" value={serverPreview.impact.preserved.users} tone="text-sky-800" />
+              <Metric label="الصلاحيات" value={serverPreview.impact.preserved.permissions} tone="text-sky-800" />
+              <Metric label="سجل التدقيق" value={serverPreview.impact.preserved.auditLogs} tone="text-sky-800" />
+              <Metric label="إصدارات النموذج الرسمي" value={serverPreview.impact.preserved.officialTemplateVersions} tone="text-sky-800" />
+              <div className="sm:col-span-2 rounded-2xl border border-sky-200 bg-white p-3 text-xs leading-6 text-sky-900">{serverPreview.officialTemplate ? <>ستُربط الدورة الجديدة بالنموذج الرسمي <strong>الإصدار {serverPreview.officialTemplate.versionNumber}</strong> — {serverPreview.officialTemplate.fileName}</> : 'لا يوجد نموذج رسمي حالي لربطه بالدورة الجديدة؛ بيانات الأساس ستظل معتمدة.'}</div>
+            </CardContent>
+          </Card>
         </div>
 
-        {expectedUniversityBaseline && <div className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"><CheckCircle2 className="h-5 w-5" />مطابق للفحص المسبق للملف المرفق: 637 سجلًا = 626 مبنى + 11 أرضًا.</div>}
-
         <Card className="rounded-[26px] border-red-200">
-          <CardHeader><CardTitle>التأكيد النهائي</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
+          <CardHeader className="flex-row items-center justify-between border-b"><CardTitle>التأكيد النهائي</CardTitle><Button variant="outline" size="sm" onClick={refreshImpact} disabled={previewing || resetting}><RefreshCcw className="ml-2 h-4 w-4" />تحديث حالة اللجنة</Button></CardHeader>
+          <CardContent className="space-y-4 p-5">
             <label className="block text-sm font-bold">اسم دورة الأساس الجديدة<Input className="mt-2" value={cycleName} onChange={(event) => setCycleName(event.target.value)} /></label>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-800">بعد التنفيذ ستكون الدورة <strong>#1 — {cycleName}</strong> هي <strong>الحالية المعتمدة</strong> ونقطة المقارنة الرسمية لكل دورة مستقبلية. لا يتم تحديث هذه الدورة مباشرة من Excel بعد تأسيسها؛ أي تحديث لاحق ينشئ دورة جديدة.</div>
             <div className="rounded-xl border border-red-100 bg-red-50/60 p-4 text-sm leading-7 text-red-900">للسماح بالحذف، اكتب العبارة التالية حرفيًا: <strong>{CONFIRMATION_PHRASE}</strong></div>
             <Input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder={CONFIRMATION_PHRASE} className={confirmationReady ? 'border-emerald-400' : 'border-red-200'} />
-            <Button className="h-12 w-full bg-red-700 text-white hover:bg-red-800" disabled={!confirmationReady || resetting || analyzing} onClick={executeReset}>{resetting ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Trash2 className="ml-2 h-5 w-5" />}{resetting ? 'جاري حذف البيانات وإعادة التأسيس...' : `حذف البيانات الحالية واعتماد ${summary.items.length.toLocaleString('ar-SA')} سجلًا كأساس جديد`}</Button>
+            <Button className="h-12 w-full bg-red-700 text-white hover:bg-red-800" disabled={!confirmationReady || resetting || analyzing || previewing} onClick={executeReset}>{resetting ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Trash2 className="ml-2 h-5 w-5" />}{resetting ? 'جاري تنفيذ المعاملة الآمنة...' : `إعادة تأسيس البيانات واعتماد ${serverPreview.willImport.toLocaleString('ar-SA')} سجلًا`}</Button>
           </CardContent>
         </Card>
       </>}
@@ -242,8 +341,8 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       {result && <Card className="rounded-[26px] border-emerald-300 bg-emerald-50">
         <CardContent className="space-y-3 p-6">
           <div className="flex items-center gap-3"><CheckCircle2 className="h-7 w-7 text-emerald-700" /><div><p className="text-lg font-black text-emerald-950">اكتملت إعادة التأسيس</p><p className="text-sm text-emerald-800">تم اعتماد {result.imported.toLocaleString('ar-SA')} سجلًا في الدورة #1 الجديدة.</p></div></div>
-          <p className="text-xs leading-6 text-emerald-900">حُذف من السجل التشغيلي السابق: {result.deleted.cycles.toLocaleString('ar-SA')} دورة و{result.deleted.records.toLocaleString('ar-SA')} سجل. تم الحفاظ على Audit Log والنماذج الرسمية.</p>
-          <Button variant="outline" onClick={() => navigate('/accounting-transformation/cycles')}>فتح سجل الدورات الجديد</Button>
+          <p className="text-xs leading-6 text-emerald-900">حُذف من السجل التشغيلي السابق: {result.deleted.cycles.toLocaleString('ar-SA')} دورة و{result.deleted.records.toLocaleString('ar-SA')} سجل. تم الحفاظ على المستخدمين والصلاحيات وAudit Log وإصدارات النماذج الرسمية.</p>
+          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => navigate('/accounting-transformation/cycles')}>فتح سجل الدورات الجديد</Button><Button variant="outline" onClick={() => navigate('/accounting-transformation/records')}>عرض بيانات الأساس</Button></div>
         </CardContent>
       </Card>}
     </div>
