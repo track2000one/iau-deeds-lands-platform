@@ -3,6 +3,8 @@ name: Verify Mosque Preview Action
 on:
   push:
     branches: [agent/mosque-preview-action]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
@@ -13,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: agent/mosque-preview-action
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
