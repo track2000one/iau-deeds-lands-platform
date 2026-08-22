@@ -1,6 +1,7 @@
 import { apiJson, authenticatedFetch } from '../../lib/http';
 import type {
   AccountingCycleComparison,
+  AccountingCycleReviewCenter,
   AccountingCycleTemplateSnapshot,
   AccountingTransformationAttachment,
   AccountingTransformationCycle,
@@ -142,6 +143,16 @@ export const reopenAccountingTransformationCycle = (id: string) => apiJson<Accou
 export const approveAccountingTransformationCycle = (id: string) => apiJson<{ cycle: AccountingTransformationCycle; comparison: AccountingCycleComparison }>(`/api/accounting-transformation/cycles/${id}/approve`, { method: 'POST' });
 export const getAccountingTransformationCycleComparison = (id: string) => apiJson<AccountingCycleComparison>(`/api/accounting-transformation/cycles/${id}/comparison`);
 export const getAccountingCycleOfficialTemplate = (id: string) => apiJson<AccountingCycleTemplateSnapshot | null>(`/api/accounting-transformation/cycles/${id}/template`);
+export const getAccountingCycleReviewCenter = (id: string) => apiJson<AccountingCycleReviewCenter>(`/api/accounting-transformation/cycles/${id}/review-center`);
+export const bulkApproveAccountingCycleReviewedRecords = (id: string, note?: string) => apiJson<{
+  message: string;
+  bulkApproved: number;
+  autoApprovedNow: number;
+  review: AccountingCycleReviewCenter;
+}>(`/api/accounting-transformation/cycles/${id}/review-center/bulk-approve`, {
+  method: 'POST',
+  body: JSON.stringify({ sourcePreReviewed: true, note: note || null }),
+});
 
 export const previewAccountingTransformationCycleImport = (cycleId: string, items: AccountingTransformationInput[], fileName?: string) =>
   apiJson<AccountingTransformationImportPreview>(`/api/accounting-transformation/cycles/${cycleId}/import-preview`, { method: 'POST', body: JSON.stringify({ items, fileName: fileName || null }) });
