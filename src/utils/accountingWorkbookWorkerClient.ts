@@ -3,9 +3,11 @@ import type {
   StructuralAccountingIntakeRow,
   StructuralAccountingWorkbookInspection,
 } from './accountingWorkbookStructuralIntake';
+import type { AccountingExcelTemplateDetection } from './accountingExcelTemplateProfiles';
 
 export type AccountingWorkbookWorkerResult = {
   inspection: StructuralAccountingWorkbookInspection;
+  templateDetection: AccountingExcelTemplateDetection;
   modelBSheets: ModelBSheetInspection[];
   modelBRows: ModelBWorkbookRow[];
   legacyRows: StructuralAccountingIntakeRow[];
