@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
-import type { AccountingRecordType, AccountingTransformationInput } from '../../types/accountingTransformation';
+import type { AccountingRecordType } from '../../types/accountingTransformation';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -25,10 +25,17 @@ import { downloadOfficialAccountingExcelTemplate } from '../api/accountingTransf
 import {
   previewAccountingTransformationBaselineReset,
   resetAccountingTransformationBaseline,
+  type AccountingBaselineResetItem,
   type AccountingBaselineResetPreview,
   type AccountingBaselineResetResult,
 } from '../api/accountingBaselineReset';
 import { analyzeAccountingWorkbookOffThread } from '../../utils/accountingWorkbookWorkerClient';
+import {
+  ACCOUNTING_BASELINE_SOURCE_SHEETS,
+  hasRequiredAccountingBaselineSheets,
+  isAccountingBaselineSourceSheet,
+  normalizeAccountingSheetName,
+} from '../../utils/accountingBaselineSourcePolicy';
 
 const CONFIRMATION_PHRASE = 'إعادة تأسيس بيانات اللجنة';
 
@@ -42,8 +49,8 @@ type IntakeRow = {
 type AnalysisSummary = {
   sheets: number;
   linkedSheets: number;
-  modelBSheets: number;
-  items: AccountingTransformationInput[];
+  ignoredSheets: number;
+  items: AccountingBaselineResetItem[];
   typeCounts: { land: number; building: number; fixed_asset: number };
 };
 
@@ -53,13 +60,15 @@ const inferOwnership = (recordType: AccountingRecordType, payload: Record<string
   return columns.some((column) => String(payload[column] ?? '').trim()) ? 'leased' as const : 'owned' as const;
 };
 
-const toInput = (row: IntakeRow): AccountingTransformationInput => ({
+const toInput = (row: IntakeRow): AccountingBaselineResetItem => ({
   recordType: row.recordType,
   ownershipMode: inferOwnership(row.recordType, row.payload),
   committeeStatus: 'approved',
   payload: row.payload,
   attachments: [],
   notes: null,
+  sourceSheet: normalizeAccountingSheetName(row.sourceSheet),
+  sourceRow: row.sourceRow,
 });
 
 const currentYearBaselineName = () => `البيانات الأساسية المعتمدة ${new Date().getFullYear()}`;
@@ -93,6 +102,7 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
     () => Boolean(serverPreview
       && serverPreview.typeCounts.building === 626
       && serverPreview.typeCounts.land === 11
+      && serverPreview.typeCounts.fixed_asset === 0
       && serverPreview.willImport === 637),
     [serverPreview],
   );
@@ -100,7 +110,7 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
   const requestServerPreview = async (nextSummary: AnalysisSummary, nextFileName: string) => {
     setPreviewing(true);
     setServerPreview(null);
-    setMessage('جاري مطابقة الملف مع حالة قاعدة البيانات الحالية قبل السماح بالحذف...');
+    setMessage('جاري مطابقة ملف الأساس مع حالة قاعدة البيانات الحالية قبل السماح بالحذف...');
     try {
       const preview = await previewAccountingTransformationBaselineReset({
         fileName: nextFileName,
@@ -108,7 +118,7 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       });
       setServerPreview(preview);
       setCycleName(preview.suggestedCycleName || currentYearBaselineName());
-      setMessage(`المعاينة النهائية جاهزة: سيُعتمد ${preview.willImport.toLocaleString('ar-SA')} سجلًا في دورة أساس واحدة.`);
+      setMessage(`المعاينة النهائية جاهزة: سيُعتمد ${preview.willImport.toLocaleString('ar-SA')} سجلًا من ورقتي الأساس الثابتتين.`);
       return preview;
     } catch (error) {
       setServerPreview(null);
@@ -134,7 +144,7 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
     setConfirmation('');
     setFileName(file.name);
     setCycleName(currentYearBaselineName());
-    setMessage('جاري تحليل جميع أوراق الملف قبل السماح بإعادة التأسيس...');
+    setMessage('جاري تحليل المصنف والتحقق من أسماء أوراق الأساس الثابتة...');
 
     try {
       const [sourceBuffer, officialBuffer] = await Promise.all([
@@ -151,7 +161,15 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       });
       if (controller.signal.aborted) return;
 
-      const rows = [...analyzed.modelBRows, ...analyzed.legacyRows] as IntakeRow[];
+      const workbookSheetNames = analyzed.inspection.sheets.map((sheet) => sheet.sheetName);
+      if (!hasRequiredAccountingBaselineSheets(workbookSheetNames)) {
+        throw new Error(
+          `ملف الأساس يجب أن يحتوي على الورقتين الثابتتين: «${ACCOUNTING_BASELINE_SOURCE_SHEETS.land}» و«${ACCOUNTING_BASELINE_SOURCE_SHEETS.building}».`,
+        );
+      }
+
+      const rows = (analyzed.legacyRows as IntakeRow[])
+        .filter((row) => isAccountingBaselineSourceSheet(row.recordType, row.sourceSheet));
       const items = rows.map(toInput);
       const typeCounts = items.reduce(
         (acc, item) => {
@@ -160,16 +178,20 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
         },
         { land: 0, building: 0, fixed_asset: 0 } as AnalysisSummary['typeCounts'],
       );
-      const linkedSheets = analyzed.inspection.sheets.filter((sheet) => Boolean(sheet.recordType)).length + analyzed.modelBSheets.length;
+      const linkedSheets = Object.values(ACCOUNTING_BASELINE_SOURCE_SHEETS).length;
+      const ignoredSheets = Math.max(0, analyzed.inspection.sheets.length - linkedSheets);
       const nextSummary: AnalysisSummary = {
         sheets: analyzed.inspection.sheets.length,
         linkedSheets,
-        modelBSheets: analyzed.modelBSheets.length,
+        ignoredSheets,
         items,
         typeCounts,
       };
       setSummary(nextSummary);
-      setMessage(`اكتمل التحليل المحلي: ${items.length.toLocaleString('ar-SA')} سجلًا. جاري طلب المعاينة النهائية من الخادم...`);
+      setMessage(
+        `تم اعتماد ورقتي الأساس فقط: ${items.length.toLocaleString('ar-SA')} سجلًا. `
+        + `تم تجاهل ${ignoredSheets.toLocaleString('ar-SA')} ورقة مرجعية/تصنيفية وعدم تحويلها إلى سجلات.`,
+      );
       await requestServerPreview(nextSummary, file.name);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -201,7 +223,8 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       `${current ? `الدورة الحالية: #${current.cycleNumber} — ${current.name}\n` : ''}` +
       `سيتم إنشاء: دورة #1 — ${cycleName.trim() || serverPreview.suggestedCycleName}\n` +
       `سيتم اعتماد: ${serverPreview.willImport.toLocaleString('ar-SA')} سجل من ${fileName}\n` +
-      `المباني: ${serverPreview.typeCounts.building.toLocaleString('ar-SA')} · الأراضي: ${serverPreview.typeCounts.land.toLocaleString('ar-SA')} · نموذج ب: ${serverPreview.typeCounts.fixed_asset.toLocaleString('ar-SA')}\n\n` +
+      `المباني: ${serverPreview.typeCounts.building.toLocaleString('ar-SA')} · الأراضي: ${serverPreview.typeCounts.land.toLocaleString('ar-SA')}\n` +
+      `مصادر البيانات: ${serverPreview.baselineSourceSheets.land} + ${serverPreview.baselineSourceSheets.building}\n\n` +
       `لن يتم حذف المستخدمين أو الصلاحيات أو Audit Log أو إصدارات النموذج الرسمي.\n\n` +
       'هل تريد تنفيذ إعادة التأسيس الآن؟',
     );
@@ -256,7 +279,7 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       <Card className="rounded-[24px] border-amber-300 bg-amber-50/70">
         <CardContent className="flex gap-3 p-5 text-sm leading-7 text-amber-950">
           <AlertTriangle className="mt-1 h-6 w-6 shrink-0" />
-          <div><strong>لا يبدأ الحذف عند اختيار الملف.</strong> يقرأ النظام المصنف ثم يطلب معاينة خادمية لحالة اللجنة الحالية. إذا تغيرت البيانات بعد المعاينة يُرفض التنفيذ تلقائيًا ولا يتم حذف شيء.</div>
+          <div><strong>لا يبدأ الحذف عند اختيار الملف.</strong> في إعادة التأسيس تُعامل أسماء الأوراق كعقد ثابت: البيانات تؤخذ فقط من <strong>{ACCOUNTING_BASELINE_SOURCE_SHEETS.land}</strong> و<strong>{ACCOUNTING_BASELINE_SOURCE_SHEETS.building}</strong>. بقية الأوراق تبقى مراجع ولا تتحول إلى سجلات.</div>
         </CardContent>
       </Card>
 
@@ -266,7 +289,7 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
           <label className="flex cursor-pointer flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-emerald-300 bg-emerald-50/30 px-5 py-9 text-center">
             <UploadCloud className="h-10 w-10 text-emerald-700" />
             <p className="mt-3 font-black">اختر ملف Excel الذي سيصبح المصدر الأساسي</p>
-            <p className="mt-1 text-xs text-slate-500">سيتم تحليل جميع الأوراق أولًا دون حذف أي شيء.</p>
+            <p className="mt-1 text-xs text-slate-500">سيتم فحص المصنف كاملًا، لكن سجلات الأساس تُقرأ فقط من الورقتين الثابتتين.</p>
             <span className="mt-4 rounded-xl border bg-white px-4 py-2 text-xs font-bold text-emerald-800">{analyzing ? 'جاري التحليل...' : fileName || 'اختيار XLSX / XLS'}</span>
             <input type="file" accept=".xlsx,.xls" className="hidden" disabled={analyzing || previewing || resetting} onChange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; void chooseFile(file).finally(() => { input.value = ''; }); }} />
           </label>
@@ -274,13 +297,18 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {summary && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Metric label="الصفوف المكتشفة محليًا" value={summary.items.length} />
-        <Metric label="المباني المكتشفة" value={summary.typeCounts.building} tone="text-sky-800" />
-        <Metric label="الأراضي المكتشفة" value={summary.typeCounts.land} tone="text-emerald-800" />
-        <Metric label="نموذج ب" value={summary.typeCounts.fixed_asset} tone="text-violet-800" />
-        <Metric label="أوراق المصنف" value={summary.sheets} />
-      </div>}
+      {summary && <>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <Metric label="سجلات الأساس المكتشفة" value={summary.items.length} />
+          <Metric label="المباني" value={summary.typeCounts.building} tone="text-sky-800" />
+          <Metric label="الأراضي" value={summary.typeCounts.land} tone="text-emerald-800" />
+          <Metric label="أوراق البيانات المعتمدة" value={summary.linkedSheets} tone="text-violet-800" />
+          <Metric label="أوراق مرجعية مستبعدة" value={summary.ignoredSheets} />
+        </div>
+        <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-xs leading-6 text-sky-950">
+          <strong>سياسة مصدر البيانات:</strong> تم تثبيت ورقة الأراضي وورقة المباني كمصدرَي السجلات فقط. الأوراق الأخرى مثل التعريفات والتصنيفات والأعمار والـValidation تبقى داخل Excel للاستدلال والتنسيق، ولا تُنشئ أصولًا في قاعدة البيانات.
+        </div>
+      </>}
 
       {summary && !serverPreview && !previewing && <Card className="rounded-[24px] border-amber-300 bg-amber-50">
         <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -290,7 +318,9 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       </Card>}
 
       {serverPreview && <>
-        {expectedUniversityBaseline && <div className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"><CheckCircle2 className="h-5 w-5" />المعاينة الخادمية مطابقة للملف المعتمد: 637 سجلًا = 626 مبنى + 11 أرضًا.</div>}
+        {expectedUniversityBaseline
+          ? <div className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"><CheckCircle2 className="h-5 w-5" />المعاينة الخادمية مطابقة لنقطة البداية الحالية: 637 سجلًا = 626 مبنى + 11 أرضًا.</div>
+          : <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-7 text-amber-950"><strong>تنبيه مراجعة:</strong> الأعداد تختلف عن الفحص السابق للملف المرجعي (637 = 626 مبنى + 11 أرضًا). لا تنفذ الحذف إلا إذا كنت تتوقع هذا التغيير في ملف الأساس.</div>}
 
         <div className="grid gap-4 lg:grid-cols-3">
           <Card className="rounded-[26px] border-red-200 bg-red-50/50">
@@ -310,6 +340,9 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
               <Metric label="السجلات التي ستُعتمد" value={serverPreview.willImport} tone="text-emerald-800" />
               <Metric label="المباني" value={serverPreview.typeCounts.building} tone="text-sky-800" />
               <Metric label="الأراضي" value={serverPreview.typeCounts.land} tone="text-emerald-800" />
+              <div className="sm:col-span-2 rounded-2xl border border-emerald-200 bg-white p-3 text-xs leading-6 text-emerald-950">
+                <strong>مصادر السجلات:</strong> {serverPreview.baselineSourceSheets.land} ({(serverPreview.sourceSheetCounts[serverPreview.baselineSourceSheets.land] || 0).toLocaleString('ar-SA')}) · {serverPreview.baselineSourceSheets.building} ({(serverPreview.sourceSheetCounts[serverPreview.baselineSourceSheets.building] || 0).toLocaleString('ar-SA')})
+              </div>
               {(serverPreview.invalid > 0 || serverPreview.duplicate > 0) && <div className="sm:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">سيُستبعد قبل التأسيس: {serverPreview.invalid.toLocaleString('ar-SA')} غير صالح و{serverPreview.duplicate.toLocaleString('ar-SA')} مكرر.</div>}
             </CardContent>
           </Card>
