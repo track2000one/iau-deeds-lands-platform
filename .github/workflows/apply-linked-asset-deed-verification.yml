@@ -6,6 +6,13 @@ on:
       - feat/linked-asset-deed-verification
     paths:
       - 'scripts/apply-linked-asset-deed-verification.mjs'
+      - '.github/workflows/apply-linked-asset-deed-verification.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'scripts/apply-linked-asset-deed-verification.mjs'
+      - '.github/workflows/apply-linked-asset-deed-verification.yml'
   workflow_dispatch:
 
 permissions:
@@ -18,6 +25,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -32,4 +40,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/app/pages/AccountingTransformationFormPage.tsx
           git commit -m "Add linked asset deed verification"
-          git push origin HEAD:${GITHUB_REF_NAME}
+          git push origin HEAD:${{ github.head_ref || github.ref_name }}
