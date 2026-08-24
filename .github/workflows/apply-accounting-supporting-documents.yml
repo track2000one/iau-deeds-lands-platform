@@ -3,13 +3,15 @@ name: Apply Accounting Supporting Documents
 on:
   push:
     branches: [feat/accounting-supporting-documents]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   patch-and-build:
-    if: ${{ !contains(github.event.head_commit.message, '[supporting-docs applied]') }}
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[supporting-docs applied]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +34,7 @@ jobs:
           grep -q "Not Available" src/utils/accountingSupportingDocuments.ts
           grep -q "المرفقات المصنفة" src/app/pages/AccountingTransformationFormPage.tsx
       - name: Commit generated source changes
+        if: ${{ github.event_name == 'push' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
