@@ -1,0 +1,35 @@
+name: Apply Linked Asset Deed Verification
+
+on:
+  push:
+    branches:
+      - feat/linked-asset-deed-verification
+    paths:
+      - 'scripts/apply-linked-asset-deed-verification.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: node scripts/apply-linked-asset-deed-verification.mjs
+      - run: npm ci
+      - run: npm run build
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/AccountingTransformationFormPage.tsx
+          git commit -m "Add linked asset deed verification"
+          git push origin HEAD:${GITHUB_REF_NAME}
