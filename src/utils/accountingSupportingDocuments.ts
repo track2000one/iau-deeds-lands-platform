@@ -27,21 +27,28 @@ const meaningful = (value: unknown) => {
 };
 
 export const inferAccountingAttachmentMeta = (attachment: AccountingTransformationAttachment): AccountingTransformationAttachment => {
+  // Never overwrite metadata that was explicitly classified by the user.
+  if (meaningful(attachment.documentPurpose) && meaningful(attachment.documentType)) return attachment;
+
   const title = normalized(attachment.title);
-  if (/صك/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: 'صك ملكية' };
-  if (/قرار.*تخصيص|تخصيص/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: 'قرار تخصيص' };
-  if (/عقد.*بناء|بناء.*عقد/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: 'عقد بناء' };
-  if (/عقد.*شراء|شراء.*عقد/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: 'عقد شراء' };
-  if (/محضر.*استلام|استلام.*محضر/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: 'محضر استلام' };
-  if (/عقد.*ايجار|عقد.*إيجار|ايجار|إيجار/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: 'عقد إيجار' };
-  if (/صيان/.test(title)) return { ...attachment, documentPurpose: 'maintenance', documentType: 'عقد صيانة' };
-  if (/تقييم/.test(title)) return { ...attachment, documentPurpose: 'valuation', documentType: 'تقرير تقييم' };
-  if (/صوره|صورة|photo|image/.test(title)) return { ...attachment, documentPurpose: 'asset_image', documentType: 'صورة أصل' };
+  if (/صك/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: attachment.documentType || 'صك ملكية' };
+  if (/قرار.*تخصيص|تخصيص/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: attachment.documentType || 'قرار تخصيص' };
+  if (/عقد.*بناء|بناء.*عقد/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: attachment.documentType || 'عقد بناء' };
+  if (/عقد.*شراء|شراء.*عقد/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: attachment.documentType || 'عقد شراء' };
+  if (/محضر.*استلام|استلام.*محضر/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: attachment.documentType || 'محضر استلام' };
+  if (/عقد.*ايجار|عقد.*إيجار|ايجار|إيجار/.test(title)) return { ...attachment, documentPurpose: 'ownership_acquisition', documentType: attachment.documentType || 'عقد إيجار' };
+  if (/صيان/.test(title)) return { ...attachment, documentPurpose: attachment.documentPurpose || 'maintenance', documentType: attachment.documentType || 'عقد صيانة' };
+  if (/تقييم/.test(title)) return { ...attachment, documentPurpose: attachment.documentPurpose || 'valuation', documentType: attachment.documentType || 'تقرير تقييم' };
+  if (/صوره|صورة|photo|image/.test(title)) return { ...attachment, documentPurpose: attachment.documentPurpose || 'asset_image', documentType: attachment.documentType || 'صورة أصل' };
   return { ...attachment, documentPurpose: attachment.documentPurpose || 'other' };
 };
 
 const ownershipAttachments = (item: AccountingTransformationRecord) =>
-  (Array.isArray(item.attachments) ? item.attachments : []).filter((attachment) => attachment.documentPurpose === 'ownership_acquisition');
+  (Array.isArray(item.attachments) ? item.attachments : [])
+    // Historical attachments may predate documentPurpose/documentType. Re-classify them
+    // at read/export time from their title without mutating the stored record.
+    .map(inferAccountingAttachmentMeta)
+    .filter((attachment) => attachment.documentPurpose === 'ownership_acquisition');
 
 export const resolveOwnershipSupportingDocumentType = (item: AccountingTransformationRecord, existingValue: unknown) => {
   const types = Array.from(new Set(ownershipAttachments(item).map((attachment) => String(attachment.documentType || '').trim()).filter(Boolean)));
