@@ -143,10 +143,10 @@ replaceOnce(
           statusText = 'جاري التحقق من الأصل المرتبط ووثائق الملكية...';
         } else if (linkedAssetCheck.status === 'deed_found') {
           statusClass = 'border-emerald-200 bg-emerald-50 text-emerald-800';
-          statusText = `تم العثور على الأصل المرتبط${linkedAssetCheck.assetDescription ? ` (${linkedAssetCheck.assetDescription})` : ''} ويوجد صك ملكية مصنف ضمن مرفقاته.`;
+          statusText = 'تم العثور على الأصل المرتبط' + (linkedAssetCheck.assetDescription ? ' (' + linkedAssetCheck.assetDescription + ')' : '') + ' ويوجد صك ملكية مصنف ضمن مرفقاته.';
         } else if (linkedAssetCheck.status === 'found_without_deed') {
           statusClass = 'border-amber-200 bg-amber-50 text-amber-800';
-          statusText = `تم العثور على الأصل المرتبط${linkedAssetCheck.assetDescription ? ` (${linkedAssetCheck.assetDescription})` : ''}، لكن لا يوجد صك ملكية مصنف ضمن مرفقاته.`;
+          statusText = 'تم العثور على الأصل المرتبط' + (linkedAssetCheck.assetDescription ? ' (' + linkedAssetCheck.assetDescription + ')' : '') + '، لكن لا يوجد صك ملكية مصنف ضمن مرفقاته.';
         } else if (linkedAssetCheck.status === 'not_found') {
           statusClass = 'border-amber-200 bg-amber-50 text-amber-800';
           statusText = 'لم يتم العثور على سجل مطابق لهذا الرقم. سيبقى الرقم كرابط مرجعي فقط حتى يتم تسجيل الأصل المرتبط.';
@@ -169,4 +169,4 @@ replaceOnce(
 
 fs.writeFileSync(filePath, source);
 console.log('Applied linked asset deed verification.');
-// Workflow trigger: verification rule v1
+// Workflow trigger: verification rule v2
