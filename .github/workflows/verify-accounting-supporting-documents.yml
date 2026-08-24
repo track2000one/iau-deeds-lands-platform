@@ -1,0 +1,32 @@
+name: Verify Accounting Supporting Documents
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify supporting-document rules
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const source = fs.readFileSync('src/utils/accountingSupportingDocuments.ts', 'utf8');
+          if (!source.includes(".map(inferAccountingAttachmentMeta)")) throw new Error('Historical attachment inference is missing');
+          if (!source.includes("return 'Not Available'")) throw new Error('Not Available fallback is missing');
+          if (!source.includes('Never overwrite metadata')) throw new Error('Manual metadata protection is missing');
+          console.log('Supporting-document export rules verified.');
+          NODE
+      - name: Build frontend
+        run: npm run build
