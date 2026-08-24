@@ -33,6 +33,7 @@ import {
   updateAccountingTransformationRecord,
   uploadAccountingTransformationFile,
 } from '../api/accountingTransformation';
+import { getOrganizationUnits } from '../api/organization';
 import type {
   AccountingCommitteeStatus,
   AccountingOwnershipMode,
@@ -83,6 +84,25 @@ export const AccountingTransformationFormPage: React.FC = () => {
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [responsiblePartyOptions, setResponsiblePartyOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    getOrganizationUnits()
+      .then((units) => {
+        if (!active) return;
+        const options = Array.from(new Set(
+          units
+            .filter((unit) => unit.isActive && unit.nameAr?.trim())
+            .map((unit) => unit.nameAr.trim())
+        )).sort((a, b) => a.localeCompare(b, 'ar'));
+        setResponsiblePartyOptions(options);
+      })
+      .catch(() => {
+        // Non-critical lookup: keep the field available for free-text entry.
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!recordId) return;
@@ -164,6 +184,17 @@ export const AccountingTransformationFormPage: React.FC = () => {
     }
     if (recordType === 'fixed_asset' && field.c === 'AG') {
       return <NativeSelect value={String(value)} onChange={(e) => setField(field.c, e.target.value)}><option value="">اختر طريقة التقييم</option>{MODEL_B_VALUATION_METHODS.map((option) => <option key={option} value={option}>{option}</option>)}</NativeSelect>;
+    }
+    const responsiblePartyField =
+      (recordType === 'fixed_asset' && field.c === 'V') ||
+      (recordType === 'building' && field.c === 'AW') ||
+      (recordType === 'land' && field.c === 'AK');
+    if (responsiblePartyField) {
+      return <div className="space-y-1.5">
+        <Input list="accounting-responsible-parties" value={String(value)} onChange={(e) => setField(field.c, e.target.value)} placeholder="اختر إدارة مسجلة أو اكتب اسم الشخص المسؤول" />
+        <datalist id="accounting-responsible-parties">{responsiblePartyOptions.map((option) => <option key={option} value={option} />)}</datalist>
+        <p className="text-[10px] leading-4 text-slate-500">تظهر الإدارات النشطة المسجلة في المنصة كمقترحات، ويمكن كتابة اسم شخص أو جهة أخرى عند الحاجة.</p>
+      </div>;
     }
     const numericColumns = new Set(['AD','AH','AI','AJ','AK','AL','AM','AN','AO','AP','AZ','BA','BB']);
     const fieldType = recordType === 'fixed_asset' ? (numericColumns.has(field.c) ? 'number' : 'text') : getAccountingFieldType(field.a);
