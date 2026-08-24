@@ -12,6 +12,7 @@ export type AccountingCommitteeStatus =
 export type AccountingOwnershipMode = 'owned' | 'leased' | 'other';
 export type AccountingCycleStatus = 'draft' | 'under_review' | 'approved' | 'archived';
 export type AccountingRecordChangeType = 'baseline' | 'new' | 'modified' | 'unchanged' | 'manual' | string;
+export type AccountingAttachmentPurpose = 'ownership_acquisition' | 'maintenance' | 'valuation' | 'asset_image' | 'other';
 
 export type AccountingTransformationAttachment = {
   title: string;
@@ -19,6 +20,10 @@ export type AccountingTransformationAttachment = {
   driveFileId?: string | null;
   mimeType?: string | null;
   notes?: string | null;
+  documentPurpose?: AccountingAttachmentPurpose | null;
+  documentType?: string | null;
+  documentNumber?: string | null;
+  archiveNumber?: string | null;
 };
 
 export type AccountingCycleTemplateSnapshot = {

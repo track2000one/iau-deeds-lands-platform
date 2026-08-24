@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import type { AccountingTransformationRecord } from '../types/accountingTransformation';
 import { ACCOUNTING_FIELDS, type AccountingRecordType as LegacyRecordType } from '../app/config/accountingTransformationFields';
 import { MODEL_B_FIELDS, MODEL_B_SHEET_NAME } from '../app/config/fixedAssetModelB';
+import { resolveOwnershipSupportingArchiveNumber, resolveOwnershipSupportingDocumentType } from './accountingSupportingDocuments';
 
 const XML_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -188,7 +189,14 @@ const fillLegacySheet = async (zip: JSZip, sheet: SheetInfo, items: AccountingTr
   Array.from(sheetData.children).forEach((child) => { if (child.localName === 'row' && Number(child.getAttribute('r')) >= dataStartRow) sheetData.removeChild(child); });
   items.forEach((item, index) => {
     const rowNumber = dataStartRow + index; const row = cloneRow(pristine, rowNumber); sheetData.appendChild(row);
-    ACCOUNTING_FIELDS[type].forEach((field) => setInline(doc, ensureCell(doc, row, field.c, rowNumber), text(item.payload?.[field.c])));
+    ACCOUNTING_FIELDS[type].forEach((field) => {
+      let value = item.payload?.[field.c];
+      const ownershipTypeColumn = (type === 'building' && field.c === 'AU') || (type === 'land' && field.c === 'AI');
+      const ownershipArchiveColumn = (type === 'building' && field.c === 'AV') || (type === 'land' && field.c === 'AJ');
+      if (ownershipTypeColumn) value = resolveOwnershipSupportingDocumentType(item, value);
+      if (ownershipArchiveColumn) value = resolveOwnershipSupportingArchiveNumber(item, value);
+      setInline(doc, ensureCell(doc, row, field.c, rowNumber), text(value));
+    });
   });
   assertProtectedRowsUnchanged(sheetData, dataStartRow, protectedSnapshot);
   const fallbackEndColumn = ACCOUNTING_FIELDS[type].at(-1)?.c || 'BB';
