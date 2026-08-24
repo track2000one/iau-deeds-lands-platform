@@ -1,0 +1,30 @@
+name: Verify Accounting Attachment Metadata Export
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/utils/accountingSupportingDocuments.ts'
+      - '.github/workflows/verify-accounting-attachment-metadata.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Verify classified attachment mappings
+        run: |
+          grep -q "valuationDocumentNumber: 'BK'" src/utils/accountingSupportingDocuments.ts
+          grep -q "maintenanceType: 'CC'" src/utils/accountingSupportingDocuments.ts
+          grep -q "maintenanceDocumentNumber: 'CD'" src/utils/accountingSupportingDocuments.ts
+          grep -q "assetImageArchive: 'CE'" src/utils/accountingSupportingDocuments.ts
+          grep -q "valuationDocumentNumber: 'AQ'" src/utils/accountingSupportingDocuments.ts
+          grep -q "maintenanceType: 'BL'" src/utils/accountingSupportingDocuments.ts
+          grep -q "maintenanceDocumentNumber: 'BM'" src/utils/accountingSupportingDocuments.ts
+          grep -q "assetImageArchive: 'BN'" src/utils/accountingSupportingDocuments.ts
