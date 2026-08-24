@@ -158,7 +158,7 @@ replaceOnce(
 
       return <div className="space-y-1.5">
         <Input value={String(value)} onChange={(e) => setField(field.c, e.target.value)} placeholder="أدخل الرقم الفريد للأصل المرتبط" />
-        <p className={`rounded-xl border px-2.5 py-2 text-[10px] leading-5 ${statusClass}`}>{statusText}</p>
+        <p className={'rounded-xl border px-2.5 py-2 text-[10px] leading-5 ' + statusClass}>{statusText}</p>
       </div>;
     }
 
@@ -169,4 +169,4 @@ replaceOnce(
 
 fs.writeFileSync(filePath, source);
 console.log('Applied linked asset deed verification.');
-// Workflow trigger: verification rule v2
+// Workflow trigger: verification rule v3
