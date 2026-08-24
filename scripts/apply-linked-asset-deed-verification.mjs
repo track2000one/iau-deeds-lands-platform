@@ -169,3 +169,4 @@ replaceOnce(
 
 fs.writeFileSync(filePath, source);
 console.log('Applied linked asset deed verification.');
+// Workflow trigger: verification rule v1
