@@ -39,6 +39,11 @@ import type {
   AccountingRecordType,
   AccountingTransformationAttachment,
 } from '../../types/accountingTransformation';
+import {
+  ACCOUNTING_ATTACHMENT_PURPOSE_OPTIONS,
+  ACCOUNTING_DOCUMENT_TYPE_SUGGESTIONS,
+  inferAccountingAttachmentMeta,
+} from '../../utils/accountingSupportingDocuments';
 
 const initialPayload = (type: AccountingRecordType): Record<string, unknown> => type === 'fixed_asset'
   ? { A: 'جامعة الإمام عبدالرحمن بن فيصل', B: '0029', AQ: 'المملكة العربية السعودية' }
@@ -121,13 +126,16 @@ export const AccountingTransformationFormPage: React.FC = () => {
     setUploading(true);
     try {
       const uploaded: AccountingTransformationAttachment[] = [];
-      for (const file of Array.from(files)) uploaded.push(await uploadAccountingTransformationFile(file));
+      for (const file of Array.from(files)) uploaded.push(inferAccountingAttachmentMeta(await uploadAccountingTransformationFile(file)));
       setAttachments((current) => [...current, ...uploaded]);
       toast.success(`تم رفع ${uploaded.length} مرفق`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر رفع المرفقات');
     } finally { setUploading(false); }
   };
+
+  const updateAttachment = (index: number, patch: Partial<AccountingTransformationAttachment>) =>
+    setAttachments((current) => current.map((attachment, itemIndex) => itemIndex === index ? { ...attachment, ...patch } : attachment));
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -197,7 +205,20 @@ export const AccountingTransformationFormPage: React.FC = () => {
         <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
           <Card className="rounded-[24px] border-sky-200/80 bg-[linear-gradient(145deg,#f8fcff,#eef8ff)]"><CardHeader><CardTitle className="text-base">مؤشر اكتمال المتطلبات</CardTitle></CardHeader><CardContent className="space-y-3"><ProgressPreview label="الحصر" value={progress.census} /><ProgressPreview label="الجرد" value={progress.inventory} /><ProgressPreview label="التقييم" value={progress.valuation} />{modelBValidation && <div className={`rounded-xl border p-3 text-xs ${modelBValidation.complete ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>جاهزية نموذج ب: <strong>{modelBValidation.completion}%</strong><br />إلزامي ناقص: {modelBValidation.missingMandatory.length} · شرطي ناقص: {modelBValidation.conditionalMissing.length}</div>}<p className="text-[11px] leading-5 text-slate-500">تعاد جميع مؤشرات الجاهزية في الخادم عند الحفظ، ولا يصبح السجل رسميًا بمجرد الإدخال إذا بقيت متطلبات غير مكتملة.</p></CardContent></Card>
 
-          <Card className="rounded-[24px]"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Paperclip className="h-4 w-4" />المرفقات</CardTitle></CardHeader><CardContent className="space-y-3"><label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed p-4 text-sm font-bold text-slate-600 hover:bg-slate-50"><Upload className="h-4 w-4" />{uploading ? 'جاري الرفع...' : 'رفع صور أو مستندات'}<input type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} disabled={uploading} /></label>{attachments.length ? <div className="space-y-2">{attachments.map((attachment, index) => <div key={`${attachment.driveUrl}-${index}`} className="flex items-center gap-2 rounded-xl border bg-white p-2 text-xs"><FileText className="h-4 w-4 shrink-0 text-sky-600" /><a href={attachment.driveUrl} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-bold text-sky-700">{attachment.title}</a><button type="button" onClick={() => setAttachments((current) => current.filter((_, i) => i !== index))} className="grid h-7 w-7 place-items-center rounded-lg hover:bg-red-50"><X className="h-3.5 w-3.5 text-red-600" /></button></div>)}</div> : <p className="text-xs text-slate-400">لا توجد مرفقات.</p>}</CardContent></Card>
+          <Card className="rounded-[24px]">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Paperclip className="h-4 w-4" />المرفقات المصنفة</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed p-4 text-sm font-bold text-slate-600 hover:bg-slate-50"><Upload className="h-4 w-4" />{uploading ? 'جاري الرفع...' : 'رفع صور أو مستندات'}<input type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} disabled={uploading} /></label>
+              <p className="rounded-xl border border-sky-100 bg-sky-50/70 p-2.5 text-[10px] leading-5 text-sky-800">صنّف المرفق مرة واحدة. عند إنشاء ملف Excel تستخدم المنصة مرفقات «إثبات الملكية / الاقتناء» لتعبئة نوع الوثيقة تلقائيًا في <strong>AU للمباني</strong> و<strong>AI للأراضي</strong>. إذا لم توجد وثيقة مناسبة تُكتب <strong>Not Available</strong> بدل الشرطة.</p>
+              <datalist id="accounting-document-types">{ACCOUNTING_DOCUMENT_TYPE_SUGGESTIONS.map((option) => <option key={option} value={option} />)}</datalist>
+              {attachments.length ? <div className="space-y-3">{attachments.map((attachment, index) => <div key={`${attachment.driveUrl}-${index}`} className="space-y-2 rounded-2xl border bg-white p-3 text-xs">
+                <div className="flex items-center gap-2"><FileText className="h-4 w-4 shrink-0 text-sky-600" /><a href={attachment.driveUrl} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-bold text-sky-700">{attachment.title}</a><button type="button" onClick={() => setAttachments((current) => current.filter((_, i) => i !== index))} className="grid h-7 w-7 place-items-center rounded-lg hover:bg-red-50"><X className="h-3.5 w-3.5 text-red-600" /></button></div>
+                <div className="space-y-1"><Label className="text-[10px]">تصنيف المرفق</Label><NativeSelect value={attachment.documentPurpose || 'other'} onChange={(e) => updateAttachment(index, { documentPurpose: e.target.value as AccountingTransformationAttachment['documentPurpose'] })}>{ACCOUNTING_ATTACHMENT_PURPOSE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>
+                <div className="space-y-1"><Label className="text-[10px]">نوع الوثيقة</Label><Input list="accounting-document-types" value={attachment.documentType || ''} onChange={(e) => updateAttachment(index, { documentType: e.target.value || null })} placeholder="مثال: صك ملكية" /></div>
+                <div className="grid grid-cols-2 gap-2"><div className="space-y-1"><Label className="text-[10px]">رقم الوثيقة</Label><Input value={attachment.documentNumber || ''} onChange={(e) => updateAttachment(index, { documentNumber: e.target.value || null })} /></div><div className="space-y-1"><Label className="text-[10px]">رقم الأرشفة</Label><Input value={attachment.archiveNumber || ''} onChange={(e) => updateAttachment(index, { archiveNumber: e.target.value || null })} /></div></div>
+              </div>)}</div> : <p className="text-xs text-slate-400">لا توجد مرفقات.</p>}
+            </CardContent>
+          </Card>
 
           <Card className="rounded-[24px]"><CardHeader><CardTitle className="text-base">ملاحظات اللجنة</CardTitle></CardHeader><CardContent><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={6} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" /></CardContent></Card>
         </aside>
