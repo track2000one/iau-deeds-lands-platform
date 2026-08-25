@@ -572,7 +572,7 @@ export const MosquesUnitPage: React.FC = () => {
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>جدول المساجد والمصليات الجامعية</title>
   <style>
-    @page { size: A4 landscape; margin: 1mm 2mm 2mm; }
+    @page { size: A4 landscape; margin: 5mm; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     html, body { margin: 0; padding: 0; background: #fff; color: #172033; font-family: Tahoma, Arial, sans-serif; direction: rtl; }
     body { font-size: 7.6px; line-height: 1.22; }
