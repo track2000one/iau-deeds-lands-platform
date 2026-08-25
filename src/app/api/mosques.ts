@@ -264,6 +264,14 @@ export const mosqueApi = {
     if (!response.ok) throw new Error(body?.message || 'تعذر رفع الملف');
     return body as { driveUrl: string; driveFileId?: string; fileName?: string; mimeType?: string };
   },
+  mediaBlob: async (fileId: string) => {
+    const response = await authenticatedFetch(`/api/uploads/${encodeURIComponent(fileId)}/content`, { headers: { 'x-upload-module': 'mosques' } });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body?.message || 'تعذر تحميل معاينة الملف');
+    }
+    return response.blob();
+  },
   deleteUpload: async (fileId: string) => {
     const response = await authenticatedFetch(`/api/uploads/${encodeURIComponent(fileId)}`, { method: 'DELETE', headers: { 'x-upload-module': 'mosques' } });
     if (!response.ok && response.status !== 404) {

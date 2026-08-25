@@ -138,7 +138,54 @@ const normalizeSiteMedia = (value: MosqueSite['images']): MosqueSiteMediaLibrary
 };
 const drivePreviewUrl = (url: string) => {
   const id = String(url || '').match(/drive\.google\.com\/file\/d\/([^/?#]+)/i)?.[1] || String(url || '').match(/[?&]id=([^&#]+)/i)?.[1];
-  return id ? `https://drive.google.com/uc?export=view&id=${encodeURIComponent(id)}` : url;
+  return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600` : url;
+};
+
+const MosqueMediaImage: React.FC<{ item: { url: string; fileId?: string | null }; alt: string; className?: string }> = ({ item, alt, className }) => {
+  const [src, setSrc] = useState<string | null>(() => item.fileId ? null : drivePreviewUrl(item.url));
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    const fallback = drivePreviewUrl(item.url);
+
+    setFailed(false);
+    if (!item.fileId) {
+      setSrc(fallback);
+      return () => undefined;
+    }
+
+    setSrc(null);
+    void mosqueApi.mediaBlob(item.fileId)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(fallback);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [item.fileId, item.url]);
+
+  if (failed) {
+    return <div className={`${className || ''} flex items-center justify-center bg-slate-100 px-3 text-center text-xs font-semibold text-slate-500`}>تعذر عرض الصورة — يمكن فتح الملف بالضغط على البطاقة</div>;
+  }
+
+  if (!src) {
+    return <div className={`${className || ''} flex items-center justify-center gap-2 bg-slate-100 text-xs font-semibold text-slate-500`}><RefreshCw className="h-4 w-4 animate-spin" />جاري تحميل الصورة...</div>;
+  }
+
+  return <img src={src} alt={alt} className={className} onError={() => {
+    const fallback = drivePreviewUrl(item.url);
+    if (src !== fallback) setSrc(fallback);
+    else setFailed(true);
+  }} />;
 };
 
 type MediaImportKind = 'site_image' | 'mosque_image' | 'document';
@@ -1278,7 +1325,7 @@ export const MosquesUnitPage: React.FC = () => {
               <Info label="الإحداثيات" value={previewSite.latitude != null && previewSite.longitude != null ? `${previewSite.latitude}, ${previewSite.longitude}` : '-'} />
             </div>
             {previewSite.notes && <div className="rounded-2xl border bg-slate-50 p-4"><p className="text-xs text-muted-foreground">ملاحظات</p><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{previewSite.notes}</p></div>}
-            {(() => { const media = normalizeSiteMedia(previewSite.images); return media.photos.length || media.documents.length ? <div className="space-y-4 rounded-2xl border bg-white p-4"><div className="flex items-center justify-between"><p className="font-black text-slate-800">الصور والمرفقات</p><Badge variant="outline">{media.photos.length + media.documents.length} ملف</Badge></div>{media.photos.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{media.photos.map((item, index) => <a key={`preview-photo-${index}`} href={item.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border bg-slate-50"><img src={drivePreviewUrl(item.url)} alt={item.fileName || 'صورة الموقع'} className="h-32 w-full object-cover" /><div className="flex items-center justify-between gap-2 p-2"><span className="min-w-0 truncate text-xs font-semibold text-slate-700">{item.fileName || `صورة ${index + 1}`}</span><Badge variant="outline" className="shrink-0 text-[10px]">{item.category === 'site_image' ? 'الموقع' : 'المسجد'}</Badge></div></a>)}</div>}{media.documents.length > 0 && <div className="space-y-2">{media.documents.map((item, index) => <a key={`preview-doc-${index}`} href={item.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-xl border bg-slate-50 p-3 text-sm hover:bg-sky-50"><span className="min-w-0 truncate font-semibold text-slate-700"><FileText className="ml-2 inline h-4 w-4 text-sky-700" />{item.fileName || `مستند ${index + 1}`}</span><ExternalLink className="h-4 w-4 shrink-0 text-sky-700" /></a>)}</div>}</div> : null; })()}
+            {(() => { const media = normalizeSiteMedia(previewSite.images); return media.photos.length || media.documents.length ? <div className="space-y-4 rounded-2xl border bg-white p-4"><div className="flex items-center justify-between"><p className="font-black text-slate-800">الصور والمرفقات</p><Badge variant="outline">{media.photos.length + media.documents.length} ملف</Badge></div>{media.photos.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{media.photos.map((item, index) => <a key={`preview-photo-${index}`} href={item.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border bg-slate-50"><MosqueMediaImage item={item} alt={item.fileName || 'صورة الموقع'} className="h-32 w-full object-cover" /><div className="flex items-center justify-between gap-2 p-2"><span className="min-w-0 truncate text-xs font-semibold text-slate-700">{item.fileName || `صورة ${index + 1}`}</span><Badge variant="outline" className="shrink-0 text-[10px]">{item.category === 'site_image' ? 'الموقع' : 'المسجد'}</Badge></div></a>)}</div>}{media.documents.length > 0 && <div className="space-y-2">{media.documents.map((item, index) => <a key={`preview-doc-${index}`} href={item.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-xl border bg-slate-50 p-3 text-sm hover:bg-sky-50"><span className="min-w-0 truncate font-semibold text-slate-700"><FileText className="ml-2 inline h-4 w-4 text-sky-700" />{item.fileName || `مستند ${index + 1}`}</span><ExternalLink className="h-4 w-4 shrink-0 text-sky-700" /></a>)}</div>}</div> : null; })()}
             {previewSite.latitude != null && previewSite.longitude != null && <div className="flex justify-end"><Button variant="outline" className={button3d} onClick={() => window.open(`https://www.google.com/maps?q=${previewSite.latitude},${previewSite.longitude}`, '_blank')}><MapPin className="ml-2 h-4 w-4" />فتح الموقع على الخريطة</Button></div>}
           </div>}
         </DialogContent>
