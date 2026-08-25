@@ -1,0 +1,51 @@
+name: Apply Mosque Print Table Layout V2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-mosque-print-table-layout-v2.py'
+      - '.github/workflows/apply-mosque-print-table-layout-v2.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-mosque-print-table-layout-v2
+  cancel-in-progress: true
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Apply layout patch
+        run: python3 scripts/apply-mosque-print-table-layout-v2.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify frontend build
+        run: npm run build
+
+      - name: Commit verified source change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/MosquesUnitPage.tsx
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+            exit 0
+          fi
+          git commit -m "fix(mosques): tighten A4 print table margins"
+          git push origin main
