@@ -2,6 +2,26 @@ import { apiJson, authenticatedFetch, getApiBaseUrl } from '../../lib/http';
 
 export type MosqueModuleRole = 'head' | 'supervisor' | 'personnel' | 'university_member' | 'viewer';
 
+export type MosqueSiteMediaItem = {
+  url: string;
+  fileId?: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  category?: 'site_image' | 'mosque_image';
+};
+
+export type MosqueSiteDocumentItem = {
+  url: string;
+  fileId?: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+};
+
+export type MosqueSiteMediaLibrary = {
+  photos: MosqueSiteMediaItem[];
+  documents: MosqueSiteDocumentItem[];
+};
+
 export type MosqueSite = {
   id: string;
   publicToken: string;
@@ -21,7 +41,7 @@ export type MosqueSite = {
   khateebName?: string | null;
   contactPhone?: string | null;
   notes?: string | null;
-  images?: string[] | null;
+  images?: string[] | MosqueSiteMediaLibrary | null;
   supervisorUserId?: string | null;
   _count?: { requests: number; tickets: number; personnel: number };
 };
@@ -242,7 +262,7 @@ export const mosqueApi = {
     const response = await authenticatedFetch('/api/uploads', { method: 'POST', headers: { 'x-upload-module': 'mosques' }, body: data });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body?.message || 'تعذر رفع الملف');
-    return body as { driveUrl: string; driveFileId?: string; fileName?: string };
+    return body as { driveUrl: string; driveFileId?: string; fileName?: string; mimeType?: string };
   },
 };
 

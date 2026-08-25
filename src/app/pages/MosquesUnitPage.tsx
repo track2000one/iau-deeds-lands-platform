@@ -63,6 +63,7 @@ import {
   type MosquePersonnel,
   type MosqueRequest,
   type MosqueSite,
+  type MosqueSiteMediaLibrary,
   type MosqueStaffUser,
   type MosqueTicket,
 } from '../api/mosques';
@@ -127,6 +128,18 @@ const emptySite = {
 const emptyRequest = { siteId: '', requestType: 'maintenance', priority: 'medium', description: '', notes: '', file: null as File | null };
 const emptyLeave = { siteId: '', requestType: 'leave', startDate: '', endDate: '', reason: '', replacementName: '', notes: '' };
 
+type PendingSiteMedia = { file: File; kind: 'site_image' | 'mosque_image' | 'document' };
+
+const emptySiteMedia = (): MosqueSiteMediaLibrary => ({ photos: [], documents: [] });
+const normalizeSiteMedia = (value: MosqueSite['images']): MosqueSiteMediaLibrary => {
+  if (Array.isArray(value)) return { photos: value.map((url) => ({ url, category: 'mosque_image' as const })), documents: [] };
+  return { photos: value?.photos || [], documents: value?.documents || [] };
+};
+const drivePreviewUrl = (url: string) => {
+  const id = String(url || '').match(/drive\.google\.com\/file\/d\/([^/?#]+)/i)?.[1] || String(url || '').match(/[?&]id=([^&#]+)/i)?.[1];
+  return id ? `https://drive.google.com/uc?export=view&id=${encodeURIComponent(id)}` : url;
+};
+
 export const MosquesUnitPage: React.FC = () => {
   const navigate = useNavigate();
   const { hasPermission, isAdmin } = usePermissions();
@@ -160,6 +173,9 @@ export const MosquesUnitPage: React.FC = () => {
   const [siteDialog, setSiteDialog] = useState(false);
   const [editingSite, setEditingSite] = useState<MosqueSite | null>(null);
   const [siteForm, setSiteForm] = useState<any>(emptySite);
+  const [siteMediaKind, setSiteMediaKind] = useState<'site_image' | 'mosque_image' | 'document'>('mosque_image');
+  const [siteMediaFiles, setSiteMediaFiles] = useState<PendingSiteMedia[]>([]);
+  const [siteMediaLibrary, setSiteMediaLibrary] = useState<MosqueSiteMediaLibrary>(emptySiteMedia());
   const [showSiteMap, setShowSiteMap] = useState(false);
   const [locatingSite, setLocatingSite] = useState(false);
   const [requestDialog, setRequestDialog] = useState(false);
@@ -271,6 +287,9 @@ export const MosquesUnitPage: React.FC = () => {
   const openSiteDialog = (site?: MosqueSite) => {
     setEditingSite(site || null);
     setShowSiteMap(false);
+    setSiteMediaKind('mosque_image');
+    setSiteMediaFiles([]);
+    setSiteMediaLibrary(normalizeSiteMedia(site?.images || null));
     setSiteForm(site ? {
       name: site.name, siteType: site.siteType, city: site.city || '', district: site.district || '', campusLocation: site.campusLocation || '',
       area: site.area ?? '', capacity: site.capacity ?? '', latitude: site.latitude ?? '', longitude: site.longitude ?? '', status: site.status,
@@ -327,6 +346,23 @@ export const MosquesUnitPage: React.FC = () => {
     if (!siteForm.name.trim()) return toast.error('اسم المسجد أو المصلى مطلوب');
     setSaving(true);
     try {
+      const nextMedia: MosqueSiteMediaLibrary = {
+        photos: [...siteMediaLibrary.photos],
+        documents: [...siteMediaLibrary.documents],
+      };
+
+      for (const pending of siteMediaFiles) {
+        const uploaded = await mosqueApi.upload(pending.file);
+        const media = {
+          url: uploaded.driveUrl,
+          fileId: uploaded.driveFileId || null,
+          fileName: uploaded.fileName || pending.file.name,
+          mimeType: uploaded.mimeType || pending.file.type || null,
+        };
+        if (pending.kind === 'document') nextMedia.documents.push(media);
+        else nextMedia.photos.push({ ...media, category: pending.kind });
+      }
+
       const payload = {
         ...siteForm,
         area: siteForm.area === '' ? null : Number(siteForm.area),
@@ -334,13 +370,14 @@ export const MosquesUnitPage: React.FC = () => {
         latitude: siteForm.latitude === '' ? null : Number(siteForm.latitude),
         longitude: siteForm.longitude === '' ? null : Number(siteForm.longitude),
         mapUrl: siteForm.latitude !== '' && siteForm.longitude !== '' ? `https://www.google.com/maps?q=${siteForm.latitude},${siteForm.longitude}` : null,
-        images: [],
+        images: nextMedia,
       };
       const savedSite = editingSite
-        ? await mosqueApi.updateSite(editingSite.id, { ...payload, images: editingSite.images || [] })
+        ? await mosqueApi.updateSite(editingSite.id, payload)
         : await mosqueApi.createSite(payload);
-      toast.success(editingSite ? 'تم تحديث بيانات الموقع' : 'تمت إضافة الموقع وإنشاء QR تلقائيًا');
+      toast.success(editingSite ? 'تم تحديث بيانات الموقع والمرفقات' : 'تمت إضافة الموقع والمرفقات وإنشاء QR تلقائيًا');
       setSiteDialog(false);
+      setSiteMediaFiles([]);
       await loadAll();
       if (!editingSite) setQrSite(savedSite);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر الحفظ'); } finally { setSaving(false); }
@@ -811,6 +848,18 @@ export const MosquesUnitPage: React.FC = () => {
                 <Field label="الإمام"><Input className="h-11" value={siteForm.imamName} onChange={(e) => setSiteForm({ ...siteForm, imamName: e.target.value })} /></Field>
                 <Field label="المؤذن"><Input className="h-11" value={siteForm.muezzinName} onChange={(e) => setSiteForm({ ...siteForm, muezzinName: e.target.value })} /></Field>
                 <Field label="الخطيب"><Input className="h-11" value={siteForm.khateebName} onChange={(e) => setSiteForm({ ...siteForm, khateebName: e.target.value })} /></Field>
+              </CardContent>
+            </Card>
+            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
+              <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-amber-50/50 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><FileText className="h-5 w-5" />صور ومرفقات المسجد / المصلى</CardTitle><CardDescription>يمكن رفع عدة صور للمسجد أو للموقع، إضافة إلى PDF وWord وExcel. الحد الأقصى 20 MB لكل ملف.</CardDescription></CardHeader>
+              <CardContent className="space-y-4 pt-5">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr]">
+                  <Field label="تصنيف المرفق"><NativeSelect className="h-11" value={siteMediaKind} onChange={(e) => setSiteMediaKind(e.target.value as any)}><option value="mosque_image">صورة المسجد / المصلى</option><option value="site_image">صورة الموقع / المبنى</option><option value="document">مستند / ملف</option></NativeSelect></Field>
+                  <Field label="اختيار الملفات"><Input className="h-11 file:ml-3" type="file" multiple accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => { const files = Array.from(e.target.files || []); if (!files.length) return; setSiteMediaFiles((current) => [...current, ...files.map((file) => ({ file, kind: file.type.startsWith('image/') ? siteMediaKind === 'document' ? 'mosque_image' : siteMediaKind : 'document' }))]); e.currentTarget.value = ''; }} /></Field>
+                </div>
+                {siteMediaFiles.length > 0 && <div className="space-y-2 rounded-2xl border border-dashed border-sky-200 bg-sky-50/50 p-3"><p className="text-xs font-bold text-sky-800">ملفات بانتظار الرفع ({siteMediaFiles.length})</p>{siteMediaFiles.map((item, index) => <div key={`pending-${index}-${item.file.name}`} className="flex items-center justify-between gap-2 rounded-xl border bg-white p-2 text-sm"><span className="min-w-0 truncate">{item.file.name} — {item.kind === 'document' ? 'مستند' : item.kind === 'site_image' ? 'صورة الموقع' : 'صورة المسجد'}</span><Button type="button" size="sm" variant="ghost" className="text-red-600" onClick={() => setSiteMediaFiles((current) => current.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button></div>)}</div>}
+                {siteMediaLibrary.photos.length > 0 && <div className="space-y-2"><p className="text-xs font-bold text-slate-700">الصور المحفوظة ({siteMediaLibrary.photos.length})</p><div className="grid grid-cols-2 gap-3 md:grid-cols-4">{siteMediaLibrary.photos.map((item, index) => <div key={`photo-${index}`} className="overflow-hidden rounded-2xl border bg-white"><img src={drivePreviewUrl(item.url)} alt={item.fileName || 'صورة المسجد'} className="h-28 w-full object-cover" /><div className="flex items-center justify-between gap-1 p-2"><a className="min-w-0 truncate text-xs text-sky-700 hover:underline" href={item.url} target="_blank" rel="noreferrer">{item.fileName || `صورة ${index + 1}`}</a><Button type="button" size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-600" onClick={() => setSiteMediaLibrary((current) => ({ ...current, photos: current.photos.filter((_, i) => i !== index) }))}><Trash2 className="h-3.5 w-3.5" /></Button></div></div>)}</div></div>}
+                {siteMediaLibrary.documents.length > 0 && <div className="space-y-2"><p className="text-xs font-bold text-slate-700">المستندات والملفات ({siteMediaLibrary.documents.length})</p>{siteMediaLibrary.documents.map((item, index) => <div key={`document-${index}`} className="flex items-center justify-between gap-2 rounded-xl border bg-white p-2 text-sm"><a className="min-w-0 truncate text-sky-700 hover:underline" href={item.url} target="_blank" rel="noreferrer"><ExternalLink className="ml-1 inline h-3.5 w-3.5" />{item.fileName || `مستند ${index + 1}`}</a><Button type="button" size="sm" variant="ghost" className="text-red-600" onClick={() => setSiteMediaLibrary((current) => ({ ...current, documents: current.documents.filter((_, i) => i !== index) }))}><Trash2 className="h-4 w-4" /></Button></div>)}</div>}
               </CardContent>
             </Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/50 pb-4"><CardTitle className="text-base md:text-lg">ملاحظات إضافية</CardTitle></CardHeader><CardContent className="pt-5"><Field label="الملاحظات"><Textarea rows={4} value={siteForm.notes} onChange={(e) => setSiteForm({ ...siteForm, notes: e.target.value })} placeholder="أي معلومات تنظيمية أو تشغيلية إضافية..." /></Field></CardContent></Card>
