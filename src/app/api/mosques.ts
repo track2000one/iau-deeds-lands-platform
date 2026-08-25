@@ -264,6 +264,13 @@ export const mosqueApi = {
     if (!response.ok) throw new Error(body?.message || 'تعذر رفع الملف');
     return body as { driveUrl: string; driveFileId?: string; fileName?: string; mimeType?: string };
   },
+  deleteUpload: async (fileId: string) => {
+    const response = await authenticatedFetch(`/api/uploads/${encodeURIComponent(fileId)}`, { method: 'DELETE', headers: { 'x-upload-module': 'mosques' } });
+    if (!response.ok && response.status !== 404) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body?.message || 'تعذر حذف الملف المرفوع');
+    }
+  },
 };
 
 export const mosquePublicApi = {
