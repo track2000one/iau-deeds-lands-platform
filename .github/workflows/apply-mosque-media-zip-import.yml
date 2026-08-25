@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'scripts/apply-mosque-media-zip-import.mjs'
+      - 'scripts/apply-mosque-media-zip-import.py'
       - '.github/workflows/apply-mosque-media-zip-import.yml'
   workflow_dispatch:
 
@@ -23,7 +23,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: node scripts/apply-mosque-media-zip-import.mjs
+      - run: python3 scripts/apply-mosque-media-zip-import.py
       - run: npm run build
       - name: Commit changes
         run: |
