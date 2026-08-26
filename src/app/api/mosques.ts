@@ -27,6 +27,7 @@ export type MosqueSite = {
   publicToken: string;
   name: string;
   siteType: 'mosque' | 'jami' | 'prayer_room';
+  prayerRoomGender?: 'men' | 'women' | null;
   city?: string | null;
   district?: string | null;
   campusLocation?: string | null;
@@ -209,7 +210,7 @@ export type MosqueDashboard = {
   managedSiteIds?: string[];
 };
 
-export type PublicMosqueSite = Pick<MosqueSite, 'publicToken' | 'name' | 'siteType' | 'city' | 'district' | 'campusLocation' | 'area' | 'capacity' | 'latitude' | 'longitude' | 'mapUrl' | 'status'>;
+export type PublicMosqueSite = Pick<MosqueSite, 'publicToken' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation' | 'area' | 'capacity' | 'latitude' | 'longitude' | 'mapUrl' | 'status'>;
 
 const publicJson = async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
   const base = getApiBaseUrl();
