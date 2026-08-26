@@ -102,7 +102,9 @@ const SITE_PRINT_COLUMNS: Array<{ key: SitePrintColumnKey; label: string }> = [
 ];
 const DEFAULT_SITE_PRINT_COLUMNS: SitePrintColumnKey[] = ['name', 'type', 'building', 'location', 'cityDistrict', 'area', 'imam', 'muezzin', 'status'];
 
-type SitePrintFontSize = 'auto' | 'small' | 'medium' | 'large';
+const SITE_PRINT_FONT_MIN = 5;
+const SITE_PRINT_FONT_MAX = 14;
+const SITE_PRINT_FONT_DEFAULT = 7.2;
 type SitePrintWidthMode = 'smart' | 'compact' | 'equal';
 type SitePrintWrapMode = 'wrap' | 'single';
 type SitePrintOrientation = 'auto' | 'landscape' | 'portrait';
@@ -371,7 +373,8 @@ export const MosquesUnitPage: React.FC = () => {
   const [siteSortBy, setSiteSortBy] = useState('name');
   const [siteSortDirection, setSiteSortDirection] = useState<'asc' | 'desc'>('asc');
   const [sitePrintColumns, setSitePrintColumns] = useState<SitePrintColumnKey[]>([...DEFAULT_SITE_PRINT_COLUMNS]);
-  const [sitePrintFontSize, setSitePrintFontSize] = useState<SitePrintFontSize>('auto');
+  const [sitePrintFontSize, setSitePrintFontSize] = useState<number>(SITE_PRINT_FONT_DEFAULT);
+  const [sitePrintFontAuto, setSitePrintFontAuto] = useState(true);
   const [sitePrintWidthMode, setSitePrintWidthMode] = useState<SitePrintWidthMode>('smart');
   const [sitePrintWrapMode, setSitePrintWrapMode] = useState<SitePrintWrapMode>('wrap');
   const [sitePrintOrientation, setSitePrintOrientation] = useState<SitePrintOrientation>('auto');
@@ -555,7 +558,8 @@ export const MosquesUnitPage: React.FC = () => {
   const resetSitePrintColumns = () => setSitePrintColumns([...DEFAULT_SITE_PRINT_COLUMNS]);
 
   const resetSitePrintLayout = () => {
-    setSitePrintFontSize('auto');
+    setSitePrintFontSize(SITE_PRINT_FONT_DEFAULT);
+    setSitePrintFontAuto(true);
     setSitePrintWidthMode('smart');
     setSitePrintWrapMode('wrap');
     setSitePrintOrientation('auto');
@@ -650,7 +654,9 @@ export const MosquesUnitPage: React.FC = () => {
       ? (selectedColumns.length <= 5 ? 'portrait' : 'landscape')
       : sitePrintOrientation;
     const automaticFont = selectedColumns.length >= 12 ? 5.8 : selectedColumns.length >= 9 ? 6.5 : selectedColumns.length >= 6 ? 7.2 : 8.1;
-    const printFontNumber = sitePrintFontSize === 'small' ? 6.1 : sitePrintFontSize === 'medium' ? 7.2 : sitePrintFontSize === 'large' ? 8.4 : automaticFont;
+    const printFontNumber = sitePrintFontAuto
+      ? automaticFont
+      : Math.min(SITE_PRINT_FONT_MAX, Math.max(SITE_PRINT_FONT_MIN, sitePrintFontSize));
     const printFontSize = `${printFontNumber}px`;
     const headerFontSize = `${printFontNumber + 0.25}px`;
     const tableWidth = sitePrintWidthMode === 'equal'
@@ -680,7 +686,7 @@ export const MosquesUnitPage: React.FC = () => {
     ].filter(Boolean) as string[];
     const filterNote = filterParts.join(' | ');
     const printedColumnsNote = selectedColumns.map((column) => column.label).join('، ');
-    const fontLabel = sitePrintFontSize === 'auto' ? 'تلقائي' : sitePrintFontSize === 'small' ? 'صغير' : sitePrintFontSize === 'medium' ? 'متوسط' : 'كبير';
+    const fontLabel = sitePrintFontAuto ? `تلقائي (${printFontNumber.toFixed(1)}px)` : `${printFontNumber.toFixed(1)}px`;
     const widthLabel = sitePrintWidthMode === 'smart' ? 'ذكي تلقائي' : sitePrintWidthMode === 'compact' ? 'مضغوط' : 'متساوٍ';
     const wrapLabel = sitePrintWrapMode === 'wrap' ? 'التفاف تلقائي' : 'سطر واحد';
     const orientationLabel = sitePrintOrientation === 'auto' ? `تلقائي (${resolvedOrientation === 'portrait' ? 'عمودي' : 'أفقي'})` : resolvedOrientation === 'portrait' ? 'عمودي' : 'أفقي';
@@ -1534,12 +1540,22 @@ export const MosquesUnitPage: React.FC = () => {
                   <Button type="button" size="sm" variant="outline" className={button3d} onClick={resetSitePrintLayout}>إعادة التنسيق التلقائي</Button>
                 </div>
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <div><Label className="mb-1.5 block text-xs font-bold text-slate-600">حجم الخط</Label><NativeSelect className="h-10 rounded-xl bg-white" value={sitePrintFontSize} onChange={(e) => setSitePrintFontSize(e.target.value as SitePrintFontSize)}><option value="auto">تلقائي حسب عدد الأعمدة</option><option value="small">صغير</option><option value="medium">متوسط</option><option value="large">كبير</option></NativeSelect></div>
+                  <div>
+                    <Label className="mb-1.5 block text-xs font-bold text-slate-600">حجم الخط (px)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" inputMode="decimal" min={SITE_PRINT_FONT_MIN} max={SITE_PRINT_FONT_MAX} step={0.5} className="h-10 rounded-xl bg-white text-center font-bold" value={sitePrintFontSize} onChange={(e) => { const next = Number(e.target.value); if (Number.isFinite(next)) { setSitePrintFontSize(Math.min(SITE_PRINT_FONT_MAX, Math.max(SITE_PRINT_FONT_MIN, next))); setSitePrintFontAuto(false); } }} />
+                      <label className={`flex h-10 cursor-pointer items-center gap-2 rounded-xl border px-3 text-xs font-bold transition ${sitePrintFontAuto ? 'border-sky-300 bg-sky-50 text-sky-800' : 'border-slate-200 bg-white text-slate-600'}`}>
+                        <input type="checkbox" className="h-4 w-4 accent-sky-700" checked={sitePrintFontAuto} onChange={(e) => setSitePrintFontAuto(e.target.checked)} />
+                        تلقائي
+                      </label>
+                    </div>
+                    <p className="mt-1 text-[10px] text-muted-foreground">من {SITE_PRINT_FONT_MIN} إلى {SITE_PRINT_FONT_MAX} px — كل تعديل رقمي يلغي الوضع التلقائي.</p>
+                  </div>
                   <div><Label className="mb-1.5 block text-xs font-bold text-slate-600">مساحة الأعمدة</Label><NativeSelect className="h-10 rounded-xl bg-white" value={sitePrintWidthMode} onChange={(e) => setSitePrintWidthMode(e.target.value as SitePrintWidthMode)}><option value="smart">تلقائي ذكي حسب المحتوى</option><option value="compact">مضغوط</option><option value="equal">متساوٍ</option></NativeSelect></div>
                   <div><Label className="mb-1.5 block text-xs font-bold text-slate-600">عرض النص داخل الحقل</Label><NativeSelect className="h-10 rounded-xl bg-white" value={sitePrintWrapMode} onChange={(e) => setSitePrintWrapMode(e.target.value as SitePrintWrapMode)}><option value="wrap">التفاف تلقائي للنص</option><option value="single">سطر واحد</option></NativeSelect></div>
                   <div><Label className="mb-1.5 block text-xs font-bold text-slate-600">اتجاه الصفحة</Label><NativeSelect className="h-10 rounded-xl bg-white" value={sitePrintOrientation} onChange={(e) => setSitePrintOrientation(e.target.value as SitePrintOrientation)}><option value="auto">تلقائي حسب عدد الأعمدة</option><option value="landscape">أفقي</option><option value="portrait">عمودي</option></NativeSelect></div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[11px] leading-6 text-sky-900"><strong>التنسيق الحالي:</strong><span>الخط: {sitePrintFontSize === 'auto' ? 'تلقائي' : sitePrintFontSize === 'small' ? 'صغير' : sitePrintFontSize === 'medium' ? 'متوسط' : 'كبير'}</span><span>•</span><span>الأعمدة: {sitePrintWidthMode === 'smart' ? 'ذكية حسب المحتوى' : sitePrintWidthMode === 'compact' ? 'مضغوطة' : 'متساوية'}</span><span>•</span><span>النص: {sitePrintWrapMode === 'wrap' ? 'التفاف' : 'سطر واحد'}</span><span>•</span><span>الصفحة: {sitePrintOrientation === 'auto' ? 'تلقائية' : sitePrintOrientation === 'portrait' ? 'عمودية' : 'أفقية'}</span></div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[11px] leading-6 text-sky-900"><strong>التنسيق الحالي:</strong><span>الخط: {sitePrintFontAuto ? 'تلقائي' : `${sitePrintFontSize} px`}</span><span>•</span><span>الأعمدة: {sitePrintWidthMode === 'smart' ? 'ذكية حسب المحتوى' : sitePrintWidthMode === 'compact' ? 'مضغوطة' : 'متساوية'}</span><span>•</span><span>النص: {sitePrintWrapMode === 'wrap' ? 'التفاف' : 'سطر واحد'}</span><span>•</span><span>الصفحة: {sitePrintOrientation === 'auto' ? 'تلقائية' : sitePrintOrientation === 'portrait' ? 'عمودية' : 'أفقية'}</span></div>
               </div>
 
               <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 lg:flex-row lg:items-center lg:justify-between">
