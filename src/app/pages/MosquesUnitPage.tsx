@@ -81,6 +81,26 @@ const roleLabels: Record<MosqueModuleRole, string> = {
 const personnelRoleLabels: Record<string, string> = { imam: 'إمام', muezzin: 'مؤذن', khateeb: 'خطيب', collaborating_khateeb: 'خطيب متعاون', collaborator: 'خطيب متعاون' };
 const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', jami: 'جامع', prayer_room: 'مصلى' };
 const siteStatusLabels: Record<string, string> = { active: 'نشط', maintenance: 'تحت الصيانة', temporarily_closed: 'مغلق مؤقتًا' };
+
+
+type SitePrintColumnKey = 'name' | 'type' | 'building' | 'location' | 'cityDistrict' | 'area' | 'capacity' | 'imam' | 'muezzin' | 'khateeb' | 'contactPhone' | 'coordinates' | 'status' | 'notes';
+const SITE_PRINT_COLUMNS: Array<{ key: SitePrintColumnKey; label: string }> = [
+  { key: 'name', label: 'الاسم' },
+  { key: 'type', label: 'النوع' },
+  { key: 'building', label: 'رقم المبنى' },
+  { key: 'location', label: 'الموقع داخل الجامعة' },
+  { key: 'cityDistrict', label: 'المدينة / الحي' },
+  { key: 'area', label: 'المساحة' },
+  { key: 'capacity', label: 'الطاقة الاستيعابية' },
+  { key: 'imam', label: 'الإمام' },
+  { key: 'muezzin', label: 'المؤذن' },
+  { key: 'khateeb', label: 'الخطيب' },
+  { key: 'contactPhone', label: 'رقم التواصل' },
+  { key: 'coordinates', label: 'الإحداثيات' },
+  { key: 'status', label: 'الحالة' },
+  { key: 'notes', label: 'الملاحظات' },
+];
+const DEFAULT_SITE_PRINT_COLUMNS: SitePrintColumnKey[] = ['name', 'type', 'building', 'location', 'cityDistrict', 'area', 'imam', 'muezzin', 'status'];
 const requestTypeLabels: Record<string, string> = {
   maintenance: 'صيانة', renovation: 'ترميم', equipment: 'تجهيزات', cleaning: 'نظافة', carpet: 'فرش',
   air_conditioning: 'مكيفات', audio: 'أجهزة صوت', lighting: 'إنارة', other: 'أخرى',
@@ -345,6 +365,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [siteFilterStatus, setSiteFilterStatus] = useState('all');
   const [siteSortBy, setSiteSortBy] = useState('name');
   const [siteSortDirection, setSiteSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sitePrintColumns, setSitePrintColumns] = useState<SitePrintColumnKey[]>([...DEFAULT_SITE_PRINT_COLUMNS]);
   const [activeTab, setActiveTab] = useState('overview');
   const [requestQuickFilter, setRequestQuickFilter] = useState<'all' | 'new' | 'under_review' | 'approved' | 'late'>('all');
   const [ticketQuickFilter, setTicketQuickFilter] = useState<'all' | 'open'>('all');
@@ -512,6 +533,18 @@ export const MosquesUnitPage: React.FC = () => {
     setSiteSortDirection('asc');
   };
 
+
+  const toggleSitePrintColumn = (key: SitePrintColumnKey) => {
+    if (sitePrintColumns.includes(key) && sitePrintColumns.length === 1) {
+      toast.info('يجب إبقاء عمود واحد على الأقل للطباعة');
+      return;
+    }
+    setSitePrintColumns((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+  };
+
+  const selectAllSitePrintColumns = () => setSitePrintColumns(SITE_PRINT_COLUMNS.map((column) => column.key));
+  const resetSitePrintColumns = () => setSitePrintColumns([...DEFAULT_SITE_PRINT_COLUMNS]);
+
   const mapSites = useMemo(() => visibleSites.filter((site) => Number.isFinite(Number(site.latitude)) && Number.isFinite(Number(site.longitude))), [visibleSites]);
   const mapCenter: [number, number] = useMemo(() => {
     if (!mapSites.length) return [26.3927, 50.0438];
@@ -526,6 +559,12 @@ export const MosquesUnitPage: React.FC = () => {
       return;
     }
 
+    const selectedColumns = SITE_PRINT_COLUMNS.filter((column) => sitePrintColumns.includes(column.key));
+    if (!selectedColumns.length) {
+      toast.info('حدد عمودًا واحدًا على الأقل للطباعة');
+      return;
+    }
+
     const printWindow = window.open('', '_blank', 'width=1300,height=900');
     if (!printWindow) {
       toast.error('تعذر فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة للمنصة ثم أعد المحاولة.');
@@ -537,23 +576,30 @@ export const MosquesUnitPage: React.FC = () => {
     }[char] || char));
     const display = (value: unknown) => value === null || value === undefined || value === '' ? '-' : escapeHtml(value);
     const generatedAt = new Date().toLocaleString('ar-SA-u-ca-gregory');
-    const tableRows = rows.map((site, index) => {
+    const columnValue = (site: MosqueSite, key: SitePrintColumnKey) => {
       const buildingCode = String(site.campusLocation || '').match(/\b(?:M|A|H)\d+\b/i)?.[0]?.toUpperCase() || '-';
-      const universityLocation = site.campusLocation || '-';
       const cityDistrict = [site.city, site.district].filter(Boolean).join(' — ') || '-';
-      const area = site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-';
-      return `<tr>
-        <td>${index + 1}</td>
-        <td class="name">${display(site.name)}</td>
-        <td>${display(siteTypeLabels[site.siteType] || site.siteType)}</td>
-        <td dir="ltr">${display(buildingCode)}</td>
-        <td>${display(universityLocation)}</td>
-        <td>${display(cityDistrict)}</td>
-        <td>${display(area)}</td>
-        <td>${display(site.imamName || '-')}</td>
-        <td>${display(site.muezzinName || '-')}</td>
-        <td>${display(siteStatusLabels[site.status] || site.status)}</td>
-      </tr>`;
+      if (key === 'name') return site.name;
+      if (key === 'type') return siteTypeLabels[site.siteType] || site.siteType;
+      if (key === 'building') return buildingCode;
+      if (key === 'location') return site.campusLocation || '-';
+      if (key === 'cityDistrict') return cityDistrict;
+      if (key === 'area') return site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-';
+      if (key === 'capacity') return site.capacity ? site.capacity.toLocaleString('ar-SA') : '-';
+      if (key === 'imam') return site.imamName || '-';
+      if (key === 'muezzin') return site.muezzinName || '-';
+      if (key === 'khateeb') return site.khateebName || '-';
+      if (key === 'contactPhone') return site.contactPhone || '-';
+      if (key === 'coordinates') return site.latitude != null && site.longitude != null ? `${site.latitude}, ${site.longitude}` : '-';
+      if (key === 'status') return siteStatusLabels[site.status] || site.status;
+      if (key === 'notes') return site.notes || '-';
+      return '-';
+    };
+    const centerColumns = new Set<SitePrintColumnKey>(['type', 'building', 'area', 'capacity', 'contactPhone', 'coordinates', 'status']);
+    const tableHeader = selectedColumns.map((column) => `<th class="col-${column.key}">${escapeHtml(column.label)}</th>`).join('');
+    const tableRows = rows.map((site, index) => {
+      const cells = selectedColumns.map((column) => `<td class="col-${column.key}${column.key === 'name' ? ' name' : ''}${centerColumns.has(column.key) ? ' center' : ''}"${column.key === 'building' || column.key === 'coordinates' || column.key === 'contactPhone' ? ' dir="ltr"' : ''}>${display(columnValue(site, column.key))}</td>`).join('');
+      return `<tr><td class="row-number">${index + 1}</td>${cells}</tr>`;
     }).join('');
 
     const sortLabels: Record<string, string> = { name: 'الاسم', building: 'رقم المبنى', city: 'المدينة', type: 'النوع', status: 'الحالة', area: 'المساحة' };
@@ -565,6 +611,9 @@ export const MosquesUnitPage: React.FC = () => {
       `الفرز: ${sortLabels[siteSortBy] || siteSortBy} — ${siteSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}`,
     ].filter(Boolean) as string[];
     const filterNote = filterParts.join(' | ');
+    const printedColumnsNote = selectedColumns.map((column) => column.label).join('، ');
+    const printFontSize = selectedColumns.length >= 12 ? '5.5px' : selectedColumns.length >= 9 ? '6.2px' : '7px';
+    const headerFontSize = selectedColumns.length >= 12 ? '5.7px' : selectedColumns.length >= 9 ? '6.4px' : '7.2px';
     const html = `<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
@@ -575,30 +624,25 @@ export const MosquesUnitPage: React.FC = () => {
     @page { size: A4 landscape; margin: 5mm; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     html, body { margin: 0; padding: 0; background: #fff; color: #172033; font-family: Tahoma, Arial, sans-serif; direction: rtl; }
-    body { font-size: 7.6px; line-height: 1.22; }
+    body { font-size: ${printFontSize}; line-height: 1.2; }
     .header { margin: 0 0 1.3mm; padding: 0 0 1.2mm; border-bottom: 1.2px solid #0f6f99; }
-    .kicker { color: #587083; font-size: 6.4px; margin-bottom: 0.35mm; }
-    h1 { margin: 0; color: #102a43; font-size: 13.5px; line-height: 1.05; }
-    .meta { margin-top: 0.45mm; color: #66788a; font-size: 6.4px; display: flex; justify-content: space-between; gap: 2mm; }
-    .filters { margin-top: 0.7mm; padding: 0.75mm 1.1mm; border: 1px solid #dbe7ef; border-radius: 1mm; background: #f8fbfd; color: #50677a; font-size: 6.4px; line-height: 1.2; }
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .kicker { color: #587083; font-size: 6.2px; margin-bottom: 0.35mm; }
+    h1 { margin: 0; color: #102a43; font-size: 13px; line-height: 1.05; }
+    .meta { margin-top: 0.45mm; color: #66788a; font-size: 6.2px; display: flex; justify-content: space-between; gap: 2mm; }
+    .filters { margin-top: 0.7mm; padding: 0.75mm 1.1mm; border: 1px solid #dbe7ef; border-radius: 1mm; background: #f8fbfd; color: #50677a; font-size: 6.1px; line-height: 1.2; }
+    .columns-note { margin-top: 0.55mm; padding: 0.7mm 1.1mm; border: 1px solid #cfe7d9; border-radius: 1mm; background: #f2fbf6; color: #37624b; font-size: 6px; line-height: 1.2; }
+    table { width: 100%; border-collapse: collapse; table-layout: auto; }
     thead { display: table-header-group; }
     tr { break-inside: avoid; page-break-inside: avoid; }
-    th, td { border: 1px solid #cdd9e3; padding: 0.85mm 0.6mm; vertical-align: middle; text-align: right; line-height: 1.18; word-break: normal; overflow-wrap: anywhere; }
-    th { background: #eaf5fb; color: #173a50; font-weight: 900; font-size: 6.7px; white-space: nowrap; }
+    th, td { border: 1px solid #cdd9e3; padding: 0.78mm 0.55mm; vertical-align: middle; text-align: right; line-height: 1.16; word-break: normal; overflow-wrap: anywhere; }
+    th { background: #eaf5fb; color: #173a50; font-weight: 900; font-size: ${headerFontSize}; white-space: nowrap; text-align: center; }
     tbody tr:nth-child(even) td { background: #f8fbfd; }
-    td:first-child, th:first-child { width: 3.5%; text-align: center; }
-    th:nth-child(2) { width: 10.5%; }
-    th:nth-child(3) { width: 6%; }
-    th:nth-child(4) { width: 6%; }
-    th:nth-child(5) { width: 20%; }
-    th:nth-child(6) { width: 16%; }
-    th:nth-child(7) { width: 7%; }
-    th:nth-child(8), th:nth-child(9) { width: 11.5%; }
-    th:nth-child(10) { width: 8%; }
+    .row-number { width: 3.2%; min-width: 6mm; text-align: center; font-weight: 800; }
     td.name { font-weight: 800; color: #183b56; }
-    td:nth-child(1), td:nth-child(3), td:nth-child(4), td:nth-child(7), td:nth-child(10) { text-align: center; }
-    .footer { margin-top: 1mm; padding-top: 0.8mm; border-top: 1px solid #dce5ec; display: flex; justify-content: space-between; gap: 2mm; color: #718496; font-size: 5.8px; }
+    td.center { text-align: center; }
+    td.col-location, td.col-cityDistrict, td.col-notes { min-width: 22mm; }
+    td.col-notes { max-width: 42mm; }
+    .footer { margin-top: 1mm; padding-top: 0.8mm; border-top: 1px solid #dce5ec; display: flex; justify-content: space-between; gap: 2mm; color: #718496; font-size: 5.7px; }
   </style>
 </head>
 <body>
@@ -607,9 +651,10 @@ export const MosquesUnitPage: React.FC = () => {
     <h1>جدول المساجد والمصليات الجامعية</h1>
     <div class="meta"><span>عدد السجلات: ${rows.length}</span><span>تاريخ الاستخراج: ${escapeHtml(generatedAt)}</span></div>
     <div class="filters"><strong>معايير التصفية والفرز:</strong> ${escapeHtml(filterNote || 'جميع السجلات — الفرز حسب الاسم تصاعديًا')}</div>
+    <div class="columns-note"><strong>الأعمدة المطبوعة (${selectedColumns.length}):</strong> ${escapeHtml(printedColumnsNote)}</div>
   </header>
   <table>
-    <thead><tr><th>م</th><th>الاسم</th><th>النوع</th><th>رقم المبنى</th><th>الموقع داخل الجامعة</th><th>المدينة / الحي</th><th>المساحة</th><th>الإمام</th><th>المؤذن</th><th>الحالة</th></tr></thead>
+    <thead><tr><th class="row-number">م</th>${tableHeader}</tr></thead>
     <tbody>${tableRows}</tbody>
   </table>
   <footer class="footer"><span>منصة إدارة الأملاك والأراضي — وحدة العناية بالمساجد والمصليات الجامعية</span><span>يمكن اختيار «حفظ كملف PDF» من نافذة الطباعة.</span></footer>
@@ -1367,6 +1412,29 @@ export const MosquesUnitPage: React.FC = () => {
                 <NativeSelect className="h-11 rounded-xl" value={siteFilterType} onChange={(e) => setSiteFilterType(e.target.value)}><option value="all">جميع الأنواع</option><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect>
                 <NativeSelect className="h-11 rounded-xl" value={siteFilterStatus} onChange={(e) => setSiteFilterStatus(e.target.value)}><option value="all">جميع الحالات</option><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect>
                 <NativeSelect className="h-11 rounded-xl" value={siteSortBy} onChange={(e) => setSiteSortBy(e.target.value)}><option value="name">فرز حسب الاسم</option><option value="building">فرز حسب رقم المبنى</option><option value="city">فرز حسب المدينة</option><option value="type">فرز حسب النوع</option><option value="status">فرز حسب الحالة</option><option value="area">فرز حسب المساحة</option></NativeSelect>
+              </div>
+
+              <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-l from-sky-50/80 via-white to-emerald-50/60 p-3 sm:p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2"><Printer className="h-4 w-4 text-sky-700" /><span className="text-sm font-black text-slate-800">أعمدة الطباعة / PDF</span><Badge variant="outline" className="border-sky-200 bg-white text-sky-700">{sitePrintColumns.length} من {SITE_PRINT_COLUMNS.length} محدد</Badge></div>
+                    <p className="mt-1 text-xs leading-6 text-muted-foreground">ضع علامة على البيانات التي تريد ظهورها في جدول الطباعة. يبقى رقم التسلسل «م» ظاهرًا تلقائيًا.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" className={button3d} onClick={selectAllSitePrintColumns}>تحديد الكل</Button>
+                    <Button type="button" size="sm" variant="outline" className={button3d} onClick={resetSitePrintColumns}>الأعمدة الأساسية</Button>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7">
+                  {SITE_PRINT_COLUMNS.map((column) => {
+                    const checked = sitePrintColumns.includes(column.key);
+                    return <label key={column.key} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${checked ? 'border-sky-300 bg-sky-50 text-sky-800 shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'}`}>
+                      <input type="checkbox" className="h-4 w-4 accent-sky-700" checked={checked} onChange={() => toggleSitePrintColumn(column.key)} />
+                      <span>{column.label}</span>
+                    </label>;
+                  })}
+                </div>
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-[11px] leading-6 text-emerald-900"><strong>سيتم طباعة:</strong> {SITE_PRINT_COLUMNS.filter((column) => sitePrintColumns.includes(column.key)).map((column) => column.label).join('، ')}</div>
               </div>
 
               <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 lg:flex-row lg:items-center lg:justify-between">
