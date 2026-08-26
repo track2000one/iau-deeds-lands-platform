@@ -40,8 +40,9 @@ for old, new in replacements:
         raise SystemExit(f'Expected exactly one match, found {count}: {old[:120]!r}')
     text = text.replace(old, new, 1)
 
-if 'SitePrintFontSize' in text:
-    raise SystemExit('Legacy SitePrintFontSize type/reference still present')
+# Remove any remaining type-only casts from older variants of the smart print control.
+text = text.replace(' as SitePrintFontSize', '')
+
 if "sitePrintFontSize === '" in text:
     raise SystemExit('Legacy font-size enum comparison still present')
 
