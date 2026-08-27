@@ -184,6 +184,18 @@ export type MosqueNotification = {
   createdAt: string;
 };
 
+export type MosqueWorkflowKind = 'request' | 'ticket' | 'leave' | 'job';
+export type MosqueWorkflowHistoryEntry = {
+  id: string;
+  action: string;
+  description?: string | null;
+  details?: { kind?: string; fromStatus?: string | null; toStatus?: string | null; note?: string | null } | null;
+  username?: string | null;
+  userEmail?: string | null;
+  userRole?: string | null;
+  createdAt: string;
+};
+
 export type MosqueDashboard = {
   role: MosqueModuleRole;
   siteId?: string | null;
@@ -243,6 +255,11 @@ export const mosqueApi = {
 
   jobs: () => apiJson<MosqueJobApplication[]>('/api/mosques/jobs'),
   updateJobStatus: (id: string, input: Record<string, unknown>) => apiJson<MosqueJobApplication>(`/api/mosques/jobs/${id}/status`, { method: 'PATCH', body: JSON.stringify(input) }),
+
+  workflowHistory: (kind: MosqueWorkflowKind, id: string) => apiJson<MosqueWorkflowHistoryEntry[]>(`/api/mosques/workflow/${kind}/${id}/history`),
+  updateWorkflow: <T = any>(kind: MosqueWorkflowKind, id: string, input: Record<string, unknown>) => apiJson<T>(`/api/mosques/workflow/${kind}/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  workflowAction: <T = any>(kind: MosqueWorkflowKind, id: string, input: Record<string, unknown>) => apiJson<T>(`/api/mosques/workflow/${kind}/${id}/action`, { method: 'PATCH', body: JSON.stringify(input) }),
+  resubmitWorkflow: <T = any>(kind: 'request' | 'leave', id: string, input: Record<string, unknown>) => apiJson<T>(`/api/mosques/workflow/${kind}/${id}/resubmit`, { method: 'PATCH', body: JSON.stringify(input) }),
 
   personnel: () => apiJson<MosquePersonnel[]>('/api/mosques/personnel'),
   createPersonnel: (input: Record<string, unknown>) => apiJson<MosquePersonnel>('/api/mosques/personnel', { method: 'POST', body: JSON.stringify(input) }),

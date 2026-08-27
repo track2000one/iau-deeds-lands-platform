@@ -68,6 +68,8 @@ import {
   type MosqueSiteMediaLibrary,
   type MosqueStaffUser,
   type MosqueTicket,
+  type MosqueWorkflowHistoryEntry,
+  type MosqueWorkflowKind,
 } from '../api/mosques';
 
 const roleLabels: Record<MosqueModuleRole, string> = {
@@ -413,6 +415,11 @@ export const MosquesUnitPage: React.FC = () => {
   const [statusValue, setStatusValue] = useState('');
   const [statusNote, setStatusNote] = useState('');
   const [statusEvidence, setStatusEvidence] = useState<File | null>(null);
+  const [workflowEditTarget, setWorkflowEditTarget] = useState<{ kind: MosqueWorkflowKind; item: any } | null>(null);
+  const [workflowEditForm, setWorkflowEditForm] = useState<any>({});
+  const [workflowEditSaving, setWorkflowEditSaving] = useState(false);
+  const [editingReturnedRequest, setEditingReturnedRequest] = useState<MosqueRequest | null>(null);
+  const [editingReturnedLeave, setEditingReturnedLeave] = useState<MosqueLeave | null>(null);
   const [previewSite, setPreviewSite] = useState<MosqueSite | null>(null);
   const [printingSiteCard, setPrintingSiteCard] = useState(false);
   const [qrSite, setQrSite] = useState<MosqueSite | null>(null);
@@ -1061,7 +1068,22 @@ export const MosquesUnitPage: React.FC = () => {
   };
 
   const openRequestDialog = () => {
+    setEditingReturnedRequest(null);
     setRequestForm({ ...emptyRequest, siteId: linkedSiteId || sites[0]?.id || '' });
+    setRequestDialog(true);
+  };
+
+  const openReturnedRequestEdit = (item: MosqueRequest) => {
+    setEditingReturnedRequest(item);
+    setRequestForm({
+      ...emptyRequest,
+      siteId: item.siteId,
+      requestType: item.requestType,
+      priority: item.priority,
+      description: item.description,
+      notes: item.notes || '',
+      file: null,
+    });
     setRequestDialog(true);
   };
 
@@ -1071,15 +1093,37 @@ export const MosquesUnitPage: React.FC = () => {
     try {
       const attachments: string[] = [];
       if (requestForm.file) attachments.push((await mosqueApi.upload(requestForm.file)).driveUrl);
-      await mosqueApi.createRequest({ ...requestForm, file: undefined, attachments });
-      toast.success('تم إنشاء الطلب وإرساله للمراجعة');
+      if (editingReturnedRequest) {
+        await mosqueApi.resubmitWorkflow('request', editingReturnedRequest.id, { ...requestForm, file: undefined, attachments, resubmitNote: 'تم التعديل وإعادة الإرسال' });
+        toast.success('تم تعديل الطلب وإعادة إرساله للمراجعة');
+        setEditingReturnedRequest(null);
+      } else {
+        await mosqueApi.createRequest({ ...requestForm, file: undefined, attachments });
+        toast.success('تم إنشاء الطلب وإرساله للمراجعة');
+      }
       setRequestDialog(false);
       await loadAll();
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر إنشاء الطلب'); } finally { setSaving(false); }
   };
 
   const openLeaveDialog = () => {
+    setEditingReturnedLeave(null);
     setLeaveForm({ ...emptyLeave, siteId: linkedSiteId || sites[0]?.id || '' });
+    setLeaveDialog(true);
+  };
+
+  const openReturnedLeaveEdit = (item: MosqueLeave) => {
+    setEditingReturnedLeave(item);
+    setLeaveForm({
+      ...emptyLeave,
+      siteId: item.siteId,
+      requestType: item.requestType,
+      startDate: item.startDate ? String(item.startDate).slice(0, 10) : '',
+      endDate: item.endDate ? String(item.endDate).slice(0, 10) : '',
+      reason: item.reason,
+      replacementName: item.replacementName,
+      notes: (item as any).notes || '',
+    });
     setLeaveDialog(true);
   };
 
@@ -1087,25 +1131,37 @@ export const MosquesUnitPage: React.FC = () => {
     if (!leaveForm.siteId || !leaveForm.startDate || !leaveForm.endDate || !leaveForm.reason.trim() || !leaveForm.replacementName.trim()) return toast.error('أكمل بيانات الإجازة والبديل');
     setSaving(true);
     try {
-      await mosqueApi.createLeave(leaveForm);
-      toast.success('تم إرسال طلب الإجازة/الاعتذار');
+      if (editingReturnedLeave) {
+        await mosqueApi.resubmitWorkflow('leave', editingReturnedLeave.id, { ...leaveForm, resubmitNote: 'تم التعديل وإعادة الإرسال' });
+        toast.success('تم تعديل الطلب وإعادة إرساله للمراجعة');
+        setEditingReturnedLeave(null);
+      } else {
+        await mosqueApi.createLeave(leaveForm);
+        toast.success('تم إرسال طلب الإجازة/الاعتذار');
+      }
       setLeaveDialog(false);
       await loadAll();
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر إرسال الطلب'); } finally { setSaving(false); }
   };
 
   const transitionsFor = (kind: string, status: string) => {
-    if (kind === 'request') return requestTransitions[status] || [];
-    if (kind === 'ticket') return ticketTransitions[status] || [];
-    if (kind === 'leave') return leaveTransitions[status] || [];
-    return jobTransitions[status] || [];
+    let allowed = kind === 'request' ? [...(requestTransitions[status] || [])]
+      : kind === 'ticket' ? [...(ticketTransitions[status] || [])]
+        : kind === 'leave' ? [...(leaveTransitions[status] || [])]
+          : [...(jobTransitions[status] || [])];
+    if (kind === 'ticket' && ['new', 'under_review', 'assigned'].includes(status)) allowed.push('returned_for_edit');
+    if (kind === 'ticket' && status === 'returned_for_edit') allowed.push('new');
+    if (kind === 'job' && ['new', 'under_review', 'shortlisted', 'interview'].includes(status)) allowed.push('returned_for_edit');
+    if (kind === 'job' && status === 'returned_for_edit') allowed.push('new');
+    if (role === 'head' && status !== 'archived') allowed.push('archived');
+    return [...new Set(allowed)];
   };
 
-  const openStatusDialog = (kind: 'request' | 'ticket' | 'leave' | 'job', item: any) => {
-    const next = transitionsFor(kind, item.status);
+  const openStatusDialog = (kind: 'request' | 'ticket' | 'leave' | 'job', item: any, preferredStatus?: string) => {
+    const next = transitionsFor(kind, item.status).filter((s) => !(s === 'approved' && role !== 'head'));
     if (!next.length) return toast.info('لا توجد حالة تالية متاحة لهذا السجل');
     setStatusTarget({ kind, item });
-    setStatusValue(next[0]);
+    setStatusValue(preferredStatus && next.includes(preferredStatus) ? preferredStatus : next[0]);
     setStatusNote('');
     setStatusEvidence(null);
     setStatusDialog(true);
@@ -1113,7 +1169,7 @@ export const MosquesUnitPage: React.FC = () => {
 
   const applyStatus = async () => {
     if (!statusTarget || !statusValue) return;
-    if (['rejected', 'returned_for_edit'].includes(statusValue) && !statusNote.trim()) return toast.error('اكتب سبب الرفض أو ملاحظة الإعادة');
+    if (['rejected', 'returned_for_edit', 'archived'].includes(statusValue) && !statusNote.trim()) return toast.error(statusValue === 'archived' ? 'اكتب سبب الحذف / الأرشفة' : 'اكتب سبب الرفض أو ملاحظة الإعادة');
     if (statusTarget.kind === 'request' && statusValue === 'completed' && !statusEvidence && !statusTarget.item.completionEvidenceUrl) {
       return toast.error('يلزم رفع إثبات الإنجاز قبل إكمال الطلب');
     }
@@ -1124,10 +1180,7 @@ export const MosquesUnitPage: React.FC = () => {
         if (statusEvidence) evidenceUrl = (await mosqueApi.upload(statusEvidence)).driveUrl;
       }
       const payload = { status: statusValue, note: statusNote, rejectionReason: statusNote, returnReason: statusNote, completionEvidenceUrl: evidenceUrl };
-      if (statusTarget.kind === 'request') await mosqueApi.updateRequestStatus(statusTarget.item.id, payload);
-      if (statusTarget.kind === 'ticket') await mosqueApi.updateTicketStatus(statusTarget.item.id, { ...payload, resolutionNote: statusNote });
-      if (statusTarget.kind === 'leave') await mosqueApi.updateLeaveStatus(statusTarget.item.id, payload);
-      if (statusTarget.kind === 'job') await mosqueApi.updateJobStatus(statusTarget.item.id, payload);
+      await mosqueApi.workflowAction(statusTarget.kind, statusTarget.item.id, payload);
       toast.success('تم تحديث الحالة');
       setStatusDialog(false);
       await loadAll();
@@ -1137,6 +1190,38 @@ export const MosquesUnitPage: React.FC = () => {
   const convertTicket = async (ticket: MosqueTicket) => {
     if (!confirm(`تحويل البلاغ ${ticket.ticketNumber} إلى طلب صيانة مرتبط؟`)) return;
     try { await mosqueApi.convertTicketToRequest(ticket.id, { requestType: 'maintenance', priority: 'medium' }); toast.success('تم إنشاء طلب صيانة مرتبط بالبلاغ'); await loadAll(); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر التحويل'); }
+  };
+
+
+  const openWorkflowEdit = (kind: MosqueWorkflowKind, item: any) => {
+    setWorkflowEditTarget({ kind, item });
+    if (kind === 'request') setWorkflowEditForm({ siteId: item.siteId, requestType: item.requestType, priority: item.priority, description: item.description, notes: item.notes || '', assignedTo: item.assignedTo || '', adminNote: '' });
+    else if (kind === 'ticket') setWorkflowEditForm({ siteId: item.siteId, ticketType: item.ticketType, description: item.description, reporterName: item.reporterName || '', reporterPhone: item.reporterPhone || '', reporterEmail: item.reporterEmail || '', notes: item.notes || '', assignedTo: item.assignedTo || '', adminNote: '' });
+    else if (kind === 'leave') setWorkflowEditForm({ siteId: item.siteId, requestType: item.requestType, startDate: String(item.startDate || '').slice(0, 10), endDate: String(item.endDate || '').slice(0, 10), reason: item.reason, replacementName: item.replacementName, notes: item.notes || '', adminNote: '' });
+    else setWorkflowEditForm({ fullName: item.fullName, phone: item.phone, email: item.email, qualification: item.qualification, experience: item.experience || '', jobType: item.jobType, preferredLocation: item.preferredLocation || '', internalNotes: item.internalNotes || '', adminNote: '' });
+  };
+
+  const saveWorkflowEdit = async () => {
+    if (!workflowEditTarget) return;
+    setWorkflowEditSaving(true);
+    try {
+      await mosqueApi.updateWorkflow(workflowEditTarget.kind, workflowEditTarget.item.id, workflowEditForm);
+      toast.success('تم حفظ التعديل الإداري وتسجيله في سجل الإجراءات');
+      setWorkflowEditTarget(null);
+      await loadAll();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر حفظ التعديل الإداري'); } finally { setWorkflowEditSaving(false); }
+  };
+
+  const workflowAdminActions = (kind: MosqueWorkflowKind, item: any) => {
+    if (!['head', 'supervisor'].includes(role) || item.status === 'archived') return null;
+    const allowed = transitionsFor(kind, item.status);
+    return <>
+      <Button variant="outline" size="sm" className={button3d} onClick={() => openWorkflowEdit(kind, item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل إداري</Button>
+      {allowed.includes('returned_for_edit') && <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openStatusDialog(kind, item, 'returned_for_edit')}><RefreshCw className="ml-1 h-3.5 w-3.5" />إرجاع للتعديل</Button>}
+      {role === 'head' && allowed.includes('approved') && <Button variant="outline" size="sm" className="border-emerald-300 text-emerald-700" onClick={() => openStatusDialog(kind, item, 'approved')}><CheckCircle2 className="ml-1 h-3.5 w-3.5" />اعتماد</Button>}
+      {allowed.includes('rejected') && <Button variant="outline" size="sm" className="border-red-300 text-red-700" onClick={() => openStatusDialog(kind, item, 'rejected')}><X className="ml-1 h-3.5 w-3.5" />رفض</Button>}
+      {role === 'head' && <Button variant="outline" size="sm" className="border-red-300 bg-red-50/50 text-red-700" onClick={() => openStatusDialog(kind, item, 'archived')}><Trash2 className="ml-1 h-3.5 w-3.5" />حذف / أرشفة</Button>}
+    </>;
   };
 
   const openPersonnelDialog = (item?: MosquePersonnel) => {
@@ -1595,26 +1680,26 @@ export const MosquesUnitPage: React.FC = () => {
         <TabsContent value="requests" className="space-y-4">
           {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />الإبلاغ عن مشكلة / طلب صيانة أو احتياج</Button></div>}
           {requestQuickFilter !== 'all' && <QuickFilterBar label={requestQuickFilter === 'new' ? 'الطلبات الجديدة' : requestQuickFilter === 'under_review' ? 'الطلبات تحت المراجعة' : requestQuickFilter === 'approved' ? 'الطلبات المعتمدة' : 'الطلبات المتأخرة'} onClear={() => setRequestQuickFilter('all')} />}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredRequests.map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} submitterName={item.applicant?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || 'مقدم الطلب'} onView={() => setViewingWorkflow({ kind: 'request', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} />)}</div>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredRequests.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} submitterName={item.applicant?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || 'مقدم الطلب'} onView={() => setViewingWorkflow({ kind: 'request', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedRequestEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('request', item)} />)}</div>
           {!filteredRequests.length && <Empty text="لا توجد طلبات مطابقة" />}
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-4">
           {ticketQuickFilter !== 'all' && <QuickFilterBar label="البلاغات المفتوحة" onClear={() => setTicketQuickFilter('all')} />}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredTickets.map((item) => <WorkflowCard key={item.id} title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'بدون وسيلة تواصل']} submitterName={item.reporterName || 'غير محدد'} submitterRole="مقدّم البلاغ" onView={() => setViewingWorkflow({ kind: 'ticket', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className={button3d} onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline">مرتبط بطلب صيانة</Badge> : null} />)}</div>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredTickets.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'بدون وسيلة تواصل']} submitterName={item.reporterName || 'غير محدد'} submitterRole="مقدّم البلاغ" onView={() => setViewingWorkflow({ kind: 'ticket', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={<>{workflowAdminActions('ticket', item)}{['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className={button3d} onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline">مرتبط بطلب صيانة</Badge> : null}</>} />)}</div>
           {!filteredTickets.length && <Empty text="لا توجد بلاغات مطابقة" />}
         </TabsContent>
 
         <TabsContent value="leaves" className="space-y-4">
           {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button></div>}
           {leaveQuickFilter !== 'all' && <QuickFilterBar label="الإجازات والاعتذارات المعلقة" onClear={() => setLeaveQuickFilter('all')} />}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredLeaves.map((item) => <WorkflowCard key={item.id} title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} submitterName={item.applicant?.name || item.personnel?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || (item.personnel?.role ? personnelRoleLabels[item.personnel.role] || item.personnel.role : 'مقدم الطلب')} onView={() => setViewingWorkflow({ kind: 'leave', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} />)}</div>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredLeaves.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} submitterName={item.applicant?.name || item.personnel?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || (item.personnel?.role ? personnelRoleLabels[item.personnel.role] || item.personnel.role : 'مقدم الطلب')} onView={() => setViewingWorkflow({ kind: 'leave', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedLeaveEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('leave', item)} />)}</div>
           {!filteredLeaves.length && <Empty text="لا توجد طلبات إجازة أو اعتذار مطابقة" />}
         </TabsContent>
 
         <TabsContent value="jobs" className="space-y-4">
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">بيانات الهوية والجوال والبريد والسيرة الذاتية تظهر فقط للمخولين داخل الوحدة، ولا تظهر في البوابة العامة.</div>
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{jobs.map((item) => <WorkflowCard key={item.id} title={item.applicationNumber} subtitle={`${item.fullName} — ${item.jobType}`} description={`${item.qualification}${item.preferredLocation ? ` — ${item.preferredLocation}` : ''}`} status={item.status} meta={[item.email, item.phone]} onStatus={canEdit && role === 'head' ? () => openStatusDialog('job', item) : undefined} extraAction={item.cvUrl ? <Button variant="outline" size="sm" className={button3d} onClick={() => window.open(item.cvUrl!, '_blank')}><Eye className="ml-1 h-3.5 w-3.5" />السيرة الذاتية</Button> : null} />)}</div>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{jobs.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.applicationNumber} subtitle={`${item.fullName} — ${item.jobType}`} description={`${item.qualification}${item.preferredLocation ? ` — ${item.preferredLocation}` : ''}`} status={item.status} meta={[item.email, item.phone]} onStatus={canEdit && role === 'head' ? () => openStatusDialog('job', item) : undefined} extraAction={<>{workflowAdminActions('job', item)}{item.cvUrl ? <Button variant="outline" size="sm" className={button3d} onClick={() => window.open(item.cvUrl!, '_blank')}><Eye className="ml-1 h-3.5 w-3.5" />السيرة الذاتية</Button> : null}</>} />)}</div>
           {!jobs.length && <Empty text="لا توجد طلبات توظيف" />}
         </TabsContent>
 
@@ -1845,7 +1930,7 @@ export const MosquesUnitPage: React.FC = () => {
       <Dialog open={requestDialog} onOpenChange={setRequestDialog}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-emerald-50/20 sm:max-w-[980px]" dir="rtl">
           <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6">
-            <DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><Wrench className="h-5 w-5 text-sky-700" />الإبلاغ عن مشكلة / طلب صيانة أو احتياج</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><Wrench className="h-5 w-5 text-sky-700" />{editingReturnedRequest ? 'تعديل الطلب وإعادة الإرسال' : 'الإبلاغ عن مشكلة / طلب صيانة أو احتياج'}</DialogTitle>
             <DialogDescription>هذه الخدمة مخصصة للإمام والمؤذن والخطيب والخطيب المتعاون للإبلاغ عن مشكلة في المسجد أو الجامع أو المصلى وطلب الصيانة أو الاحتياج.</DialogDescription>
           </DialogHeader>
           <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-4 md:p-6">
@@ -1866,14 +1951,14 @@ export const MosquesUnitPage: React.FC = () => {
               <CardContent className="pt-5"><Field label="صورة أو ملف PDF"><Input className="h-11 file:ml-3" type="file" accept="image/*,application/pdf" onChange={(e) => setRequestForm({ ...requestForm, file: e.target.files?.[0] || null })} /></Field><p className="mt-2 text-xs text-muted-foreground">يفضل إرفاق صورة واضحة للمشكلة عند توفرها لتسريع المعالجة.</p></CardContent>
             </Card>
           </div>
-          <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => setRequestDialog(false)}>إلغاء</Button><Button className={'min-w-32 ' + button3d} onClick={saveRequest} disabled={saving}>{saving ? 'جاري الإرسال...' : 'إرسال الطلب'}</Button></DialogFooter>
+          <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => setRequestDialog(false)}>إلغاء</Button><Button className={'min-w-32 ' + button3d} onClick={saveRequest} disabled={saving}>{saving ? 'جاري الإرسال...' : editingReturnedRequest ? 'حفظ وإعادة الإرسال' : 'إرسال الطلب'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={leaveDialog} onOpenChange={setLeaveDialog}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-violet-50/20 sm:max-w-[980px]" dir="rtl">
           <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-violet-50/60 p-5 text-right md:p-6">
-            <DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><CalendarDays className="h-5 w-5 text-sky-700" />طلب إجازة / اعتذار</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl"><CalendarDays className="h-5 w-5 text-sky-700" />{editingReturnedLeave ? 'تعديل الإجازة / الاعتذار وإعادة الإرسال' : 'طلب إجازة / اعتذار'}</DialogTitle>
             <DialogDescription>حدد الفترة والبديل بوضوح ليتمكن النظام من فحص التعارضات ومراجعة الطلب.</DialogDescription>
           </DialogHeader>
           <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-4 md:p-6">
@@ -1881,7 +1966,22 @@ export const MosquesUnitPage: React.FC = () => {
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-emerald-50/40 pb-4"><CardTitle className="text-base md:text-lg">الفترة والبديل</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><Field label="من *"><Input className="h-11" type="date" value={leaveForm.startDate} onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value })} /></Field><Field label="إلى *"><Input className="h-11" type="date" value={leaveForm.endDate} onChange={(e) => setLeaveForm({ ...leaveForm, endDate: e.target.value })} /></Field><div className="md:col-span-2"><Field label="اسم النائب / البديل *"><Input className="h-11" value={leaveForm.replacementName} onChange={(e) => setLeaveForm({ ...leaveForm, replacementName: e.target.value })} placeholder="الاسم الكامل للبديل" /></Field></div></CardContent></Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-amber-50/40 pb-4"><CardTitle className="text-base md:text-lg">سبب الطلب والملاحظات</CardTitle></CardHeader><CardContent className="space-y-4 pt-5"><Field label="السبب *"><Textarea rows={5} value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} /></Field><Field label="ملاحظات"><Textarea rows={3} value={leaveForm.notes} onChange={(e) => setLeaveForm({ ...leaveForm, notes: e.target.value })} /></Field></CardContent></Card>
           </div>
-          <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => setLeaveDialog(false)}>إلغاء</Button><Button className={'min-w-32 ' + button3d} onClick={saveLeave} disabled={saving}>{saving ? 'جاري الإرسال...' : 'إرسال الطلب'}</Button></DialogFooter>
+          <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => setLeaveDialog(false)}>إلغاء</Button><Button className={'min-w-32 ' + button3d} onClick={saveLeave} disabled={saving}>{saving ? 'جاري الإرسال...' : editingReturnedLeave ? 'حفظ وإعادة الإرسال' : 'إرسال الطلب'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+      <Dialog open={Boolean(workflowEditTarget)} onOpenChange={(open) => !open && !workflowEditSaving && setWorkflowEditTarget(null)}>
+        <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-violet-50/20 sm:max-w-[900px]" dir="rtl">
+          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-violet-50/50 p-5 text-right"><DialogTitle className="flex items-center gap-2 text-xl font-black"><Pencil className="h-5 w-5 text-sky-700" />تعديل إداري للمعاملة</DialogTitle><DialogDescription>يتم حفظ التعديل في سجل الإجراءات دون حذف تاريخ المعاملة.</DialogDescription></DialogHeader>
+          <div className="max-h-[calc(92vh-150px)] space-y-4 overflow-y-auto p-5 md:p-6">
+            {workflowEditTarget?.kind === 'request' && <Card><CardContent className="grid gap-4 pt-5 md:grid-cols-2"><Field label="الموقع"><NativeSelect value={workflowEditForm.siteId || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, siteId: e.target.value })}>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="نوع الطلب"><NativeSelect value={workflowEditForm.requestType || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, requestType: e.target.value })}>{Object.entries(requestTypeLabels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></Field><Field label="الأولوية"><NativeSelect value={workflowEditForm.priority || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, priority: e.target.value })}>{Object.entries(priorityLabels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></Field><div className="md:col-span-2"><Field label="الوصف"><Textarea rows={5} value={workflowEditForm.description || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, description: e.target.value })} /></Field></div><div className="md:col-span-2"><Field label="الملاحظات"><Textarea rows={3} value={workflowEditForm.notes || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, notes: e.target.value })} /></Field></div></CardContent></Card>}
+            {workflowEditTarget?.kind === 'ticket' && <Card><CardContent className="grid gap-4 pt-5 md:grid-cols-2"><Field label="الموقع"><NativeSelect value={workflowEditForm.siteId || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, siteId: e.target.value })}>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="نوع البلاغ"><NativeSelect value={workflowEditForm.ticketType || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, ticketType: e.target.value })}>{Object.entries(ticketTypeLabels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></Field><Field label="اسم المبلغ"><Input value={workflowEditForm.reporterName || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, reporterName: e.target.value })} /></Field><Field label="الجوال"><Input value={workflowEditForm.reporterPhone || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, reporterPhone: e.target.value })} /></Field><div className="md:col-span-2"><Field label="الوصف"><Textarea rows={5} value={workflowEditForm.description || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, description: e.target.value })} /></Field></div><div className="md:col-span-2"><Field label="الملاحظات"><Textarea rows={3} value={workflowEditForm.notes || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, notes: e.target.value })} /></Field></div></CardContent></Card>}
+            {workflowEditTarget?.kind === 'leave' && <Card><CardContent className="grid gap-4 pt-5 md:grid-cols-2"><Field label="الموقع"><NativeSelect value={workflowEditForm.siteId || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, siteId: e.target.value })}>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="نوع الطلب"><NativeSelect value={workflowEditForm.requestType || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, requestType: e.target.value })}>{Object.entries(leaveTypeLabels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect></Field><Field label="من"><Input type="date" value={workflowEditForm.startDate || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, startDate: e.target.value })} /></Field><Field label="إلى"><Input type="date" value={workflowEditForm.endDate || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, endDate: e.target.value })} /></Field><Field label="البديل"><Input value={workflowEditForm.replacementName || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, replacementName: e.target.value })} /></Field><div className="md:col-span-2"><Field label="السبب"><Textarea rows={4} value={workflowEditForm.reason || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, reason: e.target.value })} /></Field></div><div className="md:col-span-2"><Field label="الملاحظات"><Textarea rows={3} value={workflowEditForm.notes || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, notes: e.target.value })} /></Field></div></CardContent></Card>}
+            {workflowEditTarget?.kind === 'job' && <Card><CardContent className="grid gap-4 pt-5 md:grid-cols-2"><Field label="الاسم"><Input value={workflowEditForm.fullName || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, fullName: e.target.value })} /></Field><Field label="الجوال"><Input value={workflowEditForm.phone || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, phone: e.target.value })} /></Field><Field label="البريد"><Input value={workflowEditForm.email || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, email: e.target.value })} /></Field><Field label="نوع الوظيفة"><Input value={workflowEditForm.jobType || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, jobType: e.target.value })} /></Field><Field label="المؤهل"><Input value={workflowEditForm.qualification || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, qualification: e.target.value })} /></Field><Field label="الموقع المفضل"><Input value={workflowEditForm.preferredLocation || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, preferredLocation: e.target.value })} /></Field><div className="md:col-span-2"><Field label="ملاحظات داخلية"><Textarea rows={4} value={workflowEditForm.internalNotes || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, internalNotes: e.target.value })} /></Field></div></CardContent></Card>}
+            <Card className="border-amber-200 bg-amber-50/50"><CardContent className="pt-5"><Field label="ملاحظة التعديل الإداري"><Textarea rows={3} value={workflowEditForm.adminNote || ''} onChange={(e) => setWorkflowEditForm({ ...workflowEditForm, adminNote: e.target.value })} placeholder="مثال: تصحيح بيانات التصنيف بناءً على المستند المرفق" /></Field></CardContent></Card>
+          </div>
+          <DialogFooter className="border-t border-sky-100 bg-white p-4 md:px-6"><Button variant="outline" className={button3d} disabled={workflowEditSaving} onClick={() => setWorkflowEditTarget(null)}>إلغاء</Button><Button className={'min-w-36 ' + button3d} disabled={workflowEditSaving} onClick={saveWorkflowEdit}><Save className="ml-2 h-4 w-4" />{workflowEditSaving ? 'جاري الحفظ...' : 'حفظ التعديل الإداري'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1889,9 +1989,9 @@ export const MosquesUnitPage: React.FC = () => {
 
       <Dialog open={statusDialog} onOpenChange={setStatusDialog}>
         <DialogContent className="max-h-[90vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-violet-50/20 sm:max-w-[760px]" dir="rtl">
-          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-violet-50/50 p-5 text-right"><DialogTitle className="text-xl font-black">تحديث حالة الإجراء</DialogTitle><DialogDescription>{statusTarget?.item?.requestNumber || statusTarget?.item?.ticketNumber || statusTarget?.item?.leaveNumber || statusTarget?.item?.applicationNumber}</DialogDescription></DialogHeader>
-          <div className="space-y-5 overflow-y-auto p-5 md:p-6"><Card className="border-sky-200/70 bg-white/90"><CardContent className="space-y-4 pt-5"><Field label="الحالة الجديدة"><NativeSelect className="h-11" value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>{statusTarget ? transitionsFor(statusTarget.kind, statusTarget.item.status).filter((s) => !(s === 'approved' && role !== 'head')).map((s) => <option key={s} value={s}>{statusLabels[s] || s}</option>) : null}</NativeSelect></Field><Field label={['rejected', 'returned_for_edit'].includes(statusValue) ? 'السبب / الملاحظة *' : 'ملاحظة الإجراء'}><Textarea rows={5} value={statusNote} onChange={(e) => setStatusNote(e.target.value)} placeholder="دوّن المبرر أو الملاحظة المرتبطة بالإجراء..." /></Field>{statusTarget?.kind === 'request' && statusValue === 'completed' && <Field label="إثبات الإنجاز *"><Input className="h-11" type="file" accept="image/*,application/pdf" onChange={(e) => setStatusEvidence(e.target.files?.[0] || null)} /></Field>}</CardContent></Card></div>
-          <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => setStatusDialog(false)}>إلغاء</Button><Button className={button3d} onClick={applyStatus} disabled={saving}>{saving ? 'جاري التحديث...' : 'تحديث الحالة'}</Button></DialogFooter>
+          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-violet-50/50 p-5 text-right"><DialogTitle className="text-xl font-black">إجراء رسمي على المعاملة</DialogTitle><DialogDescription>{statusTarget?.item?.requestNumber || statusTarget?.item?.ticketNumber || statusTarget?.item?.leaveNumber || statusTarget?.item?.applicationNumber}</DialogDescription></DialogHeader>
+          <div className="space-y-5 overflow-y-auto p-5 md:p-6"><Card className="border-sky-200/70 bg-white/90"><CardContent className="space-y-4 pt-5"><Field label="الحالة الجديدة"><NativeSelect className="h-11" value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>{statusTarget ? transitionsFor(statusTarget.kind, statusTarget.item.status).filter((s) => !(s === 'approved' && role !== 'head')).map((s) => <option key={s} value={s}>{statusLabels[s] || s}</option>) : null}</NativeSelect></Field><Field label={['rejected', 'returned_for_edit', 'archived'].includes(statusValue) ? 'السبب / الملاحظة *' : 'ملاحظة الإجراء'}><Textarea rows={5} value={statusNote} onChange={(e) => setStatusNote(e.target.value)} placeholder="دوّن المبرر أو الملاحظة المرتبطة بالإجراء..." /></Field>{statusTarget?.kind === 'request' && statusValue === 'completed' && <Field label="إثبات الإنجاز *"><Input className="h-11" type="file" accept="image/*,application/pdf" onChange={(e) => setStatusEvidence(e.target.files?.[0] || null)} /></Field>}</CardContent></Card></div>
+          <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => setStatusDialog(false)}>إلغاء</Button><Button className={button3d} onClick={applyStatus} disabled={saving}>{saving ? 'جاري التنفيذ...' : statusValue === 'archived' ? 'تأكيد الحذف / الأرشفة' : 'تنفيذ الإجراء'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1993,9 +2093,16 @@ const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onEd
 
 const QuickFilterBar = ({ label, onClear }: { label: string; onClear: () => void }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm"><span>العرض الحالي: <strong>{label}</strong></span><Button variant="outline" size="sm" className={button3d} onClick={onClear}>عرض الكل</Button></div>;
 
-const WorkflowCard = ({ title, subtitle, description, status, meta, submitterName, submitterRole, onView, onStatus, extraAction }: { title: string; subtitle: string; description: string; status: string; meta: string[]; submitterName?: string; submitterRole?: string; onView?: () => void; onStatus?: () => void; extraAction?: React.ReactNode }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-sky-400 via-blue-600 to-slate-800" /><CardContent className="flex min-h-[315px] flex-col p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{title}</p><h3 className="mt-1 font-black text-slate-800">{subtitle}</h3></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>{submitterName && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-white/90 p-3"><div><p className="text-[11px] text-muted-foreground">مقدم الإجراء</p><p className="mt-1 font-bold text-slate-800">{submitterName}</p></div>{submitterRole && <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700">{submitterRole}</Badge>}</div>}<p className="mt-3 line-clamp-3 rounded-2xl border bg-slate-50/80 p-3 text-sm leading-6 text-slate-700">{description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">{meta.map((x, i) => <span key={i} className="rounded-xl border bg-white p-2">{x || '-'}</span>)}</div><div className="mt-auto flex flex-wrap gap-2 border-t pt-4">{onView && <Button variant="outline" size="sm" className={button3d} onClick={onView}><Eye className="ml-1 h-3.5 w-3.5" />عرض التفاصيل</Button>}{onStatus && <Button variant="outline" size="sm" className={button3d} onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />تحديث الحالة</Button>}{extraAction}</div></CardContent></Card>;
+const WorkflowCard = ({ title, subtitle, description, status, meta, submitterName, submitterRole, onView, onStatus, extraAction }: { title: string; subtitle: string; description: string; status: string; meta: string[]; submitterName?: string; submitterRole?: string; onView?: () => void; onStatus?: () => void; extraAction?: React.ReactNode }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-sky-400 via-blue-600 to-slate-800" /><CardContent className="flex min-h-[315px] flex-col p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{title}</p><h3 className="mt-1 font-black text-slate-800">{subtitle}</h3></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>{submitterName && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-white/90 p-3"><div><p className="text-[11px] text-muted-foreground">مقدم الإجراء</p><p className="mt-1 font-bold text-slate-800">{submitterName}</p></div>{submitterRole && <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700">{submitterRole}</Badge>}</div>}<p className="mt-3 line-clamp-3 rounded-2xl border bg-slate-50/80 p-3 text-sm leading-6 text-slate-700">{description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">{meta.map((x, i) => <span key={i} className="rounded-xl border bg-white p-2">{x || '-'}</span>)}</div><div className="mt-auto flex flex-wrap gap-2 border-t pt-4">{onView && <Button variant="outline" size="sm" className={button3d} onClick={onView}><Eye className="ml-1 h-3.5 w-3.5" />عرض التفاصيل</Button>}{onStatus && <Button variant="outline" size="sm" className={button3d} onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />إجراء رسمي</Button>}{extraAction}</div></CardContent></Card>;
 
 const WorkflowDetailsDialog = ({ target, onOpenChange }: { target: { kind: 'request' | 'ticket' | 'leave'; item: any } | null; onOpenChange: (open: boolean) => void }) => {
+  const [history, setHistory] = useState<MosqueWorkflowHistoryEntry[]>([]);
+  useEffect(() => {
+    if (!target) { setHistory([]); return; }
+    let cancelled = false;
+    void mosqueApi.workflowHistory(target.kind, target.item.id).then((rows) => { if (!cancelled) setHistory(rows); }).catch(() => { if (!cancelled) setHistory([]); });
+    return () => { cancelled = true; };
+  }, [target?.kind, target?.item?.id]);
   if (!target) return null;
   const { kind, item } = target;
   const isRequest = kind === 'request';
@@ -2034,6 +2141,8 @@ const WorkflowDetailsDialog = ({ target, onOpenChange }: { target: { kind: 'requ
           {isTicket && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">بيانات البلاغ</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Info label="نوع البلاغ" value={ticketTypeLabels[item.ticketType] || item.ticketType} /><Info label="الطلب المرتبط" value={item.convertedRequestId ? 'تم التحويل إلى طلب صيانة' : 'غير محول'} /></div><div><p className="text-[11px] text-muted-foreground">الوصف</p><p className="mt-1 rounded-xl border bg-slate-50 p-3 text-sm leading-7">{item.description || '-'}</p></div>{item.resolutionNote && <Info label="ملاحظة الحل" value={item.resolutionNote} />}{item.rejectionReason && <Info label="سبب الرفض" value={item.rejectionReason} />}{item.notes && <Info label="الملاحظات" value={item.notes} />}</CardContent></Card>}
 
           {!isRequest && !isTicket && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">بيانات الإجازة / الاعتذار</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Info label="نوع الطلب" value={leaveTypeLabels[item.requestType] || item.requestType} /><Info label="من" value={item.startDate ? new Date(item.startDate).toLocaleDateString('ar-SA') : '-'} /><Info label="إلى" value={item.endDate ? new Date(item.endDate).toLocaleDateString('ar-SA') : '-'} /><Info label="البديل" value={item.replacementName || '-'} /></div><div><p className="text-[11px] text-muted-foreground">السبب</p><p className="mt-1 rounded-xl border bg-slate-50 p-3 text-sm leading-7">{item.reason || '-'}</p></div>{item.notes && <Info label="الملاحظات" value={item.notes} />}{item.reviewerNote && <Info label="ملاحظة المراجع" value={item.reviewerNote} />}{item.returnReason && <Info label="ملاحظة الإعادة" value={item.returnReason} />}{item.rejectionReason && <Info label="سبب الرفض" value={item.rejectionReason} />}</CardContent></Card>}
+
+          <Card className="border-indigo-200 bg-indigo-50/30"><CardHeader className="pb-3"><CardTitle className="text-base">سجل الإجراءات الرسمي</CardTitle><CardDescription>تسلسل زمني للتعديلات والقرارات المسجلة على المعاملة.</CardDescription></CardHeader><CardContent className="space-y-2">{history.length ? history.map((entry) => <div key={entry.id} className="rounded-xl border bg-white p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{entry.action === 'administrative_edit' ? 'تعديل إداري' : entry.action === 'archive' ? 'حذف / أرشفة' : entry.action === 'resubmitted_after_return' ? 'إعادة إرسال بعد التعديل' : 'تغيير حالة'}</strong><span className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString('ar-SA')}</span></div><p className="mt-1 text-xs text-muted-foreground">{entry.username || entry.userEmail || 'النظام'}{entry.details?.fromStatus || entry.details?.toStatus ? ` — ${statusLabels[entry.details?.fromStatus || ''] || entry.details?.fromStatus || '-'} ← ${statusLabels[entry.details?.toStatus || ''] || entry.details?.toStatus || '-'}` : ''}</p>{entry.details?.note && <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs leading-6">{entry.details.note}</p>}</div>) : <p className="text-sm text-muted-foreground">لا توجد إجراءات مسجلة بعد.</p>}</CardContent></Card>
 
           {(attachmentUrls.length > 0 || item.completionEvidenceUrl) && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">المرفقات</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">{attachmentUrls.map((url: string, index: number) => <Button key={`${url}-${index}`} variant="outline" size="sm" className={button3d} onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}><ExternalLink className="ml-1 h-3.5 w-3.5" />مرفق {index + 1}</Button>)}{item.completionEvidenceUrl && <Button variant="outline" size="sm" className={button3d} onClick={() => window.open(item.completionEvidenceUrl, '_blank', 'noopener,noreferrer')}><CheckCircle2 className="ml-1 h-3.5 w-3.5" />إثبات الإنجاز</Button>}</CardContent></Card>}
         </div>
