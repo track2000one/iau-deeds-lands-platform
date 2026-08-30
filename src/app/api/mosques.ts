@@ -154,6 +154,45 @@ export type MosquePersonnel = {
   site?: { name: string };
 };
 
+
+export type MosqueQuranInventory = {
+  id: string;
+  siteId: string;
+  largeCount: number;
+  mediumCount: number;
+  smallCount: number;
+  damagedCount: number;
+  neededCount: number;
+  totalCount: number;
+  countedAt: string;
+  countedBy?: string | null;
+  countedByName?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  site?: { id: string; name: string };
+};
+
+export type MosqueQuranInventoryOverviewItem = {
+  site: Pick<MosqueSite, 'id' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation' | 'status'>;
+  latest: MosqueQuranInventory | null;
+};
+
+export type MosqueQuranInventorySummary = {
+  sites: number;
+  countedSites: number;
+  total: number;
+  large: number;
+  medium: number;
+  small: number;
+  damaged: number;
+  needed: number;
+};
+
+export type MosqueQuranInventoryResponse = {
+  items: MosqueQuranInventoryOverviewItem[];
+  summary: MosqueQuranInventorySummary;
+};
+
 export type MosqueAssignment = {
   id: string;
   userId: string;
@@ -260,6 +299,10 @@ export const mosqueApi = {
   updateWorkflow: <T = any>(kind: MosqueWorkflowKind, id: string, input: Record<string, unknown>) => apiJson<T>(`/api/mosques/workflow/${kind}/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   workflowAction: <T = any>(kind: MosqueWorkflowKind, id: string, input: Record<string, unknown>) => apiJson<T>(`/api/mosques/workflow/${kind}/${id}/action`, { method: 'PATCH', body: JSON.stringify(input) }),
   resubmitWorkflow: <T = any>(kind: 'request' | 'leave', id: string, input: Record<string, unknown>) => apiJson<T>(`/api/mosques/workflow/${kind}/${id}/resubmit`, { method: 'PATCH', body: JSON.stringify(input) }),
+
+  quranInventory: () => apiJson<MosqueQuranInventoryResponse>('/api/mosques/quran-inventory'),
+  quranInventoryHistory: (siteId: string) => apiJson<MosqueQuranInventory[]>(`/api/mosques/quran-inventory/${siteId}/history`),
+  createQuranInventory: (input: Record<string, unknown>) => apiJson<MosqueQuranInventory>('/api/mosques/quran-inventory', { method: 'POST', body: JSON.stringify(input) }),
 
   personnel: () => apiJson<MosquePersonnel[]>('/api/mosques/personnel'),
   createPersonnel: (input: Record<string, unknown>) => apiJson<MosquePersonnel>('/api/mosques/personnel', { method: 'POST', body: JSON.stringify(input) }),
