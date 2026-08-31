@@ -739,7 +739,7 @@ export const MosquesUnitPage: React.FC = () => {
   };
 
   const deleteQuranWarehouse = async (warehouse: MosqueQuranWarehouse) => {
-    if (!window.confirm(`هل تريد حذف المكتبة «${warehouse.name}»؟\n\nلن يسمح النظام بالحذف إذا كانت المكتبة مرتبطة بحركات محفوظة حفاظًا على السجل.`)) return;
+    if (!window.confirm(`هل تريد حذف المكتبة «${warehouse.name}»؟\n\nلن يسمح النظام بالحذف إذا كانت المكتبة مرتبطة بحركات محفوظة. إذا أردت البدء من الصفر استخدم زر «تصفير المكتبة».`)) return;
     setQuranStockSaving(true);
     try {
       await mosqueApi.deleteQuranWarehouse(warehouse.id);
@@ -762,6 +762,33 @@ export const MosquesUnitPage: React.FC = () => {
     const stockStatus = warehouse.lowStock ? 'رصيد منخفض' : 'الرصيد آمن';
     printWindow.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>بطاقة مكتبة المصاحف - ${escapeHtml(warehouse.name)}</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0;padding:0;direction:rtl}.head{border:2px solid #d6a84b;border-radius:18px;padding:18px;background:linear-gradient(135deg,#fff9e8,#fff,#edfdf5)}h1{margin:0 0 8px;font-size:24px}.meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px}.pill{padding:6px 10px;border:1px solid #d8dee8;border-radius:999px;background:#fff}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}.box{border:1px solid #cbd5e1;border-radius:14px;padding:12px;text-align:center}.box small{display:block;color:#64748b;margin-bottom:5px}.box b{font-size:22px}.section{margin-top:18px}.section h2{font-size:16px;margin:0 0 8px}.notes{border:1px solid #e2e8f0;border-radius:12px;padding:10px;min-height:42px;white-space:pre-wrap}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:center}th{background:#f8fafc}.warning{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:12px;padding:10px;margin-top:12px;font-weight:bold}.footer{margin-top:14px;font-size:10px;color:#64748b;text-align:left}@media print{button{display:none}}</style></head><body><div class="head"><h1>بطاقة مكتبة المصاحف</h1><div class="meta"><span class="pill"><b>${escapeHtml(warehouse.name)}</b></span><span class="pill">الرمز: ${escapeHtml(warehouse.code)}</span><span class="pill">الموقع: ${escapeHtml(warehouse.location || '-')}</span><span class="pill">الحالة: ${status}</span><span class="pill">حالة الرصيد: ${stockStatus}</span></div>${warehouse.lowStock ? `<div class="warning">الناقص حتى حد الأمان: كبير ${warehouse.shortage.largeCount} — متوسط ${warehouse.shortage.mediumCount} — صغير ${warehouse.shortage.smallCount}</div>` : ''}</div><div class="grid"><div class="box"><small>الإجمالي</small><b>${warehouse.balance.totalCount}</b></div><div class="box"><small>كبير — الحد الأدنى ${warehouse.minLargeCount}</small><b>${warehouse.balance.largeCount}</b></div><div class="box"><small>متوسط — الحد الأدنى ${warehouse.minMediumCount}</small><b>${warehouse.balance.mediumCount}</b></div><div class="box"><small>صغير — الحد الأدنى ${warehouse.minSmallCount}</small><b>${warehouse.balance.smallCount}</b></div></div><div class="section"><h2>الملاحظات</h2><div class="notes">${escapeHtml(warehouse.notes || 'لا توجد ملاحظات')}</div></div><div class="section"><h2>آخر حركات المصاحف الظاهرة</h2><table><thead><tr><th>م</th><th>رقم الحركة</th><th>النوع</th><th>المسجد / المصلى</th><th>كبير</th><th>متوسط</th><th>صغير</th><th>الإجمالي</th><th>التاريخ</th></tr></thead><tbody>${movementRows}</tbody></table></div><div class="footer">تاريخ الطباعة: ${escapeHtml(new Date().toLocaleString('ar-SA-u-ca-gregory'))} — جامعة الإمام عبدالرحمن بن فيصل / وحدة العناية بالمساجد والمصليات الجامعية</div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
     printWindow.document.close();
+  };
+
+  const resetQuranLibrary = async () => {
+    const confirmationPhrase = 'تصفير مكتبة المصاحف';
+    const entered = window.prompt(
+      `عملية التصفير ستحذف نهائيًا:\n\n• مكتبة المصاحف ورصيدها\n• جميع حركات إضافة وإرجاع المصاحف\n• جميع سجلات الجرد السابقة للمساجد والمصليات\n\nلن يتم حذف المساجد أو المصليات أو بياناتها الأساسية.\n\nللتأكيد اكتب العبارة التالية كما هي:\n${confirmationPhrase}`,
+      ''
+    );
+    if (entered === null) return;
+    if (entered.trim() !== confirmationPhrase) {
+      toast.error('لم يتم التصفير لأن عبارة التأكيد غير مطابقة');
+      return;
+    }
+
+    setQuranStockSaving(true);
+    try {
+      const result = await mosqueApi.resetQuranLibrary(confirmationPhrase);
+      setQuranWarehousePreview(null);
+      setQuranWarehouseDialog(false);
+      setQuranStockMovementDialog(false);
+      toast.success(result.message || 'تم تصفير مكتبة المصاحف ويمكن البدء من الصفر');
+      await loadAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تصفير مكتبة المصاحف');
+    } finally {
+      setQuranStockSaving(false);
+    }
   };
 
   const openQuranStockMovement = (movementType: string) => {
@@ -2028,6 +2055,7 @@ export const MosquesUnitPage: React.FC = () => {
                 {!quranStockDashboard?.warehouses.length && <Button variant="outline" className={button3d} onClick={openQuranWarehouse}><Plus className="ml-1 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}
                 <Button className="bg-emerald-700 hover:bg-emerald-600" onClick={() => openQuranStockMovement('receipt')} disabled={!quranStockDashboard?.warehouses.length}><Plus className="ml-1 h-4 w-4" />إضافة رصيد للمكتبة</Button>
                 <Button variant="outline" className="border-amber-300 text-amber-800" onClick={() => openQuranStockMovement('return')} disabled={!quranStockDashboard?.warehouses.length}><RefreshCw className="ml-1 h-4 w-4" />إرجاع للمكتبة</Button>
+                <Button variant="outline" className={`${button3d} border-red-300 bg-red-50/60 text-red-700 hover:bg-red-100 hover:text-red-800`} onClick={() => void resetQuranLibrary()} disabled={quranStockSaving || (!quranStockDashboard?.warehouses.length && !quranStockDashboard?.summary.siteSystemTotal && quranSummary.countedSites === 0)}><RefreshCw className="ml-1 h-4 w-4" />تصفير المكتبة</Button>
               </div>}
             </CardHeader>
             <CardContent className="space-y-5 pt-5">
