@@ -2099,7 +2099,7 @@ export const MosquesUnitPage: React.FC = () => {
 
           <Card className={`${card3d} overflow-hidden`}>
             <CardHeader className="gap-3 border-b border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-sky-50 md:flex-row md:items-center md:justify-between">
-              <div><CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-emerald-700" />إدارة وحصر المصاحف</CardTitle><CardDescription>الجرد الفعلي للموجود داخل المساجد والمصليات للمطابقة مع الرصيد النظامي والإضافات القادمة من مكتبة المصاحف، مع متابعة التالف والاحتياج.</CardDescription></div>
+              <div><CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-emerald-700" />إدارة وحصر المصاحف</CardTitle><CardDescription>متابعة رصيد المصاحف في المساجد والمصليات. تتم إضافة المصاحف من مكتبة المصاحف مباشرة مع الخصم التلقائي من رصيد المكتبة.</CardDescription></div>
               {canPrint && <Button variant="outline" className={button3d} onClick={printQuranInventory}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button>}
             </CardHeader>
             <CardContent className="space-y-4 pt-5">
@@ -2123,22 +2123,12 @@ export const MosquesUnitPage: React.FC = () => {
                     const site = sites.find((row) => row.id === item.site.id) || item.site as MosqueSite;
                     const latest = item.latest;
                     const systemStock = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.systemStock;
-                    return <tr key={item.site.id} className="border-t border-slate-100 hover:bg-slate-50/60"><td className="p-3"><p className="font-black text-slate-800">{item.site.name}</p><p className="mt-1 text-xs text-muted-foreground">{siteTypeDisplayLabel(item.site as MosqueSite)} — {item.site.campusLocation || item.site.city || '-'}</p></td><td className="p-3 text-center font-bold">{systemStock?.largeCount ?? latest?.largeCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.mediumCount ?? latest?.mediumCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.smallCount ?? latest?.smallCount ?? 0}</td><td className="p-3 text-center text-lg font-black text-emerald-700">{systemStock?.totalCount ?? latest?.totalCount ?? 0}</td><td className="p-3 text-center font-bold text-red-600">{latest?.damagedCount ?? 0}</td><td className="p-3 text-center font-bold text-amber-700">{latest?.neededCount ?? 0}</td><td className="p-3 text-center text-xs">{latest ? new Date(latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : <Badge variant="outline">لم يجرد</Badge>}</td><td className="p-3"><div className="flex justify-center gap-2"><Button
-  size="sm"
-  onClick={() => openQuranInventoryDialog(site)}
-  className="group relative overflow-hidden border-0 bg-gradient-to-l from-emerald-700 via-emerald-600 to-teal-500 font-black text-white shadow-[0_0_14px_rgba(16,185,129,0.42),0_4px_0_rgba(6,95,70,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:from-emerald-600 hover:to-teal-400 hover:shadow-[0_0_24px_rgba(16,185,129,0.68),0_4px_0_rgba(6,95,70,0.22)]"
->
-  <span className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-white/15 to-transparent" />
-  <span className="relative ml-1 inline-flex h-6 w-6 items-center justify-center rounded-lg bg-amber-300 text-emerald-950 shadow-[0_0_14px_rgba(253,224,71,0.92)] ring-1 ring-white/80">
-    <BookOpen className="h-3.5 w-3.5" />
-  </span>
-  <span className="relative">تسجيل جرد فعلي</span>
-</Button>{role === 'head' && <Button size="sm" className={`${button3d} bg-sky-700 hover:bg-sky-600`} onClick={() => openQuranDistributionForSite(site)}><ExternalLink className="ml-1 h-3.5 w-3.5" />إضافة من المكتبة</Button>}<Button size="sm" variant="outline" className={button3d} onClick={() => openQuranHistory(site)}><Clock3 className="ml-1 h-3.5 w-3.5" />السجل</Button></div></td></tr>;
+                    return <tr key={item.site.id} className="border-t border-slate-100 hover:bg-slate-50/60"><td className="p-3"><p className="font-black text-slate-800">{item.site.name}</p><p className="mt-1 text-xs text-muted-foreground">{siteTypeDisplayLabel(item.site as MosqueSite)} — {item.site.campusLocation || item.site.city || '-'}</p></td><td className="p-3 text-center font-bold">{systemStock?.largeCount ?? latest?.largeCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.mediumCount ?? latest?.mediumCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.smallCount ?? latest?.smallCount ?? 0}</td><td className="p-3 text-center text-lg font-black text-emerald-700">{systemStock?.totalCount ?? latest?.totalCount ?? 0}</td><td className="p-3 text-center font-bold text-red-600">{latest?.damagedCount ?? 0}</td><td className="p-3 text-center font-bold text-amber-700">{latest?.neededCount ?? 0}</td><td className="p-3 text-center text-xs">{latest ? new Date(latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : <Badge variant="outline">لم يجرد</Badge>}</td><td className="p-3"><div className="flex justify-center gap-2">{role === 'head' && <Button size="sm" className={`${button3d} bg-sky-700 hover:bg-sky-600`} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-3.5 w-3.5" />إضافة مصحف من المكتبة</Button>}<Button size="sm" variant="outline" className={button3d} onClick={() => openQuranHistory(site)}><Clock3 className="ml-1 h-3.5 w-3.5" />السجل</Button></div></td></tr>;
                   })}</tbody>
                 </table>
               </div>
               {!filteredQuranInventoryItems.length && <Empty text="لا توجد مواقع مطابقة لبحث حصر المصاحف" />}
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs leading-6 text-emerald-900">ملاحظة: <strong>هذا الجدول يمثل آخر جرد فعلي للموقع.</strong> زيادة رصيد المسجد أو المصلى تتم من زر «إضافة من المكتبة» فقط، وعندها تخصم الكمية تلقائيًا من مكتبة المصاحف. الجرد مخصص للمطابقة الفعلية ولا يستخدم لإضافة رصيد جديد.</div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs leading-6 text-emerald-900">ملاحظة: <strong>إضافة المصاحف للمسجد أو المصلى تتم من زر «إضافة مصحف من المكتبة» فقط.</strong> عند الإضافة تخصم الكمية تلقائيًا من رصيد مكتبة المصاحف وتضاف إلى رصيد الموقع مع حفظ الحركة.</div>
             </CardContent>
           </Card>
         </TabsContent>
