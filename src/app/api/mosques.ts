@@ -376,6 +376,7 @@ export const mosqueApi = {
   quranStockMovements: () => apiJson<MosqueQuranStockMovement[]>('/api/mosques/quran-stock/movements'),
   createQuranWarehouse: (input: Record<string, unknown>) => apiJson<MosqueQuranWarehouse>('/api/mosques/quran-warehouses', { method: 'POST', body: JSON.stringify(input) }),
   updateQuranWarehouse: (id: string, input: Record<string, unknown>) => apiJson<MosqueQuranWarehouse>(`/api/mosques/quran-warehouses/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  deleteQuranWarehouse: (id: string) => apiJson<void>(`/api/mosques/quran-warehouses/${id}`, { method: 'DELETE' }),
   createQuranStockMovement: (input: Record<string, unknown>) => apiJson<MosqueQuranStockMovement>('/api/mosques/quran-stock/movements', { method: 'POST', body: JSON.stringify(input) }),
 
   personnel: () => apiJson<MosquePersonnel[]>('/api/mosques/personnel'),
