@@ -194,7 +194,7 @@ const quranStockMovementTypeLabels: Record<string, string> = {
 const quranStockMovementDisplayLabel = (movement: MosqueQuranStockMovement) =>
   movement.movementType === 'return' && movement.notes?.startsWith('تراجع عن حركة الصرف')
     ? 'تراجع عن صرف'
-    : quranStockMovementDisplayLabel(movement);
+    : quranStockMovementTypeLabels[movement.movementType] || movement.movementType;
 const emptyQuranWarehouseForm = () => ({ code: '', name: 'المستودع المركزي للمصاحف', location: '', active: true, minLargeCount: '0', minMediumCount: '0', minSmallCount: '0', notes: '' });
 const emptyQuranStockMovementForm = () => ({ movementType: 'receipt', warehouseId: '', siteId: '', largeCount: '0', mediumCount: '0', smallCount: '0', referenceNumber: '', movementAt: new Date().toISOString().slice(0, 10), notes: '' });
 
