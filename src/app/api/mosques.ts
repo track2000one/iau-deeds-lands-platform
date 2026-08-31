@@ -193,6 +193,74 @@ export type MosqueQuranInventoryResponse = {
   summary: MosqueQuranInventorySummary;
 };
 
+export type MosqueQuranStockCount = {
+  largeCount: number;
+  mediumCount: number;
+  smallCount: number;
+  totalCount: number;
+};
+
+export type MosqueQuranWarehouse = {
+  id: string;
+  code: string;
+  name: string;
+  location?: string | null;
+  active: boolean;
+  minLargeCount: number;
+  minMediumCount: number;
+  minSmallCount: number;
+  notes?: string | null;
+  balance: MosqueQuranStockCount;
+  shortage: MosqueQuranStockCount;
+  lowStock: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MosqueQuranStockMovement = {
+  id: string;
+  movementNumber: string;
+  movementType: 'receipt' | 'distribution' | 'return' | 'warehouse_damage' | 'adjustment_in' | 'adjustment_out';
+  warehouseId: string;
+  siteId?: string | null;
+  largeCount: number;
+  mediumCount: number;
+  smallCount: number;
+  totalCount: number;
+  referenceNumber?: string | null;
+  movementAt: string;
+  notes?: string | null;
+  createdBy?: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+  warehouse?: { id: string; code: string; name: string };
+  site?: { id: string; name: string; siteType?: string; prayerRoomGender?: string | null } | null;
+};
+
+export type MosqueQuranStockDashboard = {
+  warehouses: MosqueQuranWarehouse[];
+  summary: {
+    warehouseTotal: number;
+    warehouseLarge: number;
+    warehouseMedium: number;
+    warehouseSmall: number;
+    receivedTotal: number;
+    distributedTotal: number;
+    returnedTotal: number;
+    damagedTotal: number;
+    siteSystemTotal: number;
+    siteNeedTotal: number;
+    lowStockWarehouses: number;
+    shortageTotal: number;
+  };
+  sites: Array<{
+    site: Pick<MosqueSite, 'id' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation'>;
+    latestInventory: MosqueQuranInventory | null;
+    systemStock: MosqueQuranStockCount;
+  }>;
+  recentMovements: MosqueQuranStockMovement[];
+};
+
 export type MosqueAssignment = {
   id: string;
   userId: string;
@@ -303,6 +371,12 @@ export const mosqueApi = {
   quranInventory: () => apiJson<MosqueQuranInventoryResponse>('/api/mosques/quran-inventory'),
   quranInventoryHistory: (siteId: string) => apiJson<MosqueQuranInventory[]>(`/api/mosques/quran-inventory/${siteId}/history`),
   createQuranInventory: (input: Record<string, unknown>) => apiJson<MosqueQuranInventory>('/api/mosques/quran-inventory', { method: 'POST', body: JSON.stringify(input) }),
+
+  quranStockDashboard: () => apiJson<MosqueQuranStockDashboard>('/api/mosques/quran-stock/dashboard'),
+  quranStockMovements: () => apiJson<MosqueQuranStockMovement[]>('/api/mosques/quran-stock/movements'),
+  createQuranWarehouse: (input: Record<string, unknown>) => apiJson<MosqueQuranWarehouse>('/api/mosques/quran-warehouses', { method: 'POST', body: JSON.stringify(input) }),
+  updateQuranWarehouse: (id: string, input: Record<string, unknown>) => apiJson<MosqueQuranWarehouse>(`/api/mosques/quran-warehouses/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  createQuranStockMovement: (input: Record<string, unknown>) => apiJson<MosqueQuranStockMovement>('/api/mosques/quran-stock/movements', { method: 'POST', body: JSON.stringify(input) }),
 
   personnel: () => apiJson<MosquePersonnel[]>('/api/mosques/personnel'),
   createPersonnel: (input: Record<string, unknown>) => apiJson<MosquePersonnel>('/api/mosques/personnel', { method: 'POST', body: JSON.stringify(input) }),
