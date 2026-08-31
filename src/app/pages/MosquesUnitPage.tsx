@@ -192,7 +192,8 @@ const quranStockMovementTypeLabels: Record<string, string> = {
   receipt: 'إضافة رصيد للمكتبة',
   distribution: 'إضافة مصاحف لمسجد / مصلى',
   return: 'إرجاع إلى مكتبة المصاحف',
-  warehouse_damage: 'سحب مصاحف من المكتبة',
+  site_withdrawal: 'سحب مصاحف من مسجد / مصلى',
+  warehouse_damage: 'استبعاد مصاحف من المكتبة',
   adjustment_in: 'تسوية زيادة',
   adjustment_out: 'تسوية نقص',
 };
@@ -201,7 +202,7 @@ const quranStockMovementDisplayLabel = (movement: MosqueQuranStockMovement) =>
     ? 'تراجع عن إضافة مصاحف'
     : quranStockMovementTypeLabels[movement.movementType] || movement.movementType;
 const emptyQuranWarehouseForm = () => ({ code: '', name: 'مكتبة المصاحف', location: '', active: true, minLargeCount: '0', minMediumCount: '0', minSmallCount: '0', notes: '' });
-const emptyQuranStockMovementForm = () => ({ movementType: 'receipt', warehouseId: '', siteId: '', largeCount: '0', mediumCount: '0', smallCount: '0', referenceNumber: '', movementAt: new Date().toISOString().slice(0, 10), notes: '' });
+const emptyQuranStockMovementForm = () => ({ movementType: 'receipt', warehouseId: '', siteId: '', largeCount: '0', mediumCount: '0', smallCount: '0', withdrawalReason: '', referenceNumber: '', movementAt: new Date().toISOString().slice(0, 10), notes: '' });
 
 type PendingSiteMedia = { file: File; kind: 'site_image' | 'mosque_image' | 'document' };
 
@@ -672,11 +673,10 @@ export const MosquesUnitPage: React.FC = () => {
 
   const saveQuranInventory = async () => {
     if (!quranInventorySite) return;
-    const values = ['largeCount', 'mediumCount', 'smallCount', 'damagedCount', 'neededCount'] as const;
+    const values = ['largeCount', 'mediumCount', 'smallCount', 'neededCount'] as const;
     const parsed = Object.fromEntries(values.map((key) => [key, Number(quranForm[key] || 0)])) as Record<typeof values[number], number>;
     if (values.some((key) => !Number.isInteger(parsed[key]) || parsed[key] < 0)) return toast.error('أعداد المصاحف يجب أن تكون أرقامًا صحيحة غير سالبة');
     const total = parsed.largeCount + parsed.mediumCount + parsed.smallCount;
-    if (parsed.damagedCount > total) return toast.error('عدد المصاحف المسحوبة لا يمكن أن يتجاوز إجمالي المصاحف');
     const currentSystemStock = quranStockDashboard?.sites.find((item) => item.site.id === quranInventorySite.id)?.systemStock;
     const hasPreviousInventory = Boolean(quranLatestBySite[quranInventorySite.id]);
     if (hasPreviousInventory && currentSystemStock && (
@@ -689,6 +689,7 @@ export const MosquesUnitPage: React.FC = () => {
       await mosqueApi.createQuranInventory({
         siteId: quranInventorySite.id,
         ...parsed,
+        damagedCount: 0,
         countedAt: quranForm.countedAt || new Date().toISOString(),
         notes: quranForm.notes || null,
       });
@@ -808,7 +809,7 @@ export const MosquesUnitPage: React.FC = () => {
       ...emptyQuranStockMovementForm(),
       movementType,
       warehouseId: activeWarehouse?.id || '',
-      siteId: ['distribution', 'return'].includes(movementType) ? (sites[0]?.id || '') : '',
+      siteId: ['distribution', 'return', 'site_withdrawal'].includes(movementType) ? (sites[0]?.id || '') : '',
     });
     setQuranStockMovementDialog(true);
   };
@@ -828,25 +829,55 @@ export const MosquesUnitPage: React.FC = () => {
     setQuranStockMovementDialog(true);
   };
 
+  const openQuranWithdrawalForSite = (site: MosqueSite) => {
+    const activeWarehouse = quranStockDashboard?.warehouses.find((item) => item.active) || quranStockDashboard?.warehouses[0];
+    if (!activeWarehouse) {
+      toast.error('لا توجد مكتبة مصاحف مفعّلة لتسجيل حركة السحب');
+      return;
+    }
+    const current = quranStockDashboard?.sites.find((item) => item.site.id === site.id)?.systemStock;
+    if (!current?.totalCount) {
+      toast.info('لا يوجد رصيد مصاحف في هذا المسجد أو المصلى يمكن سحبه');
+      return;
+    }
+    setQuranStockMovementForm({
+      ...emptyQuranStockMovementForm(),
+      movementType: 'site_withdrawal',
+      warehouseId: activeWarehouse.id,
+      siteId: site.id,
+    });
+    setQuranStockMovementDialog(true);
+  };
+
   const saveQuranStockMovement = async () => {
     const values = ['largeCount', 'mediumCount', 'smallCount'] as const;
     const parsed = Object.fromEntries(values.map((key) => [key, Number(quranStockMovementForm[key] || 0)])) as Record<typeof values[number], number>;
     if (!quranStockMovementForm.warehouseId) return toast.error('اختر مكتبة المصاحف');
     if (values.some((key) => !Number.isInteger(parsed[key]) || parsed[key] < 0)) return toast.error('الكميات يجب أن تكون أرقامًا صحيحة غير سالبة');
     if ((parsed.largeCount + parsed.mediumCount + parsed.smallCount) <= 0) return toast.error('أدخل كمية واحدة على الأقل');
-    if (['distribution', 'return'].includes(quranStockMovementForm.movementType) && !quranStockMovementForm.siteId) return toast.error('اختر المسجد أو المصلى');
+    if (['distribution', 'return', 'site_withdrawal'].includes(quranStockMovementForm.movementType) && !quranStockMovementForm.siteId) return toast.error('اختر المسجد أو المصلى');
+    if (quranStockMovementForm.movementType === 'site_withdrawal' && !String(quranStockMovementForm.withdrawalReason || '').trim()) return toast.error('حدد سبب سحب المصاحف من المسجد أو المصلى');
     setQuranStockSaving(true);
     try {
       await mosqueApi.createQuranStockMovement({
         movementType: quranStockMovementForm.movementType,
         warehouseId: quranStockMovementForm.warehouseId,
-        siteId: ['distribution', 'return'].includes(quranStockMovementForm.movementType) ? quranStockMovementForm.siteId : null,
+        siteId: ['distribution', 'return', 'site_withdrawal'].includes(quranStockMovementForm.movementType) ? quranStockMovementForm.siteId : null,
         ...parsed,
         referenceNumber: quranStockMovementForm.referenceNumber || null,
         movementAt: quranStockMovementForm.movementAt || new Date().toISOString(),
-        notes: quranStockMovementForm.notes || null,
+        notes: quranStockMovementForm.movementType === 'site_withdrawal'
+          ? `سبب السحب: ${String(quranStockMovementForm.withdrawalReason || '').trim()}${quranStockMovementForm.notes ? `
+${quranStockMovementForm.notes}` : ''}`
+          : (quranStockMovementForm.notes || null),
       });
-      toast.success(quranStockMovementForm.movementType === 'distribution' ? 'تمت إضافة المصاحف للموقع وخصمها تلقائيًا من رصيد المكتبة' : quranStockMovementForm.movementType === 'receipt' ? 'تمت إضافة الكمية إلى رصيد مكتبة المصاحف' : 'تم تسجيل حركة المصاحف بنجاح');
+      toast.success(quranStockMovementForm.movementType === 'distribution'
+        ? 'تمت إضافة المصاحف للموقع وخصمها تلقائيًا من رصيد المكتبة'
+        : quranStockMovementForm.movementType === 'site_withdrawal'
+          ? 'تم سحب المصاحف من رصيد المسجد أو المصلى وتسجيل سبب السحب في السجل'
+          : quranStockMovementForm.movementType === 'receipt'
+            ? 'تمت إضافة الكمية إلى رصيد مكتبة المصاحف'
+            : 'تم تسجيل حركة المصاحف بنجاح');
       setQuranStockMovementDialog(false);
       await loadAll();
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تسجيل حركة مصاحف المكتبة'); }
@@ -886,12 +917,13 @@ export const MosquesUnitPage: React.FC = () => {
     const rows = quranInventoryItems.map((item) => {
       const site = (sites.find((row) => row.id === item.site.id) || item.site) as MosqueSite;
       const latest = item.latest;
-      const systemStock = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.systemStock;
+      const stockRow = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id);
+      const systemStock = stockRow?.systemStock;
       const large = Number(systemStock?.largeCount ?? latest?.largeCount ?? 0);
       const medium = Number(systemStock?.mediumCount ?? latest?.mediumCount ?? 0);
       const small = Number(systemStock?.smallCount ?? latest?.smallCount ?? 0);
       const total = large + medium + small;
-      const damaged = Number(latest?.damagedCount ?? 0);
+      const damaged = Number(stockRow?.withdrawnStock?.totalCount ?? 0);
       const needed = Number(latest?.neededCount ?? 0);
       const lastCountAt = latest?.countedAt ? new Date(latest.countedAt).getTime() : 0;
       return { item, site, latest, large, medium, small, total, damaged, needed, lastCountAt };
@@ -1243,6 +1275,7 @@ export const MosquesUnitPage: React.FC = () => {
       const buildingCode = String(site.campusLocation || '').match(/\b(?:M|A|H)\d+\b/i)?.[0]?.toUpperCase() || '-';
       const coordinates = site.latitude != null && site.longitude != null ? `${site.latitude}, ${site.longitude}` : '-';
       const quranInventory = quranLatestBySite[site.id] as MosqueQuranInventory | null | undefined;
+      const quranWithdrawn = quranStockDashboard?.sites.find((row) => row.site.id === site.id)?.withdrawnStock?.totalCount || 0;
       const infoItems = [
         ['الاسم', site.name],
         ['النوع', siteTypeDisplayLabel(site)],
@@ -1260,7 +1293,7 @@ export const MosquesUnitPage: React.FC = () => {
         ['مصاحف كبيرة', quranInventory?.largeCount?.toLocaleString('ar-SA') || '-'],
         ['مصاحف متوسطة', quranInventory?.mediumCount?.toLocaleString('ar-SA') || '-'],
         ['مصاحف صغيرة', quranInventory?.smallCount?.toLocaleString('ar-SA') || '-'],
-        ['المصاحف المسحوبة', quranInventory?.damagedCount?.toLocaleString('ar-SA') || '-'],
+        ['المصاحف المسحوبة', quranWithdrawn.toLocaleString('ar-SA')],
         ['الاحتياج الحالي', quranInventory?.neededCount?.toLocaleString('ar-SA') || '-'],
       ];
       const infoHtml = infoItems.map(([label, value], index) => `
@@ -1878,7 +1911,7 @@ export const MosquesUnitPage: React.FC = () => {
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.tickets || []), 'البلاغات');
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.leaves || []), 'الإجازات');
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.jobs || []), 'التوظيف');
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(quranInventoryItems.map((item) => ({ الموقع: item.site.name, النوع: siteTypeDisplayLabel(item.site as MosqueSite), كبير: item.latest?.largeCount || 0, متوسط: item.latest?.mediumCount || 0, صغير: item.latest?.smallCount || 0, الإجمالي: item.latest?.totalCount || 0, المسحوبة: item.latest?.damagedCount || 0, الاحتياج: item.latest?.neededCount || 0, 'آخر جرد': item.latest?.countedAt ? new Date(item.latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لم يجرد' }))), 'حصر المصاحف');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(quranInventoryItems.map((item) => ({ الموقع: item.site.name, النوع: siteTypeDisplayLabel(item.site as MosqueSite), كبير: item.latest?.largeCount || 0, متوسط: item.latest?.mediumCount || 0, صغير: item.latest?.smallCount || 0, الإجمالي: item.latest?.totalCount || 0, المسحوبة: quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.withdrawnStock?.totalCount || 0, الاحتياج: item.latest?.neededCount || 0, 'آخر جرد': item.latest?.countedAt ? new Date(item.latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لم يجرد' }))), 'حصر المصاحف');
       XLSX.writeFile(workbook, `mosques-unit-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تصدير التقرير'); }
   };
@@ -2205,7 +2238,7 @@ export const MosquesUnitPage: React.FC = () => {
                 <ReportMetric label="المصاحف الكبيرة" value={quranStockDashboard?.sites.reduce((sum, row) => sum + row.systemStock.largeCount, 0) ?? quranSummary.large} />
                 <ReportMetric label="المصاحف المتوسطة" value={quranStockDashboard?.sites.reduce((sum, row) => sum + row.systemStock.mediumCount, 0) ?? quranSummary.medium} />
                 <ReportMetric label="المصاحف الصغيرة" value={quranStockDashboard?.sites.reduce((sum, row) => sum + row.systemStock.smallCount, 0) ?? quranSummary.small} />
-                <ReportMetric label="المسحوبة" value={quranSummary.damaged} />
+                <ReportMetric label="المسحوبة" value={quranStockDashboard?.summary.withdrawnTotal ?? 0} />
                 <ReportMetric label="الاحتياج الحالي" value={quranSummary.needed} />
               </div>
               <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-[1fr_220px_auto] md:items-center">
@@ -2219,8 +2252,10 @@ export const MosquesUnitPage: React.FC = () => {
                   <tbody>{filteredQuranInventoryItems.map((item) => {
                     const site = sites.find((row) => row.id === item.site.id) || item.site as MosqueSite;
                     const latest = item.latest;
-                    const systemStock = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.systemStock;
-                    return <tr key={item.site.id} className="border-t border-slate-100 hover:bg-slate-50/60"><td className="p-3"><p className="font-black text-slate-800">{item.site.name}</p><p className="mt-1 text-xs text-muted-foreground">{siteTypeDisplayLabel(item.site as MosqueSite)} — {item.site.campusLocation || item.site.city || '-'}</p></td><td className="p-3 text-center font-bold">{systemStock?.largeCount ?? latest?.largeCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.mediumCount ?? latest?.mediumCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.smallCount ?? latest?.smallCount ?? 0}</td><td className="p-3 text-center text-lg font-black text-emerald-700">{systemStock?.totalCount ?? latest?.totalCount ?? 0}</td><td className="p-3 text-center font-bold text-red-600">{latest?.damagedCount ?? 0}</td><td className="p-3 text-center font-bold text-amber-700">{latest?.neededCount ?? 0}</td><td className="p-3 text-center text-xs">{latest ? new Date(latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : <Badge variant="outline">لم يجرد</Badge>}</td><td className="p-3"><div className="flex justify-center gap-2">{role === 'head' && <Button size="sm" className={`${button3d} bg-sky-700 hover:bg-sky-600`} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-3.5 w-3.5" />إضافة مصحف من المكتبة</Button>}<Button size="sm" variant="outline" className={button3d} onClick={() => openQuranHistory(site)}><Clock3 className="ml-1 h-3.5 w-3.5" />السجل</Button></div></td></tr>;
+                    const stockRow = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id);
+                    const systemStock = stockRow?.systemStock;
+                    const withdrawnStock = stockRow?.withdrawnStock;
+                    return <tr key={item.site.id} className="border-t border-slate-100 hover:bg-slate-50/60"><td className="p-3"><p className="font-black text-slate-800">{item.site.name}</p><p className="mt-1 text-xs text-muted-foreground">{siteTypeDisplayLabel(item.site as MosqueSite)} — {item.site.campusLocation || item.site.city || '-'}</p></td><td className="p-3 text-center font-bold">{systemStock?.largeCount ?? latest?.largeCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.mediumCount ?? latest?.mediumCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.smallCount ?? latest?.smallCount ?? 0}</td><td className="p-3 text-center text-lg font-black text-emerald-700">{systemStock?.totalCount ?? latest?.totalCount ?? 0}</td><td className="p-3 text-center font-bold text-red-600">{withdrawnStock?.totalCount ?? 0}</td><td className="p-3 text-center font-bold text-amber-700">{latest?.neededCount ?? 0}</td><td className="p-3 text-center text-xs">{latest ? new Date(latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : <Badge variant="outline">لم يجرد</Badge>}</td><td className="p-3"><div className="flex justify-center gap-2">{role === 'head' && <Button size="sm" className={`${button3d} bg-sky-700 hover:bg-sky-600`} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-3.5 w-3.5" />إضافة مصحف من المكتبة</Button>}{role === 'head' && <Button size="sm" className={`${button3d} bg-amber-600 hover:bg-amber-500`} onClick={() => openQuranWithdrawalForSite(site)}><RefreshCw className="ml-1 h-3.5 w-3.5" />سحب مصاحف</Button>}<Button size="sm" variant="outline" className={button3d} onClick={() => openQuranHistory(site)}><Clock3 className="ml-1 h-3.5 w-3.5" />السجل</Button></div></td></tr>;
                   })}</tbody>
                 </table>
               </div>
@@ -2485,14 +2520,15 @@ export const MosquesUnitPage: React.FC = () => {
 
       <Dialog open={quranStockMovementDialog} onOpenChange={setQuranStockMovementDialog}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-emerald-200/80 sm:max-w-[900px]" dir="rtl">
-          <DialogHeader className="border-b border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-sky-50 p-5 text-right"><DialogTitle className="flex items-center gap-2 text-xl font-black"><BookOpen className="h-5 w-5 text-emerald-700" />حركة مصاحف المكتبة</DialogTitle><DialogDescription>إضافة الرصيد تزيد رصيد المكتبة، وإضافة المصاحف للموقع تخصمها تلقائيًا من المكتبة، والإرجاع يعيد الكمية إلى المكتبة. لا يتم تعديل الرصيد يدويًا خارج سجل الحركات.</DialogDescription></DialogHeader>
+          <DialogHeader className="border-b border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-sky-50 p-5 text-right"><DialogTitle className="flex items-center gap-2 text-xl font-black"><BookOpen className="h-5 w-5 text-emerald-700" />{quranStockMovementForm.movementType === 'site_withdrawal' ? 'سحب مصاحف من المسجد / المصلى' : 'حركة مصاحف المكتبة'}</DialogTitle><DialogDescription>{quranStockMovementForm.movementType === 'site_withdrawal' ? 'السحب يخصم المصاحف من الرصيد النظامي للموقع ويسجل سبب السحب وتاريخه. المصاحف المسحوبة لا تعاد تلقائيًا إلى رصيد المكتبة المتاح.' : 'إضافة الرصيد تزيد رصيد المكتبة، وإضافة المصاحف للموقع تخصمها تلقائيًا من المكتبة، والإرجاع يعيد الكمية إلى المكتبة. لا يتم تعديل الرصيد يدويًا خارج سجل الحركات.'}</DialogDescription></DialogHeader>
           <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-5 md:p-6">
-            <div className="grid gap-4 md:grid-cols-2"><Field label="نوع الحركة *"><NativeSelect value={quranStockMovementForm.movementType} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, movementType: e.target.value, siteId: ['distribution', 'return'].includes(e.target.value) ? (quranStockMovementForm.siteId || sites[0]?.id || '') : '' })}>{Object.entries(quranStockMovementTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect></Field><Field label="المكتبة *"><NativeSelect value={quranStockMovementForm.warehouseId} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, warehouseId: e.target.value })}><option value="">اختر المكتبة</option>{quranStockDashboard?.warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} — رصيد {warehouse.balance.totalCount}</option>)}</NativeSelect></Field>{['distribution', 'return'].includes(quranStockMovementForm.movementType) && <div className="md:col-span-2"><Field label="المسجد / المصلى *"><NativeSelect value={quranStockMovementForm.siteId} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name} — {siteTypeDisplayLabel(site)}</option>)}</NativeSelect></Field></div>}</div>
+            <div className="grid gap-4 md:grid-cols-2"><Field label="نوع الحركة *"><NativeSelect value={quranStockMovementForm.movementType} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, movementType: e.target.value, siteId: ['distribution', 'return', 'site_withdrawal'].includes(e.target.value) ? (quranStockMovementForm.siteId || sites[0]?.id || '') : '' })}>{Object.entries(quranStockMovementTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect></Field><Field label="المكتبة *"><NativeSelect value={quranStockMovementForm.warehouseId} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, warehouseId: e.target.value })}><option value="">اختر المكتبة</option>{quranStockDashboard?.warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} — رصيد {warehouse.balance.totalCount}</option>)}</NativeSelect></Field>{['distribution', 'return', 'site_withdrawal'].includes(quranStockMovementForm.movementType) && <div className="md:col-span-2"><Field label="المسجد / المصلى *"><NativeSelect value={quranStockMovementForm.siteId} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name} — {siteTypeDisplayLabel(site)}</option>)}</NativeSelect></Field></div>}</div>
             {quranStockDashboard?.warehouses.find((warehouse) => warehouse.id === quranStockMovementForm.warehouseId) && <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><p className="text-xs font-bold text-emerald-900">الرصيد الحالي للمكتبة</p>{(() => { const balance = quranStockDashboard.warehouses.find((warehouse) => warehouse.id === quranStockMovementForm.warehouseId)!.balance; return <div className="mt-2 grid grid-cols-4 gap-2 text-center"><Info label="الإجمالي" value={balance.totalCount} /><Info label="كبير" value={balance.largeCount} /><Info label="متوسط" value={balance.mediumCount} /><Info label="صغير" value={balance.smallCount} /></div>; })()}</div>}
             <Card className="border-emerald-200"><CardHeader className="pb-3"><CardTitle className="text-base">الكميات حسب الحجم</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-3"><Field label="المصاحف الكبيرة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranStockMovementForm.largeCount} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, largeCount: e.target.value })} /></Field><Field label="المصاحف المتوسطة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranStockMovementForm.mediumCount} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, mediumCount: e.target.value })} /></Field><Field label="المصاحف الصغيرة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranStockMovementForm.smallCount} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, smallCount: e.target.value })} /></Field></CardContent></Card>
+            {quranStockMovementForm.movementType === 'site_withdrawal' && <Field label="سبب السحب *"><NativeSelect value={quranStockMovementForm.withdrawalReason || ''} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, withdrawalReason: e.target.value })}><option value="">اختر سبب السحب</option><option value="قدم المصحف">قدم المصحف</option><option value="تهالك أو تمزق">تهالك أو تمزق</option><option value="عدم ملاءمة النسخة للموقع">عدم ملاءمة النسخة للموقع</option><option value="فائض عن حاجة الموقع">فائض عن حاجة الموقع</option><option value="إعادة تنظيم وتوزيع">إعادة تنظيم وتوزيع</option><option value="أخرى">أخرى</option></NativeSelect></Field>}
             <div className="grid gap-4 md:grid-cols-2"><Field label="رقم المرجع / السند"><Input value={quranStockMovementForm.referenceNumber} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, referenceNumber: e.target.value })} /></Field><Field label="تاريخ الحركة"><Input type="date" value={quranStockMovementForm.movementAt} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, movementAt: e.target.value })} /></Field></div>
-            <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">إجمالي هذه الحركة: <strong>{(Number(quranStockMovementForm.largeCount || 0) + Number(quranStockMovementForm.mediumCount || 0) + Number(quranStockMovementForm.smallCount || 0)).toLocaleString('ar-SA')} مصحف</strong>{quranStockMovementForm.movementType === 'distribution' && ' — سيتم خصمها تلقائيًا من مكتبة المصاحف وإضافتها إلى رصيد الموقع.'}</div>
-            <Field label="ملاحظات الحركة"><Textarea rows={4} value={quranStockMovementForm.notes} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, notes: e.target.value })} placeholder="مثال: إضافة رصيد للمكتبة، إضافة لمسجد، إرجاع فائض، سبب التسوية..." /></Field>
+            <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">إجمالي هذه الحركة: <strong>{(Number(quranStockMovementForm.largeCount || 0) + Number(quranStockMovementForm.mediumCount || 0) + Number(quranStockMovementForm.smallCount || 0)).toLocaleString('ar-SA')} مصحف</strong>{quranStockMovementForm.movementType === 'distribution' ? ' — سيتم خصمها تلقائيًا من مكتبة المصاحف وإضافتها إلى رصيد الموقع.' : quranStockMovementForm.movementType === 'site_withdrawal' ? ' — سيتم خصمها من رصيد المسجد أو المصلى فقط، ولن تدخل تلقائيًا في الرصيد المتاح للمكتبة.' : ''}</div>
+            <Field label="ملاحظات الحركة"><Textarea rows={4} value={quranStockMovementForm.notes} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, notes: e.target.value })} placeholder={quranStockMovementForm.movementType === 'site_withdrawal' ? 'تفاصيل إضافية عن حالة المصاحف أو مكان حفظها بعد السحب...' : 'مثال: إضافة رصيد للمكتبة، إضافة لمسجد، إرجاع فائض، سبب التسوية...'} /></Field>
           </div>
           <DialogFooter className="border-t bg-white p-4 md:px-6"><Button variant="outline" onClick={() => setQuranStockMovementDialog(false)}>إلغاء</Button><Button className="bg-emerald-700 hover:bg-emerald-600" onClick={saveQuranStockMovement} disabled={quranStockSaving}><Save className="ml-2 h-4 w-4" />{quranStockSaving ? 'جاري التسجيل...' : 'تسجيل الحركة'}</Button></DialogFooter>
         </DialogContent>
@@ -2554,7 +2590,7 @@ export const MosquesUnitPage: React.FC = () => {
           <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-5 md:p-6">
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900"><strong>تنبيه:</strong> الجرد الفعلي للمطابقة فقط. لا يمكن زيادة رصيد مسجد أو مصلى من شاشة الجرد بعد اعتماد أول جرد؛ استخدم «إضافة من المكتبة» ليتم خصم الكمية تلقائيًا من مكتبة المصاحف وحفظ الحركة.</div>
             <Card className="border-emerald-200/70"><CardHeader className="pb-3"><CardTitle className="text-base">المصاحف حسب الحجم</CardTitle><CardDescription>أدخل العدد الفعلي الموجود حاليًا بالموقع.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-3"><Field label="المصاحف الكبيرة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranForm.largeCount} onChange={(e) => setQuranForm({ ...quranForm, largeCount: e.target.value })} /></Field><Field label="المصاحف المتوسطة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranForm.mediumCount} onChange={(e) => setQuranForm({ ...quranForm, mediumCount: e.target.value })} /></Field><Field label="المصاحف الصغيرة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranForm.smallCount} onChange={(e) => setQuranForm({ ...quranForm, smallCount: e.target.value })} /></Field></CardContent></Card>
-            <Card className="border-amber-200/70"><CardHeader className="pb-3"><CardTitle className="text-base">الحالة والاحتياج</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-3"><Field label="المصاحف المسحوبة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranForm.damagedCount} onChange={(e) => setQuranForm({ ...quranForm, damagedCount: e.target.value })} /></Field><Field label="المطلوب توفيره"><Input type="number" min="0" step="1" inputMode="numeric" value={quranForm.neededCount} onChange={(e) => setQuranForm({ ...quranForm, neededCount: e.target.value })} /></Field><Field label="تاريخ الجرد"><Input type="date" value={quranForm.countedAt} onChange={(e) => setQuranForm({ ...quranForm, countedAt: e.target.value })} /></Field></CardContent></Card>
+            <Card className="border-amber-200/70"><CardHeader className="pb-3"><CardTitle className="text-base">الاحتياج وتاريخ الجرد</CardTitle><CardDescription>المصاحف المسحوبة تسجل من إجراء «سحب مصاحف» حتى يتم خصمها من رصيد الموقع وحفظ سبب السحب.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-2"><Field label="المطلوب توفيره"><Input type="number" min="0" step="1" inputMode="numeric" value={quranForm.neededCount} onChange={(e) => setQuranForm({ ...quranForm, neededCount: e.target.value })} /></Field><Field label="تاريخ الجرد"><Input type="date" value={quranForm.countedAt} onChange={(e) => setQuranForm({ ...quranForm, countedAt: e.target.value })} /></Field></CardContent></Card>
             <div className="grid grid-cols-2 gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 sm:grid-cols-4"><Info label="الإجمالي الحالي" value={(Number(quranForm.largeCount || 0) + Number(quranForm.mediumCount || 0) + Number(quranForm.smallCount || 0)).toLocaleString('ar-SA')} /><Info label="الكبيرة" value={Number(quranForm.largeCount || 0).toLocaleString('ar-SA')} /><Info label="المتوسطة" value={Number(quranForm.mediumCount || 0).toLocaleString('ar-SA')} /><Info label="الصغيرة" value={Number(quranForm.smallCount || 0).toLocaleString('ar-SA')} /></div>
             <Field label="ملاحظات الجرد"><Textarea rows={4} value={quranForm.notes} onChange={(e) => setQuranForm({ ...quranForm, notes: e.target.value })} placeholder="مثال: مصاحف مسحوبة، حاجة إلى توفير مصاحف إضافية، موقع التخزين..." /></Field>
           </div>
@@ -2565,7 +2601,7 @@ export const MosquesUnitPage: React.FC = () => {
       <Dialog open={Boolean(quranHistorySite)} onOpenChange={(open) => !open && setQuranHistorySite(null)}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 sm:max-w-[1050px]" dir="rtl">
           <DialogHeader className="border-b bg-gradient-to-l from-sky-50 via-white to-emerald-50 p-5 text-right"><DialogTitle className="flex items-center gap-2 text-xl font-black"><Clock3 className="h-5 w-5 text-sky-700" />سجل جرد المصاحف</DialogTitle><DialogDescription>{quranHistorySite?.name || ''} — سجل زمني غير مستبدل لعمليات الجرد السابقة.</DialogDescription></DialogHeader>
-          <div className="max-h-[calc(92vh-125px)] overflow-y-auto p-5">{quranHistoryLoading ? <div className="flex items-center justify-center gap-2 py-12"><RefreshCw className="h-5 w-5 animate-spin" />جاري تحميل السجل...</div> : quranHistoryRows.length ? <div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[850px] text-sm"><thead className="bg-sky-50"><tr><th className="p-3">تاريخ الجرد</th><th className="p-3">كبيرة</th><th className="p-3">متوسطة</th><th className="p-3">صغيرة</th><th className="p-3">الإجمالي</th><th className="p-3">المسحوبة</th><th className="p-3">الاحتياج</th><th className="p-3">مسجل الجرد</th><th className="p-3">ملاحظات</th></tr></thead><tbody>{quranHistoryRows.map((row) => <tr key={row.id} className="border-t"><td className="p-3 text-center">{new Date(row.countedAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td><td className="p-3 text-center">{row.largeCount}</td><td className="p-3 text-center">{row.mediumCount}</td><td className="p-3 text-center">{row.smallCount}</td><td className="p-3 text-center font-black text-emerald-700">{row.totalCount}</td><td className="p-3 text-center text-red-600">{row.damagedCount}</td><td className="p-3 text-center text-amber-700">{row.neededCount}</td><td className="p-3 text-center">{row.countedByName || '-'}</td><td className="max-w-[260px] p-3 text-xs leading-5">{row.notes || '-'}</td></tr>)}</tbody></table></div> : <Empty text="لا يوجد سجل جرد سابق لهذا الموقع" />}</div>
+          <div className="max-h-[calc(92vh-125px)] overflow-y-auto p-5">{quranHistoryLoading ? <div className="flex items-center justify-center gap-2 py-12"><RefreshCw className="h-5 w-5 animate-spin" />جاري تحميل السجل...</div> : quranHistoryRows.length ? <div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[850px] text-sm"><thead className="bg-sky-50"><tr><th className="p-3">تاريخ الجرد</th><th className="p-3">كبيرة</th><th className="p-3">متوسطة</th><th className="p-3">صغيرة</th><th className="p-3">الإجمالي</th><th className="p-3">مسحوبة (جرد سابق)</th><th className="p-3">الاحتياج</th><th className="p-3">مسجل الجرد</th><th className="p-3">ملاحظات</th></tr></thead><tbody>{quranHistoryRows.map((row) => <tr key={row.id} className="border-t"><td className="p-3 text-center">{new Date(row.countedAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td><td className="p-3 text-center">{row.largeCount}</td><td className="p-3 text-center">{row.mediumCount}</td><td className="p-3 text-center">{row.smallCount}</td><td className="p-3 text-center font-black text-emerald-700">{row.totalCount}</td><td className="p-3 text-center text-red-600">{row.damagedCount}</td><td className="p-3 text-center text-amber-700">{row.neededCount}</td><td className="p-3 text-center">{row.countedByName || '-'}</td><td className="max-w-[260px] p-3 text-xs leading-5">{row.notes || '-'}</td></tr>)}</tbody></table></div> : <Empty text="لا يوجد سجل جرد سابق لهذا الموقع" />}</div>
         </DialogContent>
       </Dialog>
 

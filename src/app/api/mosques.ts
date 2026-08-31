@@ -220,7 +220,7 @@ export type MosqueQuranWarehouse = {
 export type MosqueQuranStockMovement = {
   id: string;
   movementNumber: string;
-  movementType: 'receipt' | 'distribution' | 'return' | 'warehouse_damage' | 'adjustment_in' | 'adjustment_out';
+  movementType: 'receipt' | 'distribution' | 'return' | 'site_withdrawal' | 'warehouse_damage' | 'adjustment_in' | 'adjustment_out';
   warehouseId: string;
   siteId?: string | null;
   largeCount: number;
@@ -247,6 +247,7 @@ export type MosqueQuranStockDashboard = {
     receivedTotal: number;
     distributedTotal: number;
     returnedTotal: number;
+    withdrawnTotal: number;
     damagedTotal: number;
     siteSystemTotal: number;
     siteNeedTotal: number;
@@ -257,6 +258,7 @@ export type MosqueQuranStockDashboard = {
     site: Pick<MosqueSite, 'id' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation'>;
     latestInventory: MosqueQuranInventory | null;
     systemStock: MosqueQuranStockCount;
+    withdrawnStock: MosqueQuranStockCount;
   }>;
   recentMovements: MosqueQuranStockMovement[];
 };
