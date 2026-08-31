@@ -263,6 +263,30 @@ export type MosqueQuranStockDashboard = {
   recentMovements: MosqueQuranStockMovement[];
 };
 
+export type MosqueQuranOpeningBaselineStatus = {
+  closed: boolean;
+  closedAt?: string | null;
+  closedByName?: string | null;
+  totalSites: number;
+  countedSites: number;
+  remainingSites: number;
+  items: Array<{
+    site: Pick<MosqueSite, 'id' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation' | 'status'>;
+    counted: boolean;
+    baseline: null | {
+      largeCount: number;
+      mediumCount: number;
+      smallCount: number;
+      totalCount: number;
+      recommendedWithdrawalCount: number;
+      countedAt: string;
+      countedByName?: string | null;
+      notes?: string | null;
+      inventoryId?: string | null;
+    };
+  }>;
+};
+
 export type MosqueAssignment = {
   id: string;
   userId: string;
@@ -375,6 +399,9 @@ export const mosqueApi = {
   createQuranInventory: (input: Record<string, unknown>) => apiJson<MosqueQuranInventory>('/api/mosques/quran-inventory', { method: 'POST', body: JSON.stringify(input) }),
 
   quranStockDashboard: () => apiJson<MosqueQuranStockDashboard>('/api/mosques/quran-stock/dashboard'),
+  quranOpeningBaselineStatus: () => apiJson<MosqueQuranOpeningBaselineStatus>('/api/mosques/quran-stock/opening-baseline'),
+  saveQuranOpeningBaseline: (input: Record<string, unknown>) => apiJson<{ message: string; inventory: MosqueQuranInventory; state: MosqueQuranOpeningBaselineStatus }>('/api/mosques/quran-stock/opening-baseline', { method: 'POST', body: JSON.stringify(input) }),
+  closeQuranOpeningBaseline: (confirmation: string) => apiJson<{ message: string; state: MosqueQuranOpeningBaselineStatus }>('/api/mosques/quran-stock/opening-baseline/close', { method: 'POST', body: JSON.stringify({ confirmation }) }),
   quranStockMovements: () => apiJson<MosqueQuranStockMovement[]>('/api/mosques/quran-stock/movements'),
   createQuranWarehouse: (input: Record<string, unknown>) => apiJson<MosqueQuranWarehouse>('/api/mosques/quran-warehouses', { method: 'POST', body: JSON.stringify(input) }),
   updateQuranWarehouse: (id: string, input: Record<string, unknown>) => apiJson<MosqueQuranWarehouse>(`/api/mosques/quran-warehouses/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),

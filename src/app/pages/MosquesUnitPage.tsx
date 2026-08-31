@@ -67,6 +67,7 @@ import {
   type MosqueQuranInventory,
   type MosqueQuranInventoryOverviewItem,
   type MosqueQuranInventorySummary,
+  type MosqueQuranOpeningBaselineStatus,
   type MosqueQuranStockDashboard,
   type MosqueQuranStockMovement,
   type MosqueQuranWarehouse,
@@ -182,6 +183,15 @@ const emptyQuranInventoryForm = () => ({
   notes: '',
 });
 const emptyQuranSummary: MosqueQuranInventorySummary = { sites: 0, countedSites: 0, total: 0, large: 0, medium: 0, small: 0, damaged: 0, needed: 0 };
+
+const emptyQuranOpeningBaselineForm = () => ({
+  largeCount: '0',
+  mediumCount: '0',
+  smallCount: '0',
+  recommendedWithdrawalCount: '0',
+  countedAt: new Date().toISOString().slice(0, 10),
+  notes: '',
+});
 
 type QuranPrintSiteFilter = 'all' | 'mosque' | 'jami' | 'prayer_room_men' | 'prayer_room_women';
 type QuranPrintStateFilter = 'all' | 'with_stock' | 'without_stock' | 'need' | 'damaged' | 'not_counted';
@@ -428,6 +438,10 @@ export const MosquesUnitPage: React.FC = () => {
   const [quranHistoryRows, setQuranHistoryRows] = useState<MosqueQuranInventory[]>([]);
   const [quranHistoryLoading, setQuranHistoryLoading] = useState(false);
   const [quranStockDashboard, setQuranStockDashboard] = useState<MosqueQuranStockDashboard | null>(null);
+  const [quranOpeningBaselineStatus, setQuranOpeningBaselineStatus] = useState<MosqueQuranOpeningBaselineStatus | null>(null);
+  const [quranOpeningBaselineDialog, setQuranOpeningBaselineDialog] = useState(false);
+  const [quranOpeningBaselineSite, setQuranOpeningBaselineSite] = useState<MosqueSite | null>(null);
+  const [quranOpeningBaselineForm, setQuranOpeningBaselineForm] = useState<any>(emptyQuranOpeningBaselineForm());
   const [quranWarehouseDialog, setQuranWarehouseDialog] = useState(false);
   const [quranWarehouseForm, setQuranWarehouseForm] = useState<any>(emptyQuranWarehouseForm());
   const [editingQuranWarehouse, setEditingQuranWarehouse] = useState<MosqueQuranWarehouse | null>(null);
@@ -516,6 +530,12 @@ export const MosquesUnitPage: React.FC = () => {
           setQuranInventoryItems(quranData.items || []);
           setQuranSummary(quranData.summary || emptyQuranSummary);
           setQuranStockDashboard(quranStockData);
+          if (me.role === 'head') {
+            try { setQuranOpeningBaselineStatus(await mosqueApi.quranOpeningBaselineStatus()); }
+            catch { setQuranOpeningBaselineStatus(null); }
+          } else {
+            setQuranOpeningBaselineStatus(null);
+          }
         } catch {
           setQuranInventoryItems([]);
           setQuranSummary(emptyQuranSummary);
@@ -812,6 +832,78 @@ export const MosquesUnitPage: React.FC = () => {
       siteId: ['distribution', 'return', 'site_withdrawal'].includes(movementType) ? (sites[0]?.id || '') : '',
     });
     setQuranStockMovementDialog(true);
+  };
+
+  const openQuranOpeningBaselineForSite = (site: MosqueSite) => {
+    if (quranOpeningBaselineStatus?.closed) {
+      toast.info('الجرد التأسيسي معتمد ومقفل، ولا يمكن تعديل الرصيد الافتتاحي');
+      return;
+    }
+    const existing = quranOpeningBaselineStatus?.items.find((item) => item.site.id === site.id)?.baseline;
+    setQuranOpeningBaselineSite(site);
+    setQuranOpeningBaselineForm({
+      ...emptyQuranOpeningBaselineForm(),
+      largeCount: String(existing?.largeCount ?? 0),
+      mediumCount: String(existing?.mediumCount ?? 0),
+      smallCount: String(existing?.smallCount ?? 0),
+      recommendedWithdrawalCount: String(existing?.recommendedWithdrawalCount ?? 0),
+      countedAt: existing?.countedAt ? String(existing.countedAt).slice(0, 10) : new Date().toISOString().slice(0, 10),
+      notes: existing?.notes || '',
+    });
+    setQuranOpeningBaselineDialog(true);
+  };
+
+  const saveQuranOpeningBaseline = async () => {
+    if (!quranOpeningBaselineSite) return;
+    const keys = ['largeCount', 'mediumCount', 'smallCount', 'recommendedWithdrawalCount'] as const;
+    const parsed = Object.fromEntries(keys.map((key) => [key, Number(quranOpeningBaselineForm[key] || 0)])) as Record<typeof keys[number], number>;
+    if (keys.some((key) => !Number.isInteger(parsed[key]) || parsed[key] < 0)) return toast.error('أعداد الجرد التأسيسي يجب أن تكون أرقامًا صحيحة غير سالبة');
+    const total = parsed.largeCount + parsed.mediumCount + parsed.smallCount;
+    if (parsed.recommendedWithdrawalCount > total) return toast.error('عدد المصاحف الموصى بسحبها لا يمكن أن يتجاوز إجمالي الموجود في الموقع');
+    setQuranStockSaving(true);
+    try {
+      const result = await mosqueApi.saveQuranOpeningBaseline({
+        siteId: quranOpeningBaselineSite.id,
+        ...parsed,
+        countedAt: quranOpeningBaselineForm.countedAt || new Date().toISOString(),
+        notes: quranOpeningBaselineForm.notes || null,
+      });
+      setQuranOpeningBaselineStatus(result.state);
+      setQuranOpeningBaselineDialog(false);
+      setQuranOpeningBaselineSite(null);
+      toast.success(result.message || 'تم حفظ الجرد التأسيسي دون التأثير على رصيد مكتبة المصاحف');
+      await loadAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ الجرد التأسيسي');
+    } finally {
+      setQuranStockSaving(false);
+    }
+  };
+
+  const closeQuranOpeningBaseline = async () => {
+    if (!quranOpeningBaselineStatus || quranOpeningBaselineStatus.closed) return;
+    if (quranOpeningBaselineStatus.remainingSites > 0) {
+      toast.error(`لا يمكن الإقفال قبل حصر جميع المواقع. المتبقي ${quranOpeningBaselineStatus.remainingSites} موقعًا`);
+      return;
+    }
+    const phrase = 'اعتماد الجرد التأسيسي';
+    const entered = window.prompt(`سيتم إقفال الأرصدة الافتتاحية نهائيًا. اكتب العبارة التالية للتأكيد:
+
+${phrase}`);
+    if (entered === null) return;
+    if (entered.trim() !== phrase) return toast.error('عبارة التأكيد غير مطابقة');
+    if (!window.confirm('بعد الإقفال، أي إضافة جديدة للمساجد ستتم من مكتبة المصاحف وأي سحب سيتم كحركة مستقلة. هل تريد اعتماد الجرد التأسيسي؟')) return;
+    setQuranStockSaving(true);
+    try {
+      const result = await mosqueApi.closeQuranOpeningBaseline(phrase);
+      setQuranOpeningBaselineStatus(result.state);
+      toast.success(result.message || 'تم اعتماد وإقفال الجرد التأسيسي');
+      await loadAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إقفال الجرد التأسيسي');
+    } finally {
+      setQuranStockSaving(false);
+    }
   };
 
   const openQuranDistributionForSite = (site: MosqueSite) => {
@@ -2233,6 +2325,17 @@ ${quranStockMovementForm.notes}` : ''}`
               {canPrint && <Button variant="outline" className={button3d} onClick={openQuranPrintDialog}><Filter className="ml-2 h-4 w-4" />إعداد الطباعة / PDF</Button>}
             </CardHeader>
             <CardContent className="space-y-4 pt-5">
+              {role === 'head' && quranOpeningBaselineStatus && <div className={`rounded-2xl border p-4 ${quranOpeningBaselineStatus.closed ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70'}`}>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2"><p className="font-black text-slate-900">الجرد التأسيسي للمصاحف</p><Badge className={quranOpeningBaselineStatus.closed ? 'bg-emerald-600' : 'bg-amber-500'}>{quranOpeningBaselineStatus.closed ? 'معتمد ومقفل' : 'مرحلة الحصر الميداني'}</Badge></div>
+                    <p className="mt-1 text-xs leading-6 text-slate-600">يسجل المصاحف الموجودة فعليًا في المساجد والمصليات قبل تشغيل النظام كنقطة بداية، ولا يخصم أي كمية من مكتبة المصاحف.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="bg-white px-3 py-2">تم الحصر {quranOpeningBaselineStatus.countedSites} / {quranOpeningBaselineStatus.totalSites}</Badge>{!quranOpeningBaselineStatus.closed && <Button className={`${button3d} bg-emerald-700 hover:bg-emerald-600`} disabled={quranOpeningBaselineStatus.remainingSites > 0 || quranStockSaving} onClick={closeQuranOpeningBaseline}><CheckCircle2 className="ml-2 h-4 w-4" />اعتماد وإقفال الجرد التأسيسي</Button>}</div>
+                </div>
+                {!quranOpeningBaselineStatus.closed && quranOpeningBaselineStatus.remainingSites > 0 && <div className="mt-3 rounded-xl border border-amber-200 bg-white/80 px-3 py-2 text-xs font-bold text-amber-800">متبقي {quranOpeningBaselineStatus.remainingSites} موقعًا قبل إمكانية الاعتماد والإقفال.</div>}
+                {quranOpeningBaselineStatus.closed && <div className="mt-3 text-xs text-emerald-800">تم الإقفال {quranOpeningBaselineStatus.closedAt ? new Date(quranOpeningBaselineStatus.closedAt).toLocaleString('ar-SA-u-ca-gregory') : ''}{quranOpeningBaselineStatus.closedByName ? ` — بواسطة ${quranOpeningBaselineStatus.closedByName}` : ''}.</div>}
+              </div>}
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
                 <ReportMetric label="إجمالي المصاحف" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total} />
                 <ReportMetric label="المصاحف الكبيرة" value={quranStockDashboard?.sites.reduce((sum, row) => sum + row.systemStock.largeCount, 0) ?? quranSummary.large} />
@@ -2255,12 +2358,12 @@ ${quranStockMovementForm.notes}` : ''}`
                     const stockRow = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id);
                     const systemStock = stockRow?.systemStock;
                     const withdrawnStock = stockRow?.withdrawnStock;
-                    return <tr key={item.site.id} className="border-t border-slate-100 hover:bg-slate-50/60"><td className="p-3"><p className="font-black text-slate-800">{item.site.name}</p><p className="mt-1 text-xs text-muted-foreground">{siteTypeDisplayLabel(item.site as MosqueSite)} — {item.site.campusLocation || item.site.city || '-'}</p></td><td className="p-3 text-center font-bold">{systemStock?.largeCount ?? latest?.largeCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.mediumCount ?? latest?.mediumCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.smallCount ?? latest?.smallCount ?? 0}</td><td className="p-3 text-center text-lg font-black text-emerald-700">{systemStock?.totalCount ?? latest?.totalCount ?? 0}</td><td className="p-3 text-center font-bold text-red-600">{withdrawnStock?.totalCount ?? 0}</td><td className="p-3 text-center font-bold text-amber-700">{latest?.neededCount ?? 0}</td><td className="p-3 text-center text-xs">{latest ? new Date(latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : <Badge variant="outline">لم يجرد</Badge>}</td><td className="p-3"><div className="flex justify-center gap-2">{role === 'head' && <Button size="sm" className={`${button3d} bg-sky-700 hover:bg-sky-600`} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-3.5 w-3.5" />إضافة مصحف من المكتبة</Button>}{role === 'head' && <Button size="sm" className={`${button3d} bg-amber-600 hover:bg-amber-500`} onClick={() => openQuranWithdrawalForSite(site)}><RefreshCw className="ml-1 h-3.5 w-3.5" />سحب مصاحف</Button>}<Button size="sm" variant="outline" className={button3d} onClick={() => openQuranHistory(site)}><Clock3 className="ml-1 h-3.5 w-3.5" />السجل</Button></div></td></tr>;
+                    return <tr key={item.site.id} className="border-t border-slate-100 hover:bg-slate-50/60"><td className="p-3"><p className="font-black text-slate-800">{item.site.name}</p><p className="mt-1 text-xs text-muted-foreground">{siteTypeDisplayLabel(item.site as MosqueSite)} — {item.site.campusLocation || item.site.city || '-'}</p></td><td className="p-3 text-center font-bold">{systemStock?.largeCount ?? latest?.largeCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.mediumCount ?? latest?.mediumCount ?? 0}</td><td className="p-3 text-center font-bold">{systemStock?.smallCount ?? latest?.smallCount ?? 0}</td><td className="p-3 text-center text-lg font-black text-emerald-700">{systemStock?.totalCount ?? latest?.totalCount ?? 0}</td><td className="p-3 text-center font-bold text-red-600">{withdrawnStock?.totalCount ?? 0}</td><td className="p-3 text-center font-bold text-amber-700">{latest?.neededCount ?? 0}</td><td className="p-3 text-center text-xs">{latest ? new Date(latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : <Badge variant="outline">لم يجرد</Badge>}</td><td className="p-3"><div className="flex flex-wrap justify-center gap-2">{role === 'head' && quranOpeningBaselineStatus && !quranOpeningBaselineStatus.closed && <Button size="sm" className={`${button3d} bg-violet-700 hover:bg-violet-600`} onClick={() => openQuranOpeningBaselineForSite(site)}><ClipboardList className="ml-1 h-3.5 w-3.5" />{quranOpeningBaselineStatus.items.find((row) => row.site.id === site.id)?.counted ? 'تحديث الجرد التأسيسي' : 'الجرد التأسيسي'}</Button>}{role === 'head' && <Button size="sm" className={`${button3d} bg-sky-700 hover:bg-sky-600`} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-3.5 w-3.5" />إضافة مصحف من المكتبة</Button>}{role === 'head' && <Button size="sm" className={`${button3d} bg-amber-600 hover:bg-amber-500`} onClick={() => openQuranWithdrawalForSite(site)}><RefreshCw className="ml-1 h-3.5 w-3.5" />سحب مصاحف</Button>}<Button size="sm" variant="outline" className={button3d} onClick={() => openQuranHistory(site)}><Clock3 className="ml-1 h-3.5 w-3.5" />السجل</Button></div></td></tr>;
                   })}</tbody>
                 </table>
               </div>
               {!filteredQuranInventoryItems.length && <Empty text="لا توجد مواقع مطابقة لبحث حصر المصاحف" />}
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs leading-6 text-emerald-900">ملاحظة: <strong>إضافة المصاحف للمسجد أو المصلى تتم من زر «إضافة مصحف من المكتبة» فقط.</strong> عند الإضافة تخصم الكمية تلقائيًا من رصيد مكتبة المصاحف وتضاف إلى رصيد الموقع مع حفظ الحركة.</div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs leading-6 text-emerald-900">ملاحظة: خلال مرحلة البداية يستخدم «الجرد التأسيسي» لتسجيل المصاحف الموجودة أصلًا دون الخصم من المكتبة. <strong>بعد اعتماد وإقفال الجرد التأسيسي، إضافة أي مصحف جديد للمسجد أو المصلى تتم من زر «إضافة مصحف من المكتبة» فقط</strong> ليتم الخصم التلقائي وحفظ الحركة.</div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -2515,6 +2618,20 @@ ${quranStockMovementForm.notes}` : ''}`
             <Field label="ملاحظات"><Textarea rows={3} value={quranWarehouseForm.notes} onChange={(e) => setQuranWarehouseForm({ ...quranWarehouseForm, notes: e.target.value })} /></Field>
           </div>
           <DialogFooter className="border-t bg-white p-4 md:px-6"><Button variant="outline" onClick={() => setQuranWarehouseDialog(false)}>إلغاء</Button><Button className="bg-emerald-700 hover:bg-emerald-600" onClick={saveQuranWarehouse} disabled={quranStockSaving}><Save className="ml-2 h-4 w-4" />{quranStockSaving ? 'جاري الحفظ...' : editingQuranWarehouse ? 'حفظ التعديلات' : 'إنشاء المكتبة'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={quranOpeningBaselineDialog} onOpenChange={(open) => { setQuranOpeningBaselineDialog(open); if (!open) setQuranOpeningBaselineSite(null); }}>
+        <DialogContent className="grid h-[90dvh] max-h-[90dvh] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden p-0 gap-0 border-violet-200/80 bg-gradient-to-br from-white via-violet-50/25 to-emerald-50/20 sm:max-w-[900px]" dir="rtl">
+          <DialogHeader className="border-b border-violet-100 bg-gradient-to-l from-violet-50 via-white to-emerald-50 p-5 text-right"><DialogTitle className="flex items-center gap-2 text-xl font-black"><ClipboardList className="h-5 w-5 text-violet-700" />الجرد التأسيسي للمصاحف</DialogTitle><DialogDescription>{quranOpeningBaselineSite?.name || ''} — تسجيل الرصيد الموجود فعليًا قبل بدء العمل بالنظام. هذه العملية لا تخصم من مكتبة المصاحف.</DialogDescription></DialogHeader>
+          <div className="min-h-0 space-y-5 overflow-y-auto p-5 md:p-6">
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm leading-7 text-sky-900"><strong>نقطة البداية:</strong> احصر المصاحف الموجودة ميدانيًا في هذا المسجد أو المصلى ثم أدخلها هنا. بعد إقفال الجرد التأسيسي، أي مصحف جديد يضاف للموقع يجب أن يأتي من «مكتبة المصاحف» ويخصم منها تلقائيًا.</div>
+            <Card className="border-violet-200/70"><CardHeader className="pb-3"><CardTitle className="text-base">الرصيد الافتتاحي حسب الحجم</CardTitle><CardDescription>أدخل العدد الفعلي الموجود وقت الزيارة الميدانية.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-3"><Field label="المصاحف الكبيرة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranOpeningBaselineForm.largeCount} onChange={(e) => setQuranOpeningBaselineForm({ ...quranOpeningBaselineForm, largeCount: e.target.value })} /></Field><Field label="المصاحف المتوسطة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranOpeningBaselineForm.mediumCount} onChange={(e) => setQuranOpeningBaselineForm({ ...quranOpeningBaselineForm, mediumCount: e.target.value })} /></Field><Field label="المصاحف الصغيرة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranOpeningBaselineForm.smallCount} onChange={(e) => setQuranOpeningBaselineForm({ ...quranOpeningBaselineForm, smallCount: e.target.value })} /></Field></CardContent></Card>
+            <div className="grid gap-4 md:grid-cols-2"><Field label="مصاحف يوصى بسحبها"><Input type="number" min="0" step="1" inputMode="numeric" value={quranOpeningBaselineForm.recommendedWithdrawalCount} onChange={(e) => setQuranOpeningBaselineForm({ ...quranOpeningBaselineForm, recommendedWithdrawalCount: e.target.value })} /><p className="mt-1 text-[11px] leading-5 text-muted-foreground">توصية ميدانية فقط؛ لا تعتبر المصاحف مسحوبة حتى تنفيذ إجراء «سحب مصاحف» فعليًا.</p></Field><Field label="تاريخ الحصر الميداني"><Input type="date" value={quranOpeningBaselineForm.countedAt} onChange={(e) => setQuranOpeningBaselineForm({ ...quranOpeningBaselineForm, countedAt: e.target.value })} /></Field></div>
+            <div className="grid grid-cols-2 gap-3 rounded-2xl border border-violet-200 bg-violet-50/60 p-4 sm:grid-cols-4"><Info label="الإجمالي" value={(Number(quranOpeningBaselineForm.largeCount || 0) + Number(quranOpeningBaselineForm.mediumCount || 0) + Number(quranOpeningBaselineForm.smallCount || 0)).toLocaleString('ar-SA')} /><Info label="الكبيرة" value={Number(quranOpeningBaselineForm.largeCount || 0).toLocaleString('ar-SA')} /><Info label="المتوسطة" value={Number(quranOpeningBaselineForm.mediumCount || 0).toLocaleString('ar-SA')} /><Info label="الصغيرة" value={Number(quranOpeningBaselineForm.smallCount || 0).toLocaleString('ar-SA')} /></div>
+            <Field label="ملاحظات الحصر"><Textarea rows={4} value={quranOpeningBaselineForm.notes} onChange={(e) => setQuranOpeningBaselineForm({ ...quranOpeningBaselineForm, notes: e.target.value })} placeholder="مثال: بعض المصاحف قديمة ويوصى بسحبها، موقع المصاحف داخل المسجد، ملاحظات الزيارة..." /></Field>
+          </div>
+          <DialogFooter className="relative z-20 shrink-0 border-t border-violet-100 bg-white p-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] md:px-6"><Button variant="outline" className={button3d} onClick={() => setQuranOpeningBaselineDialog(false)}>إلغاء</Button><Button className={`${button3d} min-w-40 bg-violet-700 hover:bg-violet-600`} onClick={saveQuranOpeningBaseline} disabled={quranStockSaving}><Save className="ml-2 h-4 w-4" />{quranStockSaving ? 'جاري الحفظ...' : 'حفظ الرصيد الافتتاحي'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
