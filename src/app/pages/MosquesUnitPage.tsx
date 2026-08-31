@@ -68,6 +68,7 @@ import {
   type MosqueQuranInventoryOverviewItem,
   type MosqueQuranInventorySummary,
   type MosqueQuranStockDashboard,
+  type MosqueQuranStockMovement,
   type MosqueQuranWarehouse,
   type MosqueRequest,
   type MosqueSite,
@@ -190,6 +191,10 @@ const quranStockMovementTypeLabels: Record<string, string> = {
   adjustment_in: 'تسوية زيادة',
   adjustment_out: 'تسوية نقص',
 };
+const quranStockMovementDisplayLabel = (movement: MosqueQuranStockMovement) =>
+  movement.movementType === 'return' && movement.notes?.startsWith('تراجع عن حركة الصرف')
+    ? 'تراجع عن صرف'
+    : quranStockMovementDisplayLabel(movement);
 const emptyQuranWarehouseForm = () => ({ code: '', name: 'المستودع المركزي للمصاحف', location: '', active: true, minLargeCount: '0', minMediumCount: '0', minSmallCount: '0', notes: '' });
 const emptyQuranStockMovementForm = () => ({ movementType: 'receipt', warehouseId: '', siteId: '', largeCount: '0', mediumCount: '0', smallCount: '0', referenceNumber: '', movementAt: new Date().toISOString().slice(0, 10), notes: '' });
 
@@ -633,6 +638,10 @@ export const MosquesUnitPage: React.FC = () => {
     });
   }, [quranInventoryItems, quranSearch, quranNeedOnly]);
 
+  const isQuranDistributionReversed = (movementNumber: string) => Boolean(
+    quranStockDashboard?.recentMovements.some((item) => item.movementType === 'return' && item.referenceNumber === movementNumber)
+  );
+
   const openQuranInventoryDialog = (site: MosqueSite) => {
     const latest = quranLatestBySite[site.id] as MosqueQuranInventory | null | undefined;
     setQuranInventorySite(site);
@@ -739,7 +748,7 @@ export const MosquesUnitPage: React.FC = () => {
     const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char] || char));
     const movements = (quranStockDashboard?.recentMovements || []).filter((item) => item.warehouseId === warehouse.id).slice(0, 30);
     const movementRows = movements.length
-      ? movements.map((movement, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(movement.movementNumber)}</td><td>${escapeHtml(quranStockMovementTypeLabels[movement.movementType] || movement.movementType)}</td><td>${escapeHtml(movement.site?.name || '-')}</td><td>${movement.largeCount}</td><td>${movement.mediumCount}</td><td>${movement.smallCount}</td><td><b>${movement.totalCount}</b></td><td>${escapeHtml(new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory'))}</td></tr>`).join('')
+      ? movements.map((movement, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(movement.movementNumber)}</td><td>${escapeHtml(quranStockMovementDisplayLabel(movement))}</td><td>${escapeHtml(movement.site?.name || '-')}</td><td>${movement.largeCount}</td><td>${movement.mediumCount}</td><td>${movement.smallCount}</td><td><b>${movement.totalCount}</b></td><td>${escapeHtml(new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory'))}</td></tr>`).join('')
       : '<tr><td colspan="9">لا توجد حركات مخزون ظاهرة لهذا المستودع.</td></tr>';
     const status = warehouse.active ? 'مفعّل' : 'غير مفعّل';
     const stockStatus = warehouse.lowStock ? 'مخزون منخفض' : 'الرصيد آمن';
@@ -796,6 +805,25 @@ export const MosquesUnitPage: React.FC = () => {
       await loadAll();
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تسجيل حركة مخزون المصاحف'); }
     finally { setQuranStockSaving(false); }
+  };
+
+  const reverseQuranStockMovement = async (movement: MosqueQuranStockMovement) => {
+    if (movement.movementType !== 'distribution') return;
+    if (isQuranDistributionReversed(movement.movementNumber)) return toast.info('تم التراجع عن حركة الصرف هذه مسبقًا');
+    const reason = window.prompt(`سبب التراجع عن حركة الصرف ${movement.movementNumber}:`, 'إدخال حركة الصرف بالخطأ');
+    if (reason === null) return;
+    if (reason.trim().length < 3) return toast.error('اكتب سببًا واضحًا للتراجع');
+    if (!window.confirm(`سيتم عكس حركة الصرف ${movement.movementNumber} وإعادة ${movement.totalCount} مصحفًا إلى المستودع مع إبقاء الحركة الأصلية في السجل. هل تريد المتابعة؟`)) return;
+    setQuranStockSaving(true);
+    try {
+      const result = await mosqueApi.reverseQuranStockMovement(movement.id, { reason: reason.trim() });
+      toast.success(`تم التراجع عن الصرف وإعادة الكمية للمستودع بموجب ${result.reversal.movementNumber}`);
+      await loadAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر التراجع عن حركة الصرف');
+    } finally {
+      setQuranStockSaving(false);
+    }
   };
 
   const openQuranHistory = async (site: MosqueSite) => {
@@ -2028,8 +2056,8 @@ export const MosquesUnitPage: React.FC = () => {
               ))}</div>}
 
               <div>
-                <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-black text-slate-800">آخر حركات المصاحف</p><p className="text-xs text-muted-foreground">سجل التوريد والصرف والتوزيع والإرجاع والتسويات.</p></div><Badge variant="outline">{quranStockDashboard?.recentMovements.length || 0} حركة ظاهرة</Badge></div>
-                {quranStockDashboard?.recentMovements.length ? <div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[1000px] text-sm"><thead className="bg-slate-50"><tr><th className="p-3">رقم الحركة</th><th className="p-3">النوع</th><th className="p-3">المستودع</th><th className="p-3">المسجد / المصلى</th><th className="p-3">كبير</th><th className="p-3">متوسط</th><th className="p-3">صغير</th><th className="p-3">الإجمالي</th><th className="p-3">التاريخ</th></tr></thead><tbody>{quranStockDashboard.recentMovements.slice(0, 20).map((movement) => <tr key={movement.id} className="border-t"><td className="p-3 text-center font-mono text-xs">{movement.movementNumber}</td><td className="p-3 text-center"><Badge variant="outline">{quranStockMovementTypeLabels[movement.movementType] || movement.movementType}</Badge></td><td className="p-3 text-center">{movement.warehouse?.name || '-'}</td><td className="p-3 text-center">{movement.site?.name || '-'}</td><td className="p-3 text-center">{movement.largeCount}</td><td className="p-3 text-center">{movement.mediumCount}</td><td className="p-3 text-center">{movement.smallCount}</td><td className="p-3 text-center font-black text-emerald-700">{movement.totalCount}</td><td className="p-3 text-center text-xs">{new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td></tr>)}</tbody></table></div> : <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">لا توجد حركات مخزون مسجلة حتى الآن.</div>}
+                <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-black text-slate-800">آخر حركات المصاحف</p><p className="text-xs text-muted-foreground">سجل محاسبي غير قابل للمحو. التراجع عن الصرف ينشئ حركة إرجاع عكسية ويحافظ على الحركة الأصلية للتدقيق.</p></div><Badge variant="outline">{quranStockDashboard?.recentMovements.length || 0} حركة ظاهرة</Badge></div>
+                {quranStockDashboard?.recentMovements.length ? <div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[1120px] text-sm"><thead className="bg-slate-50"><tr><th className="p-3">رقم الحركة</th><th className="p-3">النوع</th><th className="p-3">المستودع</th><th className="p-3">المسجد / المصلى</th><th className="p-3">كبير</th><th className="p-3">متوسط</th><th className="p-3">صغير</th><th className="p-3">الإجمالي</th><th className="p-3">التاريخ</th><th className="p-3">الإجراء</th></tr></thead><tbody>{quranStockDashboard.recentMovements.slice(0, 20).map((movement) => { const reversed = movement.movementType === 'distribution' && isQuranDistributionReversed(movement.movementNumber); return <tr key={movement.id} className="border-t"><td className="p-3 text-center font-mono text-xs">{movement.movementNumber}</td><td className="p-3 text-center"><Badge variant="outline" className={movement.notes?.startsWith('تراجع عن حركة الصرف') ? 'border-amber-300 bg-amber-50 text-amber-800' : ''}>{quranStockMovementDisplayLabel(movement)}</Badge></td><td className="p-3 text-center">{movement.warehouse?.name || '-'}</td><td className="p-3 text-center">{movement.site?.name || '-'}</td><td className="p-3 text-center">{movement.largeCount}</td><td className="p-3 text-center">{movement.mediumCount}</td><td className="p-3 text-center">{movement.smallCount}</td><td className="p-3 text-center font-black text-emerald-700">{movement.totalCount}</td><td className="p-3 text-center text-xs">{new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td><td className="p-3 text-center">{movement.movementType === 'distribution' ? reversed ? <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">تم التراجع</Badge> : role === 'head' ? <Button size="sm" variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" disabled={quranStockSaving} onClick={() => void reverseQuranStockMovement(movement)}><RefreshCw className="ml-1 h-3.5 w-3.5" />تراجع</Button> : '-' : movement.notes?.startsWith('تراجع عن حركة الصرف') ? <span className="text-xs text-muted-foreground">حركة عكسية</span> : '-'}</td></tr>; })}</tbody></table></div> : <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">لا توجد حركات مخزون مسجلة حتى الآن.</div>}
               </div>
             </CardContent>
           </Card>
@@ -2313,7 +2341,7 @@ export const MosquesUnitPage: React.FC = () => {
               <Card className={quranWarehousePreview.lowStock ? 'border-red-200 bg-red-50/30' : 'border-emerald-200 bg-emerald-50/30'}><CardHeader className="pb-3"><div className="flex items-center justify-between gap-3"><CardTitle className="text-base">الرصيد الحالي وحدود الأمان</CardTitle>{quranWarehousePreview.lowStock ? <Badge className="bg-red-600">مخزون منخفض</Badge> : <Badge className="bg-emerald-600">الرصيد آمن</Badge>}</div></CardHeader><CardContent className="grid grid-cols-2 gap-3 md:grid-cols-4"><Info label="الإجمالي" value={quranWarehousePreview.balance.totalCount.toLocaleString('ar-SA')} /><Info label={`كبير — حد ${quranWarehousePreview.minLargeCount}`} value={quranWarehousePreview.balance.largeCount.toLocaleString('ar-SA')} /><Info label={`متوسط — حد ${quranWarehousePreview.minMediumCount}`} value={quranWarehousePreview.balance.mediumCount.toLocaleString('ar-SA')} /><Info label={`صغير — حد ${quranWarehousePreview.minSmallCount}`} value={quranWarehousePreview.balance.smallCount.toLocaleString('ar-SA')} /></CardContent></Card>
               {quranWarehousePreview.lowStock && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">الناقص حتى حد الأمان: كبير {quranWarehousePreview.shortage.largeCount} — متوسط {quranWarehousePreview.shortage.mediumCount} — صغير {quranWarehousePreview.shortage.smallCount}</div>}
               <Card><CardHeader className="pb-3"><CardTitle className="text-base">الملاحظات</CardTitle></CardHeader><CardContent className="text-sm leading-7 text-slate-700">{quranWarehousePreview.notes || 'لا توجد ملاحظات مسجلة.'}</CardContent></Card>
-              <div><div className="mb-2 flex items-center justify-between"><p className="font-black text-slate-800">آخر حركات هذا المستودع</p><Badge variant="outline">{(quranStockDashboard?.recentMovements || []).filter((item) => item.warehouseId === quranWarehousePreview.id).length} حركة ظاهرة</Badge></div><div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[850px] text-sm"><thead className="bg-slate-50"><tr><th className="p-3">رقم الحركة</th><th className="p-3">النوع</th><th className="p-3">الموقع المستفيد</th><th className="p-3">كبير</th><th className="p-3">متوسط</th><th className="p-3">صغير</th><th className="p-3">الإجمالي</th><th className="p-3">التاريخ</th></tr></thead><tbody>{(quranStockDashboard?.recentMovements || []).filter((item) => item.warehouseId === quranWarehousePreview.id).slice(0, 15).map((movement) => <tr key={movement.id} className="border-t"><td className="p-3 text-center font-mono text-xs">{movement.movementNumber}</td><td className="p-3 text-center">{quranStockMovementTypeLabels[movement.movementType] || movement.movementType}</td><td className="p-3 text-center">{movement.site?.name || '-'}</td><td className="p-3 text-center">{movement.largeCount}</td><td className="p-3 text-center">{movement.mediumCount}</td><td className="p-3 text-center">{movement.smallCount}</td><td className="p-3 text-center font-black">{movement.totalCount}</td><td className="p-3 text-center text-xs">{new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td></tr>)}{!(quranStockDashboard?.recentMovements || []).some((item) => item.warehouseId === quranWarehousePreview.id) && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">لا توجد حركات مخزون ظاهرة لهذا المستودع.</td></tr>}</tbody></table></div></div>
+              <div><div className="mb-2 flex items-center justify-between"><p className="font-black text-slate-800">آخر حركات هذا المستودع</p><Badge variant="outline">{(quranStockDashboard?.recentMovements || []).filter((item) => item.warehouseId === quranWarehousePreview.id).length} حركة ظاهرة</Badge></div><div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[850px] text-sm"><thead className="bg-slate-50"><tr><th className="p-3">رقم الحركة</th><th className="p-3">النوع</th><th className="p-3">الموقع المستفيد</th><th className="p-3">كبير</th><th className="p-3">متوسط</th><th className="p-3">صغير</th><th className="p-3">الإجمالي</th><th className="p-3">التاريخ</th></tr></thead><tbody>{(quranStockDashboard?.recentMovements || []).filter((item) => item.warehouseId === quranWarehousePreview.id).slice(0, 15).map((movement) => <tr key={movement.id} className="border-t"><td className="p-3 text-center font-mono text-xs">{movement.movementNumber}</td><td className="p-3 text-center">{quranStockMovementDisplayLabel(movement)}</td><td className="p-3 text-center">{movement.site?.name || '-'}</td><td className="p-3 text-center">{movement.largeCount}</td><td className="p-3 text-center">{movement.mediumCount}</td><td className="p-3 text-center">{movement.smallCount}</td><td className="p-3 text-center font-black">{movement.totalCount}</td><td className="p-3 text-center text-xs">{new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td></tr>)}{!(quranStockDashboard?.recentMovements || []).some((item) => item.warehouseId === quranWarehousePreview.id) && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">لا توجد حركات مخزون ظاهرة لهذا المستودع.</td></tr>}</tbody></table></div></div>
             </div>
             <DialogFooter className="border-t bg-white p-4 md:px-6"><Button variant="outline" onClick={() => setQuranWarehousePreview(null)}>إغلاق</Button><Button variant="outline" onClick={() => printQuranWarehouse(quranWarehousePreview)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>{role === 'head' && <Button className="bg-sky-700 hover:bg-sky-600" onClick={() => { const warehouse = quranWarehousePreview; setQuranWarehousePreview(null); openEditQuranWarehouse(warehouse); }}><Pencil className="ml-2 h-4 w-4" />تعديل</Button>}</DialogFooter>
           </>}
