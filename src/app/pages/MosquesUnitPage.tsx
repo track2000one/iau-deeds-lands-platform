@@ -47,6 +47,7 @@ import { Textarea } from '../components/ui/textarea';
 import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { MosqueFieldVisitsPanel } from '../components/MosqueFieldVisitsPanel';
 import {
   Dialog,
   DialogContent,
@@ -2059,7 +2060,7 @@ ${quranStockMovementForm.notes}` : ''}`
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" className={button3d} onClick={() => navigate('/mosques/public')}><ExternalLink className="ml-2 h-4 w-4" />البوابة العامة</Button>
-            {role !== 'personnel' && <Button variant="outline" className={button3d} onClick={() => window.open('https://inspection-vna1.vercel.app/', '_blank', 'noopener,noreferrer')}><ClipboardList className="ml-2 h-4 w-4" />نظام المعاينة</Button>}
+            {['head', 'supervisor'].includes(role) && <Button variant="outline" className={button3d} onClick={() => goToDashboardSection('field-visits')}><ClipboardList className="ml-2 h-4 w-4" />الجولات والزيارات</Button>}
             <Button variant="outline" className={button3d} onClick={loadAll}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button>
             {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" className={button3d} onClick={openMediaImportDialog}><FileText className="ml-2 h-4 w-4" />استيراد مكتبة ZIP</Button>}
             {canAdd && ['head', 'supervisor'].includes(role) && <Button className={`${button3d} bg-sky-700 hover:bg-sky-800`} onClick={() => openSiteDialog()}><Plus className="ml-2 h-4 w-4" />إضافة مسجد / مصلى</Button>}
@@ -2117,6 +2118,7 @@ ${quranStockMovementForm.notes}` : ''}`
           >
             <option value="overview">الرئيسية</option>
             <option value="sites">المساجد والمصليات</option>
+            {['head', 'supervisor'].includes(role) && <option value="field-visits">الجولات والزيارات</option>}
             {['head', 'supervisor', 'personnel'].includes(role) && <option value="quran">المصاحف</option>}
             {['head', 'supervisor', 'personnel'].includes(role) && <option value="requests">الطلبات</option>}
             {['head', 'supervisor'].includes(role) && <option value="tickets">البلاغات</option>}
@@ -2133,6 +2135,7 @@ ${quranStockMovementForm.notes}` : ''}`
         <TabsList className="hidden h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border bg-white/80 p-2 sm:flex [&>[data-slot=tabs-trigger]]:min-w-max [&>[data-slot=tabs-trigger]]:flex-none">
           <TabsTrigger value="overview">الرئيسية</TabsTrigger>
           <TabsTrigger value="sites">المساجد والمصليات</TabsTrigger>
+          {['head', 'supervisor'].includes(role) && <TabsTrigger value="field-visits">الجولات والزيارات</TabsTrigger>}
           {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger value="quran">المصاحف</TabsTrigger>}
           {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger value="requests">الطلبات</TabsTrigger>}
           {['head', 'supervisor'].includes(role) && <TabsTrigger value="tickets">البلاغات</TabsTrigger>}
@@ -2276,6 +2279,10 @@ ${quranStockMovementForm.notes}` : ''}`
           </Card>
           {visibleSites.length === 0 ? <Empty text="لا توجد مساجد أو مصليات مسجلة" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{visibleSites.map((site) => <SiteCard key={site.id} site={site} canEdit={canEdit && ['head', 'supervisor'].includes(role)} canDelete={canDelete && role === 'head'} canPrint={canPrint} onPreview={() => setPreviewSite(site)} onPrint={() => void printSiteCard(site)} onEdit={() => openSiteDialog(site)} onDelete={() => deleteSite(site)} onQr={() => setQrSite(site)} quranInventory={quranLatestBySite[site.id] as MosqueQuranInventory | null | undefined} />)}</div>}
         </TabsContent>
+
+        {['head', 'supervisor'].includes(role) && <TabsContent value="field-visits" className="space-y-4">
+          <MosqueFieldVisitsPanel sites={sites} canAdd={canAdd} canEdit={canEdit} canPrint={canPrint} />
+        </TabsContent>}
 
         <TabsContent value="requests" className="space-y-4">
           {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />الإبلاغ عن مشكلة / طلب صيانة أو احتياج</Button></div>}

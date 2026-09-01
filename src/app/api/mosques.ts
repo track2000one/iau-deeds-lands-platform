@@ -48,6 +48,80 @@ export type MosqueSite = {
   _count?: { requests: number; tickets: number; personnel: number };
 };
 
+export type MosqueFieldVisitImage = {
+  url: string;
+  fileId?: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  capturedAt?: string | null;
+};
+
+export type MosqueFieldVisitItem = {
+  id?: string;
+  visitId?: string;
+  category: string;
+  title: string;
+  status: 'good' | 'needs_action' | 'not_available' | 'not_applicable' | 'not_checked';
+  note?: string | null;
+  priority: 'low' | 'normal' | 'medium' | 'high' | 'urgent';
+  responsibleEntity?: string | null;
+  dueDate?: string | null;
+  resolutionStatus: 'new' | 'referred' | 'in_progress' | 'resolved' | 'closed';
+  resolutionNote?: string | null;
+  beforeImages: MosqueFieldVisitImage[];
+  afterImages: MosqueFieldVisitImage[];
+};
+
+export type MosqueFieldVisit = {
+  id: string;
+  visitNumber: string;
+  tourId?: string | null;
+  siteId: string;
+  visitType: 'initial' | 'follow_up' | 'urgent' | 'closure_verification';
+  visitDate: string;
+  departureAt?: string | null;
+  representativeName?: string | null;
+  teamMembers: string[];
+  overallStatus: 'excellent' | 'good' | 'needs_attention' | 'critical';
+  priority: 'low' | 'normal' | 'medium' | 'high' | 'urgent';
+  workflowStatus: 'planned' | 'in_progress' | 'completed' | 'follow_up' | 'closed';
+  generalNotes?: string | null;
+  recommendations?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  site: Pick<MosqueSite, 'id' | 'publicToken' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation' | 'status'>;
+  tour?: Pick<MosqueFieldTour, 'id' | 'tourNumber' | 'title' | 'scheduledDate' | 'status'> | null;
+  items: MosqueFieldVisitItem[];
+};
+
+export type MosqueFieldTour = {
+  id: string;
+  tourNumber: string;
+  title: string;
+  scheduledDate: string;
+  scope?: string | null;
+  teamMembers: string[];
+  status: 'scheduled' | 'in_progress' | 'completed' | 'postponed' | 'cancelled';
+  notes?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  visits?: Array<Pick<MosqueFieldVisit, 'id' | 'visitNumber' | 'siteId' | 'visitDate' | 'workflowStatus' | 'overallStatus' | 'priority' | 'site'>>;
+};
+
+export type MosqueFieldVisitSummary = {
+  totalSites: number;
+  visitedSites: number;
+  remainingSites: number;
+  coveragePercent: number;
+  visits: number;
+  openItems: number;
+  urgentItems: number;
+  resolvedItems: number;
+  overdueItems: number;
+};
+
 export type MosqueApplicantInfo = {
   userId?: string | null;
   name: string;
@@ -378,6 +452,16 @@ export const mosqueApi = {
   createSite: (input: Partial<MosqueSite>) => apiJson<MosqueSite>('/api/mosques/sites', { method: 'POST', body: JSON.stringify(input) }),
   updateSite: (id: string, input: Partial<MosqueSite>) => apiJson<MosqueSite>(`/api/mosques/sites/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteSite: (id: string) => apiJson<void>(`/api/mosques/sites/${id}`, { method: 'DELETE' }),
+
+  fieldVisitChecklist: () => apiJson<MosqueFieldVisitItem[]>('/api/mosques/field-visits/checklist-template'),
+  fieldTours: () => apiJson<MosqueFieldTour[]>('/api/mosques/field-tours'),
+  createFieldTour: (input: Record<string, unknown>) => apiJson<MosqueFieldTour>('/api/mosques/field-tours', { method: 'POST', body: JSON.stringify(input) }),
+  updateFieldTour: (id: string, input: Record<string, unknown>) => apiJson<MosqueFieldTour>(`/api/mosques/field-tours/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  fieldVisits: (filters: { siteId?: string; tourId?: string; workflowStatus?: string } = {}) => apiJson<MosqueFieldVisit[]>(`/api/mosques/field-visits?${new URLSearchParams(filters).toString()}`),
+  fieldVisit: (id: string) => apiJson<MosqueFieldVisit>(`/api/mosques/field-visits/${id}`),
+  fieldVisitSummary: () => apiJson<MosqueFieldVisitSummary>('/api/mosques/field-visits/summary'),
+  createFieldVisit: (input: Record<string, unknown>) => apiJson<MosqueFieldVisit>('/api/mosques/field-visits', { method: 'POST', body: JSON.stringify(input) }),
+  updateFieldVisit: (id: string, input: Record<string, unknown>) => apiJson<MosqueFieldVisit>(`/api/mosques/field-visits/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
 
   requests: () => apiJson<MosqueRequest[]>('/api/mosques/requests'),
   createRequest: (input: Record<string, unknown>) => apiJson<MosqueRequest>('/api/mosques/requests', { method: 'POST', body: JSON.stringify(input) }),
