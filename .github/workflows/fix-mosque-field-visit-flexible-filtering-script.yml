@@ -1,0 +1,37 @@
+name: Fix Mosque Field Visit Flexible Filtering Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-mosque-field-visit-flexible-filtering-script.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fix nested template literals
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/apply-mosque-field-visit-flexible-filtering-print-title.mjs')
+          s = p.read_text()
+          s = s.replace("{activeFilterCount ? ` (${activeFilterCount})` : ''}", "{activeFilterCount ? ' (' + activeFilterCount + ')' : ''}")
+          s = s.replace("{activeFilterCount ? `تم تطبيق ${activeFilterCount} معيار تصفية.` : 'سيتم تضمين جميع الزيارات.'}", "{activeFilterCount ? 'تم تطبيق ' + activeFilterCount + ' معيار تصفية.' : 'سيتم تضمين جميع الزيارات.'}")
+          p.write_text(s)
+          PY
+      - name: Commit fix and remove temporary workflow
+        run: |
+          rm -f .github/workflows/fix-mosque-field-visit-flexible-filtering-script.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/apply-mosque-field-visit-flexible-filtering-print-title.mjs .github/workflows/fix-mosque-field-visit-flexible-filtering-script.yml
+          git commit -m "Fix flexible field visit patch script"
+          git push
