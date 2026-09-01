@@ -33,6 +33,7 @@ export type MosqueSite = {
   campusLocation?: string | null;
   area?: number | null;
   capacity?: number | null;
+  quranTargetCount?: number | null;
   latitude?: number | null;
   longitude?: number | null;
   mapUrl?: string | null;
@@ -255,10 +256,14 @@ export type MosqueQuranStockDashboard = {
     shortageTotal: number;
   };
   sites: Array<{
-    site: Pick<MosqueSite, 'id' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation'>;
+    site: Pick<MosqueSite, 'id' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation' | 'quranTargetCount'>;
     latestInventory: MosqueQuranInventory | null;
     systemStock: MosqueQuranStockCount;
     withdrawnStock: MosqueQuranStockCount;
+    targetCount: number;
+    needCount: number;
+    coveragePercent: number | null;
+    needLevel: 'not_set' | 'complete' | 'low' | 'medium' | 'high';
   }>;
   recentMovements: MosqueQuranStockMovement[];
 };
