@@ -46,7 +46,8 @@ const enhanceRequiredFields = () => {
     if (control) markRequiredLabel(label, control);
   });
 
-  document.querySelectorAll<HTMLElement>(`${CONTROL_SELECTOR}[required], ${CONTROL_SELECTOR}[aria-required="true"]`).forEach((control) => {
+  document.querySelectorAll<HTMLElement>(CONTROL_SELECTOR).forEach((control) => {
+    if (!control.matches('[required], [aria-required="true"]')) return;
     control.dataset.appRequired = 'true';
     const id = control.id;
     const associatedLabel = id
