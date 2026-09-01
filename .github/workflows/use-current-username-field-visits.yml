@@ -1,0 +1,47 @@
+name: Use Current Username For Field Visits
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/use-current-username-field-visits.py'
+      - '.github/workflows/use-current-username-field-visits.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: use-current-username-field-visits-frontend
+  cancel-in-progress: true
+
+jobs:
+  apply-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply current username UI
+        run: python3 scripts/use-current-username-field-visits.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify frontend build
+        run: npm run build
+      - name: Commit verified frontend source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/api/mosques.ts src/app/pages/MosquesUnitPage.tsx src/app/components/MosqueFieldVisitsPanel.tsx
+          if git diff --cached --quiet; then
+            echo "No frontend source changes to commit"
+            exit 0
+          fi
+          git commit -m "feat(mosques): use current username for field visits"
+          git push origin main
