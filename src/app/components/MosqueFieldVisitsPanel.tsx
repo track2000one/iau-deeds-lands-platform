@@ -7,6 +7,7 @@ import {
   ClipboardList,
   FileText,
   Eye,
+  Image as ImageIcon,
   Loader2,
   MapPin,
   Paperclip,
@@ -345,16 +346,17 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
       const uploaded: MosqueFieldVisitAttachment[] = [];
       for (const file of selected) {
         const result = await mosqueApi.upload(file);
-        uploaded.push({
+        const attachment: MosqueFieldVisitAttachment = {
           url: result.driveUrl,
           fileId: result.driveFileId || null,
           fileName: result.fileName || file.name,
           mimeType: result.mimeType || file.type,
           fileSize: file.size,
           capturedAt: new Date().toISOString(),
-        });
+        };
+        uploaded.push(attachment);
+        setVisitForm((current) => ({ ...current, attachments: [...current.attachments, attachment] }));
       }
-      setVisitForm((current) => ({ ...current, attachments: [...current.attachments, ...uploaded] }));
       toast.success(`تم رفع ${uploaded.length} ${uploaded.length === 1 ? 'مرفق' : 'مرفقات'}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر رفع مرفقات الزيارة');
@@ -597,7 +599,42 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 const InfoLine: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => <div className="flex items-start justify-between gap-3"><span className="text-slate-500">{label}</span><b className="text-left text-slate-800">{value || '-'}</b></div>;
 const InfoBox: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => <div className="rounded-xl border bg-white p-3"><span className="block text-[11px] font-semibold text-slate-500">{label}</span><b className="mt-1 block text-sm text-slate-800">{value || '-'}</b></div>;
 const ReadOnlyNote: React.FC<{ label: string; value?: string | null }> = ({ label, value }) => <div className="rounded-xl border bg-white p-3"><span className="block text-[11px] font-semibold text-slate-500">{label}</span><p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{value || '-'}</p></div>;
-const VisitImages: React.FC<{ label: string; images: MosqueFieldVisitImage[] }> = ({ label, images }) => <div><p className="mb-2 text-xs font-bold text-slate-600">{label} ({images.length})</p><div className="flex flex-wrap gap-2">{images.length ? images.map((image, index) => <a key={`${image.url}-${index}`} href={image.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-white shadow-sm"><img src={image.url} alt={`${label} ${index + 1}`} className="h-20 w-24 object-cover" /></a>) : <span className="text-xs text-slate-400">لا توجد صور</span>}</div></div>;
+const AttachmentPreview: React.FC<{
+  attachment: MosqueFieldVisitAttachment;
+  className?: string;
+}> = ({ attachment, className = 'h-full w-full' }) => {
+  const [previewUrl, setPreviewUrl] = React.useState(attachment.fileId ? '' : attachment.url);
+  const [failed, setFailed] = React.useState(false);
+  const isPdf = attachment.mimeType === 'application/pdf' || String(attachment.fileName || '').toLowerCase().endsWith('.pdf');
+
+  React.useEffect(() => {
+    let active = true;
+    let objectUrl = '';
+    setFailed(false);
+    if (!attachment.fileId) {
+      setPreviewUrl(attachment.url);
+      return () => { active = false; };
+    }
+    setPreviewUrl('');
+    void mosqueApi.mediaBlob(attachment.fileId).then((blob) => {
+      if (!active) return;
+      objectUrl = URL.createObjectURL(blob);
+      setPreviewUrl(objectUrl);
+    }).catch(() => {
+      if (active) setFailed(true);
+    });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachment.fileId, attachment.url]);
+
+  if (failed) return <div className={`flex flex-col items-center justify-center bg-slate-100 text-slate-500 ${className}`}>{isPdf ? <FileText className="h-9 w-9 text-red-600" /> : <ImageIcon className="h-9 w-9 text-sky-600" />}<span className="mt-1 text-[10px] font-semibold">تعذرت المعاينة</span></div>;
+  if (!previewUrl) return <div className={`flex items-center justify-center bg-slate-100 ${className}`}><Loader2 className="h-6 w-6 animate-spin text-sky-700" /></div>;
+  if (isPdf) return <iframe src={`${previewUrl}#page=1&toolbar=0&navpanes=0&view=FitH`} title={attachment.fileName || 'معاينة ملف PDF'} className={`pointer-events-none border-0 bg-white ${className}`} />;
+  return <img src={previewUrl} alt={attachment.fileName || 'صورة مرفقة'} className={`object-cover ${className}`} onError={() => setFailed(true)} />;
+};
+const VisitImages: React.FC<{ label: string; images: MosqueFieldVisitImage[] }> = ({ label, images }) => <div><p className="mb-2 text-xs font-bold text-slate-600">{label} ({images.length})</p><div className="flex flex-wrap gap-2">{images.length ? images.map((image, index) => <a key={`${image.url}-${index}`} href={image.url} target="_blank" rel="noreferrer" className="block h-20 w-24 overflow-hidden rounded-lg border bg-white shadow-sm"><AttachmentPreview attachment={image} /></a>) : <span className="text-xs text-slate-400">لا توجد صور</span>}</div></div>;
 const attachmentSize = (size?: number | null) => {
   if (!size) return '';
   if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} كيلوبايت`;
@@ -613,7 +650,7 @@ const VisitAttachmentGallery: React.FC<{
     const isImage = String(attachment.mimeType || '').startsWith('image/');
     return <div key={`${attachment.url}-${index}`} className="overflow-hidden rounded-xl border bg-white shadow-sm">
       <a href={attachment.url} target="_blank" rel="noreferrer" className="flex h-28 items-center justify-center bg-slate-100">
-        {isImage ? <img src={attachment.url} alt={attachment.fileName || `صورة ${index + 1}`} className="h-full w-full object-cover" /> : <div className="text-center text-red-600"><FileText className="mx-auto h-10 w-10" /><span className="mt-1 block text-xs font-black">PDF</span></div>}
+        {isImage || attachment.mimeType === 'application/pdf' ? <AttachmentPreview attachment={attachment} /> : <div className="text-center text-red-600"><FileText className="mx-auto h-10 w-10" /><span className="mt-1 block text-xs font-black">PDF</span></div>}
       </a>
       <div className="flex items-center gap-2 p-2.5"><a href={attachment.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{attachment.fileName || `مرفق ${index + 1}`}</b>{attachmentSize(attachment.fileSize) && <span className="mt-0.5 block text-[10px] text-slate-500">{attachmentSize(attachment.fileSize)}</span>}</a>{onRemove && <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => onRemove(index)} aria-label={`حذف ${attachment.fileName || 'المرفق'}`}><Trash2 className="h-4 w-4" /></Button>}</div>
     </div>;
