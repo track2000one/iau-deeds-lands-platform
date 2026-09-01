@@ -413,6 +413,7 @@ export const MosquesUnitPage: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<MosqueModuleRole>('viewer');
+  const [currentUsername, setCurrentUsername] = useState('مستخدم');
   const [linkedSiteId, setLinkedSiteId] = useState<string | null>(null);
   const [myPersonnelRole, setMyPersonnelRole] = useState<string | null>(null);
   const [fullPermissionAccess, setFullPermissionAccess] = useState(false);
@@ -515,6 +516,7 @@ export const MosquesUnitPage: React.FC = () => {
     try {
       const me = await mosqueApi.me();
       setRole(me.role);
+      setCurrentUsername(me.username || 'مستخدم');
       setLinkedSiteId(me.siteId || null);
       setMyPersonnelRole(me.personnelRole || null);
       setFullPermissionAccess(Boolean(me.fullPermissionAccess && me.accessSource === 'module_permissions'));
@@ -2281,7 +2283,7 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="field-visits" className="space-y-4">
-          <MosqueFieldVisitsPanel sites={sites} canAdd={canAdd} canEdit={canEdit} canDelete={canDelete && role === 'head'} canPrint={canPrint} />
+          <MosqueFieldVisitsPanel sites={sites} currentUsername={currentUsername} canAdd={canAdd} canEdit={canEdit} canDelete={canDelete && role === 'head'} canPrint={canPrint} />
         </TabsContent>}
 
         <TabsContent value="requests" className="space-y-4">

@@ -51,6 +51,7 @@ import { Textarea } from './ui/textarea';
 
 type Props = {
   sites: MosqueSite[];
+  currentUsername: string;
   canAdd: boolean;
   canEdit: boolean;
   canDelete: boolean;
@@ -157,14 +158,14 @@ const freshItems = (items: MosqueFieldVisitItem[]) => items.map((item) => ({
   afterImages: [...(item.afterImages || [])],
 }));
 
-const emptyVisit = (items: MosqueFieldVisitItem[] = []): VisitForm => ({
+const emptyVisit = (items: MosqueFieldVisitItem[] = [], currentUsername = 'مستخدم'): VisitForm => ({
   tourId: '',
   siteId: '',
   visitType: 'initial',
   visitDate: dateTimeLocal(new Date().toISOString()),
   departureAt: '',
   representativeName: '',
-  teamMembers: 'محمد أحمد المغربي، فهد بن عبدالله القعود، عبير بنت أحمد الكعبي',
+  teamMembers: currentUsername || 'مستخدم',
   overallStatus: 'good',
   priority: 'normal',
   workflowStatus: 'in_progress',
@@ -174,7 +175,7 @@ const emptyVisit = (items: MosqueFieldVisitItem[] = []): VisitForm => ({
   items: freshItems(items),
 });
 
-export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit, canDelete, canPrint }) => {
+export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername, canAdd, canEdit, canDelete, canPrint }) => {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [summary, setSummary] = React.useState<MosqueFieldVisitSummary>(emptySummary);
@@ -190,7 +191,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
   const [tourSearch, setTourSearch] = React.useState('');
   const [tourForm, setTourForm] = React.useState({
     title: '', scheduledDate: new Date().toISOString().slice(0, 10), scope: '',
-    teamMembers: 'محمد أحمد المغربي، فهد بن عبدالله القعود، عبير بنت أحمد الكعبي', notes: '', siteIds: [] as string[],
+    teamMembers: currentUsername || 'مستخدم', notes: '', siteIds: [] as string[],
   });
 
   const [visitDialog, setVisitDialog] = React.useState(false);
@@ -201,7 +202,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
   const [printTarget, setPrintTarget] = React.useState<MosqueFieldVisit | null>(null);
   const [includePrintImages, setIncludePrintImages] = React.useState(true);
   const [preparingPrint, setPreparingPrint] = React.useState(false);
-  const [visitForm, setVisitForm] = React.useState<VisitForm>(() => emptyVisit());
+  const [visitForm, setVisitForm] = React.useState<VisitForm>(() => emptyVisit([], currentUsername));
   const [uploadingKey, setUploadingKey] = React.useState('');
 
   const load = React.useCallback(async () => {
@@ -249,7 +250,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
     setTourForm({
       title: `جولة ميدانية - ${new Date().toLocaleDateString('ar-SA-u-ca-gregory')}`,
       scheduledDate: new Date().toISOString().slice(0, 10),
-      scope: '', teamMembers: 'محمد أحمد المغربي، فهد بن عبدالله القعود، عبير بنت أحمد الكعبي', notes: '', siteIds: [],
+      scope: '', teamMembers: currentUsername || 'مستخدم', notes: '', siteIds: [],
     });
     setTourSearch('');
     setTourDialog(true);
@@ -258,7 +259,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
   const saveTour = async () => {
     const teamMembers = splitMembers(tourForm.teamMembers);
     if (!tourForm.title.trim() || !tourForm.scheduledDate || !teamMembers.length || !tourForm.siteIds.length) {
-      toast.error('أكمل عنوان الجولة وتاريخها والفريق واختر موقعًا واحدًا على الأقل');
+      toast.error('أكمل عنوان الجولة وتاريخها واختر موقعًا واحدًا على الأقل');
       return;
     }
     const conflictingVisit = tourForm.siteIds.map((siteId) => activeVisitBySite.get(siteId)).find(Boolean);
@@ -297,7 +298,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
       return;
     }
     setEditingVisit(null);
-    setVisitForm({ ...emptyVisit(template), siteId: preset?.siteId || '', tourId: preset?.tourId || '' });
+    setVisitForm({ ...emptyVisit(template, currentUsername), siteId: preset?.siteId || '', tourId: preset?.tourId || '' });
     setVisitDialog(true);
   };
 
@@ -404,7 +405,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
   const saveVisit = async () => {
     const teamMembers = splitMembers(visitForm.teamMembers);
     if (!visitForm.siteId || !visitForm.visitDate || !teamMembers.length) {
-      toast.error('اختر المسجد أو المصلى وأدخل تاريخ الزيارة وأعضاء الفريق');
+      toast.error('اختر المسجد أو المصلى وأدخل تاريخ الزيارة');
       return;
     }
     if (!editingVisit) {
@@ -639,7 +640,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
     <Dialog open={tourDialog} onOpenChange={setTourDialog}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[920px]" dir="rtl">
         <DialogHeader className="text-right"><DialogTitle className="flex items-center gap-2"><Route className="h-5 w-5 text-emerald-700" />إنشاء جولة ميدانية</DialogTitle><DialogDescription>اختر المواقع المسجلة حاليًا؛ ستُنشأ زيارة مجدولة مستقلة لكل مسجد أو مصلى داخل الجولة.</DialogDescription></DialogHeader>
-        <div className="grid gap-4 md:grid-cols-2"><Field label="عنوان الجولة *"><Input value={tourForm.title} onChange={(event) => setTourForm({ ...tourForm, title: event.target.value })} /></Field><Field label="تاريخ الجولة *"><Input type="date" value={tourForm.scheduledDate} onChange={(event) => setTourForm({ ...tourForm, scheduledDate: event.target.value })} /></Field><div className="md:col-span-2"><Field label="أعضاء الفريق *"><Textarea rows={2} value={tourForm.teamMembers} onChange={(event) => setTourForm({ ...tourForm, teamMembers: event.target.value })} placeholder="افصل بين الأسماء بفاصلة" /></Field></div><div className="md:col-span-2"><Field label="نطاق الجولة"><Input value={tourForm.scope} onChange={(event) => setTourForm({ ...tourForm, scope: event.target.value })} placeholder="مثال: الحرم الجامعي الشرقي - مباني الكليات الصحية" /></Field></div></div>
+        <div className="grid gap-4 md:grid-cols-2"><Field label="عنوان الجولة *"><Input value={tourForm.title} onChange={(event) => setTourForm({ ...tourForm, title: event.target.value })} /></Field><Field label="تاريخ الجولة *"><Input type="date" value={tourForm.scheduledDate} onChange={(event) => setTourForm({ ...tourForm, scheduledDate: event.target.value })} /></Field><div className="md:col-span-2"><Field label="منفذ الجولة"><Input value={tourForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field><p className="mt-1 text-[11px] text-slate-500">يُسجل اسم المستخدم الحالي تلقائيًا دون الحاجة لكتابة جميع أعضاء الفريق.</p></div><div className="md:col-span-2"><Field label="نطاق الجولة"><Input value={tourForm.scope} onChange={(event) => setTourForm({ ...tourForm, scope: event.target.value })} placeholder="مثال: الحرم الجامعي الشرقي - مباني الكليات الصحية" /></Field></div></div>
         <div className="rounded-2xl border bg-slate-50 p-4"><div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black">المساجد والمصليات المشمولة</p><p className="text-xs text-slate-500">تم اختيار {tourForm.siteIds.length} موقع</p></div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setTourForm({ ...tourForm, siteIds: filteredTourSites.filter((site) => !activeVisitBySite.has(site.id)).map((site) => site.id) })}>تحديد المتاح</Button><Button size="sm" variant="outline" onClick={() => setTourForm({ ...tourForm, siteIds: [] })}>إلغاء التحديد</Button></div></div><div className="relative mb-3"><Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" /><Input className="pr-9" value={tourSearch} onChange={(event) => setTourSearch(event.target.value)} placeholder="ابحث عن موقع" /></div><div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">{filteredTourSites.map((site) => { const checked = tourForm.siteIds.includes(site.id); const activeVisit = activeVisitBySite.get(site.id); const unavailable = Boolean(activeVisit); return <div key={site.id} className={`rounded-xl border p-3 ${unavailable ? 'border-amber-200 bg-amber-50/70' : checked ? 'border-emerald-300 bg-emerald-50' : 'bg-white'}`}><label className={`flex items-start gap-3 ${unavailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}><input type="checkbox" className="mt-1 h-4 w-4 accent-emerald-700" checked={checked} disabled={unavailable} onChange={() => setTourForm((current) => ({ ...current, siteIds: checked ? current.siteIds.filter((id) => id !== site.id) : [...current.siteIds, site.id] }))} /><span className="min-w-0 flex-1"><b className="block text-sm">{site.name}</b><small className="block text-slate-500">{site.campusLocation || [site.city, site.district].filter(Boolean).join(' - ') || 'الموقع غير محدد'}</small>{activeVisit && <span className="mt-1 block text-[11px] font-bold text-amber-700">زيارة قائمة: {activeVisit.visitNumber} — {visitStatusLabels[activeVisit.workflowStatus]}</span>}</span></label>{activeVisit && <Button type="button" size="sm" variant="outline" className="mt-2 h-8 border-amber-300 bg-white text-xs text-amber-800" onClick={() => setViewingVisit(activeVisit)}><Eye className="ml-1 h-3.5 w-3.5" />فتح الزيارة القائمة</Button>}</div>; })}</div></div>
         <Field label="ملاحظات الجولة"><Textarea rows={3} value={tourForm.notes} onChange={(event) => setTourForm({ ...tourForm, notes: event.target.value })} /></Field>
         <DialogFooter><Button variant="outline" onClick={() => setTourDialog(false)}>إلغاء</Button><Button onClick={() => void saveTour()} disabled={saving}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}حفظ وجدولة الزيارات</Button></DialogFooter>
@@ -709,7 +710,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
     <Dialog open={visitDialog} onOpenChange={setVisitDialog}>
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-[1120px]" dir="rtl">
         <DialogHeader className="text-right"><DialogTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-sky-700" />{editingVisit ? `توثيق الزيارة ${editingVisit.visitNumber}` : 'إنشاء زيارة ميدانية'}</DialogTitle><DialogDescription>تُحفظ الزيارة في السجل التاريخي للمسجد أو المصلى المحدد، وتنتقل الملاحظات المفتوحة إلى المتابعة.</DialogDescription></DialogHeader>
-        <div className="grid gap-4 rounded-2xl border bg-slate-50/70 p-4 md:grid-cols-3"><Field label="المسجد أو المصلى *"><NativeSelect value={visitForm.siteId} onChange={(event) => setVisitForm({ ...visitForm, siteId: event.target.value })} disabled={Boolean(editingVisit?.tourId)}><option value="">اختر الموقع</option>{sites.map((site) => { const activeVisit = activeVisitBySite.get(site.id); const blocked = !editingVisit && Boolean(activeVisit); return <option key={site.id} value={site.id} disabled={blocked}>{site.name} — {site.campusLocation || site.city || ''}{blocked ? ` — زيارة قائمة ${activeVisit!.visitNumber}` : ''}</option>; })}</NativeSelect></Field><Field label="نوع الزيارة"><NativeSelect value={visitForm.visitType} onChange={(event) => setVisitForm({ ...visitForm, visitType: event.target.value as MosqueFieldVisit['visitType'] })}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field><Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field><Field label="ممثل الموقع"><Input value={visitForm.representativeName} onChange={(event) => setVisitForm({ ...visitForm, representativeName: event.target.value })} /></Field><Field label="حالة سجل الزيارة"><NativeSelect value={visitForm.workflowStatus} onChange={(event) => setVisitForm({ ...visitForm, workflowStatus: event.target.value as MosqueFieldVisit['workflowStatus'] })}>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><div className="md:col-span-3"><Field label="أعضاء الفريق *"><Textarea rows={2} value={visitForm.teamMembers} onChange={(event) => setVisitForm({ ...visitForm, teamMembers: event.target.value })} /></Field></div><Field label="الحالة العامة"><NativeSelect value={visitForm.overallStatus} onChange={(event) => setVisitForm({ ...visitForm, overallStatus: event.target.value as MosqueFieldVisit['overallStatus'] })}>{Object.entries(overallLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="الأولوية العامة"><NativeSelect value={visitForm.priority} onChange={(event) => setVisitForm({ ...visitForm, priority: event.target.value as MosqueFieldVisit['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field></div>
+        <div className="grid gap-4 rounded-2xl border bg-slate-50/70 p-4 md:grid-cols-3"><Field label="المسجد أو المصلى *"><NativeSelect value={visitForm.siteId} onChange={(event) => setVisitForm({ ...visitForm, siteId: event.target.value })} disabled={Boolean(editingVisit?.tourId)}><option value="">اختر الموقع</option>{sites.map((site) => { const activeVisit = activeVisitBySite.get(site.id); const blocked = !editingVisit && Boolean(activeVisit); return <option key={site.id} value={site.id} disabled={blocked}>{site.name} — {site.campusLocation || site.city || ''}{blocked ? ` — زيارة قائمة ${activeVisit!.visitNumber}` : ''}</option>; })}</NativeSelect></Field><Field label="نوع الزيارة"><NativeSelect value={visitForm.visitType} onChange={(event) => setVisitForm({ ...visitForm, visitType: event.target.value as MosqueFieldVisit['visitType'] })}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field><Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field><Field label="ممثل الموقع"><Input value={visitForm.representativeName} onChange={(event) => setVisitForm({ ...visitForm, representativeName: event.target.value })} /></Field><Field label="حالة سجل الزيارة"><NativeSelect value={visitForm.workflowStatus} onChange={(event) => setVisitForm({ ...visitForm, workflowStatus: event.target.value as MosqueFieldVisit['workflowStatus'] })}>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><div className="md:col-span-3"><Field label="منفذ الزيارة"><Input value={visitForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field><p className="mt-1 text-[11px] text-slate-500">يُسجل اسم المستخدم الحالي تلقائيًا. السجلات السابقة تحتفظ بأسماء الفريق المحفوظة تاريخيًا.</p></div><Field label="الحالة العامة"><NativeSelect value={visitForm.overallStatus} onChange={(event) => setVisitForm({ ...visitForm, overallStatus: event.target.value as MosqueFieldVisit['overallStatus'] })}>{Object.entries(overallLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="الأولوية العامة"><NativeSelect value={visitForm.priority} onChange={(event) => setVisitForm({ ...visitForm, priority: event.target.value as MosqueFieldVisit['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field></div>
         <div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">أكمل جميع البنود قبل اعتماد الزيارة كمكتملة.</p></div><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div>{visitForm.items.map((item, index) => <Card key={`${item.category}-${item.title}-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center"><div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div><NativeSelect className="lg:w-44" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{Object.entries(itemStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="ملاحظة المعالجة"><Input value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} /></Field><ImageField label="صور قبل المعالجة" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label="صور بعد المعالجة" images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div>}</CardContent></Card>)}</div>
         <div className="grid gap-4 md:grid-cols-2"><Field label="الملاحظات العامة"><Textarea rows={4} value={visitForm.generalNotes} onChange={(event) => setVisitForm({ ...visitForm, generalNotes: event.target.value })} /></Field><Field label="التوصيات"><Textarea rows={4} value={visitForm.recommendations} onChange={(event) => setVisitForm({ ...visitForm, recommendations: event.target.value })} /></Field></div>
         <VisitAttachmentField attachments={visitForm.attachments} loading={uploadingKey === 'visit-attachments'} onFiles={(files) => void uploadVisitAttachments(files)} onRemove={removeVisitAttachment} onDescriptionChange={updateVisitAttachmentDescription} />
