@@ -319,6 +319,16 @@ export const LoginPage: React.FC = () => {
           font-weight: 800;
         }
 
+        /* Login credentials are inherently required; keep the form clean without the global "مطلوب" badge. */
+        .neo-login-page .neo-field-label[data-app-required-label="true"] {
+          display: block;
+        }
+
+        .neo-login-page .neo-field-label[data-app-required-label="true"]::after {
+          content: none !important;
+          display: none !important;
+        }
+
         .neo-input-shell {
           position: relative;
           height: 48px;
