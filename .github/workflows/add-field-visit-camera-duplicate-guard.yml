@@ -1,0 +1,47 @@
+name: Add Field Visit Camera And Duplicate Guard
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/add-field-visit-camera-duplicate-guard.py'
+      - '.github/workflows/add-field-visit-camera-duplicate-guard.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: add-field-visit-camera-duplicate-guard
+  cancel-in-progress: true
+
+jobs:
+  apply-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply field visit UI improvements
+        run: python3 scripts/add-field-visit-camera-duplicate-guard.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify frontend build
+        run: npm run build
+      - name: Commit verified frontend source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/components/MosqueFieldVisitsPanel.tsx
+          if git diff --cached --quiet; then
+            echo "No frontend source changes to commit"
+            exit 0
+          fi
+          git commit -m "feat(mosques): add direct camera and prevent duplicate visits"
+          git push origin main
