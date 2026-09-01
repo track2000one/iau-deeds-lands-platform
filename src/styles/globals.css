@@ -753,3 +753,9 @@ label[data-app-required-label="true"]::after {
   }
 }
 
+/* ===== Hide required text badge; yellow field remains the visual cue ===== */
+label[data-app-required-label="true"]::after {
+  content: none !important;
+  display: none !important;
+}
+
