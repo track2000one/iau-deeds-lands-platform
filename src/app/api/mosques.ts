@@ -6,6 +6,7 @@ export type MosqueSiteMediaItem = {
   url: string;
   fileId?: string | null;
   fileName?: string | null;
+  description?: string | null;
   mimeType?: string | null;
   category?: 'site_image' | 'mosque_image';
 };

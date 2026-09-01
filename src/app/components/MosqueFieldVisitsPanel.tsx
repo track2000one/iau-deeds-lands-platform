@@ -353,6 +353,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
           url: result.driveUrl,
           fileId: result.driveFileId || null,
           fileName: result.fileName || file.name,
+          description: '',
           mimeType: result.mimeType || file.type,
           fileSize: file.size,
           capturedAt: new Date().toISOString(),
@@ -372,10 +373,22 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
     setVisitForm((current) => ({ ...current, attachments: current.attachments.filter((_, currentIndex) => currentIndex !== index) }));
   };
 
+  const updateVisitAttachmentDescription = (index: number, description: string) => {
+    setVisitForm((current) => ({
+      ...current,
+      attachments: current.attachments.map((attachment, currentIndex) => currentIndex === index ? { ...attachment, description } : attachment),
+    }));
+  };
+
   const saveVisit = async () => {
     const teamMembers = splitMembers(visitForm.teamMembers);
     if (!visitForm.siteId || !visitForm.visitDate || !teamMembers.length) {
       toast.error('اختر المسجد أو المصلى وأدخل تاريخ الزيارة وأعضاء الفريق');
+      return;
+    }
+    const undescribedAttachment = visitForm.attachments.find((attachment) => !String(attachment.description || '').trim());
+    if (undescribedAttachment) {
+      toast.error('اكتب وصفًا واضحًا لكل مرفق قبل حفظ الزيارة');
       return;
     }
     const needsNote = visitForm.items.find((item) => item.status === 'needs_action' && !String(item.note || '').trim());
@@ -434,7 +447,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
 
     const isImageAttachment = (attachment: MosqueFieldVisitAttachment) => String(attachment.mimeType || '').startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(String(attachment.fileName || ''));
     const printImages = [
-      ...(visit.attachments || []).filter(isImageAttachment).map((attachment) => ({ attachment, label: 'مرفق الزيارة' })),
+      ...(visit.attachments || []).filter(isImageAttachment).map((attachment, index) => ({ attachment, label: attachment.description || `مرفق الزيارة ${index + 1}` })),
       ...visit.items.flatMap((item) => [
         ...(item.beforeImages || []).map((attachment) => ({ attachment, label: `قبل المعالجة — ${item.title}` })),
         ...(item.afterImages || []).map((attachment) => ({ attachment, label: `بعد المعالجة — ${item.title}` })),
@@ -444,17 +457,17 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
     const objectUrls: string[] = [];
     const printableImages = includeImages ? (await Promise.all(printImages.map(async ({ attachment, label }) => {
       try {
-        if (!attachment.fileId) return { src: attachment.url, label, fileName: attachment.fileName || 'صورة مرفقة' };
+        if (!attachment.fileId) return { src: attachment.url, label };
         const blob = await mosqueApi.mediaBlob(attachment.fileId);
         const src = URL.createObjectURL(blob);
         objectUrls.push(src);
-        return { src, label, fileName: attachment.fileName || 'صورة مرفقة' };
+        return { src, label };
       } catch {
         return null;
       }
-    }))).filter((item): item is { src: string; label: string; fileName: string } => Boolean(item)) : [];
-    const imageSection = printableImages.length ? `<section class="attachments"><h2>الصور المرفقة (${printableImages.length})</h2><div class="image-grid">${printableImages.map((item, index) => `<figure><img src="${html(item.src)}" alt="${html(item.fileName)}"><figcaption><b>${index + 1}. ${html(item.label)}</b><span>${html(item.fileName)}</span></figcaption></figure>`).join('')}</div></section>` : '';
-    const pdfSection = pdfAttachments.length ? `<section class="pdf-list"><b>ملفات PDF المرفقة (${pdfAttachments.length})</b><div>${pdfAttachments.map((attachment, index) => `${index + 1}. ${html(attachment.fileName || 'ملف PDF')}`).join(' &nbsp; | &nbsp; ')}</div></section>` : '';
+    }))).filter((item): item is { src: string; label: string } => Boolean(item)) : [];
+    const imageSection = printableImages.length ? `<section class="attachments"><h2>الصور المرفقة (${printableImages.length})</h2><div class="image-grid">${printableImages.map((item, index) => `<figure><img src="${html(item.src)}" alt="${html(item.label)}"><figcaption><b>${index + 1}. ${html(item.label)}</b></figcaption></figure>`).join('')}</div></section>` : '';
+    const pdfSection = pdfAttachments.length ? `<section class="pdf-list"><b>ملفات PDF المرفقة (${pdfAttachments.length})</b><div>${pdfAttachments.map((attachment, index) => `${index + 1}. ${html(attachment.description || `مرفق PDF ${index + 1}`)}`).join(' &nbsp; | &nbsp; ')}</div></section>` : '';
     const actionItems = visit.items.filter((item) => item.status === 'needs_action');
     const rows = visit.items.map((item, index) => `<tr><td>${index + 1}</td><td>${html(item.category)}</td><td class="right">${html(item.title)}</td><td>${html(itemStatusLabels[item.status] || item.status)}</td><td>${html(priorityLabels[item.priority] || item.priority)}</td><td class="right">${html(item.note || '-')}</td><td>${html(item.responsibleEntity || '-')}</td><td>${html(resolutionLabels[item.resolutionStatus] || item.resolutionStatus)}</td><td>${(item.beforeImages?.length || 0)}/${(item.afterImages?.length || 0)}</td></tr>`).join('');
     report.document.open();
@@ -669,7 +682,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
         <div className="grid gap-4 rounded-2xl border bg-slate-50/70 p-4 md:grid-cols-3"><Field label="المسجد أو المصلى *"><NativeSelect value={visitForm.siteId} onChange={(event) => setVisitForm({ ...visitForm, siteId: event.target.value })} disabled={Boolean(editingVisit?.tourId)}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name} — {site.campusLocation || site.city || ''}</option>)}</NativeSelect></Field><Field label="نوع الزيارة"><NativeSelect value={visitForm.visitType} onChange={(event) => setVisitForm({ ...visitForm, visitType: event.target.value as MosqueFieldVisit['visitType'] })}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field><Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field><Field label="ممثل الموقع"><Input value={visitForm.representativeName} onChange={(event) => setVisitForm({ ...visitForm, representativeName: event.target.value })} /></Field><Field label="حالة سجل الزيارة"><NativeSelect value={visitForm.workflowStatus} onChange={(event) => setVisitForm({ ...visitForm, workflowStatus: event.target.value as MosqueFieldVisit['workflowStatus'] })}>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><div className="md:col-span-3"><Field label="أعضاء الفريق *"><Textarea rows={2} value={visitForm.teamMembers} onChange={(event) => setVisitForm({ ...visitForm, teamMembers: event.target.value })} /></Field></div><Field label="الحالة العامة"><NativeSelect value={visitForm.overallStatus} onChange={(event) => setVisitForm({ ...visitForm, overallStatus: event.target.value as MosqueFieldVisit['overallStatus'] })}>{Object.entries(overallLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="الأولوية العامة"><NativeSelect value={visitForm.priority} onChange={(event) => setVisitForm({ ...visitForm, priority: event.target.value as MosqueFieldVisit['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field></div>
         <div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">أكمل جميع البنود قبل اعتماد الزيارة كمكتملة.</p></div><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div>{visitForm.items.map((item, index) => <Card key={`${item.category}-${item.title}-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center"><div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div><NativeSelect className="lg:w-44" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{Object.entries(itemStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="ملاحظة المعالجة"><Input value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} /></Field><ImageField label="صور قبل المعالجة" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label="صور بعد المعالجة" images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div>}</CardContent></Card>)}</div>
         <div className="grid gap-4 md:grid-cols-2"><Field label="الملاحظات العامة"><Textarea rows={4} value={visitForm.generalNotes} onChange={(event) => setVisitForm({ ...visitForm, generalNotes: event.target.value })} /></Field><Field label="التوصيات"><Textarea rows={4} value={visitForm.recommendations} onChange={(event) => setVisitForm({ ...visitForm, recommendations: event.target.value })} /></Field></div>
-        <VisitAttachmentField attachments={visitForm.attachments} loading={uploadingKey === 'visit-attachments'} onFiles={(files) => void uploadVisitAttachments(files)} onRemove={removeVisitAttachment} />
+        <VisitAttachmentField attachments={visitForm.attachments} loading={uploadingKey === 'visit-attachments'} onFiles={(files) => void uploadVisitAttachments(files)} onRemove={removeVisitAttachment} onDescriptionChange={updateVisitAttachmentDescription} />
         <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setVisitDialog(false)}>إلغاء</Button>{editingVisit && canPrint && <Button variant="outline" onClick={() => requestVisitPrint({ ...editingVisit, ...visitForm, teamMembers: splitMembers(visitForm.teamMembers), visitDate: new Date(visitForm.visitDate).toISOString(), departureAt: visitForm.departureAt ? new Date(visitForm.departureAt).toISOString() : null } as MosqueFieldVisit)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>}<Button onClick={() => void saveVisit()} disabled={saving || Boolean(uploadingKey)}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}{editingVisit ? 'حفظ نتائج الزيارة' : 'إنشاء الزيارة'}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
@@ -712,8 +725,8 @@ const AttachmentPreview: React.FC<{
 
   if (failed) return <div className={`flex flex-col items-center justify-center bg-slate-100 text-slate-500 ${className}`}>{isPdf ? <FileText className="h-9 w-9 text-red-600" /> : <ImageIcon className="h-9 w-9 text-sky-600" />}<span className="mt-1 text-[10px] font-semibold">تعذرت المعاينة</span></div>;
   if (!previewUrl) return <div className={`flex items-center justify-center bg-slate-100 ${className}`}><Loader2 className="h-6 w-6 animate-spin text-sky-700" /></div>;
-  if (isPdf) return <iframe src={`${previewUrl}#page=1&toolbar=0&navpanes=0&view=FitH`} title={attachment.fileName || 'معاينة ملف PDF'} className={`pointer-events-none border-0 bg-white ${className}`} />;
-  return <img src={previewUrl} alt={attachment.fileName || 'صورة مرفقة'} className={`object-cover ${className}`} onError={() => setFailed(true)} />;
+  if (isPdf) return <iframe src={`${previewUrl}#page=1&toolbar=0&navpanes=0&view=FitH`} title={attachment.description || 'معاينة ملف PDF'} className={`pointer-events-none border-0 bg-white ${className}`} />;
+  return <img src={previewUrl} alt={attachment.description || 'صورة مرفقة'} className={`object-cover ${className}`} onError={() => setFailed(true)} />;
 };
 const VisitImages: React.FC<{ label: string; images: MosqueFieldVisitImage[] }> = ({ label, images }) => <div><p className="mb-2 text-xs font-bold text-slate-600">{label} ({images.length})</p><div className="flex flex-wrap gap-2">{images.length ? images.map((image, index) => <a key={`${image.url}-${index}`} href={image.url} target="_blank" rel="noreferrer" className="block h-20 w-24 overflow-hidden rounded-lg border bg-white shadow-sm"><AttachmentPreview attachment={image} /></a>) : <span className="text-xs text-slate-400">لا توجد صور</span>}</div></div>;
 const attachmentSize = (size?: number | null) => {
@@ -725,15 +738,17 @@ const VisitAttachmentGallery: React.FC<{
   label: string;
   attachments: MosqueFieldVisitAttachment[];
   onRemove?: (index: number) => void;
-}> = ({ label, attachments, onRemove }) => <div className="rounded-2xl border bg-slate-50/70 p-4">
+  onDescriptionChange?: (index: number, description: string) => void;
+}> = ({ label, attachments, onRemove, onDescriptionChange }) => <div className="rounded-2xl border bg-slate-50/70 p-4">
   <div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2"><Paperclip className="h-4 w-4 text-sky-700" /><h3 className="font-black text-slate-800">{label}</h3></div><Badge variant="outline">{attachments.length}</Badge></div>
   {attachments.length ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{attachments.map((attachment, index) => {
     const isImage = String(attachment.mimeType || '').startsWith('image/');
-    return <div key={`${attachment.url}-${index}`} className="overflow-hidden rounded-xl border bg-white shadow-sm">
+    const hasDescription = Boolean(String(attachment.description || '').trim());
+    return <div key={`${attachment.url}-${index}`} className={`overflow-hidden rounded-xl border bg-white shadow-sm ${onDescriptionChange && !hasDescription ? 'border-amber-400' : ''}`}>
       <a href={attachment.url} target="_blank" rel="noreferrer" className="flex h-28 items-center justify-center bg-slate-100">
         {isImage || attachment.mimeType === 'application/pdf' ? <AttachmentPreview attachment={attachment} /> : <div className="text-center text-red-600"><FileText className="mx-auto h-10 w-10" /><span className="mt-1 block text-xs font-black">PDF</span></div>}
       </a>
-      <div className="flex items-center gap-2 p-2.5"><a href={attachment.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{attachment.fileName || `مرفق ${index + 1}`}</b>{attachmentSize(attachment.fileSize) && <span className="mt-0.5 block text-[10px] text-slate-500">{attachmentSize(attachment.fileSize)}</span>}</a>{onRemove && <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => onRemove(index)} aria-label={`حذف ${attachment.fileName || 'المرفق'}`}><Trash2 className="h-4 w-4" /></Button>}</div>
+      <div className="space-y-2 p-2.5">{onDescriptionChange ? <div><Label className="mb-1 block text-[11px] font-bold text-slate-600">وصف المرفق *</Label><Input value={attachment.description || ''} onChange={(event) => onDescriptionChange(index, event.target.value)} maxLength={500} placeholder="مثال: صورة المقاعد التي تحتاج استبدال" className={`h-9 text-xs ${hasDescription ? '' : 'border-amber-400 focus-visible:ring-amber-400'}`} /></div> : <b className="block text-sm text-slate-800">{attachment.description || `مرفق ${index + 1}`}</b>}<div className="flex items-center justify-between gap-2"><span className="text-[10px] text-slate-500">{attachment.mimeType === 'application/pdf' ? 'ملف PDF' : 'صورة'}{attachmentSize(attachment.fileSize) ? ` — ${attachmentSize(attachment.fileSize)}` : ''}</span>{onRemove && <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => onRemove(index)} aria-label={`حذف ${attachment.description || 'المرفق'}`}><Trash2 className="h-4 w-4" /></Button>}</div></div>
     </div>;
   })}</div> : <div className="rounded-xl border border-dashed bg-white p-5 text-center text-sm text-slate-400">لا توجد مرفقات مرفوعة</div>}
 </div>;
@@ -742,14 +757,15 @@ const VisitAttachmentField: React.FC<{
   loading: boolean;
   onFiles: (files: FileList | null) => void;
   onRemove: (index: number) => void;
-}> = ({ attachments, loading, onFiles, onRemove }) => <div className="space-y-3">
+  onDescriptionChange: (index: number, description: string) => void;
+}> = ({ attachments, loading, onFiles, onRemove, onDescriptionChange }) => <div className="space-y-3">
   <label className={`flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-5 text-center transition ${loading ? 'cursor-wait border-sky-300 bg-sky-50' : 'border-slate-300 bg-slate-50 hover:border-sky-400 hover:bg-sky-50/70'}`}>
     {loading ? <Loader2 className="mb-2 h-6 w-6 animate-spin text-sky-700" /> : <Upload className="mb-2 h-6 w-6 text-sky-700" />}
     <b className="text-sm text-slate-800">{loading ? 'جاري رفع المرفقات...' : 'رفع صور أو ملفات PDF'}</b>
-    <span className="mt-1 text-xs text-slate-500">يمكن اختيار عدة ملفات دفعة واحدة — الحد الأعلى 20 ميجابايت للملف</span>
+    <span className="mt-1 text-xs text-slate-500">يمكن اختيار عدة ملفات دفعة واحدة — وبعد الرفع اكتب وصفًا واضحًا لكل مرفق</span>
     <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple className="hidden" disabled={loading} onChange={(event) => { onFiles(event.target.files); event.target.value = ''; }} />
   </label>
-  <VisitAttachmentGallery label="المرفقات المضافة" attachments={attachments} onRemove={onRemove} />
+  <VisitAttachmentGallery label="المرفقات المضافة" attachments={attachments} onRemove={onRemove} onDescriptionChange={onDescriptionChange} />
 </div>;
 const Metric: React.FC<{ label: string; value: React.ReactNode; icon: React.ElementType; tone?: 'green' | 'blue' | 'amber' | 'red' }> = ({ label, value, icon: Icon, tone = 'blue' }) => {
   const tones = { green: 'border-emerald-200 bg-emerald-50 text-emerald-700', blue: 'border-sky-200 bg-sky-50 text-sky-700', amber: 'border-amber-200 bg-amber-50 text-amber-700', red: 'border-red-200 bg-red-50 text-red-700' };
