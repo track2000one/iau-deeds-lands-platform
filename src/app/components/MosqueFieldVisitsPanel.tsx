@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ClipboardList,
   FileText,
+  Eye,
   Loader2,
   MapPin,
   Pencil,
@@ -15,6 +16,7 @@ import {
   Route,
   Save,
   Search,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -47,6 +49,7 @@ type Props = {
   sites: MosqueSite[];
   canAdd: boolean;
   canEdit: boolean;
+  canDelete: boolean;
   canPrint: boolean;
 };
 
@@ -165,7 +168,7 @@ const emptyVisit = (items: MosqueFieldVisitItem[] = []): VisitForm => ({
   items: freshItems(items),
 });
 
-export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit, canPrint }) => {
+export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit, canDelete, canPrint }) => {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [summary, setSummary] = React.useState<MosqueFieldVisitSummary>(emptySummary);
@@ -186,6 +189,9 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
 
   const [visitDialog, setVisitDialog] = React.useState(false);
   const [editingVisit, setEditingVisit] = React.useState<MosqueFieldVisit | null>(null);
+  const [viewingVisit, setViewingVisit] = React.useState<MosqueFieldVisit | null>(null);
+  const [deletingVisit, setDeletingVisit] = React.useState<MosqueFieldVisit | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
   const [visitForm, setVisitForm] = React.useState<VisitForm>(() => emptyVisit());
   const [uploadingKey, setUploadingKey] = React.useState('');
 
@@ -344,6 +350,22 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
     finally { setSaving(false); }
   };
 
+  const deleteVisit = async () => {
+    if (!deletingVisit) return;
+    try {
+      setDeleting(true);
+      await mosqueApi.deleteFieldVisit(deletingVisit.id);
+      toast.success(`تم حذف الزيارة ${deletingVisit.visitNumber}`);
+      setDeletingVisit(null);
+      setViewingVisit((current) => current?.id === deletingVisit.id ? null : current);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حذف الزيارة');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const printVisit = (visit: MosqueFieldVisit) => {
     const actionItems = visit.items.filter((item) => item.status === 'needs_action');
     const rows = visit.items.map((item, index) => `<tr><td>${index + 1}</td><td>${html(item.category)}</td><td class="right">${html(item.title)}</td><td>${html(itemStatusLabels[item.status] || item.status)}</td><td>${html(priorityLabels[item.priority] || item.priority)}</td><td class="right">${html(item.note || '-')}</td><td>${html(item.responsibleEntity || '-')}</td><td>${html(resolutionLabels[item.resolutionStatus] || item.resolutionStatus)}</td><td>${(item.beforeImages?.length || 0)}/${(item.afterImages?.length || 0)}</td></tr>`).join('');
@@ -419,7 +441,12 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
           <InfoLine label="الموقع" value={visit.site.campusLocation || [visit.site.city, visit.site.district].filter(Boolean).join(' - ') || '-'} />
           <InfoLine label="الحالة العامة" value={overallLabels[visit.overallStatus]} />
           <div className="flex flex-wrap gap-2"><Badge variant="outline">{visit.items.length} بند فحص</Badge><Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">{visit.items.filter((item) => item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length} ملاحظة مفتوحة</Badge>{visit.items.some((item) => item.priority === 'urgent' && !['resolved', 'closed'].includes(item.resolutionStatus)) && <Badge className="bg-red-600">عاجل</Badge>}</div>
-          <div className="flex flex-wrap justify-end gap-2 border-t pt-3">{canPrint && <Button size="sm" variant="outline" onClick={() => printVisit(visit)}><Printer className="ml-1 h-4 w-4" />تقرير</Button>}{canEdit && <Button size="sm" onClick={() => openVisit(visit)}><Pencil className="ml-1 h-4 w-4" />{visit.workflowStatus === 'planned' ? 'بدء الزيارة' : 'عرض وتحديث'}</Button>}</div>
+          <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
+            <Button size="sm" variant="outline" className="border-sky-200 text-sky-700 hover:bg-sky-50" onClick={() => setViewingVisit(visit)}><Eye className="ml-1 h-4 w-4" />عرض</Button>
+            {canPrint && <Button size="sm" variant="outline" onClick={() => printVisit(visit)}><Printer className="ml-1 h-4 w-4" />تقرير</Button>}
+            {canEdit && <Button size="sm" onClick={() => openVisit(visit)}><Pencil className="ml-1 h-4 w-4" />تعديل</Button>}
+            {canDelete && <Button size="sm" variant="destructive" onClick={() => setDeletingVisit(visit)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button>}
+          </div>
         </CardContent>
       </Card>)}
       {!filteredVisits.length && <Empty message="لا توجد زيارات مطابقة للبحث" />}
@@ -441,6 +468,65 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
       </DialogContent>
     </Dialog>
 
+    <Dialog open={Boolean(viewingVisit)} onOpenChange={(open) => { if (!open) setViewingVisit(null); }}>
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[980px]" dir="rtl">
+        {viewingVisit && <>
+          <DialogHeader className="text-right">
+            <DialogTitle className="flex items-center gap-2"><Eye className="h-5 w-5 text-sky-700" />تفاصيل الزيارة {viewingVisit.visitNumber}</DialogTitle>
+            <DialogDescription>عرض كامل لسجل الزيارة الميدانية دون تعديل البيانات.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 rounded-2xl border bg-slate-50/70 p-4 sm:grid-cols-2 lg:grid-cols-3">
+            <InfoBox label="المسجد أو المصلى" value={viewingVisit.site.name} />
+            <InfoBox label="نوع الزيارة" value={visitTypeLabels[viewingVisit.visitType]} />
+            <InfoBox label="حالة الزيارة" value={visitStatusLabels[viewingVisit.workflowStatus]} />
+            <InfoBox label="تاريخ الوصول" value={new Date(viewingVisit.visitDate).toLocaleString('ar-SA-u-ca-gregory')} />
+            <InfoBox label="وقت المغادرة" value={viewingVisit.departureAt ? new Date(viewingVisit.departureAt).toLocaleString('ar-SA-u-ca-gregory') : '-'} />
+            <InfoBox label="الحالة العامة" value={overallLabels[viewingVisit.overallStatus]} />
+            <InfoBox label="الأولوية" value={priorityLabels[viewingVisit.priority]} />
+            <InfoBox label="ممثل الموقع" value={viewingVisit.representativeName || '-'} />
+            <InfoBox label="الفريق الميداني" value={(viewingVisit.teamMembers || []).join('، ') || '-'} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ReadOnlyNote label="الملاحظات العامة" value={viewingVisit.generalNotes} />
+            <ReadOnlyNote label="التوصيات" value={viewingVisit.recommendations} />
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between"><h3 className="font-black text-slate-800">نتائج قائمة الفحص</h3><Badge variant="outline">{viewingVisit.items.length} بند</Badge></div>
+            {viewingVisit.items.map((item, index) => <Card key={item.id || `${item.category}-${item.title}-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}>
+              <CardContent className="space-y-3 pt-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div>
+                  <div className="flex flex-wrap gap-2"><Badge variant="outline">{itemStatusLabels[item.status]}</Badge><Badge variant="outline">{priorityLabels[item.priority]}</Badge></div>
+                </div>
+                {item.note && <ReadOnlyNote label="الملاحظة" value={item.note} />}
+                {item.status === 'needs_action' && <div className="grid gap-2 border-t border-amber-200 pt-3 sm:grid-cols-3"><InfoBox label="الجهة المسؤولة" value={item.responsibleEntity || '-'} /><InfoBox label="المهلة" value={item.dueDate ? new Date(item.dueDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-'} /><InfoBox label="حالة المعالجة" value={resolutionLabels[item.resolutionStatus]} /></div>}
+                {item.resolutionNote && <ReadOnlyNote label="ملاحظة المعالجة" value={item.resolutionNote} />}
+                {(item.beforeImages.length > 0 || item.afterImages.length > 0) && <div className="grid gap-3 border-t pt-3 sm:grid-cols-2"><VisitImages label="صور قبل المعالجة" images={item.beforeImages} /><VisitImages label="صور بعد المعالجة" images={item.afterImages} /></div>}
+              </CardContent>
+            </Card>)}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setViewingVisit(null)}>إغلاق</Button>
+            {canPrint && <Button variant="outline" onClick={() => printVisit(viewingVisit)}><Printer className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
+            {canEdit && <Button onClick={() => { const visit = viewingVisit; setViewingVisit(null); openVisit(visit); }}><Pencil className="ml-2 h-4 w-4" />تعديل الزيارة</Button>}
+          </DialogFooter>
+        </>}
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={Boolean(deletingVisit)} onOpenChange={(open) => { if (!open && !deleting) setDeletingVisit(null); }}>
+      <DialogContent className="sm:max-w-[520px]" dir="rtl">
+        {deletingVisit && <>
+          <DialogHeader className="text-right">
+            <DialogTitle className="flex items-center gap-2 text-red-700"><Trash2 className="h-5 w-5" />حذف الزيارة الميدانية</DialogTitle>
+            <DialogDescription>سيتم حذف الزيارة {deletingVisit.visitNumber} الخاصة بـ {deletingVisit.site.name} مع جميع بنود الفحص والصور المرتبطة بسجلها.</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">هذا الإجراء نهائي ولا يمكن التراجع عنه.</div>
+          <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setDeletingVisit(null)} disabled={deleting}>إلغاء</Button><Button variant="destructive" onClick={() => void deleteVisit()} disabled={deleting}>{deleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}تأكيد الحذف</Button></DialogFooter>
+        </>}
+      </DialogContent>
+    </Dialog>
+
     <Dialog open={visitDialog} onOpenChange={setVisitDialog}>
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-[1120px]" dir="rtl">
         <DialogHeader className="text-right"><DialogTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-sky-700" />{editingVisit ? `توثيق الزيارة ${editingVisit.visitNumber}` : 'إنشاء زيارة ميدانية'}</DialogTitle><DialogDescription>تُحفظ الزيارة في السجل التاريخي للمسجد أو المصلى المحدد، وتنتقل الملاحظات المفتوحة إلى المتابعة.</DialogDescription></DialogHeader>
@@ -455,6 +541,9 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => <div><Label className="mb-1.5 block text-xs font-bold text-slate-600">{label}</Label>{children}</div>;
 const InfoLine: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => <div className="flex items-start justify-between gap-3"><span className="text-slate-500">{label}</span><b className="text-left text-slate-800">{value || '-'}</b></div>;
+const InfoBox: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => <div className="rounded-xl border bg-white p-3"><span className="block text-[11px] font-semibold text-slate-500">{label}</span><b className="mt-1 block text-sm text-slate-800">{value || '-'}</b></div>;
+const ReadOnlyNote: React.FC<{ label: string; value?: string | null }> = ({ label, value }) => <div className="rounded-xl border bg-white p-3"><span className="block text-[11px] font-semibold text-slate-500">{label}</span><p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{value || '-'}</p></div>;
+const VisitImages: React.FC<{ label: string; images: MosqueFieldVisitImage[] }> = ({ label, images }) => <div><p className="mb-2 text-xs font-bold text-slate-600">{label} ({images.length})</p><div className="flex flex-wrap gap-2">{images.length ? images.map((image, index) => <a key={`${image.url}-${index}`} href={image.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-white shadow-sm"><img src={image.url} alt={`${label} ${index + 1}`} className="h-20 w-24 object-cover" /></a>) : <span className="text-xs text-slate-400">لا توجد صور</span>}</div></div>;
 const Metric: React.FC<{ label: string; value: React.ReactNode; icon: React.ElementType; tone?: 'green' | 'blue' | 'amber' | 'red' }> = ({ label, value, icon: Icon, tone = 'blue' }) => {
   const tones = { green: 'border-emerald-200 bg-emerald-50 text-emerald-700', blue: 'border-sky-200 bg-sky-50 text-sky-700', amber: 'border-amber-200 bg-amber-50 text-amber-700', red: 'border-red-200 bg-red-50 text-red-700' };
   return <Card className={`${tones[tone]} shadow-sm`}><CardContent className="p-3 sm:p-4"><Icon className="h-4 w-4 opacity-80" /><p className="mt-2 text-[11px] font-semibold">{label}</p><p className="mt-1 text-xl font-black sm:text-2xl">{value}</p></CardContent></Card>;

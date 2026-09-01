@@ -462,6 +462,7 @@ export const mosqueApi = {
   fieldVisitSummary: () => apiJson<MosqueFieldVisitSummary>('/api/mosques/field-visits/summary'),
   createFieldVisit: (input: Record<string, unknown>) => apiJson<MosqueFieldVisit>('/api/mosques/field-visits', { method: 'POST', body: JSON.stringify(input) }),
   updateFieldVisit: (id: string, input: Record<string, unknown>) => apiJson<MosqueFieldVisit>(`/api/mosques/field-visits/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  deleteFieldVisit: (id: string) => apiJson<void>(`/api/mosques/field-visits/${id}`, { method: 'DELETE' }),
 
   requests: () => apiJson<MosqueRequest[]>('/api/mosques/requests'),
   createRequest: (input: Record<string, unknown>) => apiJson<MosqueRequest>('/api/mosques/requests', { method: 'POST', body: JSON.stringify(input) }),

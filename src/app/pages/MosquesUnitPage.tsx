@@ -2281,7 +2281,7 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="field-visits" className="space-y-4">
-          <MosqueFieldVisitsPanel sites={sites} canAdd={canAdd} canEdit={canEdit} canPrint={canPrint} />
+          <MosqueFieldVisitsPanel sites={sites} canAdd={canAdd} canEdit={canEdit} canDelete={canDelete && role === 'head'} canPrint={canPrint} />
         </TabsContent>}
 
         <TabsContent value="requests" className="space-y-4">
