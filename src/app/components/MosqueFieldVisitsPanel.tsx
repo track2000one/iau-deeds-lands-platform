@@ -127,6 +127,129 @@ const itemStatusLabels: Record<string, string> = {
   not_applicable: 'لا ينطبق',
   not_checked: 'لم يتم التحقق',
 };
+
+type ItemStatusOption = { value: MosqueFieldVisitItem['status']; label: string };
+type ItemStatusProfileKey =
+  | 'cleanliness'
+  | 'operation'
+  | 'condition'
+  | 'absence_check'
+  | 'required_availability'
+  | 'fire_safety'
+  | 'quran_compliance'
+  | 'quran_quantity'
+  | 'activity_approval'
+  | 'accessibility'
+  | 'readiness';
+
+const uncheckedStatus: ItemStatusOption = { value: 'not_checked', label: 'لم يتم التحقق' };
+const notApplicableStatus: ItemStatusOption = { value: 'not_applicable', label: 'لا ينطبق' };
+
+const itemStatusProfiles: Record<ItemStatusProfileKey, ItemStatusOption[]> = {
+  cleanliness: [
+    { value: 'good', label: 'نظيف ومناسب' },
+    { value: 'needs_action', label: 'يحتاج تنظيف أو معالجة' },
+    notApplicableStatus,
+    uncheckedStatus,
+  ],
+  operation: [
+    { value: 'good', label: 'يعمل بكفاءة' },
+    { value: 'needs_action', label: 'متوقف أو يحتاج صيانة' },
+    notApplicableStatus,
+    uncheckedStatus,
+  ],
+  condition: [
+    { value: 'good', label: 'سليم' },
+    { value: 'needs_action', label: 'غير سليم / يحتاج معالجة' },
+    notApplicableStatus,
+    uncheckedStatus,
+  ],
+  absence_check: [
+    { value: 'good', label: 'لا توجد ملاحظة' },
+    { value: 'needs_action', label: 'توجد ملاحظة تحتاج معالجة' },
+    notApplicableStatus,
+    uncheckedStatus,
+  ],
+  required_availability: [
+    { value: 'good', label: 'متوفر وبحالة مناسبة' },
+    { value: 'needs_action', label: 'غير متوفر أو يحتاج استكمال' },
+    notApplicableStatus,
+    uncheckedStatus,
+  ],
+  fire_safety: [
+    { value: 'good', label: 'متوفرة وصالحة' },
+    { value: 'needs_action', label: 'غير متوفرة أو تحتاج صيانة / استبدال' },
+    notApplicableStatus,
+    uncheckedStatus,
+  ],
+  quran_compliance: [
+    { value: 'good', label: 'سليمة ومعتمدة' },
+    { value: 'needs_action', label: 'تحتاج معالجة أو استبدال' },
+    notApplicableStatus,
+    uncheckedStatus,
+  ],
+  quran_quantity: [
+    { value: 'good', label: 'كافية ومناسبة' },
+    { value: 'needs_action', label: 'غير كافية / تحتاج استكمال' },
+    notApplicableStatus,
+    uncheckedStatus,
+  ],
+  activity_approval: [
+    { value: 'good', label: 'معتمدة' },
+    { value: 'needs_action', label: 'غير معتمدة / تحتاج استكمال' },
+    { value: 'not_available', label: 'لا توجد أنشطة قائمة' },
+    notApplicableStatus,
+    uncheckedStatus,
+  ],
+  accessibility: [
+    { value: 'good', label: 'ملائم ومهيأ' },
+    { value: 'needs_action', label: 'غير مهيأ / يحتاج تحسين' },
+    uncheckedStatus,
+  ],
+  readiness: [
+    { value: 'good', label: 'منظم وجاهز' },
+    { value: 'needs_action', label: 'غير جاهز / يحتاج معالجة' },
+    uncheckedStatus,
+  ],
+};
+
+const itemStatusProfileByTitle: Record<string, ItemStatusProfileKey> = {
+  'نظافة السجاد والأرضيات': 'cleanliness',
+  'نظافة الجدران والنوافذ وخلو الموقع من الروائح': 'cleanliness',
+  'نظافة مرافق الوضوء ودورات المياه': 'cleanliness',
+  'كفاءة التكييف والتهوية وعدم وجود تسربات': 'operation',
+  'سلامة الإنارة والمفاتيح والمقابس': 'condition',
+  'عدم وجود تمديدات كهربائية مكشوفة أو غير آمنة': 'absence_check',
+  'سلامة الميكروفونات والسماعات وأجهزة الأذان': 'operation',
+  'وضوح مخارج الطوارئ وخلوها من العوائق': 'condition',
+  'توفر طفايات الحريق وصلاحيتها': 'fire_safety',
+  'سلامة الأبواب والممرات وسهولة الحركة': 'condition',
+  'توفر دواليب ورفوف المصاحف بحالة مناسبة': 'required_availability',
+  'سلامة الفواصل والستائر والساعات واللوحات': 'required_availability',
+  'سلامة المصاحف والتحقق من جهة الطباعة': 'quran_compliance',
+  'كفاية أعداد المصاحف وملاءمة أحجامها': 'quran_quantity',
+  'خلو الموقع من الكتب والنشرات غير المعتمدة': 'absence_check',
+  'اعتماد حلقات التحفيظ والمحاضرات والأنشطة القائمة': 'activity_approval',
+  'ملاءمة الموقع لكبار السن والأشخاص ذوي الإعاقة': 'accessibility',
+  'تنظيم الموقع ووضوح اتجاه القبلة وجاهزيته للصلاة': 'readiness',
+};
+
+const getItemStatusOptions = (item: MosqueFieldVisitItem): ItemStatusOption[] => {
+  const profile = itemStatusProfileByTitle[item.title] || 'condition';
+  const options = itemStatusProfiles[profile];
+  if (options.some((option) => option.value === item.status)) return options;
+
+  // Keep historical values editable even when a newer contextual profile no longer offers that value.
+  return [
+    { value: item.status, label: itemStatusLabels[item.status] || item.status },
+    ...options,
+  ];
+};
+
+const getItemStatusLabel = (item: MosqueFieldVisitItem) =>
+  getItemStatusOptions(item).find((option) => option.value === item.status)?.label
+  || itemStatusLabels[item.status]
+  || item.status;
 const resolutionLabels: Record<string, string> = {
   new: 'جديدة',
   referred: 'محالة',
@@ -500,7 +623,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     const imageSection = printableImages.length ? `<section class="attachments"><h2>الصور المرفقة (${printableImages.length})</h2><div class="image-grid">${printableImages.map((item, index) => `<figure><img src="${html(item.src)}" alt="${html(item.label)}"><figcaption><b>${index + 1}. ${html(item.label)}</b></figcaption></figure>`).join('')}</div></section>` : '';
     const pdfSection = pdfAttachments.length ? `<section class="pdf-list"><b>ملفات PDF المرفقة (${pdfAttachments.length})</b><div>${pdfAttachments.map((attachment, index) => `${index + 1}. ${html(attachment.description || `مرفق PDF ${index + 1}`)}`).join(' &nbsp; | &nbsp; ')}</div></section>` : '';
     const actionItems = visit.items.filter((item) => item.status === 'needs_action');
-    const rows = visit.items.map((item, index) => `<tr><td>${index + 1}</td><td>${html(item.category)}</td><td class="right">${html(item.title)}</td><td>${html(itemStatusLabels[item.status] || item.status)}</td><td>${html(priorityLabels[item.priority] || item.priority)}</td><td class="right">${html(item.note || '-')}</td><td>${html(item.responsibleEntity || '-')}</td><td>${html(resolutionLabels[item.resolutionStatus] || item.resolutionStatus)}</td><td>${(item.beforeImages?.length || 0)}/${(item.afterImages?.length || 0)}</td></tr>`).join('');
+    const rows = visit.items.map((item, index) => `<tr><td>${index + 1}</td><td>${html(item.category)}</td><td class="right">${html(item.title)}</td><td>${html(getItemStatusLabel(item))}</td><td>${html(priorityLabels[item.priority] || item.priority)}</td><td class="right">${html(item.note || '-')}</td><td>${html(item.responsibleEntity || '-')}</td><td>${html(resolutionLabels[item.resolutionStatus] || item.resolutionStatus)}</td><td>${(item.beforeImages?.length || 0)}/${(item.afterImages?.length || 0)}</td></tr>`).join('');
     report.document.open();
     report.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${html(visit.visitNumber)}</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{border:2px solid #0f766e;border-radius:16px;padding:16px;background:#f0fdfa}.kicker{font-size:11px;color:#0f766e;font-weight:bold}.title{font-size:23px;font-weight:900;margin:6px 0}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px}.box{border:1px solid #cbd5e1;border-radius:10px;padding:8px;background:white}.box small{display:block;color:#64748b;margin-bottom:4px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.metric{padding:10px;border:1px solid #cbd5e1;border-radius:10px;text-align:center}.metric b{display:block;font-size:20px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:9.5px}th,td{border:1px solid #cbd5e1;padding:6px;text-align:center;vertical-align:top}th{background:#e2e8f0}.right{text-align:right}.notes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.note{border:1px solid #cbd5e1;border-radius:10px;padding:10px;min-height:65px;white-space:pre-wrap}.pdf-list{margin-top:12px;border:1px solid #cbd5e1;border-radius:10px;padding:10px;font-size:10px}.pdf-list div{margin-top:5px;color:#475569}.attachments{page-break-before:always;padding-top:3mm}.attachments h2{margin:0 0 12px;font-size:20px}.image-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.image-grid figure{margin:0;border:1px solid #cbd5e1;border-radius:12px;padding:8px;break-inside:avoid;page-break-inside:avoid}.image-grid img{display:block;width:100%;height:230px;object-fit:contain;background:#f8fafc;border-radius:8px}.image-grid figcaption{display:flex;flex-direction:column;gap:3px;margin-top:6px;font-size:10px}.image-grid figcaption span{color:#64748b}.footer{margin-top:10px;font-size:9px;color:#64748b;display:flex;justify-content:space-between}</style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><div class="title">تقرير زيارة ميدانية</div><div class="meta"><div class="box"><small>رقم الزيارة</small><b>${html(visit.visitNumber)}</b></div><div class="box"><small>المسجد / المصلى</small><b>${html(visit.site.name)}</b></div><div class="box"><small>التاريخ</small><b>${html(new Date(visit.visitDate).toLocaleString('ar-SA-u-ca-gregory'))}</b></div><div class="box"><small>نوع الزيارة</small><b>${html(visitTypeLabels[visit.visitType])}</b></div><div class="box"><small>الفريق</small><b>${html((visit.teamMembers || []).join('، '))}</b></div><div class="box"><small>ممثل الموقع</small><b>${html(visit.representativeName || '-')}</b></div><div class="box"><small>الحالة العامة</small><b>${html(overallLabels[visit.overallStatus])}</b></div><div class="box"><small>حالة السجل</small><b>${html(visitStatusLabels[visit.workflowStatus])}</b></div></div></div><div class="metrics"><div class="metric">بنود الفحص<b>${visit.items.length}</b></div><div class="metric">ملاحظات تحتاج معالجة<b>${actionItems.length}</b></div><div class="metric">ملاحظات عاجلة<b>${actionItems.filter((item) => item.priority === 'urgent').length}</b></div><div class="metric">تم إغلاقها<b>${visit.items.filter((item) => item.resolutionStatus === 'closed').length}</b></div></div><table><thead><tr><th>م</th><th>المحور</th><th>بند الفحص</th><th>النتيجة</th><th>الأولوية</th><th>الملاحظة</th><th>الجهة المسؤولة</th><th>المعالجة</th><th>صور قبل/بعد</th></tr></thead><tbody>${rows}</tbody></table><div class="notes"><div class="note"><b>الملاحظات العامة</b><br>${html(visit.generalNotes || '-')}</div><div class="note"><b>التوصيات</b><br>${html(visit.recommendations || '-')}</div></div>${pdfSection}${imageSection}<div class="footer"><span>تم إنشاء التقرير من منصة IAU Deeds</span><span>${html(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);
     report.document.close();
@@ -676,7 +799,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
               <CardContent className="space-y-3 pt-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div>
-                  <div className="flex flex-wrap gap-2"><Badge variant="outline">{itemStatusLabels[item.status]}</Badge><Badge variant="outline">{priorityLabels[item.priority]}</Badge></div>
+                  <div className="flex flex-wrap gap-2"><Badge variant="outline">{getItemStatusLabel(item)}</Badge><Badge variant="outline">{priorityLabels[item.priority]}</Badge></div>
                 </div>
                 {item.note && <ReadOnlyNote label="الملاحظة" value={item.note} />}
                 {item.status === 'needs_action' && <div className="grid gap-2 border-t border-amber-200 pt-3 sm:grid-cols-3"><InfoBox label="الجهة المسؤولة" value={item.responsibleEntity || '-'} /><InfoBox label="المهلة" value={item.dueDate ? new Date(item.dueDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-'} /><InfoBox label="حالة المعالجة" value={resolutionLabels[item.resolutionStatus]} /></div>}
@@ -711,7 +834,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-[1120px]" dir="rtl">
         <DialogHeader className="text-right"><DialogTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-sky-700" />{editingVisit ? `توثيق الزيارة ${editingVisit.visitNumber}` : 'إنشاء زيارة ميدانية'}</DialogTitle><DialogDescription>تُحفظ الزيارة في السجل التاريخي للمسجد أو المصلى المحدد، وتنتقل الملاحظات المفتوحة إلى المتابعة.</DialogDescription></DialogHeader>
         <div className="grid gap-4 rounded-2xl border bg-slate-50/70 p-4 md:grid-cols-3"><Field label="المسجد أو المصلى *"><NativeSelect value={visitForm.siteId} onChange={(event) => setVisitForm({ ...visitForm, siteId: event.target.value })} disabled={Boolean(editingVisit?.tourId)}><option value="">اختر الموقع</option>{sites.map((site) => { const activeVisit = activeVisitBySite.get(site.id); const blocked = !editingVisit && Boolean(activeVisit); return <option key={site.id} value={site.id} disabled={blocked}>{site.name} — {site.campusLocation || site.city || ''}{blocked ? ` — زيارة قائمة ${activeVisit!.visitNumber}` : ''}</option>; })}</NativeSelect></Field><Field label="نوع الزيارة"><NativeSelect value={visitForm.visitType} onChange={(event) => setVisitForm({ ...visitForm, visitType: event.target.value as MosqueFieldVisit['visitType'] })}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field><Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field><Field label="ممثل الموقع"><Input value={visitForm.representativeName} onChange={(event) => setVisitForm({ ...visitForm, representativeName: event.target.value })} /></Field><Field label="حالة سجل الزيارة"><NativeSelect value={visitForm.workflowStatus} onChange={(event) => setVisitForm({ ...visitForm, workflowStatus: event.target.value as MosqueFieldVisit['workflowStatus'] })}>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><div className="md:col-span-3"><Field label="منفذ الزيارة"><Input value={visitForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field><p className="mt-1 text-[11px] text-slate-500">يُسجل اسم المستخدم الحالي تلقائيًا. السجلات السابقة تحتفظ بأسماء الفريق المحفوظة تاريخيًا.</p></div><Field label="الحالة العامة"><NativeSelect value={visitForm.overallStatus} onChange={(event) => setVisitForm({ ...visitForm, overallStatus: event.target.value as MosqueFieldVisit['overallStatus'] })}>{Object.entries(overallLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="الأولوية العامة"><NativeSelect value={visitForm.priority} onChange={(event) => setVisitForm({ ...visitForm, priority: event.target.value as MosqueFieldVisit['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field></div>
-        <div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">أكمل جميع البنود قبل اعتماد الزيارة كمكتملة.</p></div><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div>{visitForm.items.map((item, index) => <Card key={`${item.category}-${item.title}-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center"><div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div><NativeSelect className="lg:w-44" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{Object.entries(itemStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="ملاحظة المعالجة"><Input value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} /></Field><ImageField label="صور قبل المعالجة" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label="صور بعد المعالجة" images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div>}</CardContent></Card>)}</div>
+        <div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">تتغير خيارات النتيجة تلقائيًا حسب نوع بند الفحص، وأكمل جميع البنود قبل اعتماد الزيارة كمكتملة.</p></div><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div>{visitForm.items.map((item, index) => <Card key={`${item.category}-${item.title}-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center"><div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div><NativeSelect className="lg:w-64" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{getItemStatusOptions(item).map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="ملاحظة المعالجة"><Input value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} /></Field><ImageField label="صور قبل المعالجة" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label="صور بعد المعالجة" images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div>}</CardContent></Card>)}</div>
         <div className="grid gap-4 md:grid-cols-2"><Field label="الملاحظات العامة"><Textarea rows={4} value={visitForm.generalNotes} onChange={(event) => setVisitForm({ ...visitForm, generalNotes: event.target.value })} /></Field><Field label="التوصيات"><Textarea rows={4} value={visitForm.recommendations} onChange={(event) => setVisitForm({ ...visitForm, recommendations: event.target.value })} /></Field></div>
         <VisitAttachmentField attachments={visitForm.attachments} loading={uploadingKey === 'visit-attachments'} onFiles={(files) => void uploadVisitAttachments(files)} onRemove={removeVisitAttachment} onDescriptionChange={updateVisitAttachmentDescription} />
         <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setVisitDialog(false)}>إلغاء</Button>{editingVisit && canPrint && <Button variant="outline" onClick={() => requestVisitPrint({ ...editingVisit, ...visitForm, teamMembers: splitMembers(visitForm.teamMembers), visitDate: new Date(visitForm.visitDate).toISOString(), departureAt: visitForm.departureAt ? new Date(visitForm.departureAt).toISOString() : null } as MosqueFieldVisit)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>}<Button onClick={() => void saveVisit()} disabled={saving || Boolean(uploadingKey)}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}{editingVisit ? 'حفظ نتائج الزيارة' : 'إنشاء الزيارة'}</Button></DialogFooter>
