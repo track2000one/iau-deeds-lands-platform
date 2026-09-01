@@ -53,8 +53,11 @@ export type MosqueFieldVisitImage = {
   fileId?: string | null;
   fileName?: string | null;
   mimeType?: string | null;
+  fileSize?: number | null;
   capturedAt?: string | null;
 };
+
+export type MosqueFieldVisitAttachment = MosqueFieldVisitImage;
 
 export type MosqueFieldVisitItem = {
   id?: string;
@@ -87,6 +90,7 @@ export type MosqueFieldVisit = {
   workflowStatus: 'planned' | 'in_progress' | 'completed' | 'follow_up' | 'closed';
   generalNotes?: string | null;
   recommendations?: string | null;
+  attachments: MosqueFieldVisitAttachment[];
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
