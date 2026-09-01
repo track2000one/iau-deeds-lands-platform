@@ -167,7 +167,7 @@ replaceOnce(
               <div className="relative"><Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" /><Input className="pr-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث برقم الزيارة أو الموقع أو المنفذ" /></div>
               <NativeSelect value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)}><option value="">جميع المواقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect>
               <NativeSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">جميع حالات الزيارة</option>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>
-              <Button type="button" variant={showAdvancedFilters || activeFilterCount > 3 ? 'secondary' : 'outline'} onClick={() => setShowAdvancedFilters((current) => !current)}>تصفية وفرز متقدم{activeFilterCount ? ` (${activeFilterCount})` : ''}</Button>
+              <Button type="button" variant={showAdvancedFilters || activeFilterCount > 3 ? 'secondary' : 'outline'} onClick={() => setShowAdvancedFilters((current) => !current)}>تصفية وفرز متقدم{activeFilterCount ? ' (' + activeFilterCount + ')' : ''}</Button>
             </div>
             {showAdvancedFilters && <div className="rounded-2xl border border-sky-100 bg-slate-50/80 p-3 shadow-sm">
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -211,7 +211,7 @@ const programDialog = `    <Dialog open={programPrintDialog} onOpenChange={setPr
               <Field label="الفرز حسب"><NativeSelect value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)}><option value="date">تاريخ الزيارة</option><option value="site">المسجد / المصلى</option><option value="visit_number">رقم الزيارة</option><option value="status">حالة الزيارة</option><option value="open_items">الملاحظات المفتوحة</option><option value="priority">الأولوية العامة</option></NativeSelect></Field>
               <Field label="اتجاه الفرز"><NativeSelect value={sortDirection} onChange={(event) => setSortDirection(event.target.value as 'asc' | 'desc')}><option value="desc">تنازلي / الأحدث أولًا</option><option value="asc">تصاعدي / الأقدم أولًا</option></NativeSelect></Field>
             </div>
-            <div className="mt-3 flex items-center justify-between gap-2 border-t border-sky-100 pt-3"><span className="text-xs text-slate-600">{activeFilterCount ? `تم تطبيق ${activeFilterCount} معيار تصفية.` : 'سيتم تضمين جميع الزيارات.'}</span><Button type="button" size="sm" variant="outline" onClick={resetVisitFilters}>إعادة ضبط</Button></div>
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-sky-100 pt-3"><span className="text-xs text-slate-600">{activeFilterCount ? 'تم تطبيق ' + activeFilterCount + ' معيار تصفية.' : 'سيتم تضمين جميع الزيارات.'}</span><Button type="button" size="sm" variant="outline" onClick={resetVisitFilters}>إعادة ضبط</Button></div>
           </div>
         </div>
         <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setProgramPrintDialog(false)}>إلغاء</Button><Button onClick={printProgramReport} disabled={!filteredVisits.length}><Printer className="ml-2 h-4 w-4" />متابعة إلى الطباعة</Button></DialogFooter>
