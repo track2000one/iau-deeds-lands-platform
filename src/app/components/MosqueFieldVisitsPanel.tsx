@@ -198,6 +198,9 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
   const [viewingVisit, setViewingVisit] = React.useState<MosqueFieldVisit | null>(null);
   const [deletingVisit, setDeletingVisit] = React.useState<MosqueFieldVisit | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [printTarget, setPrintTarget] = React.useState<MosqueFieldVisit | null>(null);
+  const [includePrintImages, setIncludePrintImages] = React.useState(true);
+  const [preparingPrint, setPreparingPrint] = React.useState(false);
   const [visitForm, setVisitForm] = React.useState<VisitForm>(() => emptyVisit());
   const [uploadingKey, setUploadingKey] = React.useState('');
 
@@ -420,13 +423,60 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
     }
   };
 
-  const printVisit = (visit: MosqueFieldVisit) => {
+  const printVisit = async (visit: MosqueFieldVisit, includeImages: boolean) => {
+    const report = window.open('', '_blank', 'width=1200,height=850');
+    if (!report) {
+      toast.error('تعذر فتح نافذة التقرير. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.');
+      return;
+    }
+    report.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>جاري إعداد التقرير</title></head><body style="font-family:Tahoma,Arial;text-align:center;padding:80px"><h2>جاري إعداد تقرير الزيارة...</h2><p>يرجى الانتظار حتى يتم تحميل الصور المحددة.</p></body></html>');
+    report.document.close();
+
+    const isImageAttachment = (attachment: MosqueFieldVisitAttachment) => String(attachment.mimeType || '').startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(String(attachment.fileName || ''));
+    const printImages = [
+      ...(visit.attachments || []).filter(isImageAttachment).map((attachment) => ({ attachment, label: 'مرفق الزيارة' })),
+      ...visit.items.flatMap((item) => [
+        ...(item.beforeImages || []).map((attachment) => ({ attachment, label: `قبل المعالجة — ${item.title}` })),
+        ...(item.afterImages || []).map((attachment) => ({ attachment, label: `بعد المعالجة — ${item.title}` })),
+      ]),
+    ];
+    const pdfAttachments = (visit.attachments || []).filter((attachment) => attachment.mimeType === 'application/pdf' || /\.pdf$/i.test(String(attachment.fileName || '')));
+    const objectUrls: string[] = [];
+    const printableImages = includeImages ? (await Promise.all(printImages.map(async ({ attachment, label }) => {
+      try {
+        if (!attachment.fileId) return { src: attachment.url, label, fileName: attachment.fileName || 'صورة مرفقة' };
+        const blob = await mosqueApi.mediaBlob(attachment.fileId);
+        const src = URL.createObjectURL(blob);
+        objectUrls.push(src);
+        return { src, label, fileName: attachment.fileName || 'صورة مرفقة' };
+      } catch {
+        return null;
+      }
+    }))).filter((item): item is { src: string; label: string; fileName: string } => Boolean(item)) : [];
+    const imageSection = printableImages.length ? `<section class="attachments"><h2>الصور المرفقة (${printableImages.length})</h2><div class="image-grid">${printableImages.map((item, index) => `<figure><img src="${html(item.src)}" alt="${html(item.fileName)}"><figcaption><b>${index + 1}. ${html(item.label)}</b><span>${html(item.fileName)}</span></figcaption></figure>`).join('')}</div></section>` : '';
+    const pdfSection = pdfAttachments.length ? `<section class="pdf-list"><b>ملفات PDF المرفقة (${pdfAttachments.length})</b><div>${pdfAttachments.map((attachment, index) => `${index + 1}. ${html(attachment.fileName || 'ملف PDF')}`).join(' &nbsp; | &nbsp; ')}</div></section>` : '';
     const actionItems = visit.items.filter((item) => item.status === 'needs_action');
     const rows = visit.items.map((item, index) => `<tr><td>${index + 1}</td><td>${html(item.category)}</td><td class="right">${html(item.title)}</td><td>${html(itemStatusLabels[item.status] || item.status)}</td><td>${html(priorityLabels[item.priority] || item.priority)}</td><td class="right">${html(item.note || '-')}</td><td>${html(item.responsibleEntity || '-')}</td><td>${html(resolutionLabels[item.resolutionStatus] || item.resolutionStatus)}</td><td>${(item.beforeImages?.length || 0)}/${(item.afterImages?.length || 0)}</td></tr>`).join('');
-    const report = window.open('', '_blank', 'width=1200,height=850');
-    if (!report) return toast.error('تعذر فتح نافذة التقرير. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.');
-    report.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${html(visit.visitNumber)}</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{border:2px solid #0f766e;border-radius:16px;padding:16px;background:#f0fdfa}.kicker{font-size:11px;color:#0f766e;font-weight:bold}.title{font-size:23px;font-weight:900;margin:6px 0}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px}.box{border:1px solid #cbd5e1;border-radius:10px;padding:8px;background:white}.box small{display:block;color:#64748b;margin-bottom:4px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.metric{padding:10px;border:1px solid #cbd5e1;border-radius:10px;text-align:center}.metric b{display:block;font-size:20px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:9.5px}th,td{border:1px solid #cbd5e1;padding:6px;text-align:center;vertical-align:top}th{background:#e2e8f0}.right{text-align:right}.notes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.note{border:1px solid #cbd5e1;border-radius:10px;padding:10px;min-height:65px;white-space:pre-wrap}.footer{margin-top:10px;font-size:9px;color:#64748b;display:flex;justify-content:space-between}</style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><div class="title">تقرير زيارة ميدانية</div><div class="meta"><div class="box"><small>رقم الزيارة</small><b>${html(visit.visitNumber)}</b></div><div class="box"><small>المسجد / المصلى</small><b>${html(visit.site.name)}</b></div><div class="box"><small>التاريخ</small><b>${html(new Date(visit.visitDate).toLocaleString('ar-SA-u-ca-gregory'))}</b></div><div class="box"><small>نوع الزيارة</small><b>${html(visitTypeLabels[visit.visitType])}</b></div><div class="box"><small>الفريق</small><b>${html((visit.teamMembers || []).join('، '))}</b></div><div class="box"><small>ممثل الموقع</small><b>${html(visit.representativeName || '-')}</b></div><div class="box"><small>الحالة العامة</small><b>${html(overallLabels[visit.overallStatus])}</b></div><div class="box"><small>حالة السجل</small><b>${html(visitStatusLabels[visit.workflowStatus])}</b></div></div></div><div class="metrics"><div class="metric">بنود الفحص<b>${visit.items.length}</b></div><div class="metric">ملاحظات تحتاج معالجة<b>${actionItems.length}</b></div><div class="metric">ملاحظات عاجلة<b>${actionItems.filter((item) => item.priority === 'urgent').length}</b></div><div class="metric">تم إغلاقها<b>${visit.items.filter((item) => item.resolutionStatus === 'closed').length}</b></div></div><table><thead><tr><th>م</th><th>المحور</th><th>بند الفحص</th><th>النتيجة</th><th>الأولوية</th><th>الملاحظة</th><th>الجهة المسؤولة</th><th>المعالجة</th><th>صور قبل/بعد</th></tr></thead><tbody>${rows}</tbody></table><div class="notes"><div class="note"><b>الملاحظات العامة</b><br>${html(visit.generalNotes || '-')}</div><div class="note"><b>التوصيات</b><br>${html(visit.recommendations || '-')}</div></div><div class="footer"><span>تم إنشاء التقرير من منصة IAU Deeds</span><span>${html(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
+    report.document.open();
+    report.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${html(visit.visitNumber)}</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{border:2px solid #0f766e;border-radius:16px;padding:16px;background:#f0fdfa}.kicker{font-size:11px;color:#0f766e;font-weight:bold}.title{font-size:23px;font-weight:900;margin:6px 0}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px}.box{border:1px solid #cbd5e1;border-radius:10px;padding:8px;background:white}.box small{display:block;color:#64748b;margin-bottom:4px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.metric{padding:10px;border:1px solid #cbd5e1;border-radius:10px;text-align:center}.metric b{display:block;font-size:20px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:9.5px}th,td{border:1px solid #cbd5e1;padding:6px;text-align:center;vertical-align:top}th{background:#e2e8f0}.right{text-align:right}.notes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.note{border:1px solid #cbd5e1;border-radius:10px;padding:10px;min-height:65px;white-space:pre-wrap}.pdf-list{margin-top:12px;border:1px solid #cbd5e1;border-radius:10px;padding:10px;font-size:10px}.pdf-list div{margin-top:5px;color:#475569}.attachments{page-break-before:always;padding-top:3mm}.attachments h2{margin:0 0 12px;font-size:20px}.image-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.image-grid figure{margin:0;border:1px solid #cbd5e1;border-radius:12px;padding:8px;break-inside:avoid;page-break-inside:avoid}.image-grid img{display:block;width:100%;height:230px;object-fit:contain;background:#f8fafc;border-radius:8px}.image-grid figcaption{display:flex;flex-direction:column;gap:3px;margin-top:6px;font-size:10px}.image-grid figcaption span{color:#64748b}.footer{margin-top:10px;font-size:9px;color:#64748b;display:flex;justify-content:space-between}</style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><div class="title">تقرير زيارة ميدانية</div><div class="meta"><div class="box"><small>رقم الزيارة</small><b>${html(visit.visitNumber)}</b></div><div class="box"><small>المسجد / المصلى</small><b>${html(visit.site.name)}</b></div><div class="box"><small>التاريخ</small><b>${html(new Date(visit.visitDate).toLocaleString('ar-SA-u-ca-gregory'))}</b></div><div class="box"><small>نوع الزيارة</small><b>${html(visitTypeLabels[visit.visitType])}</b></div><div class="box"><small>الفريق</small><b>${html((visit.teamMembers || []).join('، '))}</b></div><div class="box"><small>ممثل الموقع</small><b>${html(visit.representativeName || '-')}</b></div><div class="box"><small>الحالة العامة</small><b>${html(overallLabels[visit.overallStatus])}</b></div><div class="box"><small>حالة السجل</small><b>${html(visitStatusLabels[visit.workflowStatus])}</b></div></div></div><div class="metrics"><div class="metric">بنود الفحص<b>${visit.items.length}</b></div><div class="metric">ملاحظات تحتاج معالجة<b>${actionItems.length}</b></div><div class="metric">ملاحظات عاجلة<b>${actionItems.filter((item) => item.priority === 'urgent').length}</b></div><div class="metric">تم إغلاقها<b>${visit.items.filter((item) => item.resolutionStatus === 'closed').length}</b></div></div><table><thead><tr><th>م</th><th>المحور</th><th>بند الفحص</th><th>النتيجة</th><th>الأولوية</th><th>الملاحظة</th><th>الجهة المسؤولة</th><th>المعالجة</th><th>صور قبل/بعد</th></tr></thead><tbody>${rows}</tbody></table><div class="notes"><div class="note"><b>الملاحظات العامة</b><br>${html(visit.generalNotes || '-')}</div><div class="note"><b>التوصيات</b><br>${html(visit.recommendations || '-')}</div></div>${pdfSection}${imageSection}<div class="footer"><span>تم إنشاء التقرير من منصة IAU Deeds</span><span>${html(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);
     report.document.close();
+    if (objectUrls.length) setTimeout(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)), 10 * 60 * 1000);
+  };
+
+  const requestVisitPrint = (visit: MosqueFieldVisit) => {
+    setPrintTarget(visit);
+    setIncludePrintImages(true);
+  };
+
+  const confirmVisitPrint = async () => {
+    if (!printTarget) return;
+    try {
+      setPreparingPrint(true);
+      await printVisit(printTarget, includePrintImages);
+      setPrintTarget(null);
+    } finally {
+      setPreparingPrint(false);
+    }
   };
 
   const printProgramReport = () => {
@@ -440,6 +490,12 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
     report.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير البرنامج الميداني</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{border:2px solid #0369a1;border-radius:16px;padding:16px;background:linear-gradient(135deg,#f0f9ff,#fff,#ecfdf5)}.kicker{font-size:11px;color:#0369a1;font-weight:bold}h1{font-size:24px;margin:6px 0}.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:14px 0}.metric{border:1px solid #cbd5e1;border-radius:10px;padding:10px;text-align:center;background:#fff}.metric small{display:block;color:#64748b}.metric b{display:block;font-size:22px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:10px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:center}th{background:#e2e8f0}.right{text-align:right}.footer{display:flex;justify-content:space-between;margin-top:12px;font-size:9px;color:#64748b}</style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><h1>تقرير البرنامج الميداني للمساجد والمصليات</h1><div>تم تطبيق معايير البحث والتصفية الظاهرة في المنصة قبل إنشاء التقرير.</div></div><div class="metrics"><div class="metric"><small>إجمالي المواقع</small><b>${summary.totalSites}</b></div><div class="metric"><small>تمت زيارتها</small><b>${summary.visitedSites}</b></div><div class="metric"><small>نسبة التغطية</small><b>${summary.coveragePercent}%</b></div><div class="metric"><small>الملاحظات المفتوحة</small><b>${summary.openItems}</b></div><div class="metric"><small>العاجلة</small><b>${summary.urgentItems}</b></div><div class="metric"><small>المتأخرة</small><b>${summary.overdueItems}</b></div></div><table><thead><tr><th>م</th><th>رقم الزيارة</th><th>المسجد / المصلى</th><th>النوع</th><th>التاريخ</th><th>الحالة العامة</th><th>مفتوحة</th><th>عاجلة</th><th>حالة الزيارة</th></tr></thead><tbody>${rows || '<tr><td colspan="9">لا توجد زيارات مطابقة</td></tr>'}</tbody></table><div class="footer"><span>منصة IAU Deeds — البرنامج الميداني</span><span>${html(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
     report.document.close();
   };
+
+  const printImageCount = printTarget ? [
+    ...(printTarget.attachments || []).filter((attachment) => String(attachment.mimeType || '').startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(String(attachment.fileName || ''))),
+    ...printTarget.items.flatMap((item) => [...(item.beforeImages || []), ...(item.afterImages || [])]),
+  ].length : 0;
+  const printPdfCount = printTarget ? (printTarget.attachments || []).filter((attachment) => attachment.mimeType === 'application/pdf' || /\.pdf$/i.test(String(attachment.fileName || ''))).length : 0;
 
   if (loading) return <div className="flex min-h-[320px] items-center justify-center gap-3"><Loader2 className="h-7 w-7 animate-spin text-sky-700" /><span className="font-semibold">جاري تحميل البرنامج الميداني...</span></div>;
 
@@ -497,7 +553,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
           <div className="flex flex-wrap gap-2"><Badge variant="outline">{visit.items.length} بند فحص</Badge><Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">{visit.items.filter((item) => item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length} ملاحظة مفتوحة</Badge>{visit.attachments?.length > 0 && <Badge variant="outline" className="gap-1 border-sky-200 bg-sky-50 text-sky-700"><Paperclip className="h-3 w-3" />{visit.attachments.length} مرفق</Badge>}{visit.items.some((item) => item.priority === 'urgent' && !['resolved', 'closed'].includes(item.resolutionStatus)) && <Badge className="bg-red-600">عاجل</Badge>}</div>
           <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
             <Button size="sm" variant="outline" className="border-sky-200 text-sky-700 hover:bg-sky-50" onClick={() => setViewingVisit(visit)}><Eye className="ml-1 h-4 w-4" />عرض</Button>
-            {canPrint && <Button size="sm" variant="outline" onClick={() => printVisit(visit)}><Printer className="ml-1 h-4 w-4" />تقرير</Button>}
+            {canPrint && <Button size="sm" variant="outline" onClick={() => requestVisitPrint(visit)}><Printer className="ml-1 h-4 w-4" />تقرير</Button>}
             {canEdit && <Button size="sm" onClick={() => openVisit(visit)}><Pencil className="ml-1 h-4 w-4" />تعديل</Button>}
             {canDelete && <Button size="sm" variant="destructive" className="!border-red-700 !bg-red-600 !text-white shadow-sm hover:!bg-red-700 hover:!text-white" onClick={() => setDeletingVisit(visit)}><Trash2 className="ml-1 h-4 w-4 text-white" />حذف</Button>}
           </div>
@@ -511,6 +567,31 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
       </Card>)}
       {!tours.length && <Empty message="لم يتم إنشاء جولات ميدانية بعد" />}
     </div>}
+
+    <Dialog open={Boolean(printTarget)} onOpenChange={(open) => { if (!open && !preparingPrint) setPrintTarget(null); }}>
+      <DialogContent className="sm:max-w-[620px]" dir="rtl">
+        {printTarget && <>
+          <DialogHeader className="text-right">
+            <DialogTitle className="flex items-center gap-2"><Printer className="h-5 w-5 text-sky-700" />خيارات طباعة التقرير</DialogTitle>
+            <DialogDescription>اختر ما إذا كنت تريد إدراج الصور داخل تقرير الزيارة {printTarget.visitNumber}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition ${includePrintImages ? 'border-sky-500 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200'}`}>
+              <input type="radio" name="visit-print-images" className="mt-1 h-4 w-4 accent-sky-700" checked={includePrintImages} onChange={() => setIncludePrintImages(true)} />
+              <Camera className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
+              <span><b className="block text-sm text-slate-800">طباعة التقرير مع الصور</b><small className="mt-1 block text-slate-500">إدراج {printImageCount} صورة من مرفقات الزيارة وصور قبل/بعد المعالجة في صفحات مستقلة.</small></span>
+            </label>
+            <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition ${!includePrintImages ? 'border-slate-600 bg-slate-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+              <input type="radio" name="visit-print-images" className="mt-1 h-4 w-4 accent-slate-700" checked={!includePrintImages} onChange={() => setIncludePrintImages(false)} />
+              <FileText className="mt-0.5 h-5 w-5 shrink-0 text-slate-700" />
+              <span><b className="block text-sm text-slate-800">طباعة التقرير بدون الصور</b><small className="mt-1 block text-slate-500">طباعة البيانات وقائمة الفحص والملاحظات فقط لتقليل عدد الصفحات.</small></span>
+            </label>
+          </div>
+          {printPdfCount > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">يوجد {printPdfCount} ملف PDF؛ ستظهر أسماؤها في التقرير ويمكن فتح كل ملف وطباعته بصورة مستقلة.</div>}
+          <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setPrintTarget(null)} disabled={preparingPrint}>إلغاء</Button><Button className="bg-sky-700 text-white hover:bg-sky-800" onClick={() => void confirmVisitPrint()} disabled={preparingPrint}>{preparingPrint ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Printer className="ml-2 h-4 w-4" />}{preparingPrint ? 'جاري إعداد التقرير...' : 'متابعة إلى الطباعة'}</Button></DialogFooter>
+        </>}
+      </DialogContent>
+    </Dialog>
 
     <Dialog open={tourDialog} onOpenChange={setTourDialog}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[920px]" dir="rtl">
@@ -562,7 +643,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setViewingVisit(null)}>إغلاق</Button>
-            {canPrint && <Button variant="outline" onClick={() => printVisit(viewingVisit)}><Printer className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
+            {canPrint && <Button variant="outline" onClick={() => requestVisitPrint(viewingVisit)}><Printer className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
             {canEdit && <Button onClick={() => { const visit = viewingVisit; setViewingVisit(null); openVisit(visit); }}><Pencil className="ml-2 h-4 w-4" />تعديل الزيارة</Button>}
           </DialogFooter>
         </>}
@@ -589,7 +670,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
         <div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">أكمل جميع البنود قبل اعتماد الزيارة كمكتملة.</p></div><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div>{visitForm.items.map((item, index) => <Card key={`${item.category}-${item.title}-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center"><div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div><NativeSelect className="lg:w-44" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{Object.entries(itemStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="ملاحظة المعالجة"><Input value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} /></Field><ImageField label="صور قبل المعالجة" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label="صور بعد المعالجة" images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div>}</CardContent></Card>)}</div>
         <div className="grid gap-4 md:grid-cols-2"><Field label="الملاحظات العامة"><Textarea rows={4} value={visitForm.generalNotes} onChange={(event) => setVisitForm({ ...visitForm, generalNotes: event.target.value })} /></Field><Field label="التوصيات"><Textarea rows={4} value={visitForm.recommendations} onChange={(event) => setVisitForm({ ...visitForm, recommendations: event.target.value })} /></Field></div>
         <VisitAttachmentField attachments={visitForm.attachments} loading={uploadingKey === 'visit-attachments'} onFiles={(files) => void uploadVisitAttachments(files)} onRemove={removeVisitAttachment} />
-        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setVisitDialog(false)}>إلغاء</Button>{editingVisit && canPrint && <Button variant="outline" onClick={() => printVisit({ ...editingVisit, ...visitForm, teamMembers: splitMembers(visitForm.teamMembers), visitDate: new Date(visitForm.visitDate).toISOString(), departureAt: visitForm.departureAt ? new Date(visitForm.departureAt).toISOString() : null } as MosqueFieldVisit)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>}<Button onClick={() => void saveVisit()} disabled={saving || Boolean(uploadingKey)}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}{editingVisit ? 'حفظ نتائج الزيارة' : 'إنشاء الزيارة'}</Button></DialogFooter>
+        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setVisitDialog(false)}>إلغاء</Button>{editingVisit && canPrint && <Button variant="outline" onClick={() => requestVisitPrint({ ...editingVisit, ...visitForm, teamMembers: splitMembers(visitForm.teamMembers), visitDate: new Date(visitForm.visitDate).toISOString(), departureAt: visitForm.departureAt ? new Date(visitForm.departureAt).toISOString() : null } as MosqueFieldVisit)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>}<Button onClick={() => void saveVisit()} disabled={saving || Boolean(uploadingKey)}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}{editingVisit ? 'حفظ نتائج الزيارة' : 'إنشاء الزيارة'}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   </div>;
