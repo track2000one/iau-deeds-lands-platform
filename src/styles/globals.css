@@ -636,3 +636,120 @@ label[for="isPlanned"] {
     justify-content: center;
   }
 }
+
+/* ===== Global form focus, selection, and required-field accessibility ===== */
+:root {
+  --app-focus: #0284c7;
+  --app-focus-ring: rgba(14, 165, 233, 0.20);
+  --app-focus-glow: rgba(14, 165, 233, 0.22);
+  --app-required-bg: #fff9c4;
+  --app-required-border: #facc15;
+  --app-selection-bg: #7dd3fc;
+  --app-selection-text: #0f172a;
+}
+
+/* Text selection must stay visible in every editable field and normal page text. */
+::selection {
+  background: var(--app-selection-bg) !important;
+  color: var(--app-selection-text) !important;
+}
+
+input::selection,
+textarea::selection,
+[contenteditable="true"]::selection {
+  background: #38bdf8 !important;
+  color: #082f49 !important;
+}
+
+::-moz-selection {
+  background: var(--app-selection-bg) !important;
+  color: var(--app-selection-text) !important;
+}
+
+/* Required fields: visual hint only; validation behavior remains controlled by the app. */
+:where(input, textarea, select)[required]:not(:disabled):not([readonly]),
+:where(input, textarea, select)[aria-required="true"]:not(:disabled):not([readonly]),
+:where(input, textarea, select)[data-app-required="true"]:not(:disabled):not([readonly]),
+[role="combobox"][aria-required="true"]:not([aria-disabled="true"]),
+[role="combobox"][data-app-required="true"]:not([aria-disabled="true"]) {
+  background-color: var(--app-required-bg) !important;
+  border-color: var(--app-required-border) !important;
+  box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.14) !important;
+}
+
+label[data-app-required-label="true"] {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-weight: 750;
+}
+
+label[data-app-required-label="true"]::after {
+  content: "مطلوب";
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.25rem;
+  padding: 0.08rem 0.42rem;
+  border: 1px solid #facc15;
+  border-radius: 999px;
+  background: #fef08a;
+  color: #854d0e;
+  font-size: 0.65rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(133, 77, 14, 0.08);
+}
+
+/* Strong, consistent focus indicator for mouse and keyboard navigation. */
+:where(input, textarea, select, [role="combobox"], [contenteditable="true"]):not(:disabled):not([aria-disabled="true"]):focus,
+:where(input, textarea, select, [role="combobox"], [contenteditable="true"]):not(:disabled):not([aria-disabled="true"]):focus-visible {
+  outline: 3px solid rgba(14, 165, 233, 0.68) !important;
+  outline-offset: 2px !important;
+  border-color: var(--app-focus) !important;
+  box-shadow:
+    0 0 0 4px var(--app-focus-ring),
+    0 0 20px var(--app-focus-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65) !important;
+  caret-color: #075985 !important;
+  position: relative;
+  z-index: 1;
+}
+
+/* Keyboard users should also always know which interactive control is active. */
+:where(button, a[href], [role="button"], [role="tab"], [tabindex]):focus-visible {
+  outline: 3px solid rgba(14, 165, 233, 0.68) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.14) !important;
+}
+
+/* Error state takes priority over the yellow required-field hint. */
+:where(input, textarea, select)[aria-invalid="true"],
+[role="combobox"][aria-invalid="true"] {
+  background-color: #fff7f7 !important;
+  border-color: #ef4444 !important;
+  outline-color: rgba(239, 68, 68, 0.55) !important;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.11) !important;
+}
+
+/* Read-only/disabled fields are intentionally visually distinct from editable required fields. */
+:where(input, textarea, select):disabled,
+:where(input, textarea)[readonly],
+[role="combobox"][aria-disabled="true"] {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+}
+
+:where(input, textarea, select):disabled,
+[role="combobox"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :where(input, textarea, select, [role="combobox"], [contenteditable="true"]) {
+    transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease, outline-color 140ms ease;
+  }
+}
+
