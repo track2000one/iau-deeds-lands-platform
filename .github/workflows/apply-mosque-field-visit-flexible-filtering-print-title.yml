@@ -38,3 +38,5 @@ jobs:
           git add src/app/components/MosqueFieldVisitsPanel.tsx scripts/apply-mosque-field-visit-flexible-filtering-print-title.mjs .github/workflows/apply-mosque-field-visit-flexible-filtering-print-title.yml
           git commit -m "Add flexible field visit report filtering and title"
           git push
+
+# rerun after syntax fix
