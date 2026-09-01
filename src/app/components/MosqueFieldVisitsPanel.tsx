@@ -497,7 +497,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
             <Button size="sm" variant="outline" className="border-sky-200 text-sky-700 hover:bg-sky-50" onClick={() => setViewingVisit(visit)}><Eye className="ml-1 h-4 w-4" />عرض</Button>
             {canPrint && <Button size="sm" variant="outline" onClick={() => printVisit(visit)}><Printer className="ml-1 h-4 w-4" />تقرير</Button>}
             {canEdit && <Button size="sm" onClick={() => openVisit(visit)}><Pencil className="ml-1 h-4 w-4" />تعديل</Button>}
-            {canDelete && <Button size="sm" variant="destructive" onClick={() => setDeletingVisit(visit)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button>}
+            {canDelete && <Button size="sm" variant="destructive" className="!border-red-700 !bg-red-600 !text-white shadow-sm hover:!bg-red-700 hover:!text-white" onClick={() => setDeletingVisit(visit)}><Trash2 className="ml-1 h-4 w-4 text-white" />حذف</Button>}
           </div>
         </CardContent>
       </Card>)}
@@ -575,7 +575,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, canAdd, canEdit
             <DialogDescription>سيتم حذف الزيارة {deletingVisit.visitNumber} الخاصة بـ {deletingVisit.site.name} مع جميع بنود الفحص والصور المرتبطة بسجلها.</DialogDescription>
           </DialogHeader>
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">هذا الإجراء نهائي ولا يمكن التراجع عنه.</div>
-          <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setDeletingVisit(null)} disabled={deleting}>إلغاء</Button><Button variant="destructive" onClick={() => void deleteVisit()} disabled={deleting}>{deleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}تأكيد الحذف</Button></DialogFooter>
+          <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setDeletingVisit(null)} disabled={deleting}>إلغاء</Button><Button variant="destructive" className="!border-red-700 !bg-red-600 !text-white shadow-sm hover:!bg-red-700 hover:!text-white disabled:opacity-70" onClick={() => void deleteVisit()} disabled={deleting}>{deleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin text-white" /> : <Trash2 className="ml-2 h-4 w-4 text-white" />}تأكيد الحذف</Button></DialogFooter>
         </>}
       </DialogContent>
     </Dialog>
