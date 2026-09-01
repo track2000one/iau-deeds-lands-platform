@@ -30,6 +30,23 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Repair print header patch anchor
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/add-quran-target-capacity.py')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace(
+              "old = '<th>الإجمالي</th><th>المسحوبة</th><th>الاحتياج</th><th>آخر جرد</th>'",
+              "old = '<th>الإجمالي</th><th>المسحوبة</th><th>الاحتياج</th><th style=\"width:8%\">آخر جرد</th>'",
+          )
+          text = text.replace(
+              "new = '<th>الإجمالي</th><th>المسحوبة</th><th>المستهدف</th><th>التغطية</th><th>الاحتياج</th><th>آخر جرد</th>'",
+              "new = '<th>الإجمالي</th><th>المسحوبة</th><th>المستهدف</th><th>التغطية</th><th>الاحتياج</th><th style=\"width:8%\">آخر جرد</th>'",
+          )
+          path.write_text(text, encoding='utf-8')
+          PY
+
       - name: Apply Quran target capacity frontend
         run: python3 scripts/add-quran-target-capacity.py
 
