@@ -60,6 +60,22 @@ export type MosqueFieldVisitImage = {
 
 export type MosqueFieldVisitAttachment = MosqueFieldVisitImage;
 
+export type MosqueFieldVisitQuranInventoryDetails = {
+  largeCount?: number | null;
+  mediumCount?: number | null;
+  smallCount?: number | null;
+  recommendedWithdrawalCount?: number | null;
+  conditionStatus?: 'not_checked' | 'good' | 'needs_attention';
+  publisherStatus?: 'not_checked' | 'approved' | 'needs_review';
+  notes?: string | null;
+  capturedFrom?: 'field_visit';
+};
+
+export type MosqueFieldVisitItemDetails = {
+  quranInventory?: MosqueFieldVisitQuranInventoryDetails;
+  [key: string]: unknown;
+};
+
 export type MosqueFieldVisitItem = {
   id?: string;
   visitId?: string;
@@ -72,6 +88,7 @@ export type MosqueFieldVisitItem = {
   dueDate?: string | null;
   resolutionStatus: 'new' | 'referred' | 'in_progress' | 'resolved' | 'closed';
   resolutionNote?: string | null;
+  details?: MosqueFieldVisitItemDetails | null;
   beforeImages: MosqueFieldVisitImage[];
   afterImages: MosqueFieldVisitImage[];
 };
