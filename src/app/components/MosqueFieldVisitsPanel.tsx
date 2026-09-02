@@ -1222,10 +1222,7 @@ const ImageField: React.FC<{
     {images.map((image, index) => <div key={`${image.fileId || image.url}-${index}`} className="relative overflow-hidden rounded-xl border bg-white p-1.5 shadow-sm">
       <FieldVisitImagePreview image={image} />
       <button type="button" aria-label="حذف الصورة" title="حذف الصورة" className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white shadow hover:bg-red-700" onClick={() => onRemove(index)}>×</button>
-      <div className="mt-1.5 min-w-0 px-1">
-        <p className="truncate text-[10px] font-semibold text-slate-700" title={image.fileName || `صورة ${index + 1}`}>{image.fileName || `صورة ${index + 1}`}</p>
-        {image.capturedAt && <p className="mt-0.5 text-[9px] text-slate-400">{new Date(image.capturedAt).toLocaleString('ar-SA-u-ca-gregory')}</p>}
-      </div>
+      {image.capturedAt && <div className="mt-1.5 px-1 text-center"><p className="text-[9px] text-slate-400">{new Date(image.capturedAt).toLocaleString('ar-SA-u-ca-gregory')}</p></div>}
     </div>)}
   </div>}
 </div>;
