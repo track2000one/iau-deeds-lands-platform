@@ -59,6 +59,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { isAdmin, hasPermission } = usePermissions();
 
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem('iau-sidebar-collapsed') !== 'false';
+  });
   const [logoutDialogOpen, setLogoutDialogOpen] = React.useState(false);
 
   const isRTL = i18n.language === 'ar';
@@ -117,6 +121,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   React.useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+
+  React.useEffect(() => {
+    window.localStorage.setItem('iau-sidebar-collapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'ar' ? 'en' : 'ar';
@@ -203,6 +211,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
 
+            <Button
+              variant="ghost"
+              size="icon"
+              title={sidebarCollapsed ? ui('إظهار القائمة الجانبية', 'Expand sidebar') : ui('طي القائمة الجانبية', 'Collapse sidebar')}
+              aria-label={sidebarCollapsed ? ui('إظهار القائمة الجانبية', 'Expand sidebar') : ui('طي القائمة الجانبية', 'Collapse sidebar')}
+              className="hidden lg:inline-flex shrink-0 h-10 w-10 rounded-xl future-glow-button"
+              onClick={() => setSidebarCollapsed((prev) => !prev)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+
             <div className="hidden md:flex items-center gap-2">
               <Button title={ui('الحساب', 'Account')} aria-label={ui('الحساب', 'Account')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button" onClick={() => navigate(isAdmin ? '/admin' : defaultLandingPath)}>
                 <User className="h-4 w-4" />
@@ -282,9 +301,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             h-dvh lg:h-auto
             z-50 lg:z-0
             w-[88vw] max-w-[340px] shrink-0
-            lg:w-[300px] xl:w-[320px] 2xl:w-[340px]
+            ${sidebarCollapsed ? 'lg:w-[76px]' : 'lg:w-[300px] xl:w-[320px] 2xl:w-[340px]'}
             bg-sidebar text-sidebar-foreground
-            transition-transform duration-300 ease-in-out
+            transition-[width,transform] duration-300 ease-in-out
             flex flex-col
             ${isRTL ? 'right-0 lg:border-l' : 'left-0 lg:border-r'}
             ${
@@ -297,9 +316,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             lg:translate-x-0
           `}
         >
-          <div className="p-4 border-b border-sidebar-border">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
+          <div className={`p-4 border-b border-sidebar-border ${sidebarCollapsed ? 'lg:px-2' : ''}`}>
+            <div className={`flex items-center gap-3 ${sidebarCollapsed ? 'lg:justify-center' : 'justify-between'}`}>
+              <div className={`min-w-0 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
                 <p className="text-sm font-bold truncate">{username}</p>
                 <p className="text-xs opacity-70">{ui('مستخدم المنصة', 'Platform User')}</p>
               </div>
@@ -308,7 +327,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 variant="ghost"
                 size="icon"
                 onClick={() => setLogoutDialogOpen(true)}
-                className="h-9 w-9 rounded-2xl"
+                title={ui('تسجيل الخروج', 'Log out')}
+                aria-label={ui('تسجيل الخروج', 'Log out')}
+                className="h-9 w-9 rounded-2xl shrink-0"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -343,8 +364,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Button
                     key={item.id}
                     variant="ghost"
+                    title={item.label}
+                    aria-label={item.label}
                     className={`
                       future-nav-item w-full ${isRTL ? 'justify-end' : 'justify-start'} gap-3 text-[13px] min-h-12 h-auto px-3 py-2.5 whitespace-normal
+                      ${sidebarCollapsed ? 'lg:justify-center lg:px-2 lg:gap-0' : ''}
                       ${isActive ? 'is-active font-bold' : ''}
                     `}
                     onClick={() => {
@@ -352,8 +376,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       setSidebarOpen(false);
                     }}
                   >
-                    <Icon className="h-4.5 w-4.5 shrink-0" />
-                    <span className={`min-w-0 flex-1 whitespace-normal break-words leading-5 ${isRTL ? 'text-right' : 'text-left'}`} title={item.label}>
+                    <Icon className={`shrink-0 ${sidebarCollapsed ? 'lg:h-5 lg:w-5' : 'h-4.5 w-4.5'}`} />
+                    <span className={`min-w-0 flex-1 whitespace-normal break-words leading-5 ${isRTL ? 'text-right' : 'text-left'} ${sidebarCollapsed ? 'lg:hidden' : ''}`} title={item.label}>
                       {item.label}
                     </span>
                   </Button>
@@ -361,9 +385,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               })}
             </nav>
 
-            <Separator className="my-4 bg-sidebar-border" />
+            <Separator className={`my-4 bg-sidebar-border ${sidebarCollapsed ? 'lg:mx-2' : ''}`} />
 
-            <div className={`px-3 py-2 text-xs opacity-70 ${isRTL ? 'text-right' : 'text-left'}`}>
+            <div className={`px-3 py-2 text-xs opacity-70 ${isRTL ? 'text-right' : 'text-left'} ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
               <p className="font-medium">v2060.1.0</p>
               <p className="mt-1">© 2060 IAU</p>
             </div>
