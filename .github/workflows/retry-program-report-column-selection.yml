@@ -1,0 +1,56 @@
+name: Retry Flexible Program Report Columns
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/retry-program-report-column-selection.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Correct patch marker and apply
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/apply-program-report-column-selection.py')
+          t = p.read_text(encoding='utf-8')
+          old = "end_marker = '  const printTreatmentEvidenceReport = async'"
+          new = "end_marker = '  const printImageCount = printTarget ? ['"
+          if old not in t:
+              raise SystemExit('Original end marker not found')
+          p.write_text(t.replace(old, new, 1), encoding='utf-8')
+          PY
+          python3 scripts/apply-program-report-column-selection.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Commit changes and clean temporary files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f scripts/apply-program-report-column-selection.py .github/workflows/apply-program-report-column-selection.yml .github/workflows/retry-program-report-column-selection.yml
+          git add src/app/components/MosqueFieldVisitsPanel.tsx
+          git commit -m "Add flexible program report column selection"
+          git push origin main
