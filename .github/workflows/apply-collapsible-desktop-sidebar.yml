@@ -1,0 +1,36 @@
+name: Apply Collapsible Desktop Sidebar
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-collapsible-desktop-sidebar.mjs'
+      - '.github/workflows/apply-collapsible-desktop-sidebar.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-collapsible-desktop-sidebar.mjs
+      - run: npm run build
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/components/Layout.tsx
+          git commit -m "Add collapsible desktop sidebar"
+          git push
