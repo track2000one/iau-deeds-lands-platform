@@ -30,6 +30,7 @@ import {
   type MosqueFieldVisitImage,
   type MosqueFieldVisitItem,
   type MosqueFieldVisitSummary,
+  type MosqueQuranStockDashboard,
   type MosqueSite,
 } from '../api/mosques';
 import { Badge } from './ui/badge';
@@ -250,6 +251,99 @@ const getItemStatusLabel = (item: MosqueFieldVisitItem) =>
   getItemStatusOptions(item).find((option) => option.value === item.status)?.label
   || itemStatusLabels[item.status]
   || item.status;
+
+const QURAN_QUANTITY_ITEM_TITLE = 'كفاية أعداد المصاحف وملاءمة أحجامها';
+const QURAN_EVIDENCE_PREFIX = 'مرجع مكتبة المصاحف وقت الزيارة:';
+
+const mergeQuranEvidence = (currentNote: string | null | undefined, evidence: string) => {
+  const keptLines = String(currentNote || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith(QURAN_EVIDENCE_PREFIX));
+  return [...keptLines, evidence].join('\n');
+};
+
+const QuranVisitStockLink: React.FC<{
+  dashboard: MosqueQuranStockDashboard | null;
+  siteId: string;
+  onApplyQuantity: () => void;
+}> = ({ dashboard, siteId, onApplyQuantity }) => {
+  if (!dashboard) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+        جارٍ تحميل بيانات مكتبة المصاحف المرتبطة بالموقع...
+      </div>
+    );
+  }
+
+  const stock = dashboard.sites.find((row) => row.site.id === siteId) || null;
+  if (!stock) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-800">
+        لم يتم العثور على سجل مصاحف مرتبط بهذا المسجد أو المصلى. يفضل إجراء الجرد الأولي وتحديد العدد المستهدف قبل تقييم الكفاية.
+      </div>
+    );
+  }
+
+  const latestCountDate = stock.latestInventory?.countedAt
+    ? new Date(stock.latestInventory.countedAt).toLocaleDateString('ar-SA-u-ca-gregory')
+    : 'لم يتم الجرد';
+  const coverage = stock.coveragePercent == null ? 'غير محسوبة' : String(stock.coveragePercent) + '%';
+  const target = stock.targetCount > 0 ? stock.targetCount.toLocaleString('ar-SA') : 'غير محدد';
+  const statusLabel = stock.targetCount <= 0
+    ? 'يلزم تحديد العدد المستهدف'
+    : stock.needCount > 0
+      ? 'احتياج ' + stock.needCount.toLocaleString('ar-SA') + ' مصحف'
+      : 'العدد المستهدف مكتمل';
+
+  return (
+    <Card className="border-emerald-200 bg-gradient-to-b from-emerald-50/80 to-white">
+      <CardContent className="space-y-3 pt-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <FileText className="h-4 w-4 text-emerald-700" />
+              <b className="text-sm text-emerald-950">مرجع مكتبة المصاحف المرتبط بالموقع</b>
+              <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">{statusLabel}</Badge>
+            </div>
+            <p className="mt-1 text-[11px] text-slate-500">تُعرض بيانات الرصيد النظامي مباشرة داخل الزيارة لتجنب إعادة إدخال الأعداد يدويًا.</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={onApplyQuantity}>
+            <CheckCircle2 className="ml-2 h-4 w-4" />
+            تطبيق التقييم العددي المقترح
+          </Button>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          {[
+            ['الرصيد بالموقع', stock.systemStock.totalCount.toLocaleString('ar-SA')],
+            ['كبير', stock.systemStock.largeCount.toLocaleString('ar-SA')],
+            ['متوسط', stock.systemStock.mediumCount.toLocaleString('ar-SA')],
+            ['صغير', stock.systemStock.smallCount.toLocaleString('ar-SA')],
+            ['المستهدف', target],
+            ['الاحتياج', stock.needCount.toLocaleString('ar-SA')],
+            ['التغطية', coverage],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl border border-emerald-100 bg-white px-3 py-2 text-center">
+              <div className="text-[10px] text-slate-500">{label}</div>
+              <div className="mt-1 text-sm font-black text-slate-800">{value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-2 text-[11px] text-slate-600 sm:grid-cols-3">
+          <div className="rounded-xl bg-white/80 px-3 py-2">آخر جرد: <b>{latestCountDate}</b></div>
+          <div className="rounded-xl bg-white/80 px-3 py-2">المتاح في مكتبة المصاحف: <b>{dashboard.summary.warehouseTotal.toLocaleString('ar-SA')}</b></div>
+          <div className="rounded-xl bg-white/80 px-3 py-2">المصاحف المسحوبة من الموقع: <b>{stock.withdrawnStock.totalCount.toLocaleString('ar-SA')}</b></div>
+        </div>
+
+        <div className="rounded-xl border border-sky-200 bg-sky-50/80 px-3 py-2 text-[11px] leading-6 text-sky-900">
+          <b>مهم:</b> التقييم العددي يساعد في بند «كفاية أعداد المصاحف»، لكنه لا يعتمد تلقائيًا بند «سلامة المصاحف والتحقق من جهة الطباعة»؛ هذا البند يبقى تحققًا ميدانيًا بصريًا. وعند وجود نقص تتم المعالجة من «مكتبة المصاحف» عبر حركة إضافة للموقع حتى يُخصم الرصيد من المكتبة ويُحدّث رصيد المسجد أو المصلى تلقائيًا.
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 const resolutionLabels: Record<string, string> = {
   new: 'جديدة',
   referred: 'محالة',
@@ -382,6 +476,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [summary, setSummary] = React.useState<MosqueFieldVisitSummary>(emptySummary);
+  const [quranStockDashboard, setQuranStockDashboard] = React.useState<MosqueQuranStockDashboard | null>(null);
   const [tours, setTours] = React.useState<MosqueFieldTour[]>([]);
   const [visits, setVisits] = React.useState<MosqueFieldVisit[]>([]);
   const [template, setTemplate] = React.useState<MosqueFieldVisitItem[]>([]);
@@ -433,10 +528,11 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryData, tourData, visitData, checklist] = await Promise.all([
-        mosqueApi.fieldVisitSummary(), mosqueApi.fieldTours(), mosqueApi.fieldVisits(), mosqueApi.fieldVisitChecklist(),
+      const [summaryData, tourData, visitData, checklist, quranStockData] = await Promise.all([
+        mosqueApi.fieldVisitSummary(), mosqueApi.fieldTours(), mosqueApi.fieldVisits(), mosqueApi.fieldVisitChecklist(), mosqueApi.quranStockDashboard(),
       ]);
       setSummary(summaryData);
+      setQuranStockDashboard(quranStockData);
       setTours(tourData);
       setVisits(visitData);
       setTemplate(checklist);
@@ -603,6 +699,63 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       ...current,
       items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
     }));
+  };
+
+  const selectedQuranStock = quranStockDashboard?.sites.find((row) => row.site.id === visitForm.siteId) || null;
+
+  const applyQuranQuantityAssessment = () => {
+    const itemIndex = visitForm.items.findIndex((item) => item.title === QURAN_QUANTITY_ITEM_TITLE);
+    if (itemIndex < 0) {
+      toast.error('تعذر العثور على بند كفاية أعداد المصاحف في قائمة الفحص');
+      return;
+    }
+    if (!selectedQuranStock) {
+      toast.error('لا توجد بيانات رصيد مصاحف مرتبطة بالموقع المحدد');
+      return;
+    }
+
+    const currentItem = visitForm.items[itemIndex];
+    const lastCount = selectedQuranStock.latestInventory?.countedAt
+      ? new Date(selectedQuranStock.latestInventory.countedAt).toLocaleDateString('ar-SA-u-ca-gregory')
+      : 'لم يتم الجرد';
+    const coverage = selectedQuranStock.coveragePercent == null ? 'غير محسوبة' : String(selectedQuranStock.coveragePercent) + '%';
+    const targetText = selectedQuranStock.targetCount > 0
+      ? selectedQuranStock.targetCount.toLocaleString('ar-SA')
+      : 'غير محدد';
+    const evidence = QURAN_EVIDENCE_PREFIX
+      + ' الرصيد النظامي ' + selectedQuranStock.systemStock.totalCount.toLocaleString('ar-SA')
+      + ' (كبير ' + selectedQuranStock.systemStock.largeCount.toLocaleString('ar-SA')
+      + '، متوسط ' + selectedQuranStock.systemStock.mediumCount.toLocaleString('ar-SA')
+      + '، صغير ' + selectedQuranStock.systemStock.smallCount.toLocaleString('ar-SA')
+      + ')، المستهدف ' + targetText
+      + '، الاحتياج ' + selectedQuranStock.needCount.toLocaleString('ar-SA')
+      + '، التغطية ' + coverage
+      + '، آخر جرد ' + lastCount + '.';
+
+    if (selectedQuranStock.targetCount <= 0) {
+      setVisitItem(itemIndex, { note: mergeQuranEvidence(currentItem.note, evidence) });
+      toast.warning('تم ربط بيانات الرصيد بالملاحظة، لكن لم يتم تغيير النتيجة لأن العدد المستهدف غير محدد للموقع');
+      return;
+    }
+
+    const needsAction = selectedQuranStock.needCount > 0;
+    const suggestedPriority: MosqueFieldVisitItem['priority'] = needsAction
+      ? selectedQuranStock.needLevel === 'high'
+        ? 'high'
+        : selectedQuranStock.needLevel === 'medium'
+          ? 'medium'
+          : 'normal'
+      : currentItem.priority;
+
+    setVisitItem(itemIndex, {
+      status: needsAction ? 'needs_action' : 'good',
+      note: mergeQuranEvidence(currentItem.note, evidence),
+      priority: suggestedPriority,
+      responsibleEntity: needsAction
+        ? currentItem.responsibleEntity || 'وحدة العناية بالمساجد والمصليات الجامعية - مكتبة المصاحف'
+        : currentItem.responsibleEntity,
+    });
+    toast.success(needsAction ? 'تم ربط الرصيد وتسجيل احتياج المصاحف في بند الفحص' : 'تم ربط الرصيد واعتماد كفاية العدد وفق البيانات النظامية');
   };
 
   const uploadItemImages = async (index: number, phase: 'beforeImages' | 'afterImages', files: FileList | null) => {
@@ -1346,6 +1499,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-[1120px]" dir="rtl">
         <DialogHeader className="text-right"><DialogTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-sky-700" />{editingVisit ? `توثيق الزيارة ${editingVisit.visitNumber}` : 'إنشاء زيارة ميدانية'}</DialogTitle><DialogDescription>تُحفظ الزيارة في السجل التاريخي للمسجد أو المصلى المحدد، وتنتقل الملاحظات المفتوحة إلى المتابعة.</DialogDescription></DialogHeader>
         <div className="grid gap-4 rounded-2xl border bg-slate-50/70 p-4 md:grid-cols-3"><Field label="المسجد أو المصلى *"><NativeSelect value={visitForm.siteId} onChange={(event) => setVisitForm({ ...visitForm, siteId: event.target.value })} disabled={Boolean(editingVisit?.tourId)}><option value="">اختر الموقع</option>{sites.map((site) => { const activeVisit = activeVisitBySite.get(site.id); const blocked = !editingVisit && Boolean(activeVisit); return <option key={site.id} value={site.id} disabled={blocked}>{site.name} — {site.campusLocation || site.city || ''}{blocked ? ` — زيارة قائمة ${activeVisit!.visitNumber}` : ''}</option>; })}</NativeSelect></Field><Field label="نوع الزيارة"><NativeSelect value={visitForm.visitType} onChange={(event) => setVisitForm({ ...visitForm, visitType: event.target.value as MosqueFieldVisit['visitType'] })}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field><Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field><Field label="ممثل الموقع"><Input value={visitForm.representativeName} onChange={(event) => setVisitForm({ ...visitForm, representativeName: event.target.value })} /></Field><Field label="حالة سجل الزيارة"><NativeSelect value={visitForm.workflowStatus} onChange={(event) => setVisitForm({ ...visitForm, workflowStatus: event.target.value as MosqueFieldVisit['workflowStatus'] })}>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><div className="md:col-span-3"><Field label="منفذ الزيارة"><Input value={visitForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field><p className="mt-1 text-[11px] text-slate-500">يُسجل اسم المستخدم الحالي تلقائيًا. السجلات السابقة تحتفظ بأسماء الفريق المحفوظة تاريخيًا.</p></div><Field label="الحالة العامة"><NativeSelect value={visitForm.overallStatus} onChange={(event) => setVisitForm({ ...visitForm, overallStatus: event.target.value as MosqueFieldVisit['overallStatus'] })}>{Object.entries(overallLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="الأولوية العامة"><NativeSelect value={visitForm.priority} onChange={(event) => setVisitForm({ ...visitForm, priority: event.target.value as MosqueFieldVisit['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field></div>
+        {visitForm.siteId && <QuranVisitStockLink dashboard={quranStockDashboard} siteId={visitForm.siteId} onApplyQuantity={applyQuranQuantityAssessment} />}
         <div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">تتغير خيارات النتيجة تلقائيًا حسب نوع بند الفحص، وأكمل جميع البنود قبل اعتماد الزيارة كمكتملة.</p></div><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div>{visitForm.items.map((item, index) => <Card key={`${item.category}-${item.title}-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center"><div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div><NativeSelect className="lg:w-64" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{getItemStatusOptions(item).map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label={['resolved', 'closed'].includes(item.resolutionStatus) ? 'وصف الإجراء / المعالجة المنفذة *' : 'وصف الإجراء / المعالجة المنفذة'}><Textarea rows={2} value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} placeholder="اكتب ما تم تنفيذه لمعالجة الملاحظة" /></Field><div className="md:col-span-2 rounded-2xl border border-emerald-200 bg-white p-3"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><b className="text-sm text-emerald-900">سجل المعالجة المصور — قبل / بعد</b><p className="mt-1 text-[11px] text-slate-500">وثّق الحالة قبل المعالجة، ثم أضف صورة بعد التنفيذ لإغلاق الملاحظة والتحقق منها.</p></div><div className="flex gap-2"><Badge variant="outline">قبل: {(item.beforeImages || []).length}</Badge><Badge variant="outline">بعد: {(item.afterImages || []).length}</Badge></div></div><div className="grid gap-3 md:grid-cols-2"><ImageField label="صور قبل المعالجة *" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label={item.resolutionStatus === 'closed' ? 'صور بعد المعالجة *' : 'صور بعد المعالجة'} images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div></div></div>}</CardContent></Card>)}</div>
         <div className="grid gap-4 md:grid-cols-2"><Field label="الملاحظات العامة"><Textarea rows={4} value={visitForm.generalNotes} onChange={(event) => setVisitForm({ ...visitForm, generalNotes: event.target.value })} /></Field><Field label="التوصيات"><Textarea rows={4} value={visitForm.recommendations} onChange={(event) => setVisitForm({ ...visitForm, recommendations: event.target.value })} /></Field></div>
         <VisitAttachmentField attachments={visitForm.attachments} loading={uploadingKey === 'visit-attachments'} onFiles={(files) => void uploadVisitAttachments(files)} onRemove={removeVisitAttachment} onDescriptionChange={updateVisitAttachmentDescription} />
