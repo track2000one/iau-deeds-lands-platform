@@ -333,6 +333,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [deleting, setDeleting] = React.useState(false);
   const [printTarget, setPrintTarget] = React.useState<MosqueFieldVisit | null>(null);
   const [includePrintImages, setIncludePrintImages] = React.useState(true);
+  const [printTreatmentOnly, setPrintTreatmentOnly] = React.useState(false);
   const [preparingPrint, setPreparingPrint] = React.useState(false);
   const [programPrintDialog, setProgramPrintDialog] = React.useState(false);
   const [programReportTitle, setProgramReportTitle] = React.useState('تقرير البرنامج الميداني للمساجد والمصليات');
@@ -619,6 +620,31 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       toast.error(`اكتب وصف الملاحظة في بند: ${needsNote.title}`);
       return;
     }
+    const missingBeforeEvidence = ['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)
+      ? visitForm.items.find((item) => item.status === 'needs_action' && !(item.beforeImages || []).length)
+      : null;
+    if (missingBeforeEvidence) {
+      toast.error(`أرفق صورة واحدة على الأقل قبل المعالجة في بند: ${missingBeforeEvidence.title}`);
+      return;
+    }
+    const missingResolutionDescription = visitForm.items.find((item) =>
+      item.status === 'needs_action'
+      && ['resolved', 'closed'].includes(item.resolutionStatus)
+      && !String(item.resolutionNote || '').trim()
+    );
+    if (missingResolutionDescription) {
+      toast.error(`اكتب وصف الإجراء أو المعالجة المنفذة في بند: ${missingResolutionDescription.title}`);
+      return;
+    }
+    const missingAfterEvidence = visitForm.items.find((item) =>
+      item.status === 'needs_action'
+      && item.resolutionStatus === 'closed'
+      && !(item.afterImages || []).length
+    );
+    if (missingAfterEvidence) {
+      toast.error(`لا يمكن إغلاق الملاحظة قبل إرفاق صورة بعد المعالجة في بند: ${missingAfterEvidence.title}`);
+      return;
+    }
     if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus) && visitForm.items.some((item) => item.status === 'not_checked')) {
       toast.error('لا يمكن إكمال الزيارة مع وجود بنود لم يتم التحقق منها');
       return;
@@ -699,16 +725,82 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     if (objectUrls.length) setTimeout(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)), 10 * 60 * 1000);
   };
 
+  const printTreatmentEvidenceReport = async (sourceVisits: MosqueFieldVisit[], reportTitle: string) => {
+    const report = window.open('', '_blank', 'width=1200,height=850');
+    if (!report) {
+      toast.error('تعذر فتح نافذة تقرير المعالجة. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.');
+      return;
+    }
+
+    const treatmentItems = sourceVisits.flatMap((visit) => (visit.items || [])
+      .filter((item) => item.status === 'needs_action' || (item.beforeImages || []).length || (item.afterImages || []).length)
+      .map((item) => ({ visit, item })));
+
+    if (!treatmentItems.length) {
+      report.close();
+      toast.info('لا توجد ملاحظات أو صور معالجة قبل/بعد ضمن السجل المحدد');
+      return;
+    }
+
+    report.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>جاري إعداد سجل المعالجة المصور</title></head><body style="font-family:Tahoma,Arial;text-align:center;padding:80px"><h2>جاري إعداد سجل المعالجة المصور...</h2><p>يتم تحميل صور قبل المعالجة وبعدها.</p></body></html>');
+    report.document.close();
+
+    const objectUrls: string[] = [];
+    const prepareImage = async (image: MosqueFieldVisitImage) => {
+      try {
+        if (!image.fileId) return { image, src: image.url };
+        const blob = await mosqueApi.mediaBlob(image.fileId);
+        const src = URL.createObjectURL(blob);
+        objectUrls.push(src);
+        return { image, src };
+      } catch {
+        return { image, src: image.url };
+      }
+    };
+
+    const prepared = await Promise.all(treatmentItems.map(async ({ visit, item }) => ({
+      visit,
+      item,
+      before: await Promise.all((item.beforeImages || []).map(prepareImage)),
+      after: await Promise.all((item.afterImages || []).map(prepareImage)),
+    })));
+
+    const renderImages = (images: { image: MosqueFieldVisitImage; src: string }[], phase: 'before' | 'after') => {
+      if (!images.length) return `<div class="empty-evidence">لم يتم إرفاق صورة ${phase === 'before' ? 'قبل المعالجة' : 'بعد المعالجة'}.</div>`;
+      return `<div class="evidence-images">${images.map(({ image, src }, index) => `<figure><img src="${html(src)}" alt="${phase === 'before' ? 'قبل' : 'بعد'} ${index + 1}"><figcaption>${index + 1}${image.capturedAt ? ` — ${html(new Date(image.capturedAt).toLocaleString('ar-SA-u-ca-gregory'))}` : ''}</figcaption></figure>`).join('')}</div>`;
+    };
+
+    const cards = prepared.map(({ visit, item }, index) => {
+      const before = prepared[index].before;
+      const after = prepared[index].after;
+      return `<section class="treatment-card"><div class="card-head"><div><span class="number">${index + 1}</span><b>${html(item.title)}</b><small>${html(item.category)}</small></div><div class="site"><b>${html(visit.site.name)}</b><small>${html(visit.visitNumber)} — ${html(new Date(visit.visitDate).toLocaleDateString('ar-SA-u-ca-gregory'))}</small></div></div><div class="details"><div><small>الملاحظة</small><b>${html(item.note || '-')}</b></div><div><small>الجهة المسؤولة</small><b>${html(item.responsibleEntity || '-')}</b></div><div><small>حالة المعالجة</small><b>${html(resolutionLabels[item.resolutionStatus] || item.resolutionStatus)}</b></div><div><small>وصف الإجراء / المعالجة المنفذة</small><b>${html(item.resolutionNote || '-')}</b></div></div><div class="compare"><div class="phase before"><h3>قبل المعالجة <span>${before.length}</span></h3>${renderImages(before, 'before')}</div><div class="phase after"><h3>بعد المعالجة <span>${after.length}</span></h3>${renderImages(after, 'after')}</div></div></section>`;
+    }).join('');
+
+    report.document.open();
+    report.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${html(reportTitle)}</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0;background:#fff}.head{border:2px solid #0f766e;border-radius:16px;padding:16px;background:#f0fdfa;margin-bottom:14px}.kicker{font-size:11px;color:#0f766e;font-weight:bold}.title{font-size:23px;font-weight:900;margin:6px 0}.summary{font-size:11px;color:#475569}.treatment-card{border:1px solid #cbd5e1;border-radius:16px;padding:12px;margin:0 0 14px;break-inside:avoid;page-break-inside:avoid}.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid #e2e8f0;padding-bottom:8px}.card-head>div{display:flex;flex-wrap:wrap;align-items:center;gap:7px}.card-head small{color:#64748b}.number{display:inline-flex;width:24px;height:24px;border-radius:999px;align-items:center;justify-content:center;background:#0f766e;color:white;font-weight:bold}.site{justify-content:flex-end;text-align:left}.details{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.details>div{border:1px solid #e2e8f0;border-radius:10px;padding:8px;background:#f8fafc}.details small{display:block;color:#64748b;margin-bottom:4px}.details b{font-size:10px}.compare{display:grid;grid-template-columns:1fr 1fr;gap:12px}.phase{border:1px solid #dbe4ee;border-radius:12px;padding:10px;min-height:190px}.phase h3{font-size:14px;margin:0 0 8px;display:flex;justify-content:space-between}.phase h3 span{border:1px solid #cbd5e1;border-radius:999px;padding:1px 7px;font-size:10px}.before{background:#fff7ed}.after{background:#f0fdf4}.evidence-images{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.evidence-images figure{margin:0;border:1px solid #cbd5e1;border-radius:10px;padding:6px;background:#fff;break-inside:avoid}.evidence-images img{width:100%;height:180px;display:block;object-fit:contain;background:#f8fafc;border-radius:7px}.evidence-images figcaption{font-size:9px;color:#64748b;margin-top:4px}.empty-evidence{height:180px;border:1px dashed #cbd5e1;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px}.footer{display:flex;justify-content:space-between;margin-top:10px;font-size:9px;color:#64748b}</style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><div class="title">${html(reportTitle)}</div><div class="summary">سجل معالجة مصور يوضح حالة الملاحظات قبل المعالجة وبعدها. عدد البنود: ${prepared.length}</div></div>${cards}<div class="footer"><span>منصة IAU Deeds — سجل المعالجة المصور</span><span>${html(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),600)<\/script></body></html>`);
+    report.document.close();
+    if (objectUrls.length) setTimeout(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)), 10 * 60 * 1000);
+  };
+
+  const printTourTreatmentReport = async (tour: MosqueFieldTour) => {
+    const tourVisits = (tour.visits || [])
+      .map((tourVisit) => visits.find((visit) => visit.id === tourVisit.id))
+      .filter((visit): visit is MosqueFieldVisit => Boolean(visit));
+    await printTreatmentEvidenceReport(tourVisits, `تقرير المعالجة المصور — ${tour.title}`);
+  };
+
   const requestVisitPrint = (visit: MosqueFieldVisit) => {
     setPrintTarget(visit);
     setIncludePrintImages(true);
+    setPrintTreatmentOnly(false);
   };
 
   const confirmVisitPrint = async () => {
     if (!printTarget) return;
     try {
       setPreparingPrint(true);
-      await printVisit(printTarget, includePrintImages);
+      if (printTreatmentOnly) await printTreatmentEvidenceReport([printTarget], `تقرير المعالجة المصور — ${printTarget.site.name}`);
+      else await printVisit(printTarget, includePrintImages);
       setPrintTarget(null);
     } finally {
       setPreparingPrint(false);
@@ -747,6 +839,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     ...printTarget.items.flatMap((item) => [...(item.beforeImages || []), ...(item.afterImages || [])]),
   ].length : 0;
   const printPdfCount = printTarget ? (printTarget.attachments || []).filter((attachment) => attachment.mimeType === 'application/pdf' || /\.pdf$/i.test(String(attachment.fileName || ''))).length : 0;
+  const printTreatmentCount = printTarget ? (printTarget.items || []).filter((item) => item.status === 'needs_action' || (item.beforeImages || []).length || (item.afterImages || []).length).length : 0;
 
   if (loading) return <div className="flex min-h-[320px] items-center justify-center gap-3"><Loader2 className="h-7 w-7 animate-spin text-sky-700" /><span className="font-semibold">جاري تحميل البرنامج الميداني...</span></div>;
 
@@ -830,7 +923,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     </div> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {tours.map((tour) => <Card key={tour.id} className="overflow-hidden">
         <CardHeader className="border-b bg-gradient-to-l from-emerald-50/70 to-white"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{tour.title}</CardTitle><CardDescription className="mt-1">{tour.tourNumber}</CardDescription></div><Badge variant="outline">{tourStatusLabels[tour.status]}</Badge></div></CardHeader>
-        <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-36 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between rounded-lg bg-white px-2 py-1.5 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) openVisit(full); }}><span>{visit.site.name}</span><span className="text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}</CardContent>
+        <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-36 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between rounded-lg bg-white px-2 py-1.5 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) openVisit(full); }}><span>{visit.site.name}</span><span className="text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}{canPrint && <Button size="sm" variant="outline" className="w-full border-emerald-200 text-emerald-800" onClick={() => void printTourTreatmentReport(tour)}><ImageIcon className="ml-2 h-4 w-4" />تقرير المعالجة المصور قبل / بعد</Button>}</CardContent>
       </Card>)}
       {!tours.length && <Empty message="لم يتم إنشاء جولات ميدانية بعد" />}
     </div>}
@@ -871,18 +964,23 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         {printTarget && <>
           <DialogHeader className="text-right">
             <DialogTitle className="flex items-center gap-2"><Printer className="h-5 w-5 text-sky-700" />خيارات طباعة التقرير</DialogTitle>
-            <DialogDescription>اختر ما إذا كنت تريد إدراج الصور داخل تقرير الزيارة {printTarget.visitNumber}.</DialogDescription>
+            <DialogDescription>اختر نوع التقرير المناسب للزيارة {printTarget.visitNumber}، بما في ذلك سجل المعالجة المصور قبل/بعد.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition ${includePrintImages ? 'border-sky-500 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200'}`}>
-              <input type="radio" name="visit-print-images" className="mt-1 h-4 w-4 accent-sky-700" checked={includePrintImages} onChange={() => setIncludePrintImages(true)} />
+            <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition ${includePrintImages && !printTreatmentOnly ? 'border-sky-500 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200'}`}>
+              <input type="radio" name="visit-print-mode" className="mt-1 h-4 w-4 accent-sky-700" checked={includePrintImages && !printTreatmentOnly} onChange={() => { setIncludePrintImages(true); setPrintTreatmentOnly(false); }} />
               <Camera className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
-              <span><b className="block text-sm text-slate-800">طباعة التقرير مع الصور</b><small className="mt-1 block text-slate-500">إدراج {printImageCount} صورة من مرفقات الزيارة وصور قبل/بعد المعالجة في صفحات مستقلة.</small></span>
+              <span><b className="block text-sm text-slate-800">تقرير الزيارة الكامل مع الصور</b><small className="mt-1 block text-slate-500">إدراج {printImageCount} صورة من مرفقات الزيارة وصور قبل/بعد المعالجة.</small></span>
             </label>
-            <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition ${!includePrintImages ? 'border-slate-600 bg-slate-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
-              <input type="radio" name="visit-print-images" className="mt-1 h-4 w-4 accent-slate-700" checked={!includePrintImages} onChange={() => setIncludePrintImages(false)} />
+            <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition ${!includePrintImages && !printTreatmentOnly ? 'border-slate-600 bg-slate-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+              <input type="radio" name="visit-print-mode" className="mt-1 h-4 w-4 accent-slate-700" checked={!includePrintImages && !printTreatmentOnly} onChange={() => { setIncludePrintImages(false); setPrintTreatmentOnly(false); }} />
               <FileText className="mt-0.5 h-5 w-5 shrink-0 text-slate-700" />
-              <span><b className="block text-sm text-slate-800">طباعة التقرير بدون الصور</b><small className="mt-1 block text-slate-500">طباعة البيانات وقائمة الفحص والملاحظات فقط لتقليل عدد الصفحات.</small></span>
+              <span><b className="block text-sm text-slate-800">تقرير الزيارة بدون الصور</b><small className="mt-1 block text-slate-500">طباعة البيانات وقائمة الفحص والملاحظات فقط لتقليل عدد الصفحات.</small></span>
+            </label>
+            <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition ${printTreatmentOnly ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white hover:border-emerald-200'}`}>
+              <input type="radio" name="visit-print-mode" className="mt-1 h-4 w-4 accent-emerald-700" checked={printTreatmentOnly} onChange={() => { setIncludePrintImages(true); setPrintTreatmentOnly(true); }} />
+              <ImageIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+              <span><b className="block text-sm text-slate-800">سجل المعالجة المصور — قبل / بعد</b><small className="mt-1 block text-slate-500">تقرير مركز على {printTreatmentCount} بند معالجة مع مقارنة صور قبل المعالجة وبعدها ووصف الإجراء المنفذ.</small></span>
             </label>
           </div>
           {printPdfCount > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">يوجد {printPdfCount} ملف PDF؛ ستظهر أسماؤها في التقرير ويمكن فتح كل ملف وطباعته بصورة مستقلة.</div>}
@@ -965,7 +1063,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-[1120px]" dir="rtl">
         <DialogHeader className="text-right"><DialogTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-sky-700" />{editingVisit ? `توثيق الزيارة ${editingVisit.visitNumber}` : 'إنشاء زيارة ميدانية'}</DialogTitle><DialogDescription>تُحفظ الزيارة في السجل التاريخي للمسجد أو المصلى المحدد، وتنتقل الملاحظات المفتوحة إلى المتابعة.</DialogDescription></DialogHeader>
         <div className="grid gap-4 rounded-2xl border bg-slate-50/70 p-4 md:grid-cols-3"><Field label="المسجد أو المصلى *"><NativeSelect value={visitForm.siteId} onChange={(event) => setVisitForm({ ...visitForm, siteId: event.target.value })} disabled={Boolean(editingVisit?.tourId)}><option value="">اختر الموقع</option>{sites.map((site) => { const activeVisit = activeVisitBySite.get(site.id); const blocked = !editingVisit && Boolean(activeVisit); return <option key={site.id} value={site.id} disabled={blocked}>{site.name} — {site.campusLocation || site.city || ''}{blocked ? ` — زيارة قائمة ${activeVisit!.visitNumber}` : ''}</option>; })}</NativeSelect></Field><Field label="نوع الزيارة"><NativeSelect value={visitForm.visitType} onChange={(event) => setVisitForm({ ...visitForm, visitType: event.target.value as MosqueFieldVisit['visitType'] })}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field><Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field><Field label="ممثل الموقع"><Input value={visitForm.representativeName} onChange={(event) => setVisitForm({ ...visitForm, representativeName: event.target.value })} /></Field><Field label="حالة سجل الزيارة"><NativeSelect value={visitForm.workflowStatus} onChange={(event) => setVisitForm({ ...visitForm, workflowStatus: event.target.value as MosqueFieldVisit['workflowStatus'] })}>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><div className="md:col-span-3"><Field label="منفذ الزيارة"><Input value={visitForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field><p className="mt-1 text-[11px] text-slate-500">يُسجل اسم المستخدم الحالي تلقائيًا. السجلات السابقة تحتفظ بأسماء الفريق المحفوظة تاريخيًا.</p></div><Field label="الحالة العامة"><NativeSelect value={visitForm.overallStatus} onChange={(event) => setVisitForm({ ...visitForm, overallStatus: event.target.value as MosqueFieldVisit['overallStatus'] })}>{Object.entries(overallLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="الأولوية العامة"><NativeSelect value={visitForm.priority} onChange={(event) => setVisitForm({ ...visitForm, priority: event.target.value as MosqueFieldVisit['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field></div>
-        <div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">تتغير خيارات النتيجة تلقائيًا حسب نوع بند الفحص، وأكمل جميع البنود قبل اعتماد الزيارة كمكتملة.</p></div><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div>{visitForm.items.map((item, index) => <Card key={`${item.category}-${item.title}-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center"><div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div><NativeSelect className="lg:w-64" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{getItemStatusOptions(item).map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="ملاحظة المعالجة"><Input value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} /></Field><ImageField label="صور قبل المعالجة" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label="صور بعد المعالجة" images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div>}</CardContent></Card>)}</div>
+        <div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">تتغير خيارات النتيجة تلقائيًا حسب نوع بند الفحص، وأكمل جميع البنود قبل اعتماد الزيارة كمكتملة.</p></div><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div>{visitForm.items.map((item, index) => <Card key={`${item.category}-${item.title}-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center"><div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div><NativeSelect className="lg:w-64" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{getItemStatusOptions(item).map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label={['resolved', 'closed'].includes(item.resolutionStatus) ? 'وصف الإجراء / المعالجة المنفذة *' : 'وصف الإجراء / المعالجة المنفذة'}><Textarea rows={2} value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} placeholder="اكتب ما تم تنفيذه لمعالجة الملاحظة" /></Field><div className="md:col-span-2 rounded-2xl border border-emerald-200 bg-white p-3"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><b className="text-sm text-emerald-900">سجل المعالجة المصور — قبل / بعد</b><p className="mt-1 text-[11px] text-slate-500">وثّق الحالة قبل المعالجة، ثم أضف صورة بعد التنفيذ لإغلاق الملاحظة والتحقق منها.</p></div><div className="flex gap-2"><Badge variant="outline">قبل: {(item.beforeImages || []).length}</Badge><Badge variant="outline">بعد: {(item.afterImages || []).length}</Badge></div></div><div className="grid gap-3 md:grid-cols-2"><ImageField label="صور قبل المعالجة *" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label={item.resolutionStatus === 'closed' ? 'صور بعد المعالجة *' : 'صور بعد المعالجة'} images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div></div></div>}</CardContent></Card>)}</div>
         <div className="grid gap-4 md:grid-cols-2"><Field label="الملاحظات العامة"><Textarea rows={4} value={visitForm.generalNotes} onChange={(event) => setVisitForm({ ...visitForm, generalNotes: event.target.value })} /></Field><Field label="التوصيات"><Textarea rows={4} value={visitForm.recommendations} onChange={(event) => setVisitForm({ ...visitForm, recommendations: event.target.value })} /></Field></div>
         <VisitAttachmentField attachments={visitForm.attachments} loading={uploadingKey === 'visit-attachments'} onFiles={(files) => void uploadVisitAttachments(files)} onRemove={removeVisitAttachment} onDescriptionChange={updateVisitAttachmentDescription} />
         <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setVisitDialog(false)}>إلغاء</Button>{editingVisit && canPrint && <Button variant="outline" onClick={() => requestVisitPrint({ ...editingVisit, ...visitForm, teamMembers: splitMembers(visitForm.teamMembers), visitDate: new Date(visitForm.visitDate).toISOString(), departureAt: visitForm.departureAt ? new Date(visitForm.departureAt).toISOString() : null } as MosqueFieldVisit)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>}<Button onClick={() => void saveVisit()} disabled={saving || Boolean(uploadingKey)}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}{editingVisit ? 'حفظ نتائج الزيارة' : 'إنشاء الزيارة'}</Button></DialogFooter>
