@@ -2180,7 +2180,7 @@ ${quranStockMovementForm.notes}` : ''}`
 
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <div className="rounded-2xl border border-sky-200/80 bg-white/95 p-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] sm:hidden">
+        <div className="relative overflow-hidden rounded-2xl border border-sky-300/90 bg-white/95 p-3 shadow-[0_10px_28px_rgba(15,23,42,0.08),0_0_0_1px_rgba(56,189,248,0.08),0_0_22px_rgba(56,189,248,0.10)] ring-1 ring-sky-100/80 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:border before:border-sky-300/60 before:opacity-40 before:content-[''] before:animate-pulse motion-reduce:before:animate-none sm:hidden">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold text-sky-700">التنقل بين أقسام الوحدة</p>
