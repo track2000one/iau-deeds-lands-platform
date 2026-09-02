@@ -126,8 +126,25 @@ type SitePrintWrapMode = 'wrap' | 'single';
 type SitePrintOrientation = 'auto' | 'landscape' | 'portrait';
 const requestTypeLabels: Record<string, string> = {
   maintenance: 'صيانة', renovation: 'ترميم', equipment: 'تجهيزات', cleaning: 'نظافة', carpet: 'فرش',
-  air_conditioning: 'مكيفات', audio: 'أجهزة صوت', lighting: 'إنارة', other: 'أخرى',
+  air_conditioning: 'مكيفات', audio: 'أجهزة صوت', lighting: 'إنارة', quran_supply: 'تزويد مصاحف', other: 'أخرى',
 };
+
+const QURAN_SUPPLY_REQUEST_MARKER = 'QURAN_SUPPLY_REQUEST=1';
+const quranSupplyStatusLabels: Record<string, string> = {
+  new: 'جديد',
+  under_review: 'تحت المراجعة',
+  approved: 'معتمد',
+  in_progress: 'قيد التجهيز والصرف',
+  completed: 'تم الصرف',
+  closed: 'تم التحقق والإغلاق',
+  returned_for_edit: 'معاد للتعديل',
+  rejected: 'مرفوض',
+};
+const isQuranSupplyRequest = (request: MosqueRequest) =>
+  request.requestType === 'quran_supply' || String(request.notes || '').includes(QURAN_SUPPLY_REQUEST_MARKER);
+const quranRequestStatusLabel = (request: MosqueRequest) =>
+  isQuranSupplyRequest(request) ? (quranSupplyStatusLabels[request.status] || statusLabels[request.status] || request.status) : undefined;
+
 const ticketTypeLabels: Record<string, string> = {
   cleaning: 'مشكلة نظافة', electrical: 'عطل كهرباء', air_conditioning: 'عطل مكيف', audio: 'مشكلة صوتيات',
   supplies: 'نقص مستلزمات', general: 'ملاحظة عامة', complaint: 'شكوى', other: 'أخرى',
@@ -918,11 +935,24 @@ ${phrase}`);
       toast.error('لا توجد مكتبة مصاحف مفعّلة لإضافة المصاحف');
       return;
     }
+
+    const linkedRequest = [...requests]
+      .filter((request) => isQuranSupplyRequest(request) && request.siteId === site.id && !['closed', 'rejected'].includes(request.status))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
+
+    if (linkedRequest && !['approved', 'in_progress', 'completed'].includes(linkedRequest.status)) {
+      toast.error('يوجد طلب تزويد ' + linkedRequest.requestNumber + ' وحالته «' + (quranSupplyStatusLabels[linkedRequest.status] || linkedRequest.status) + '». يجب اعتماد الطلب قبل تنفيذ الصرف من المكتبة.');
+      setActiveTab('requests');
+      return;
+    }
+
     setQuranStockMovementForm({
       ...emptyQuranStockMovementForm(),
       movementType: 'distribution',
       warehouseId: activeWarehouse.id,
       siteId: site.id,
+      referenceNumber: linkedRequest?.requestNumber || '',
+      notes: linkedRequest ? 'تنفيذ طلب تزويد المصاحف ' + linkedRequest.requestNumber : '',
     });
     setQuranStockMovementDialog(true);
   };
@@ -955,9 +985,24 @@ ${phrase}`);
     if ((parsed.largeCount + parsed.mediumCount + parsed.smallCount) <= 0) return toast.error('أدخل كمية واحدة على الأقل');
     if (['distribution', 'return', 'site_withdrawal'].includes(quranStockMovementForm.movementType) && !quranStockMovementForm.siteId) return toast.error('اختر المسجد أو المصلى');
     if (quranStockMovementForm.movementType === 'site_withdrawal' && !String(quranStockMovementForm.withdrawalReason || '').trim()) return toast.error('حدد سبب سحب المصاحف من المسجد أو المصلى');
+
+    const linkedQuranRequest = quranStockMovementForm.movementType === 'distribution'
+      ? (
+          requests.find((request) => isQuranSupplyRequest(request) && request.requestNumber === quranStockMovementForm.referenceNumber)
+          || [...requests]
+            .filter((request) => isQuranSupplyRequest(request) && request.siteId === quranStockMovementForm.siteId && !['closed', 'rejected'].includes(request.status))
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+          || null
+        )
+      : null;
+
+    if (linkedQuranRequest && !['approved', 'in_progress', 'completed'].includes(linkedQuranRequest.status)) {
+      return toast.error('طلب التزويد ' + linkedQuranRequest.requestNumber + ' لم يعتمد بعد. اعتمد الطلب أولًا ثم نفذ الصرف.');
+    }
+
     setQuranStockSaving(true);
     try {
-      await mosqueApi.createQuranStockMovement({
+      const movement = await mosqueApi.createQuranStockMovement({
         movementType: quranStockMovementForm.movementType,
         warehouseId: quranStockMovementForm.warehouseId,
         siteId: ['distribution', 'return', 'site_withdrawal'].includes(quranStockMovementForm.movementType) ? quranStockMovementForm.siteId : null,
@@ -969,6 +1014,36 @@ ${phrase}`);
 ${quranStockMovementForm.notes}` : ''}`
           : (quranStockMovementForm.notes || null),
       });
+
+      if (quranStockMovementForm.movementType === 'distribution' && linkedQuranRequest) {
+        try {
+          let requestState = linkedQuranRequest;
+          if (requestState.status === 'approved') {
+            requestState = await mosqueApi.workflowAction<MosqueRequest>('request', requestState.id, {
+              status: 'in_progress',
+              note: 'بدأ تنفيذ طلب التزويد من مكتبة المصاحف بموجب الحركة ' + movement.movementNumber + '.',
+            });
+          }
+
+          const stockBefore = quranStockDashboard?.sites.find((item) => item.site.id === quranStockMovementForm.siteId);
+          const needBefore = Number(stockBefore?.needCount || 0);
+          const remainingNeed = Math.max(0, needBefore - movement.totalCount);
+
+          if (remainingNeed === 0 && requestState.status === 'in_progress') {
+            requestState = await mosqueApi.workflowAction<MosqueRequest>('request', requestState.id, {
+              status: 'completed',
+              note: 'تم صرف كامل الاحتياج بموجب حركة المصاحف ' + movement.movementNumber + ' بعدد ' + movement.totalCount.toLocaleString('ar-SA') + ' مصحف. يبقى الإغلاق النهائي بعد التحقق في زيارة ميدانية لاحقة.',
+            });
+          } else if (remainingNeed > 0) {
+            toast.info('تم تنفيذ صرف جزئي لطلب ' + requestState.requestNumber + '، والمتبقي حسب الاحتياج المسجل ' + remainingNeed.toLocaleString('ar-SA') + ' مصحف.');
+          }
+
+          setRequests((current) => current.map((request) => request.id === requestState.id ? requestState : request));
+        } catch (workflowError) {
+          toast.warning('تم تسجيل حركة المصاحف، لكن تعذر تحديث حالة طلب التزويد تلقائيًا: ' + (workflowError instanceof Error ? workflowError.message : 'خطأ غير معروف'));
+        }
+      }
+
       toast.success(quranStockMovementForm.movementType === 'distribution'
         ? 'تمت إضافة المصاحف للموقع وخصمها تلقائيًا من رصيد المكتبة'
         : quranStockMovementForm.movementType === 'site_withdrawal'
@@ -2290,7 +2365,7 @@ ${quranStockMovementForm.notes}` : ''}`
         <TabsContent value="requests" className="space-y-4">
           {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />الإبلاغ عن مشكلة / طلب صيانة أو احتياج</Button></div>}
           {requestQuickFilter !== 'all' && <QuickFilterBar label={requestQuickFilter === 'new' ? 'الطلبات الجديدة' : requestQuickFilter === 'under_review' ? 'الطلبات تحت المراجعة' : requestQuickFilter === 'approved' ? 'الطلبات المعتمدة' : 'الطلبات المتأخرة'} onClear={() => setRequestQuickFilter('all')} />}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredRequests.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} submitterName={item.applicant?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || 'مقدم الطلب'} onView={() => setViewingWorkflow({ kind: 'request', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedRequestEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('request', item)} />)}</div>
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredRequests.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} statusLabel={quranRequestStatusLabel(item)} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} submitterName={item.applicant?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || 'مقدم الطلب'} onView={() => setViewingWorkflow({ kind: 'request', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedRequestEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('request', item)} />)}</div>
           {!filteredRequests.length && <Empty text="لا توجد طلبات مطابقة" />}
         </TabsContent>
 
@@ -2833,7 +2908,7 @@ ${quranStockMovementForm.notes}` : ''}`
       <Dialog open={statusDialog} onOpenChange={setStatusDialog}>
         <DialogContent className="max-h-[90vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-violet-50/20 sm:max-w-[760px]" dir="rtl">
           <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-violet-50/50 p-5 text-right"><DialogTitle className="text-xl font-black">إجراء رسمي على المعاملة</DialogTitle><DialogDescription>{statusTarget?.item?.requestNumber || statusTarget?.item?.ticketNumber || statusTarget?.item?.leaveNumber || statusTarget?.item?.applicationNumber}</DialogDescription></DialogHeader>
-          <div className="space-y-5 overflow-y-auto p-5 md:p-6"><Card className="border-sky-200/70 bg-white/90"><CardContent className="space-y-4 pt-5"><Field label="الحالة الجديدة"><NativeSelect className="h-11" value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>{statusTarget ? transitionsFor(statusTarget.kind, statusTarget.item.status).filter((s) => !(s === 'approved' && role !== 'head')).map((s) => <option key={s} value={s}>{statusLabels[s] || s}</option>) : null}</NativeSelect></Field><Field label={['rejected', 'returned_for_edit', 'archived'].includes(statusValue) ? 'السبب / الملاحظة *' : 'ملاحظة الإجراء'}><Textarea rows={5} value={statusNote} onChange={(e) => setStatusNote(e.target.value)} placeholder="دوّن المبرر أو الملاحظة المرتبطة بالإجراء..." /></Field>{statusTarget?.kind === 'request' && statusValue === 'completed' && <Field label="إثبات الإنجاز *"><Input className="h-11" type="file" accept="image/*,application/pdf" onChange={(e) => setStatusEvidence(e.target.files?.[0] || null)} /></Field>}</CardContent></Card></div>
+          <div className="space-y-5 overflow-y-auto p-5 md:p-6"><Card className="border-sky-200/70 bg-white/90"><CardContent className="space-y-4 pt-5"><Field label="الحالة الجديدة"><NativeSelect className="h-11" value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>{statusTarget ? transitionsFor(statusTarget.kind, statusTarget.item.status).filter((s) => !(s === 'approved' && role !== 'head')).map((s) => <option key={s} value={s}>{statusTarget?.kind === 'request' && isQuranSupplyRequest(statusTarget.item) ? (quranSupplyStatusLabels[s] || statusLabels[s] || s) : (statusLabels[s] || s)}</option>) : null}</NativeSelect></Field><Field label={['rejected', 'returned_for_edit', 'archived'].includes(statusValue) ? 'السبب / الملاحظة *' : 'ملاحظة الإجراء'}><Textarea rows={5} value={statusNote} onChange={(e) => setStatusNote(e.target.value)} placeholder="دوّن المبرر أو الملاحظة المرتبطة بالإجراء..." /></Field>{statusTarget?.kind === 'request' && statusValue === 'completed' && <Field label="إثبات الإنجاز *"><Input className="h-11" type="file" accept="image/*,application/pdf" onChange={(e) => setStatusEvidence(e.target.files?.[0] || null)} /></Field>}</CardContent></Card></div>
           <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => setStatusDialog(false)}>إلغاء</Button><Button className={button3d} onClick={applyStatus} disabled={saving}>{saving ? 'جاري التنفيذ...' : statusValue === 'archived' ? 'تأكيد الحذف / الأرشفة' : 'تنفيذ الإجراء'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2936,7 +3011,7 @@ const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onEd
 
 const QuickFilterBar = ({ label, onClear }: { label: string; onClear: () => void }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm"><span>العرض الحالي: <strong>{label}</strong></span><Button variant="outline" size="sm" className={button3d} onClick={onClear}>عرض الكل</Button></div>;
 
-const WorkflowCard = ({ title, subtitle, description, status, meta, submitterName, submitterRole, onView, onStatus, extraAction }: { title: string; subtitle: string; description: string; status: string; meta: string[]; submitterName?: string; submitterRole?: string; onView?: () => void; onStatus?: () => void; extraAction?: React.ReactNode }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-sky-400 via-blue-600 to-slate-800" /><CardContent className="flex min-h-[315px] flex-col p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{title}</p><h3 className="mt-1 font-black text-slate-800">{subtitle}</h3></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>{submitterName && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-white/90 p-3"><div><p className="text-[11px] text-muted-foreground">مقدم الإجراء</p><p className="mt-1 font-bold text-slate-800">{submitterName}</p></div>{submitterRole && <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700">{submitterRole}</Badge>}</div>}<p className="mt-3 line-clamp-3 rounded-2xl border bg-slate-50/80 p-3 text-sm leading-6 text-slate-700">{description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">{meta.map((x, i) => <span key={i} className="rounded-xl border bg-white p-2">{x || '-'}</span>)}</div><div className="mt-auto flex flex-wrap gap-2 border-t pt-4">{onView && <Button variant="outline" size="sm" className={button3d} onClick={onView}><Eye className="ml-1 h-3.5 w-3.5" />عرض التفاصيل</Button>}{onStatus && <Button variant="outline" size="sm" className={button3d} onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />إجراء رسمي</Button>}{extraAction}</div></CardContent></Card>;
+const WorkflowCard = ({ title, subtitle, description, status, statusLabel, meta, submitterName, submitterRole, onView, onStatus, extraAction }: { title: string; subtitle: string; description: string; status: string; statusLabel?: string; meta: string[]; submitterName?: string; submitterRole?: string; onView?: () => void; onStatus?: () => void; extraAction?: React.ReactNode }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-sky-400 via-blue-600 to-slate-800" /><CardContent className="flex min-h-[315px] flex-col p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{title}</p><h3 className="mt-1 font-black text-slate-800">{subtitle}</h3></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabel || statusLabels[status] || status}</Badge></div>{submitterName && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-white/90 p-3"><div><p className="text-[11px] text-muted-foreground">مقدم الإجراء</p><p className="mt-1 font-bold text-slate-800">{submitterName}</p></div>{submitterRole && <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700">{submitterRole}</Badge>}</div>}<p className="mt-3 line-clamp-3 rounded-2xl border bg-slate-50/80 p-3 text-sm leading-6 text-slate-700">{description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">{meta.map((x, i) => <span key={i} className="rounded-xl border bg-white p-2">{x || '-'}</span>)}</div><div className="mt-auto flex flex-wrap gap-2 border-t pt-4">{onView && <Button variant="outline" size="sm" className={button3d} onClick={onView}><Eye className="ml-1 h-3.5 w-3.5" />عرض التفاصيل</Button>}{onStatus && <Button variant="outline" size="sm" className={button3d} onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />إجراء رسمي</Button>}{extraAction}</div></CardContent></Card>;
 
 const WorkflowDetailsDialog = ({ target, onOpenChange }: { target: { kind: 'request' | 'ticket' | 'leave'; item: any } | null; onOpenChange: (open: boolean) => void }) => {
   const [history, setHistory] = useState<MosqueWorkflowHistoryEntry[]>([]);

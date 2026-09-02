@@ -31,6 +31,7 @@ import {
   type MosqueFieldVisitItem,
   type MosqueFieldVisitSummary,
   type MosqueQuranStockDashboard,
+  type MosqueRequest,
   type MosqueSite,
 } from '../api/mosques';
 import { Badge } from './ui/badge';
@@ -254,6 +255,31 @@ const getItemStatusLabel = (item: MosqueFieldVisitItem) =>
 
 const QURAN_QUANTITY_ITEM_TITLE = 'كفاية أعداد المصاحف وملاءمة أحجامها';
 const QURAN_EVIDENCE_PREFIX = 'مرجع مكتبة المصاحف وقت الزيارة:';
+const QURAN_SUPPLY_REQUEST_TYPE = 'quran_supply';
+const QURAN_SUPPLY_REQUEST_MARKER = 'QURAN_SUPPLY_REQUEST=1';
+const QURAN_REQUEST_VISIT_MARKER = 'QURAN_FIELD_VISIT_ID=';
+
+const quranSupplyStatusLabels: Record<string, string> = {
+  new: 'جديد',
+  under_review: 'تحت المراجعة',
+  approved: 'معتمد',
+  in_progress: 'قيد التجهيز والصرف',
+  completed: 'تم الصرف',
+  closed: 'تم التحقق والإغلاق',
+  returned_for_edit: 'معاد للتعديل',
+  rejected: 'مرفوض',
+};
+
+const isQuranSupplyRequest = (request: MosqueRequest) =>
+  request.requestType === QURAN_SUPPLY_REQUEST_TYPE
+  || String(request.notes || '').includes(QURAN_SUPPLY_REQUEST_MARKER);
+
+const quranRequestPriority = (priority: MosqueFieldVisitItem['priority']): MosqueRequest['priority'] => {
+  if (priority === 'urgent') return 'urgent';
+  if (priority === 'high') return 'high';
+  if (priority === 'medium' || priority === 'normal') return 'medium';
+  return 'low';
+};
 
 const mergeQuranEvidence = (currentNote: string | null | undefined, evidence: string) => {
   const keptLines = String(currentNote || '')
@@ -266,8 +292,9 @@ const mergeQuranEvidence = (currentNote: string | null | undefined, evidence: st
 const QuranVisitStockLink: React.FC<{
   dashboard: MosqueQuranStockDashboard | null;
   siteId: string;
+  linkedRequest?: MosqueRequest | null;
   onApplyQuantity: () => void;
-}> = ({ dashboard, siteId, onApplyQuantity }) => {
+}> = ({ dashboard, siteId, linkedRequest, onApplyQuantity }) => {
   if (!dashboard) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
@@ -305,6 +332,7 @@ const QuranVisitStockLink: React.FC<{
               <FileText className="h-4 w-4 text-emerald-700" />
               <b className="text-sm text-emerald-950">مرجع مكتبة المصاحف المرتبط بالموقع</b>
               <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">{statusLabel}</Badge>
+              {linkedRequest && <Badge variant="outline" className="border-indigo-300 bg-indigo-50 text-indigo-700">طلب {linkedRequest.requestNumber} — {quranSupplyStatusLabels[linkedRequest.status] || linkedRequest.status}</Badge>}
             </div>
             <p className="mt-1 text-[11px] text-slate-500">تُعرض بيانات الرصيد النظامي مباشرة داخل الزيارة لتجنب إعادة إدخال الأعداد يدويًا.</p>
           </div>
@@ -477,6 +505,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [saving, setSaving] = React.useState(false);
   const [summary, setSummary] = React.useState<MosqueFieldVisitSummary>(emptySummary);
   const [quranStockDashboard, setQuranStockDashboard] = React.useState<MosqueQuranStockDashboard | null>(null);
+  const [quranSupplyRequests, setQuranSupplyRequests] = React.useState<MosqueRequest[]>([]);
   const [tours, setTours] = React.useState<MosqueFieldTour[]>([]);
   const [visits, setVisits] = React.useState<MosqueFieldVisit[]>([]);
   const [template, setTemplate] = React.useState<MosqueFieldVisitItem[]>([]);
@@ -528,11 +557,17 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryData, tourData, visitData, checklist, quranStockData] = await Promise.all([
-        mosqueApi.fieldVisitSummary(), mosqueApi.fieldTours(), mosqueApi.fieldVisits(), mosqueApi.fieldVisitChecklist(), mosqueApi.quranStockDashboard(),
+      const [summaryData, tourData, visitData, checklist, quranStockData, requestRows] = await Promise.all([
+        mosqueApi.fieldVisitSummary(),
+        mosqueApi.fieldTours(),
+        mosqueApi.fieldVisits(),
+        mosqueApi.fieldVisitChecklist(),
+        mosqueApi.quranStockDashboard(),
+        mosqueApi.requests().catch(() => [] as MosqueRequest[]),
       ]);
       setSummary(summaryData);
       setQuranStockDashboard(quranStockData);
+      setQuranSupplyRequests(requestRows.filter(isQuranSupplyRequest));
       setTours(tourData);
       setVisits(visitData);
       setTemplate(checklist);
@@ -702,6 +737,12 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   };
 
   const selectedQuranStock = quranStockDashboard?.sites.find((row) => row.site.id === visitForm.siteId) || null;
+  const selectedQuranSupplyRequest = React.useMemo(() => {
+    const rows = quranSupplyRequests
+      .filter((request) => request.siteId === visitForm.siteId && !['closed', 'rejected'].includes(request.status))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return rows[0] || null;
+  }, [quranSupplyRequests, visitForm.siteId]);
 
   const applyQuranQuantityAssessment = () => {
     const itemIndex = visitForm.items.findIndex((item) => item.title === QURAN_QUANTITY_ITEM_TITLE);
@@ -756,6 +797,75 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         : currentItem.responsibleEntity,
     });
     toast.success(needsAction ? 'تم ربط الرصيد وتسجيل احتياج المصاحف في بند الفحص' : 'تم ربط الرصيد واعتماد كفاية العدد وفق البيانات النظامية');
+  };
+
+
+  const syncQuranSupplyRequest = async (visit: MosqueFieldVisit) => {
+    const stock = quranStockDashboard?.sites.find((row) => row.site.id === visit.siteId) || null;
+    const quantityItem = (visit.items || []).find((item) => item.title === QURAN_QUANTITY_ITEM_TITLE) || null;
+    if (!stock || !quantityItem || stock.targetCount <= 0) return;
+
+    try {
+      const requestRows = (await mosqueApi.requests()).filter(isQuranSupplyRequest);
+      setQuranSupplyRequests(requestRows);
+
+      const marker = QURAN_REQUEST_VISIT_MARKER + visit.id;
+      const linkedRequest = requestRows.find((request) => String(request.notes || '').includes(marker)) || null;
+      const activeForSite = requestRows
+        .filter((request) => request.siteId === visit.siteId && !['closed', 'rejected'].includes(request.status))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
+
+      const visitCanCreateRequest = ['completed', 'follow_up', 'closed'].includes(visit.workflowStatus);
+      const needsSupply = quantityItem.status === 'needs_action' && stock.needCount > 0;
+
+      if (needsSupply && visitCanCreateRequest) {
+        if (linkedRequest || activeForSite) return;
+
+        const coverage = stock.coveragePercent == null ? 'غير محسوبة' : String(stock.coveragePercent) + '%';
+        const request = await mosqueApi.createRequest({
+          siteId: visit.siteId,
+          requestType: QURAN_SUPPLY_REQUEST_TYPE,
+          priority: quranRequestPriority(quantityItem.priority),
+          description: 'تزويد ' + visit.site.name + ' بعدد ' + stock.needCount.toLocaleString('ar-SA') + ' مصحف لاستكمال العدد المستهدف البالغ ' + stock.targetCount.toLocaleString('ar-SA') + ' مصحف.',
+          notes: [
+            QURAN_SUPPLY_REQUEST_MARKER,
+            marker,
+            'QURAN_FIELD_VISIT_NUMBER=' + visit.visitNumber,
+            'مصدر الطلب: الزيارة الميدانية ' + visit.visitNumber + '.',
+            'الرصيد وقت الاكتشاف: ' + stock.systemStock.totalCount.toLocaleString('ar-SA') + ' مصحف.',
+            'العدد المستهدف: ' + stock.targetCount.toLocaleString('ar-SA') + ' مصحف.',
+            'الاحتياج: ' + stock.needCount.toLocaleString('ar-SA') + ' مصحف.',
+            'نسبة التغطية: ' + coverage + '.',
+            'يتم تحديد توزيع الأحجام عند الصرف من مكتبة المصاحف وفق الاحتياج الفعلي بالموقع.',
+          ].join('\n'),
+          attachments: [],
+        });
+        setQuranSupplyRequests((current) => [request, ...current.filter((item) => item.id !== request.id)]);
+        toast.success('تم إنشاء طلب تزويد المصاحف ' + request.requestNumber + ' وربطه بالزيارة ' + visit.visitNumber);
+        return;
+      }
+
+      const verifiedInFollowUp = quantityItem.status === 'good'
+        && stock.needCount === 0
+        && ['follow_up', 'closure_verification'].includes(visit.visitType)
+        && ['completed', 'closed'].includes(visit.workflowStatus);
+
+      if (verifiedInFollowUp) {
+        const completedRequest = requestRows
+          .filter((request) => request.siteId === visit.siteId && request.status === 'completed')
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
+        if (!completedRequest) return;
+
+        const closedRequest = await mosqueApi.workflowAction<MosqueRequest>('request', completedRequest.id, {
+          status: 'closed',
+          note: 'تم التحقق ميدانيًا من اكتمال المصاحف في الزيارة ' + visit.visitNumber + ' وإغلاق طلب التزويد بعد التأكد من زوال الاحتياج.',
+        });
+        setQuranSupplyRequests((current) => [closedRequest, ...current.filter((item) => item.id !== closedRequest.id)]);
+        toast.success('تم التحقق من طلب التزويد ' + completedRequest.requestNumber + ' وإغلاقه ميدانيًا');
+      }
+    } catch (error) {
+      toast.warning('تم حفظ الزيارة، لكن تعذر مزامنة طلب تزويد المصاحف تلقائيًا: ' + (error instanceof Error ? error.message : 'خطأ غير معروف'));
+    }
   };
 
   const uploadItemImages = async (index: number, phase: 'beforeImages' | 'afterImages', files: FileList | null) => {
@@ -903,9 +1013,11 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         teamMembers,
         items: visitForm.items.map((item) => ({ ...item, id: undefined, dueDate: item.dueDate || null })),
       };
-      if (editingVisit) await mosqueApi.updateFieldVisit(editingVisit.id, payload);
-      else await mosqueApi.createFieldVisit(payload);
+      const savedVisit = editingVisit
+        ? await mosqueApi.updateFieldVisit(editingVisit.id, payload)
+        : await mosqueApi.createFieldVisit(payload);
       toast.success(editingVisit ? 'تم تحديث الزيارة وحفظ نتائجها' : 'تم إنشاء الزيارة الميدانية');
+      await syncQuranSupplyRequest(savedVisit);
       setVisitDialog(false);
       await load();
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر حفظ الزيارة'); }
@@ -1499,7 +1611,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-[1120px]" dir="rtl">
         <DialogHeader className="text-right"><DialogTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-sky-700" />{editingVisit ? `توثيق الزيارة ${editingVisit.visitNumber}` : 'إنشاء زيارة ميدانية'}</DialogTitle><DialogDescription>تُحفظ الزيارة في السجل التاريخي للمسجد أو المصلى المحدد، وتنتقل الملاحظات المفتوحة إلى المتابعة.</DialogDescription></DialogHeader>
         <div className="grid gap-4 rounded-2xl border bg-slate-50/70 p-4 md:grid-cols-3"><Field label="المسجد أو المصلى *"><NativeSelect value={visitForm.siteId} onChange={(event) => setVisitForm({ ...visitForm, siteId: event.target.value })} disabled={Boolean(editingVisit?.tourId)}><option value="">اختر الموقع</option>{sites.map((site) => { const activeVisit = activeVisitBySite.get(site.id); const blocked = !editingVisit && Boolean(activeVisit); return <option key={site.id} value={site.id} disabled={blocked}>{site.name} — {site.campusLocation || site.city || ''}{blocked ? ` — زيارة قائمة ${activeVisit!.visitNumber}` : ''}</option>; })}</NativeSelect></Field><Field label="نوع الزيارة"><NativeSelect value={visitForm.visitType} onChange={(event) => setVisitForm({ ...visitForm, visitType: event.target.value as MosqueFieldVisit['visitType'] })}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field><Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field><Field label="ممثل الموقع"><Input value={visitForm.representativeName} onChange={(event) => setVisitForm({ ...visitForm, representativeName: event.target.value })} /></Field><Field label="حالة سجل الزيارة"><NativeSelect value={visitForm.workflowStatus} onChange={(event) => setVisitForm({ ...visitForm, workflowStatus: event.target.value as MosqueFieldVisit['workflowStatus'] })}>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><div className="md:col-span-3"><Field label="منفذ الزيارة"><Input value={visitForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field><p className="mt-1 text-[11px] text-slate-500">يُسجل اسم المستخدم الحالي تلقائيًا. السجلات السابقة تحتفظ بأسماء الفريق المحفوظة تاريخيًا.</p></div><Field label="الحالة العامة"><NativeSelect value={visitForm.overallStatus} onChange={(event) => setVisitForm({ ...visitForm, overallStatus: event.target.value as MosqueFieldVisit['overallStatus'] })}>{Object.entries(overallLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="الأولوية العامة"><NativeSelect value={visitForm.priority} onChange={(event) => setVisitForm({ ...visitForm, priority: event.target.value as MosqueFieldVisit['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field></div>
-        {visitForm.siteId && <QuranVisitStockLink dashboard={quranStockDashboard} siteId={visitForm.siteId} onApplyQuantity={applyQuranQuantityAssessment} />}
+        {visitForm.siteId && <QuranVisitStockLink dashboard={quranStockDashboard} siteId={visitForm.siteId} linkedRequest={selectedQuranSupplyRequest} onApplyQuantity={applyQuranQuantityAssessment} />}
         <div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">تتغير خيارات النتيجة تلقائيًا حسب نوع بند الفحص، وأكمل جميع البنود قبل اعتماد الزيارة كمكتملة.</p></div><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div>{visitForm.items.map((item, index) => <Card key={`${item.category}-${item.title}-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center"><div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div><NativeSelect className="lg:w-64" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{getItemStatusOptions(item).map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label={['resolved', 'closed'].includes(item.resolutionStatus) ? 'وصف الإجراء / المعالجة المنفذة *' : 'وصف الإجراء / المعالجة المنفذة'}><Textarea rows={2} value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} placeholder="اكتب ما تم تنفيذه لمعالجة الملاحظة" /></Field><div className="md:col-span-2 rounded-2xl border border-emerald-200 bg-white p-3"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><b className="text-sm text-emerald-900">سجل المعالجة المصور — قبل / بعد</b><p className="mt-1 text-[11px] text-slate-500">وثّق الحالة قبل المعالجة، ثم أضف صورة بعد التنفيذ لإغلاق الملاحظة والتحقق منها.</p></div><div className="flex gap-2"><Badge variant="outline">قبل: {(item.beforeImages || []).length}</Badge><Badge variant="outline">بعد: {(item.afterImages || []).length}</Badge></div></div><div className="grid gap-3 md:grid-cols-2"><ImageField label="صور قبل المعالجة *" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label={item.resolutionStatus === 'closed' ? 'صور بعد المعالجة *' : 'صور بعد المعالجة'} images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div></div></div>}</CardContent></Card>)}</div>
         <div className="grid gap-4 md:grid-cols-2"><Field label="الملاحظات العامة"><Textarea rows={4} value={visitForm.generalNotes} onChange={(event) => setVisitForm({ ...visitForm, generalNotes: event.target.value })} /></Field><Field label="التوصيات"><Textarea rows={4} value={visitForm.recommendations} onChange={(event) => setVisitForm({ ...visitForm, recommendations: event.target.value })} /></Field></div>
         <VisitAttachmentField attachments={visitForm.attachments} loading={uploadingKey === 'visit-attachments'} onFiles={(files) => void uploadVisitAttachments(files)} onRemove={removeVisitAttachment} onDescriptionChange={updateVisitAttachmentDescription} />
