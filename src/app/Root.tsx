@@ -122,6 +122,7 @@ const applyLightShellForGlassTheme = (themeId?: string | null) => {
 const propertyDataPath = (pathname: string) => {
   if (pathname === '/') return true;
   return [
+    '/admin',
     '/deeds',
     '/maps',
     '/lands',
