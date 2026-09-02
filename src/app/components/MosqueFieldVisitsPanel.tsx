@@ -358,7 +358,7 @@ const quranInventorySummary = (item: MosqueFieldVisitItem) => {
   const total = values.reduce((sum, value) => sum + Number(value || 0), 0);
   const condition = details.conditionStatus === 'good' ? 'سليمة' : details.conditionStatus === 'needs_attention' ? 'توجد ملاحظات' : 'لم يتحقق';
   const publisher = details.publisherStatus === 'approved' ? 'معتمدة' : details.publisherStatus === 'needs_review' ? 'تحتاج مراجعة' : 'لم يتحقق';
-  return `الجرد الميداني: إجمالي ${total} — كبير ${Number(details.largeCount || 0)} — متوسط ${Number(details.mediumCount || 0)} — صغير ${Number(details.smallCount || 0)} — المقترح سحبها/استبدالها ${Number(details.recommendedWithdrawalCount || 0)} — الحالة ${condition} — جهة الطباعة ${publisher}`;
+  return `الجرد الميداني للموقع: إجمالي ${total} — كبير ${Number(details.largeCount || 0)} — متوسط ${Number(details.mediumCount || 0)} — صغير ${Number(details.smallCount || 0)} — المقترح سحبها/استبدالها ${Number(details.recommendedWithdrawalCount || 0)} — الحالة ${condition} — جهة الطباعة ${publisher}`;
 };
 
 const QuranFieldInventoryEditor: React.FC<{
@@ -378,7 +378,7 @@ const QuranFieldInventoryEditor: React.FC<{
   const target = stock?.targetCount || 0;
   const need = total == null || target <= 0 ? null : Math.max(0, target - total);
   return <div className="md:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
-    <div className="mb-3 flex flex-wrap items-start justify-between gap-2"><div><b className="text-sm text-emerald-950">الجرد الميداني للمصاحف</b><p className="mt-1 text-[11px] leading-5 text-slate-600">أدخل العدد الفعلي الموجود أثناء الزيارة. عند الحفظ ينتقل الجرد تلقائيًا إلى قائمة المصاحف؛ قبل إقفال الجرد التأسيسي يُسجل كتحديث تأسيسي، وبعد الإقفال يُحفظ كجرد دوري جديد.</p></div><Badge variant="outline" className={baselineClosed ? 'border-sky-300 bg-white text-sky-700' : 'border-amber-300 bg-white text-amber-700'}>{baselineClosed ? 'جرد دوري' : 'الجرد التأسيسي مفتوح'}</Badge></div>
+    <div className="mb-3 flex flex-wrap items-start justify-between gap-2"><div><b className="text-sm text-emerald-950">الجرد الميداني لرصيد المسجد / المصلى</b><p className="mt-1 text-[11px] leading-5 text-slate-600">أدخل العدد الفعلي الموجود داخل المسجد أو المصلى أثناء الزيارة. هذه الأعداد تخص رصيد الموقع فقط ولا تُضاف إلى مخزون مكتبة المصاحف. قبل إقفال الجرد التأسيسي تُسجل كتحديث تأسيسي للموقع، وبعد الإقفال تُحفظ كجرد دوري جديد.</p></div><Badge variant="outline" className={baselineClosed ? 'border-sky-300 bg-white text-sky-700' : 'border-amber-300 bg-white text-amber-700'}>{baselineClosed ? 'جرد دوري' : 'الجرد التأسيسي مفتوح'}</Badge></div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Field label="المصاحف الكبيرة *"><Input type="number" min="0" value={numericValue('largeCount')} onChange={(event) => updateNumber('largeCount', event.target.value)} /></Field>
       <Field label="المصاحف المتوسطة *"><Input type="number" min="0" value={numericValue('mediumCount')} onChange={(event) => updateNumber('mediumCount', event.target.value)} /></Field>
@@ -389,7 +389,7 @@ const QuranFieldInventoryEditor: React.FC<{
       <Field label="إجمالي العد الفعلي"><Input readOnly value={total == null ? '' : total} className="bg-white font-black" /></Field>
       <Field label="الاحتياج وفق المستهدف"><Input readOnly value={need == null ? (target > 0 ? '' : 'المستهدف غير محدد') : need} className="bg-white font-black" /></Field>
     </div>
-    <div className="mt-3 grid gap-2 text-[11px] text-slate-600 sm:grid-cols-3"><div className="rounded-xl bg-white px-3 py-2">الرصيد النظامي الحالي: <b>{stock?.systemStock.totalCount ?? 0}</b></div><div className="rounded-xl bg-white px-3 py-2">العدد المستهدف: <b>{target > 0 ? target : 'غير محدد'}</b></div><div className="rounded-xl bg-white px-3 py-2">آخر جرد: <b>{stock?.latestInventory?.countedAt ? new Date(stock.latestInventory.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لا يوجد'}</b></div></div>
+    <div className="mt-3 grid gap-2 text-[11px] text-slate-600 sm:grid-cols-3"><div className="rounded-xl bg-white px-3 py-2">رصيد الموقع النظامي الحالي: <b>{stock?.systemStock.totalCount ?? 0}</b></div><div className="rounded-xl bg-white px-3 py-2">العدد المستهدف: <b>{target > 0 ? target : 'غير محدد'}</b></div><div className="rounded-xl bg-white px-3 py-2">آخر جرد: <b>{stock?.latestInventory?.countedAt ? new Date(stock.latestInventory.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لا يوجد'}</b></div></div>
   </div>;
 };
 
@@ -402,7 +402,7 @@ const QuranVisitStockLink: React.FC<{
   if (!dashboard) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
-        جارٍ تحميل بيانات مكتبة المصاحف المرتبطة بالموقع...
+        جارٍ تحميل رصيد المصاحف المسجل للمسجد أو المصلى...
       </div>
     );
   }
@@ -434,15 +434,15 @@ const QuranVisitStockLink: React.FC<{
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <FileText className="h-4 w-4 text-emerald-700" />
-              <b className="text-sm text-emerald-950">مرجع مكتبة المصاحف المرتبط بالموقع</b>
+              <b className="text-sm text-emerald-950">رصيد المصاحف بالمسجد / المصلى</b>
               <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">{statusLabel}</Badge>
               {linkedRequest && <Badge variant="outline" className="border-indigo-300 bg-indigo-50 text-indigo-700">طلب {linkedRequest.requestNumber} — {quranSupplyStatusLabels[linkedRequest.status] || linkedRequest.status}</Badge>}
             </div>
-            <p className="mt-1 text-[11px] text-slate-500">تُعرض بيانات الرصيد النظامي مباشرة داخل الزيارة لتجنب إعادة إدخال الأعداد يدويًا.</p>
+            <p className="mt-1 text-[11px] text-slate-500">هذا هو رصيد الموقع نفسه وليس مخزون المكتبة المركزية. الجرد الميداني يحدّث رصيد المسجد أو المصلى فقط، بينما تتغير مكتبة المصاحف بالحركات المخزنية الرسمية مثل الاستلام والتوزيع والإرجاع.</p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={onApplyQuantity}>
             <CheckCircle2 className="ml-2 h-4 w-4" />
-            نسخ الرصيد النظامي كبداية للجرد
+            نسخ رصيد الموقع كبداية للجرد
           </Button>
         </div>
 
@@ -465,7 +465,7 @@ const QuranVisitStockLink: React.FC<{
 
         <div className="grid gap-2 text-[11px] text-slate-600 sm:grid-cols-3">
           <div className="rounded-xl bg-white/80 px-3 py-2">آخر جرد: <b>{latestCountDate}</b></div>
-          <div className="rounded-xl bg-white/80 px-3 py-2">المتاح في مكتبة المصاحف: <b>{dashboard.summary.warehouseTotal.toLocaleString('ar-SA')}</b></div>
+          <div className="rounded-xl bg-white/80 px-3 py-2">المخزون المركزي المتاح للتزويد: <b>{dashboard.summary.warehouseTotal.toLocaleString('ar-SA')}</b></div>
           <div className="rounded-xl bg-white/80 px-3 py-2">المصاحف المسحوبة من الموقع: <b>{stock.withdrawnStock.totalCount.toLocaleString('ar-SA')}</b></div>
         </div>
 
@@ -879,7 +879,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       smallCount: selectedQuranStock.systemStock.smallCount,
       recommendedWithdrawalCount: 0,
     });
-    toast.success('تم نسخ الرصيد النظامي الحالي كنقطة بداية؛ عدّل الأعداد لتطابق العد الفعلي في الموقع');
+    toast.success('تم نسخ رصيد الموقع النظامي كنقطة بداية؛ عدّل الأعداد لتطابق العد الفعلي داخل المسجد أو المصلى');
   };
 
   const syncQuranVisitInventory = async (visit: MosqueFieldVisit) => {
@@ -898,6 +898,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       'إجمالي العد الفعلي: ' + total + ' مصحف.',
       'سلامة المصاحف: ' + conditionLabel + '.',
       'جهة الطباعة: ' + publisherLabel + '.',
+      'نوع الرصيد: رصيد المسجد / المصلى فقط — لا يمثل إضافة إلى مخزون مكتبة المصاحف.',
       details.notes ? 'ملاحظات: ' + details.notes : '',
     ].filter(Boolean).join('\n');
 
@@ -914,7 +915,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         notes,
       });
       setQuranOpeningBaselineStatus(response.state);
-      toast.success('تم نقل أعداد المصاحف من الزيارة إلى الجرد التأسيسي للموقع');
+      toast.success('تم تسجيل أعداد المصاحف في الجرد التأسيسي للمسجد / المصلى دون إضافتها إلى مخزون المكتبة');
       return;
     }
 
@@ -928,7 +929,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       countedAt: visit.visitDate,
       notes,
     });
-    toast.success('تم تسجيل أعداد المصاحف من الزيارة كجرد دوري جديد');
+    toast.success('تم تحديث رصيد المسجد / المصلى من الزيارة كجرد دوري جديد دون تغيير مخزون المكتبة');
   };
 
   const syncQuranSupplyRequest = async (visit: MosqueFieldVisit, dashboardOverride?: MosqueQuranStockDashboard | null) => {
