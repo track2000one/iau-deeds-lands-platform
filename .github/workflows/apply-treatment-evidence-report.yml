@@ -1,0 +1,40 @@
+name: Apply Mosque Treatment Evidence Report
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-treatment-evidence-report.py'
+      - '.github/workflows/apply-treatment-evidence-report.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: python3 scripts/apply-treatment-evidence-report.py
+      - run: npm ci
+      - run: npm run build
+      - name: Commit changes and clean temporary files
+        run: |
+          rm -f scripts/apply-treatment-evidence-report.py
+          rm -f .github/workflows/apply-treatment-evidence-report.yml
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/components/MosqueFieldVisitsPanel.tsx scripts/apply-treatment-evidence-report.py .github/workflows/apply-treatment-evidence-report.yml
+          git commit -m "Add visual treatment evidence reports"
+          git push
