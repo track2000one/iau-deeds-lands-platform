@@ -258,6 +258,53 @@ const resolutionLabels: Record<string, string> = {
   closed: 'مغلقة بعد التحقق',
 };
 
+type ProgramReportColumnKey =
+  | 'visit_number'
+  | 'site'
+  | 'visit_type'
+  | 'date'
+  | 'tour'
+  | 'location'
+  | 'overall'
+  | 'priority'
+  | 'open_items'
+  | 'urgent_items'
+  | 'overdue_items'
+  | 'workflow'
+  | 'team'
+  | 'representative'
+  | 'attachments'
+  | 'treatment_images';
+
+const programReportColumns: Array<{ key: ProgramReportColumnKey; label: string; align?: 'right' }> = [
+  { key: 'visit_number', label: 'رقم الزيارة' },
+  { key: 'site', label: 'المسجد / المصلى', align: 'right' },
+  { key: 'visit_type', label: 'نوع الزيارة' },
+  { key: 'date', label: 'التاريخ' },
+  { key: 'tour', label: 'الجولة', align: 'right' },
+  { key: 'location', label: 'الموقع', align: 'right' },
+  { key: 'overall', label: 'الحالة العامة' },
+  { key: 'priority', label: 'الأولوية' },
+  { key: 'open_items', label: 'ملاحظات مفتوحة' },
+  { key: 'urgent_items', label: 'عاجلة' },
+  { key: 'overdue_items', label: 'متأخرة' },
+  { key: 'workflow', label: 'حالة الزيارة' },
+  { key: 'team', label: 'فريق الزيارة', align: 'right' },
+  { key: 'representative', label: 'ممثل الموقع', align: 'right' },
+  { key: 'attachments', label: 'المرفقات' },
+  { key: 'treatment_images', label: 'صور قبل / بعد' },
+];
+
+const defaultProgramReportColumns: ProgramReportColumnKey[] = [
+  'visit_number', 'site', 'visit_type', 'date', 'overall', 'open_items', 'urgent_items', 'workflow',
+];
+const basicProgramReportColumns: ProgramReportColumnKey[] = [
+  'visit_number', 'site', 'visit_type', 'date', 'overall', 'workflow',
+];
+const followUpProgramReportColumns: ProgramReportColumnKey[] = [
+  'visit_number', 'site', 'date', 'priority', 'open_items', 'urgent_items', 'overdue_items', 'workflow',
+];
+
 const splitMembers = (value: string) => value.split(/[،,\n]/).map((item) => item.trim()).filter(Boolean);
 const html = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
@@ -337,6 +384,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [preparingPrint, setPreparingPrint] = React.useState(false);
   const [programPrintDialog, setProgramPrintDialog] = React.useState(false);
   const [programReportTitle, setProgramReportTitle] = React.useState('تقرير البرنامج الميداني للمساجد والمصليات');
+  const [programPrintColumns, setProgramPrintColumns] = React.useState<ProgramReportColumnKey[]>([...defaultProgramReportColumns]);
   const [visitForm, setVisitForm] = React.useState<VisitForm>(() => emptyVisit([], currentUsername));
   const [uploadingKey, setUploadingKey] = React.useState('');
 
@@ -822,14 +870,44 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     const reportOverdueItems = filteredVisits.reduce((total, visit) => total + overdueCount(visit), 0);
     const reportSiteCount = new Set(filteredVisits.map((visit) => visit.siteId)).size;
     const reportCompleted = filteredVisits.filter((visit) => ['completed', 'closed'].includes(visit.workflowStatus)).length;
+    const activeColumnKeys = programPrintColumns.length ? programPrintColumns : defaultProgramReportColumns;
+    const selectedColumnDefs = programReportColumns.filter((column) => activeColumnKeys.includes(column.key));
+    const tableFontSize = selectedColumnDefs.length >= 13 ? 7.5 : selectedColumnDefs.length >= 10 ? 8.5 : 10;
+
+    const cellValue = (visit: MosqueFieldVisit, column: ProgramReportColumnKey) => {
+      switch (column) {
+        case 'visit_number': return visit.visitNumber;
+        case 'site': return visit.site.name;
+        case 'visit_type': return visitTypeLabels[visit.visitType] || visit.visitType;
+        case 'date': return new Date(visit.visitDate).toLocaleDateString('ar-SA-u-ca-gregory');
+        case 'tour': return visit.tour ? [visit.tour.tourNumber, visit.tour.title].filter(Boolean).join(' — ') : '-';
+        case 'location': return [visit.site.campusLocation, visit.site.district, visit.site.city].filter(Boolean).join(' — ') || '-';
+        case 'overall': return overallLabels[visit.overallStatus] || visit.overallStatus;
+        case 'priority': return priorityLabels[visit.priority] || visit.priority;
+        case 'open_items': return openCount(visit);
+        case 'urgent_items': return urgentCount(visit);
+        case 'overdue_items': return overdueCount(visit);
+        case 'workflow': return visitStatusLabels[visit.workflowStatus] || visit.workflowStatus;
+        case 'team': return (visit.teamMembers || []).join('، ') || '-';
+        case 'representative': return visit.representativeName || '-';
+        case 'attachments': return visit.attachments?.length || 0;
+        case 'treatment_images': {
+          const before = visit.items.reduce((total, item) => total + (item.beforeImages?.length || 0), 0);
+          const after = visit.items.reduce((total, item) => total + (item.afterImages?.length || 0), 0);
+          return `${before}/${after}`;
+        }
+        default: return '-';
+      }
+    };
+
+    const headerCells = selectedColumnDefs.map((column) => `<th>${html(column.label)}</th>`).join('');
     const rows = filteredVisits.map((visit, index) => {
-      const open = openCount(visit);
-      const urgent = urgentCount(visit);
-      return `<tr><td>${index + 1}</td><td>${html(visit.visitNumber)}</td><td class="right">${html(visit.site.name)}</td><td>${html(visitTypeLabels[visit.visitType])}</td><td>${html(new Date(visit.visitDate).toLocaleDateString('ar-SA-u-ca-gregory'))}</td><td>${html(overallLabels[visit.overallStatus])}</td><td>${open}</td><td>${urgent}</td><td>${html(visitStatusLabels[visit.workflowStatus])}</td></tr>`;
+      const cells = selectedColumnDefs.map((column) => `<td${column.align === 'right' ? ' class="right"' : ''}>${html(cellValue(visit, column.key))}</td>`).join('');
+      return `<tr><td>${index + 1}</td>${cells}</tr>`;
     }).join('');
     const report = window.open('', '_blank', 'width=1200,height=850');
     if (!report) return toast.error('تعذر فتح نافذة التقرير. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.');
-    report.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${html(reportTitle)}</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{border:2px solid #0369a1;border-radius:16px;padding:16px;background:linear-gradient(135deg,#f0f9ff,#fff,#ecfdf5)}.kicker{font-size:11px;color:#0369a1;font-weight:bold}h1{font-size:24px;margin:6px 0}.subtitle{font-size:11px;color:#475569}.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:14px 0}.metric{border:1px solid #cbd5e1;border-radius:10px;padding:10px;text-align:center;background:#fff}.metric small{display:block;color:#64748b}.metric b{display:block;font-size:22px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:10px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:center}th{background:#e2e8f0}.right{text-align:right}.footer{display:flex;justify-content:space-between;margin-top:12px;font-size:9px;color:#64748b}</style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><h1>${html(reportTitle)}</h1><div class="subtitle">تم إنشاء التقرير من ${filteredVisits.length} زيارة وفق الفرز والتصفية الحالية${activeFilterCount ? ` (${activeFilterCount} معيار تصفية)` : ''}.</div></div><div class="metrics"><div class="metric"><small>الزيارات في التقرير</small><b>${filteredVisits.length}</b></div><div class="metric"><small>المواقع</small><b>${reportSiteCount}</b></div><div class="metric"><small>المكتملة / المغلقة</small><b>${reportCompleted}</b></div><div class="metric"><small>الملاحظات المفتوحة</small><b>${reportOpenItems}</b></div><div class="metric"><small>العاجلة</small><b>${reportUrgentItems}</b></div><div class="metric"><small>المتأخرة</small><b>${reportOverdueItems}</b></div></div><table><thead><tr><th>م</th><th>رقم الزيارة</th><th>المسجد / المصلى</th><th>النوع</th><th>التاريخ</th><th>الحالة العامة</th><th>مفتوحة</th><th>عاجلة</th><th>حالة الزيارة</th></tr></thead><tbody>${rows || '<tr><td colspan="9">لا توجد زيارات مطابقة</td></tr>'}</tbody></table><div class="footer"><span>منصة IAU Deeds — البرنامج الميداني</span><span>${html(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
+    report.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${html(reportTitle)}</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{border:2px solid #0369a1;border-radius:16px;padding:16px;background:linear-gradient(135deg,#f0f9ff,#fff,#ecfdf5)}.kicker{font-size:11px;color:#0369a1;font-weight:bold}h1{font-size:24px;margin:6px 0}.subtitle{font-size:11px;color:#475569}.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:14px 0}.metric{border:1px solid #cbd5e1;border-radius:10px;padding:10px;text-align:center;background:#fff}.metric small{display:block;color:#64748b}.metric b{display:block;font-size:22px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:${tableFontSize}px;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:6px;text-align:center;vertical-align:middle;word-break:break-word}th{background:#e2e8f0;white-space:nowrap}.right{text-align:right}.footer{display:flex;justify-content:space-between;margin-top:12px;font-size:9px;color:#64748b}</style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><h1>${html(reportTitle)}</h1><div class="subtitle">تم إنشاء التقرير من ${filteredVisits.length} زيارة وفق الفرز والتصفية الحالية${activeFilterCount ? ` (${activeFilterCount} معيار تصفية)` : ''}. الأعمدة المختارة: ${selectedColumnDefs.length} بالإضافة إلى عمود التسلسل.</div></div><div class="metrics"><div class="metric"><small>الزيارات في التقرير</small><b>${filteredVisits.length}</b></div><div class="metric"><small>المواقع</small><b>${reportSiteCount}</b></div><div class="metric"><small>المكتملة / المغلقة</small><b>${reportCompleted}</b></div><div class="metric"><small>الملاحظات المفتوحة</small><b>${reportOpenItems}</b></div><div class="metric"><small>العاجلة</small><b>${reportUrgentItems}</b></div><div class="metric"><small>المتأخرة</small><b>${reportOverdueItems}</b></div></div><table><thead><tr><th>م</th>${headerCells}</tr></thead><tbody>${rows || `<tr><td colspan="${selectedColumnDefs.length + 1}">لا توجد زيارات مطابقة</td></tr>`}</tbody></table><div class="footer"><span>منصة IAU Deeds — البرنامج الميداني</span><span>${html(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
     report.document.close();
     setProgramPrintDialog(false);
   };
@@ -929,10 +1007,10 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     </div>}
 
     <Dialog open={programPrintDialog} onOpenChange={setProgramPrintDialog}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[780px]" dir="rtl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[920px]" dir="rtl">
         <DialogHeader className="text-right">
           <DialogTitle className="flex items-center gap-2"><Printer className="h-5 w-5 text-sky-700" />إعداد تقرير البرنامج الميداني</DialogTitle>
-          <DialogDescription>حدد عنوان التقرير ومعايير الفرز والتصفية قبل الانتقال إلى الطباعة. يتم تحديث عدد النتائج مباشرة.</DialogDescription>
+          <DialogDescription>حدد عنوان التقرير ومعايير الفرز والتصفية والأعمدة التي تريد ظهورها في الجدول قبل الانتقال إلى الطباعة. يتم تحديث عدد النتائج مباشرة.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <Field label="عنوان التقرير / اسم الجدول">
@@ -953,6 +1031,24 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
               <Field label="اتجاه الفرز"><NativeSelect value={sortDirection} onChange={(event) => setSortDirection(event.target.value as 'asc' | 'desc')}><option value="desc">تنازلي / الأحدث أولًا</option><option value="asc">تصاعدي / الأقدم أولًا</option></NativeSelect></Field>
             </div>
             <div className="mt-3 flex items-center justify-between gap-2 border-t border-sky-100 pt-3"><span className="text-xs text-slate-600">{activeFilterCount ? 'تم تطبيق ' + activeFilterCount + ' معيار تصفية.' : 'سيتم تضمين جميع الزيارات.'}</span><Button type="button" size="sm" variant="outline" onClick={resetVisitFilters}>إعادة ضبط</Button></div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              <div><b className="text-sm text-slate-800">الأعمدة الظاهرة في جدول الطباعة</b><p className="mt-1 text-[11px] text-slate-500">اختر الأعمدة التي يحتاجها التقرير فقط. عمود التسلسل «م» يظهر تلقائيًا، وترتيب الأعمدة يبقى بالترتيب القياسي.</p></div>
+              <Badge variant="outline">{programPrintColumns.length} عمود مختار</Badge>
+            </div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => setProgramPrintColumns([...defaultProgramReportColumns])}>الافتراضي</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setProgramPrintColumns([...basicProgramReportColumns])}>أساسي</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setProgramPrintColumns([...followUpProgramReportColumns])}>متابعة ومعالجة</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setProgramPrintColumns(programReportColumns.map((column) => column.key))}>جميع الأعمدة</Button>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {programReportColumns.map((column) => {
+                const selected = programPrintColumns.includes(column.key);
+                return <button key={column.key} type="button" aria-pressed={selected} className={`flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-right text-xs font-semibold transition ${selected ? 'border-sky-300 bg-sky-50 text-sky-800 shadow-sm' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`} onClick={() => setProgramPrintColumns((current) => current.includes(column.key) ? (current.length === 1 ? current : current.filter((key) => key !== column.key)) : [...current, column.key])}><span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] ${selected ? 'border-sky-500 bg-sky-600 text-white' : 'border-slate-300 bg-white text-transparent'}`}>✓</span><span>{column.label}</span></button>;
+              })}
+            </div>
           </div>
         </div>
         <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setProgramPrintDialog(false)}>إلغاء</Button><Button onClick={printProgramReport} disabled={!filteredVisits.length}><Printer className="ml-2 h-4 w-4" />متابعة إلى الطباعة</Button></DialogFooter>
