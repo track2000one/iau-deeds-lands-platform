@@ -1,0 +1,119 @@
+name: Apply Mosques Frontend Audit Fixes
+
+on:
+  push:
+    branches: [fix/platform-audit-core]
+    paths:
+      - '.github/workflows/apply-mosques-frontend-audit-fixes.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/platform-audit-core
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply mosque frontend fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def patch(path, replacements):
+              p = Path(path)
+              s = p.read_text()
+              for old, new, expected, label in replacements:
+                  count = s.count(old)
+                  if count != expected:
+                      raise SystemExit(f'{path} / {label}: expected {expected}, found {count}')
+                  s = s.replace(old, new)
+              p.write_text(s)
+
+          patch('src/app/pages/MosquesWorkspacePage.tsx', [
+              (
+                  "import React from 'react';",
+                  "import React, { useEffect, useState } from 'react';",
+                  1,
+                  'react hooks import',
+              ),
+              (
+                  "import { Button } from '../components/ui/button';\nimport { MosquesUnitPage } from './MosquesUnitPage';",
+                  "import { Button } from '../components/ui/button';\nimport { mosqueApi } from '../api/mosques';\nimport { MosquesUnitPage } from './MosquesUnitPage';",
+                  1,
+                  'mosque api import',
+              ),
+              (
+                  "  const { isAdmin, hasPermission } = usePermissions();\n  const canImport = isAdmin || hasPermission('mosques', 'canAdd');",
+                  "  const { isAdmin, hasPermission } = usePermissions();\n  const [operationalRole, setOperationalRole] = useState<string | null>(null);\n\n  useEffect(() => {\n    let cancelled = false;\n    mosqueApi.me()\n      .then((me) => { if (!cancelled) setOperationalRole(me.role); })\n      .catch(() => { if (!cancelled) setOperationalRole(null); });\n    return () => { cancelled = true; };\n  }, []);\n\n  const canImport = (isAdmin || hasPermission('mosques', 'canAdd')) && (isAdmin || operationalRole === 'head');",
+                  1,
+                  'job import role alignment',
+              ),
+          ])
+
+          patch('src/app/pages/MosquesUnitPage.tsx', [
+              (
+                  "  const exportReportExcel = async () => {\n    try {",
+                  "  const exportReportExcel = async () => {\n    if (!canPrint) {\n      toast.error('لا تملك صلاحية تصدير تقارير الوحدة');\n      return;\n    }\n    try {",
+                  1,
+                  'export permission guard',
+              ),
+              (
+                  "{canPrint && <Button variant=\"outline\" className={button3d} onClick={() => window.print()}><Printer className=\"ml-2 h-4 w-4\" />طباعة / حفظ PDF</Button>}<Button variant=\"outline\" className={button3d} onClick={exportReportExcel}><FileText className=\"ml-2 h-4 w-4\" />تصدير Excel</Button>",
+                  "{canPrint && <Button variant=\"outline\" className={button3d} onClick={() => window.print()}><Printer className=\"ml-2 h-4 w-4\" />طباعة / حفظ PDF</Button>}{canPrint && <Button variant=\"outline\" className={button3d} onClick={exportReportExcel}><FileText className=\"ml-2 h-4 w-4\" />تصدير Excel</Button>}",
+                  1,
+                  'export button permission',
+              ),
+          ])
+
+          patch('src/app/components/MosqueFieldVisitsPanel.tsx', [
+              (
+                  "  const saveVisit = async () => {\n    const teamMembers = splitMembers(visitForm.teamMembers);",
+                  "  const saveVisit = async () => {\n    if ((editingVisit && !canEdit) || (!editingVisit && !canAdd)) {\n      toast.error(editingVisit ? 'لا تملك صلاحية تعديل الزيارات الميدانية' : 'لا تملك صلاحية إنشاء زيارة ميدانية');\n      return;\n    }\n    const teamMembers = splitMembers(visitForm.teamMembers);",
+                  1,
+                  'save visit permission guard',
+              ),
+              (
+                  "onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) openVisit(full); }}",
+                  "onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) { if (canEdit) openVisit(full); else setViewingVisit(full); } }}",
+                  1,
+                  'tour visit view/edit behavior',
+              ),
+          ])
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Verify mosque frontend invariants
+        shell: bash
+        run: |
+          grep -q "operationalRole === 'head'" src/app/pages/MosquesWorkspacePage.tsx
+          grep -q "لا تملك صلاحية تصدير تقارير الوحدة" src/app/pages/MosquesUnitPage.tsx
+          grep -q "editingVisit && !canEdit" src/app/components/MosqueFieldVisitsPanel.tsx
+          grep -q "if (canEdit) openVisit(full); else setViewingVisit(full);" src/app/components/MosqueFieldVisitsPanel.tsx
+
+      - name: Commit patched frontend
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/app/pages/MosquesWorkspacePage.tsx src/app/pages/MosquesUnitPage.tsx src/app/components/MosqueFieldVisitsPanel.tsx
+          git commit -m 'Align mosque UI permissions and field visit workflows'
+          git push origin HEAD:fix/platform-audit-core
