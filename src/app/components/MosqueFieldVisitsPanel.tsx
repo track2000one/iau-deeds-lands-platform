@@ -1512,7 +1512,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void load()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button>
           {canPrint && <Button variant="outline" onClick={openProgramPrintDialog}><Printer className="ml-2 h-4 w-4" />تقرير البرنامج</Button>}
-          {canAdd && <Button variant="outline" className="border-emerald-300 text-emerald-800" onClick={openTour}><CalendarDays className="ml-2 h-4 w-4" />إنشاء جولة</Button>}
+          {canAdd && <Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white focus-visible:ring-emerald-500" onClick={openTour}><CalendarDays className="ml-2 h-4 w-4 text-white" />إنشاء جولة</Button>}
           {canAdd && <Button className="bg-sky-700 hover:bg-sky-800" onClick={() => openNewVisit()}><Plus className="ml-2 h-4 w-4" />زيارة مستقلة</Button>}
         </div>
       </CardHeader>
