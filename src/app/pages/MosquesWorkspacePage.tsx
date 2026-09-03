@@ -1,14 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileSpreadsheet } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { usePermissions } from '../../context/PermissionsContext';
 import { Button } from '../components/ui/button';
+import { mosqueApi } from '../api/mosques';
 import { MosquesUnitPage } from './MosquesUnitPage';
 
 export const MosquesWorkspacePage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, hasPermission } = usePermissions();
-  const canImport = isAdmin || hasPermission('mosques', 'canAdd');
+  const [operationalRole, setOperationalRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    mosqueApi.me()
+      .then((me) => { if (!cancelled) setOperationalRole(me.role); })
+      .catch(() => { if (!cancelled) setOperationalRole(null); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const canImport = (isAdmin || hasPermission('mosques', 'canAdd')) && (isAdmin || operationalRole === 'head');
 
   return (
     <div className="space-y-4" dir="rtl">
