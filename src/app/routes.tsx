@@ -3,7 +3,9 @@ import { createHashRouter, Navigate } from 'react-router';
 import { Root } from './Root';
 import { RequireAdmin } from './components/RequireAdmin';
 import { PermissionGuard } from './components/PermissionGuard';
+import { RouteErrorPage } from './components/RouteErrorPage';
 import { usePermissions } from '../context/PermissionsContext';
+import type { ModuleName, ModulePermissions } from '../types/permissions';
 
 const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
 const AddDeedPage = lazy(() => import('./pages/AddDeedPage').then((m) => ({ default: m.AddDeedPage })));
@@ -110,6 +112,9 @@ const HomeLandingPage = () => {
 
 const page = (element: ReactNode) => <Suspense fallback={<LoadingPage />}>{element}</Suspense>;
 const adminOnly = (element: ReactNode) => <RequireAdmin>{page(element)}</RequireAdmin>;
+const modulePermission = (module: ModuleName, element: ReactNode, action: keyof ModulePermissions) => (
+  <PermissionGuard module={module} action={action}>{page(element)}</PermissionGuard>
+);
 const assetPermission = (element: ReactNode, action: 'canView' | 'canAdd' | 'canEdit' | 'canDelete' | 'canPrint') => (
   <PermissionGuard module="assets" action={action}>{page(element)}</PermissionGuard>
 );
@@ -121,25 +126,26 @@ const accountingTransformationPermission = (element: ReactNode, action: 'canView
 );
 
 export const router = createHashRouter([
-  { path: '/login', element: page(<LoginPage />) },
-  { path: '/forgot-password', element: page(<ForgotPasswordPage />) },
-  { path: '/reset-password', element: page(<ResetPasswordPage />) },
-  { path: '/activate-account', element: page(<ActivateAccountPage />) },
-  { path: '/mosques/public', element: page(<MosquesPublicPage />) },
+  { path: '/login', element: page(<LoginPage />), errorElement: <RouteErrorPage /> },
+  { path: '/forgot-password', element: page(<ForgotPasswordPage />), errorElement: <RouteErrorPage /> },
+  { path: '/reset-password', element: page(<ResetPasswordPage />), errorElement: <RouteErrorPage /> },
+  { path: '/activate-account', element: page(<ActivateAccountPage />), errorElement: <RouteErrorPage /> },
+  { path: '/mosques/public', element: page(<MosquesPublicPage />), errorElement: <RouteErrorPage /> },
   {
     path: '/',
     element: <Root />,
+    errorElement: <RouteErrorPage /> ,
     children: [
       { index: true, element: page(<HomeLandingPage />) },
       {
         path: 'deeds',
         children: [
-          { index: true, element: page(<AllDeedsPage />) },
-          { path: 'new', element: adminOnly(<AddDeedPage />) },
-          { path: ':deedId', element: page(<ViewDeedPage />) },
+          { index: true, element: modulePermission('deeds', <AllDeedsPage />, 'canView') },
+          { path: 'new', element: modulePermission('deeds', <AddDeedPage />, 'canAdd') },
+          { path: ':deedId', element: modulePermission('deeds', <ViewDeedPage />, 'canView') },
         ],
       },
-      { path: 'maps/:deedId?', element: page(<MapsPage />) },
+      { path: 'maps/:deedId?', element: modulePermission('deeds', <MapsPage />, 'canView') },
       {
         path: 'assets',
         children: [
@@ -156,10 +162,10 @@ export const router = createHashRouter([
       {
         path: 'site-inspections',
         children: [
-          { index: true, element: page(<SiteInspectionsPage />) },
-          { path: 'new', element: page(<SiteInspectionFormPage />) },
-          { path: ':inspectionId', element: page(<ViewSiteInspectionPage />) },
-          { path: ':inspectionId/edit', element: page(<SiteInspectionFormPage />) },
+          { index: true, element: modulePermission('site_inspections', <SiteInspectionsPage />, 'canView') },
+          { path: 'new', element: modulePermission('site_inspections', <SiteInspectionFormPage />, 'canAdd') },
+          { path: ':inspectionId', element: modulePermission('site_inspections', <ViewSiteInspectionPage />, 'canView') },
+          { path: ':inspectionId/edit', element: modulePermission('site_inspections', <SiteInspectionFormPage />, 'canEdit') },
         ],
       },
       {
@@ -184,8 +190,8 @@ export const router = createHashRouter([
         ],
       },
       { path: 'contracts/follow-up', element: <PermissionGuard module="contracts_follow_up" action="canView">{page(<ContractsFollowUpPage />)}</PermissionGuard> },
-      { path: 'reports', element: page(<ReportsPage />) },
-      { path: 'archive', element: page(<ArchivePage />) },
+      { path: 'reports', element: modulePermission('reports', <ReportsPage />, 'canView') },
+      { path: 'archive', element: modulePermission('archive', <ArchivePage />, 'canView') },
       { path: 'settings', element: page(<SettingsPage />) },
       { path: 'appearance', element: page(<AppearanceSettingsPage />) },
       { path: 'search', element: page(<UnifiedSearchPage />) },
@@ -195,23 +201,23 @@ export const router = createHashRouter([
       {
         path: 'lands',
         children: [
-          { path: 'allocated', element: page(<AllocatedLandsPage />) },
-          { path: 'allocated/new', element: adminOnly(<AddAllocatedLandPage />) },
-          { path: 'delivered', element: page(<DeliveredLandsPage />) },
-          { path: 'delivered/new', element: adminOnly(<AddDeliveredLandPage />) },
-          { path: 'leased-out', element: page(<LeasedLandsOutPage />) },
-          { path: 'leased-out/new', element: adminOnly(<AddLeasedLandOutPage />) },
-          { path: 'leased-in', element: page(<LeasedLandsInPage />) },
-          { path: 'leased-in/new', element: adminOnly(<AddLeasedLandInPage />) },
+          { path: 'allocated', element: modulePermission('allocated_lands', <AllocatedLandsPage />, 'canView') },
+          { path: 'allocated/new', element: modulePermission('allocated_lands', <AddAllocatedLandPage />, 'canAdd') },
+          { path: 'delivered', element: modulePermission('delivered_lands', <DeliveredLandsPage />, 'canView') },
+          { path: 'delivered/new', element: modulePermission('delivered_lands', <AddDeliveredLandPage />, 'canAdd') },
+          { path: 'leased-out', element: modulePermission('leased_lands_out', <LeasedLandsOutPage />, 'canView') },
+          { path: 'leased-out/new', element: modulePermission('leased_lands_out', <AddLeasedLandOutPage />, 'canAdd') },
+          { path: 'leased-in', element: modulePermission('leased_lands_in', <LeasedLandsInPage />, 'canView') },
+          { path: 'leased-in/new', element: modulePermission('leased_lands_in', <AddLeasedLandInPage />, 'canAdd') },
         ],
       },
       {
         path: 'buildings',
         children: [
-          { path: 'leased-out', element: page(<LeasedBuildingsOutPage />) },
-          { path: 'leased-out/new', element: adminOnly(<AddLeasedBuildingOutPage />) },
-          { path: 'leased-in', element: page(<LeasedBuildingsInPage />) },
-          { path: 'leased-in/new', element: adminOnly(<AddLeasedBuildingInPage />) },
+          { path: 'leased-out', element: modulePermission('leased_buildings_out', <LeasedBuildingsOutPage />, 'canView') },
+          { path: 'leased-out/new', element: modulePermission('leased_buildings_out', <AddLeasedBuildingOutPage />, 'canAdd') },
+          { path: 'leased-in', element: modulePermission('leased_buildings_in', <LeasedBuildingsInPage />, 'canView') },
+          { path: 'leased-in/new', element: modulePermission('leased_buildings_in', <AddLeasedBuildingInPage />, 'canAdd') },
         ],
       },
       { path: '*', element: <Navigate to="/" replace /> },
