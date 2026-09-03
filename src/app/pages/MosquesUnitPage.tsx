@@ -186,7 +186,7 @@ const siteActionButton = `${button3d} h-10 w-full min-w-0 justify-center gap-1.5
 
 const emptySite = {
   name: '', siteType: 'mosque', prayerRoomGender: '', city: 'الدمام', district: '', campusLocation: '', area: '', capacity: '', quranTargetCount: '', latitude: '', longitude: '',
-  status: 'active', imamName: '', muezzinName: '', khateebName: '', coordinatorName: '', contactPhone: '', supervisorUserId: '', notes: '',
+  status: 'active', imamName: '', muezzinName: '', khateebName: '', coordinatorName: '', supervisorName: '', contactPhone: '', supervisorUserId: '', notes: '',
 };
 const emptyRequest = { siteId: '', requestType: 'maintenance', priority: 'medium', description: '', notes: '', file: null as File | null };
 const emptyLeave = { siteId: '', requestType: 'leave', startDate: '', endDate: '', reason: '', replacementName: '', notes: '' };
@@ -415,6 +415,7 @@ const mediaImportSitePayload = (site: MosqueSite, images: MosqueSiteMediaLibrary
   muezzinName: site.muezzinName ?? null,
   khateebName: site.khateebName ?? null,
   coordinatorName: site.coordinatorName ?? null,
+  supervisorName: site.supervisorName ?? null,
   contactPhone: site.contactPhone ?? null,
   notes: site.notes ?? null,
   images,
@@ -1472,6 +1473,7 @@ ${quranStockMovementForm.notes}` : ''}`
         ['الإمام', site.imamName || '-'],
         ['المؤذن', site.muezzinName || '-'],
         ['الخطيب', site.khateebName || '-'],
+        ['اسم المشرف', site.supervisorName || '-'],
         ['اسم المنسق', site.coordinatorName || '-'],
         ['رقم التواصل', site.contactPhone || '-'],
         ['الإحداثيات', coordinates],
@@ -1620,7 +1622,7 @@ ${quranStockMovementForm.notes}` : ''}`
     setSiteForm(site ? {
       name: site.name, siteType: site.siteType, prayerRoomGender: site.prayerRoomGender || '', city: site.city || '', district: site.district || '', campusLocation: site.campusLocation || '',
       area: site.area ?? '', capacity: site.capacity ?? '', quranTargetCount: site.quranTargetCount ?? '', latitude: site.latitude ?? '', longitude: site.longitude ?? '', status: site.status,
-      imamName: site.imamName || '', muezzinName: site.muezzinName || '', khateebName: site.khateebName || '', coordinatorName: site.coordinatorName || '', contactPhone: site.contactPhone || '', supervisorUserId: site.supervisorUserId || '', notes: site.notes || '',
+      imamName: site.imamName || '', muezzinName: site.muezzinName || '', khateebName: site.khateebName || '', coordinatorName: site.coordinatorName || '', supervisorName: site.supervisorName || '', contactPhone: site.contactPhone || '', supervisorUserId: site.supervisorUserId || '', notes: site.notes || '',
     } : emptySite);
     setSiteDialog(true);
   };
@@ -2661,6 +2663,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 <Field label="الحي"><Input className="h-11" value={siteForm.district} onChange={(e) => setSiteForm({ ...siteForm, district: e.target.value })} /></Field>
                 <Field label="الموقع داخل الجامعة"><Input className="h-11" value={siteForm.campusLocation} onChange={(e) => setSiteForm({ ...siteForm, campusLocation: e.target.value })} placeholder="الحرم / المبنى / الكلية" /></Field>
                 {isAdmin && <Field label="المشرف المسؤول عن الموقع"><NativeSelect className="h-11" value={siteForm.supervisorUserId || ''} onChange={(e) => setSiteForm({ ...siteForm, supervisorUserId: e.target.value })}><option value="">بدون إسناد حالي</option>{staffUsers.filter((user) => user.moduleRole === 'supervisor').map((user) => <option key={user.uid} value={user.uid}>{user.username}</option>)}</NativeSelect></Field>}
+                <Field label="اسم المشرف (يدوي)"><Input className="h-11" value={siteForm.supervisorName} onChange={(e) => setSiteForm({ ...siteForm, supervisorName: e.target.value })} placeholder="اكتب اسم المشرف يدويًا" /><p className="mt-1 text-[11px] leading-5 text-muted-foreground">للتوثيق الاسمي فقط؛ لا ينشئ حسابًا ولا يمنح صلاحيات دخول.</p></Field>
               </CardContent>
             </Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">

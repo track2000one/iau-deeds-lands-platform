@@ -43,6 +43,7 @@ export type MosqueSite = {
   muezzinName?: string | null;
   khateebName?: string | null;
   coordinatorName?: string | null;
+  supervisorName?: string | null;
   contactPhone?: string | null;
   notes?: string | null;
   images?: string[] | MosqueSiteMediaLibrary | null;
