@@ -476,6 +476,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [siteFilterCity, setSiteFilterCity] = useState('');
   const [siteFilterType, setSiteFilterType] = useState('all');
+  const [siteFilterPrayerRoomGender, setSiteFilterPrayerRoomGender] = useState<'all' | 'men' | 'women'>('all');
   const [siteFilterStatus, setSiteFilterStatus] = useState('all');
   const [siteSortBy, setSiteSortBy] = useState('name');
   const [siteSortDirection, setSiteSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -642,6 +643,9 @@ export const MosquesUnitPage: React.FC = () => {
     }
     if (siteFilterCity) result = result.filter((site) => site.city === siteFilterCity);
     if (siteFilterType !== 'all') result = result.filter((site) => site.siteType === siteFilterType);
+    if (siteFilterType === 'prayer_room' && siteFilterPrayerRoomGender !== 'all') {
+      result = result.filter((site) => site.prayerRoomGender === siteFilterPrayerRoomGender);
+    }
     if (siteFilterStatus !== 'all') result = result.filter((site) => site.status === siteFilterStatus);
 
     const buildingCode = (site: MosqueSite) => String(site.campusLocation || '').match(/\b(?:M|A|H)\d+\b/i)?.[0]?.toUpperCase() || '';
@@ -662,7 +666,7 @@ export const MosquesUnitPage: React.FC = () => {
     });
 
     return result;
-  }, [sites, search, role, linkedSiteId, siteFilterCity, siteFilterType, siteFilterStatus, siteSortBy, siteSortDirection]);
+  }, [sites, search, role, linkedSiteId, siteFilterCity, siteFilterType, siteFilterPrayerRoomGender, siteFilterStatus, siteSortBy, siteSortDirection]);
 
   const siteFilterStats = useMemo(() => ({
     total: visibleSites.length,
@@ -675,6 +679,7 @@ export const MosquesUnitPage: React.FC = () => {
     setSearch('');
     setSiteFilterCity('');
     setSiteFilterType('all');
+    setSiteFilterPrayerRoomGender('all');
     setSiteFilterStatus('all');
     setSiteSortBy('name');
     setSiteSortDirection('asc');
@@ -1323,6 +1328,9 @@ ${quranStockMovementForm.notes}` : ''}`
       search.trim() ? `بحث: ${search.trim()}` : null,
       siteFilterCity ? `المدينة: ${siteFilterCity}` : null,
       siteFilterType !== 'all' ? `النوع: ${siteTypeLabels[siteFilterType] || siteFilterType}` : null,
+      siteFilterType === 'prayer_room' && siteFilterPrayerRoomGender !== 'all'
+        ? `فئة المصلى: ${prayerRoomGenderLabels[siteFilterPrayerRoomGender] || siteFilterPrayerRoomGender}`
+        : null,
       siteFilterStatus !== 'all' ? `الحالة: ${siteStatusLabels[siteFilterStatus] || siteFilterStatus}` : null,
       `الفرز: ${sortLabels[siteSortBy] || siteSortBy} — ${siteSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}`,
     ].filter(Boolean) as string[];
@@ -2270,14 +2278,15 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>
             </CardHeader>
             <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
                 <div className="relative md:col-span-2 xl:col-span-2">
                   <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input className="h-11 rounded-xl pr-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالاسم أو المدينة أو الحي أو الموقع أو الإمام..." />
                   {search && <Button type="button" variant="ghost" size="icon" className="absolute left-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setSearch('')}><X className="h-4 w-4" /></Button>}
                 </div>
                 <NativeSelect className="h-11 rounded-xl" value={siteFilterCity} onChange={(e) => setSiteFilterCity(e.target.value)}><option value="">جميع المدن</option>{siteCities.map((city) => <option key={city} value={city}>{city}</option>)}</NativeSelect>
-                <NativeSelect className="h-11 rounded-xl" value={siteFilterType} onChange={(e) => setSiteFilterType(e.target.value)}><option value="all">جميع الأنواع</option><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect>
+                <NativeSelect className="h-11 rounded-xl" value={siteFilterType} onChange={(e) => { const nextType = e.target.value; setSiteFilterType(nextType); if (nextType !== 'prayer_room') setSiteFilterPrayerRoomGender('all'); }}><option value="all">جميع الأنواع</option><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect>
+                {siteFilterType === 'prayer_room' && <NativeSelect className="h-11 rounded-xl border-emerald-200 bg-emerald-50/40" value={siteFilterPrayerRoomGender} onChange={(e) => setSiteFilterPrayerRoomGender(e.target.value as 'all' | 'men' | 'women')}><option value="all">كل المصليات</option><option value="men">مصلى رجال</option><option value="women">مصلى نساء</option></NativeSelect>}
                 <NativeSelect className="h-11 rounded-xl" value={siteFilterStatus} onChange={(e) => setSiteFilterStatus(e.target.value)}><option value="all">جميع الحالات</option><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect>
                 <NativeSelect className="h-11 rounded-xl" value={siteSortBy} onChange={(e) => setSiteSortBy(e.target.value)}><option value="name">فرز حسب الاسم</option><option value="building">فرز حسب رقم المبنى</option><option value="city">فرز حسب المدينة</option><option value="type">فرز حسب النوع</option><option value="status">فرز حسب الحالة</option><option value="area">فرز حسب المساحة</option></NativeSelect>
               </div>
@@ -2345,11 +2354,12 @@ ${quranStockMovementForm.notes}` : ''}`
                 </div>
               </div>
 
-              {(search || siteFilterCity || siteFilterType !== 'all' || siteFilterStatus !== 'all' || siteSortBy !== 'name' || siteSortDirection !== 'asc') && <div className="flex flex-wrap items-center gap-2 text-xs">
+              {(search || siteFilterCity || siteFilterType !== 'all' || siteFilterPrayerRoomGender !== 'all' || siteFilterStatus !== 'all' || siteSortBy !== 'name' || siteSortDirection !== 'asc') && <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="font-bold text-slate-600">المعايير الحالية:</span>
                 {search && <Badge variant="outline">بحث: {search}</Badge>}
                 {siteFilterCity && <Badge variant="outline">المدينة: {siteFilterCity}</Badge>}
                 {siteFilterType !== 'all' && <Badge variant="outline">النوع: {siteTypeLabels[siteFilterType]}</Badge>}
+                {siteFilterType === 'prayer_room' && siteFilterPrayerRoomGender !== 'all' && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">فئة المصلى: {prayerRoomGenderLabels[siteFilterPrayerRoomGender]}</Badge>}
                 {siteFilterStatus !== 'all' && <Badge variant="outline">الحالة: {siteStatusLabels[siteFilterStatus]}</Badge>}
                 <Badge variant="outline">الفرز: {{ name: 'الاسم', building: 'رقم المبنى', city: 'المدينة', type: 'النوع', status: 'الحالة', area: 'المساحة' }[siteSortBy] || siteSortBy} — {siteSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}</Badge>
               </div>}
