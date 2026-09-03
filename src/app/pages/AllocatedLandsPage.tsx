@@ -124,7 +124,7 @@ const usageTypeOptions = [
   { value: 'governmental', label: 'حكومي' },
   { value: 'mixed', label: 'مختلط' },
   { value: 'other', label: 'أخرى' },
-  { value: 'other', label: 'إداري' },
+  { value: 'administrative', label: 'إداري' },
 ];
 
 const getUsageLabel = (value?: string) => {
@@ -490,7 +490,7 @@ export const AllocatedLandsPage: React.FC = () => {
       return;
     }
 
-    window.open(`https://www.google.com/maps/search/?api=1&query=${land.coordinates}`, '_blank');
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(land.coordinates)}`, '_blank', 'noopener,noreferrer');
   };
 
   const mapCoordinates = form.latitude && form.longitude

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useDeeds } from '../../context/DeedContext';
-import { usePermissions } from '../../context/PermissionsContext';
+import { authenticatedFetch } from '../../lib/http';
 import { useForm } from 'react-hook-form';
 import { DeedFormData } from '../../types/deed';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
@@ -69,7 +69,6 @@ export const AddDeedPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { addDeed } = useDeeds();
-  const { isAdmin } = usePermissions();
 
   const [showMap, setShowMap] = useState(false);
   const [coordinates, setCoordinates] = useState<Coordinates | undefined>();
@@ -199,7 +198,7 @@ export const AddDeedPage: React.FC = () => {
       throw new Error('VITE_API_URL غير موجود. تأكد من ربط الواجهة بالـ Backend في Railway.');
     }
 
-    const maxSizeMB = 10;
+    const maxSizeMB = 20;
     if (file.size > maxSizeMB * 1024 * 1024) {
       throw new Error(`حجم الملف ${file.name} أكبر من الحد المسموح ${maxSizeMB} ميجا`);
     }
@@ -207,8 +206,9 @@ export const AddDeedPage: React.FC = () => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${API_BASE_URL}/api/uploads`, {
+    const response = await authenticatedFetch('/api/uploads', {
       method: 'POST',
+      headers: { 'X-Upload-Module': 'deeds' },
       body: formData,
     });
 
@@ -268,7 +268,7 @@ export const AddDeedPage: React.FC = () => {
     if (!API_BASE_URL || attachments.length === 0) return;
 
     for (const attachment of attachments) {
-      const response = await fetch(`${API_BASE_URL}/api/attachments`, {
+      const response = await authenticatedFetch('/api/attachments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

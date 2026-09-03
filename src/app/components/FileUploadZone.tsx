@@ -227,7 +227,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   onDeleteExisting,
   maxFiles = 10,
   maxSizeMB = 10,
-  accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar',
+  accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp4',
   label,
   description,
   disabled = false,
