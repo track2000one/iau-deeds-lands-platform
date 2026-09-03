@@ -7,6 +7,7 @@ import {
   ClipboardList,
   FileText,
   Eye,
+  EyeOff,
   Image as ImageIcon,
   Loader2,
   MapPin,
@@ -616,6 +617,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [visits, setVisits] = React.useState<MosqueFieldVisit[]>([]);
   const [template, setTemplate] = React.useState<MosqueFieldVisitItem[]>([]);
   const [view, setView] = React.useState<'visits' | 'tours'>('visits');
+  const [tourCardsVisible, setTourCardsVisible] = React.useState(true);
   const [search, setSearch] = React.useState('');
   const [siteFilter, setSiteFilter] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('');
@@ -1536,6 +1538,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
             <Button size="sm" variant={view === 'visits' ? 'default' : 'ghost'} onClick={() => setView('visits')}>الزيارات</Button>
             <Button size="sm" variant={view === 'tours' ? 'default' : 'ghost'} onClick={() => setView('tours')}>الجولات</Button>
           </div>
+          {view === 'tours' && <Button type="button" size="sm" variant="outline" className={tourCardsVisible ? 'border-slate-300 text-slate-700' : 'border-emerald-300 bg-emerald-50 text-emerald-800'} onClick={() => setTourCardsVisible((current) => !current)}>{tourCardsVisible ? <EyeOff className="ml-2 h-4 w-4" /> : <Eye className="ml-2 h-4 w-4" />}{tourCardsVisible ? 'إخفاء بطاقات الجولات' : 'إظهار بطاقات الجولات'}</Button>}
           {view === 'visits' && <div className="flex-1 space-y-2 md:max-w-5xl">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <div className="relative"><Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" /><Input className="pr-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث برقم الزيارة أو الموقع أو المنفذ" /></div>
@@ -1582,7 +1585,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         </CardContent>
       </Card>)}
       {!filteredVisits.length && <Empty message="لا توجد زيارات مطابقة للبحث" />}
-    </div> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    </div> : <div className={`${tourCardsVisible ? 'grid' : 'hidden'} gap-4 md:grid-cols-2 xl:grid-cols-3`}>
       {tours.map((tour) => <Card key={tour.id} className="overflow-hidden">
         <CardHeader className="border-b bg-gradient-to-l from-emerald-50/70 to-white"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{tour.title}</CardTitle><CardDescription className="mt-1">{tour.tourNumber}</CardDescription></div><Badge variant="outline">{tourStatusLabels[tour.status]}</Badge></div></CardHeader>
         <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-36 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between rounded-lg bg-white px-2 py-1.5 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) openVisit(full); }}><span>{visit.site.name}</span><span className="text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}{canPrint && <Button size="sm" variant="outline" className="w-full border-emerald-200 text-emerald-800" onClick={() => void printTourTreatmentReport(tour)}><ImageIcon className="ml-2 h-4 w-4" />تقرير المعالجة المصور قبل / بعد</Button>}</CardContent>
