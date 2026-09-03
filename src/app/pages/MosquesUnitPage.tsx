@@ -99,7 +99,7 @@ const siteTypeDisplayLabel = (site: Pick<MosqueSite, 'siteType' | 'prayerRoomGen
     : siteTypeLabels[site.siteType] || site.siteType;
 
 
-type SitePrintColumnKey = 'name' | 'type' | 'building' | 'location' | 'cityDistrict' | 'area' | 'capacity' | 'imam' | 'muezzin' | 'khateeb' | 'contactPhone' | 'coordinates' | 'status' | 'notes';
+type SitePrintColumnKey = 'name' | 'type' | 'building' | 'location' | 'cityDistrict' | 'area' | 'capacity' | 'imam' | 'muezzin' | 'khateeb' | 'coordinatorName' | 'contactPhone' | 'coordinates' | 'status' | 'notes';
 const SITE_PRINT_COLUMNS: Array<{ key: SitePrintColumnKey; label: string }> = [
   { key: 'name', label: 'الاسم' },
   { key: 'type', label: 'النوع' },
@@ -111,6 +111,7 @@ const SITE_PRINT_COLUMNS: Array<{ key: SitePrintColumnKey; label: string }> = [
   { key: 'imam', label: 'الإمام' },
   { key: 'muezzin', label: 'المؤذن' },
   { key: 'khateeb', label: 'الخطيب' },
+  { key: 'coordinatorName', label: 'اسم المنسق' },
   { key: 'contactPhone', label: 'رقم التواصل' },
   { key: 'coordinates', label: 'الإحداثيات' },
   { key: 'status', label: 'الحالة' },
@@ -1258,6 +1259,7 @@ ${quranStockMovementForm.notes}` : ''}`
       if (key === 'imam') return site.imamName || '-';
       if (key === 'muezzin') return site.muezzinName || '-';
       if (key === 'khateeb') return site.khateebName || '-';
+      if (key === 'coordinatorName') return site.coordinatorName || '-';
       if (key === 'contactPhone') return site.contactPhone || '-';
       if (key === 'coordinates') return site.latitude != null && site.longitude != null ? `${site.latitude}, ${site.longitude}` : '-';
       if (key === 'status') return siteStatusLabels[site.status] || site.status;
@@ -1276,6 +1278,7 @@ ${quranStockMovementForm.notes}` : ''}`
       imam: 1.05,
       muezzin: 1.05,
       khateeb: 1.05,
+      coordinatorName: 1.15,
       contactPhone: 0.9,
       coordinates: 1.25,
       status: 0.7,
