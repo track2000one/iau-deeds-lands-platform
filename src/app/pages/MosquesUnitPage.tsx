@@ -186,7 +186,7 @@ const siteActionButton = `${button3d} h-10 w-full min-w-0 justify-center gap-1.5
 
 const emptySite = {
   name: '', siteType: 'mosque', prayerRoomGender: '', city: 'الدمام', district: '', campusLocation: '', area: '', capacity: '', quranTargetCount: '', latitude: '', longitude: '',
-  status: 'active', imamName: '', muezzinName: '', khateebName: '', contactPhone: '', supervisorUserId: '', notes: '',
+  status: 'active', imamName: '', muezzinName: '', khateebName: '', coordinatorName: '', contactPhone: '', supervisorUserId: '', notes: '',
 };
 const emptyRequest = { siteId: '', requestType: 'maintenance', priority: 'medium', description: '', notes: '', file: null as File | null };
 const emptyLeave = { siteId: '', requestType: 'leave', startDate: '', endDate: '', reason: '', replacementName: '', notes: '' };
@@ -414,6 +414,7 @@ const mediaImportSitePayload = (site: MosqueSite, images: MosqueSiteMediaLibrary
   imamName: site.imamName ?? null,
   muezzinName: site.muezzinName ?? null,
   khateebName: site.khateebName ?? null,
+  coordinatorName: site.coordinatorName ?? null,
   contactPhone: site.contactPhone ?? null,
   notes: site.notes ?? null,
   images,
@@ -1471,6 +1472,7 @@ ${quranStockMovementForm.notes}` : ''}`
         ['الإمام', site.imamName || '-'],
         ['المؤذن', site.muezzinName || '-'],
         ['الخطيب', site.khateebName || '-'],
+        ['اسم المنسق', site.coordinatorName || '-'],
         ['رقم التواصل', site.contactPhone || '-'],
         ['الإحداثيات', coordinates],
         ['إجمالي المصاحف', quranInventory?.totalCount?.toLocaleString('ar-SA') || 'لم يتم الجرد'],
@@ -1618,7 +1620,7 @@ ${quranStockMovementForm.notes}` : ''}`
     setSiteForm(site ? {
       name: site.name, siteType: site.siteType, prayerRoomGender: site.prayerRoomGender || '', city: site.city || '', district: site.district || '', campusLocation: site.campusLocation || '',
       area: site.area ?? '', capacity: site.capacity ?? '', quranTargetCount: site.quranTargetCount ?? '', latitude: site.latitude ?? '', longitude: site.longitude ?? '', status: site.status,
-      imamName: site.imamName || '', muezzinName: site.muezzinName || '', khateebName: site.khateebName || '', contactPhone: site.contactPhone || '', supervisorUserId: site.supervisorUserId || '', notes: site.notes || '',
+      imamName: site.imamName || '', muezzinName: site.muezzinName || '', khateebName: site.khateebName || '', coordinatorName: site.coordinatorName || '', contactPhone: site.contactPhone || '', supervisorUserId: site.supervisorUserId || '', notes: site.notes || '',
     } : emptySite);
     setSiteDialog(true);
   };
@@ -2663,10 +2665,11 @@ ${quranStockMovementForm.notes}` : ''}`
             </Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
               <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-emerald-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><Building2 className="h-5 w-5" />السعة وبيانات التواصل</CardTitle></CardHeader>
-              <CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2 xl:grid-cols-4">
+              <CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2 xl:grid-cols-5">
                 <Field label="المساحة م²"><Input className="h-11" type="number" min="0" step="any" inputMode="decimal" value={siteForm.area} onChange={(e) => setSiteForm({ ...siteForm, area: e.target.value })} /></Field>
                 <Field label="الطاقة الاستيعابية"><Input className="h-11" type="number" min="0" inputMode="numeric" value={siteForm.capacity} onChange={(e) => setSiteForm({ ...siteForm, capacity: e.target.value })} /></Field>
                 <Field label="العدد المستهدف للمصاحف"><Input className="h-11" type="number" min="0" step="1" inputMode="numeric" value={siteForm.quranTargetCount} onChange={(e) => setSiteForm({ ...siteForm, quranTargetCount: e.target.value })} placeholder="مثال: 100" /><p className="mt-1 text-[11px] leading-5 text-muted-foreground">العدد المناسب توفره في الموقع؛ يحسب النظام الاحتياج تلقائيًا من الرصيد الحالي.</p></Field>
+                <Field label="اسم المنسق"><Input className="h-11" value={siteForm.coordinatorName} onChange={(e) => setSiteForm({ ...siteForm, coordinatorName: e.target.value })} placeholder="اسم منسق الموقع" /></Field>
                 <Field label="رقم التواصل"><Input className="h-11" type="tel" inputMode="tel" value={siteForm.contactPhone} onChange={(e) => setSiteForm({ ...siteForm, contactPhone: e.target.value })} placeholder="05xxxxxxxx" /></Field>
               </CardContent>
             </Card>
