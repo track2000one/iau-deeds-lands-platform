@@ -192,7 +192,10 @@ const getArchiveFileTypeLabel = (doc: ArchiveDocument) => {
 
 export const ArchivePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { isAdmin } = usePermissions();
+  const { isAdmin, hasPermission } = usePermissions();
+  const canAddArchive = isAdmin || hasPermission('archive', 'canAdd');
+  const canEditArchive = isAdmin || hasPermission('archive', 'canEdit');
+  const canDeleteArchive = isAdmin || hasPermission('archive', 'canDelete');
 
   const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -362,8 +365,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const openAddForm = () => {
-    if (!isAdmin) {
-      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+    if (!canAddArchive) {
+      toast.error('لا تملك صلاحية إضافة ملفات إلى الأرشفة');
       return;
     }
 
@@ -376,8 +379,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const openEditForm = (doc: ArchiveDocument) => {
-    if (!isAdmin) {
-      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+    if (!canEditArchive) {
+      toast.error('لا تملك صلاحية تعديل ملفات الأرشفة');
       return;
     }
 
@@ -408,8 +411,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const requestDelete = (doc: ArchiveDocument) => {
-    if (!isAdmin) {
-      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+    if (!canDeleteArchive) {
+      toast.error('لا تملك صلاحية حذف ملفات الأرشفة');
       return;
     }
 
@@ -418,8 +421,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const confirmDelete = async () => {
-    if (!isAdmin) {
-      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+    if (!canDeleteArchive) {
+      toast.error('لا تملك صلاحية حذف ملفات الأرشفة');
       return;
     }
 
@@ -475,6 +478,7 @@ export const ArchivePage: React.FC = () => {
 
     const response = await authenticatedFetch('/api/uploads', {
       method: 'POST',
+      headers: { 'x-upload-module': 'archive' },
       body: formData,
     });
 
@@ -490,8 +494,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!isAdmin) {
-      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+    if (formMode === 'add' ? !canAddArchive : !canEditArchive) {
+      toast.error(formMode === 'add' ? 'لا تملك صلاحية إضافة ملفات إلى الأرشفة' : 'لا تملك صلاحية تعديل ملفات الأرشفة');
       return;
     }
 
@@ -686,7 +690,7 @@ export const ArchivePage: React.FC = () => {
           </p>
         </div>
 
-        {isAdmin && (
+        {canAddArchive && (
           <Button onClick={openAddForm} className="w-full lg:w-auto">
             <Plus className="ml-2 h-4 w-4" />
             إضافة ملف للأرشفة
@@ -857,7 +861,7 @@ export const ArchivePage: React.FC = () => {
                   <Upload className="h-4 w-4" />
                   رفع الملف
                 </CardTitle>
-                <CardDescription>يدعم رفع أكثر من ملف دفعة واحدة: صور و PDF و Word و Excel و PowerPoint والملفات النصية والمضغوطة ومعظم الصيغ.</CardDescription>
+                <CardDescription>يدعم رفع أكثر من ملف دفعة واحدة: JPG وPNG وWEBP وGIF وPDF وWord وExcel وPowerPoint وMP4، بحد أقصى 20MB لكل ملف.</CardDescription>
               </CardHeader>
 
               <CardContent className="space-y-4">
@@ -867,7 +871,7 @@ export const ArchivePage: React.FC = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     {form.files.length > 0
                       ? `إجمالي الحجم: ${formatFileSize(form.files.reduce((sum, file) => sum + file.size, 0))}`
-                      : 'PDF، Word، Excel، PowerPoint، صور، ملفات مضغوطة، وجميع الصيغ تقريبًا'}
+                      : 'JPG، PNG، WEBP، GIF، PDF، Word، Excel، PowerPoint وMP4'}
                   </p>
 
                   <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
@@ -880,7 +884,7 @@ export const ArchivePage: React.FC = () => {
                     type="file"
                     className="hidden"
                     onChange={selectFiles}
-                    accept="*/*"
+                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,video/mp4"
                     multiple
                   />
                 </div>
@@ -1028,16 +1032,20 @@ export const ArchivePage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {isAdmin && (
+            {(canEditArchive || canDeleteArchive) && (
               <div className="flex flex-col md:flex-row justify-end gap-2">
-                <Button variant="outline" onClick={() => openEditForm(selectedDocument)}>
-                  <Edit className="ml-2 h-4 w-4" />
-                  تعديل البيانات
-                </Button>
-                <Button variant="destructive" onClick={() => requestDelete(selectedDocument)}>
-                  <Trash2 className="ml-2 h-4 w-4" />
-                  حذف
-                </Button>
+                {canEditArchive && (
+                  <Button variant="outline" onClick={() => openEditForm(selectedDocument)}>
+                    <Edit className="ml-2 h-4 w-4" />
+                    تعديل البيانات
+                  </Button>
+                )}
+                {canDeleteArchive && (
+                  <Button variant="destructive" onClick={() => requestDelete(selectedDocument)}>
+                    <Trash2 className="ml-2 h-4 w-4" />
+                    حذف
+                  </Button>
+                )}
               </div>
             )}
           </div>
