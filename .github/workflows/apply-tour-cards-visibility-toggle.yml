@@ -1,0 +1,39 @@
+name: Apply Tour Cards Visibility Toggle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-tour-cards-visibility-toggle.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-tour-cards-visibility-toggle.mjs
+      - run: npm run build
+      - name: Remove temporary patch files
+        run: rm -f scripts/apply-tour-cards-visibility-toggle.mjs .github/workflows/apply-tour-cards-visibility-toggle.yml
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/components/MosqueFieldVisitsPanel.tsx scripts/apply-tour-cards-visibility-toggle.mjs .github/workflows/apply-tour-cards-visibility-toggle.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Add tour cards visibility toggle"
+            git push origin main
+          fi
