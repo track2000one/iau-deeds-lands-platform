@@ -348,7 +348,13 @@ export type MosqueQuranStockDashboard = {
     returnedTotal: number;
     withdrawnTotal: number;
     damagedTotal: number;
+    adjustmentInTotal: number;
+    adjustmentOutTotal: number;
+    warehouseInflowTotal: number;
+    warehouseOutflowTotal: number;
+    warehouseNetMovement: number;
     siteSystemTotal: number;
+    systemTotal: number;
     siteNeedTotal: number;
     lowStockWarehouses: number;
     shortageTotal: number;
