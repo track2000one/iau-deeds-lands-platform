@@ -81,7 +81,7 @@ jobs:
                     <ReportMetric label=\"المستبعد / تسويات النقص\" value={(quranStockDashboard.summary.damagedTotal || 0) + (quranStockDashboard.summary.adjustmentOutTotal || 0)} />
                   </div>
                   <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-bold ${quranStockDashboard.summary.warehouseNetMovement === quranStockDashboard.summary.warehouseTotal ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
-                    معادلة الرصيد: {quranStockDashboard.summary.warehouseInflowTotal || 0} وارد − {quranStockDashboard.summary.warehouseOutflowTotal || 0} خارج = {quranStockDashboard.summary.warehouseNetMovement || 0}، والرصد الحالي للمكتبة = {quranStockDashboard.summary.warehouseTotal || 0}.
+                    معادلة الرصيد: {quranStockDashboard.summary.warehouseInflowTotal || 0} وارد − {quranStockDashboard.summary.warehouseOutflowTotal || 0} خارج = {quranStockDashboard.summary.warehouseNetMovement || 0}، والرصيد الحالي للمكتبة = {quranStockDashboard.summary.warehouseTotal || 0}.
                   </div>
                 </div>}
               </div>"""
@@ -99,3 +99,5 @@ jobs:
           git add src/app/api/mosques.ts src/app/pages/MosquesUnitPage.tsx .github/workflows/apply-quran-stock-summary-ux.yml
           git commit -m 'Clarify Quran stock balance and movement totals'
           git push origin main
+
+# trigger-second-push
