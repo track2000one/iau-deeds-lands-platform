@@ -1,0 +1,56 @@
+name: Apply Tour Cards Hidden Default
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-tour-cards-hidden-default.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply hidden-by-default behavior
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/app/components/MosqueFieldVisitsPanel.tsx')
+          s = p.read_text()
+
+          old_state = "const [tourCardsVisible, setTourCardsVisible] = React.useState(true);"
+          new_state = "const [tourCardsVisible, setTourCardsVisible] = React.useState(false);"
+          if s.count(old_state) != 1:
+              raise SystemExit(f'Expected one tourCardsVisible state match, found {s.count(old_state)}')
+          s = s.replace(old_state, new_state, 1)
+
+          old_tab = "<Button size=\"sm\" variant={view === 'tours' ? 'default' : 'ghost'} onClick={() => setView('tours')}>الجولات</Button>"
+          new_tab = "<Button size=\"sm\" variant={view === 'tours' ? 'default' : 'ghost'} onClick={() => { setView('tours'); setTourCardsVisible(false); }}>الجولات</Button>"
+          if s.count(old_tab) != 1:
+              raise SystemExit(f'Expected one tours tab match, found {s.count(old_tab)}')
+          s = s.replace(old_tab, new_tab, 1)
+
+          p.write_text(s)
+          PY
+      - run: npm ci
+      - run: npm run build
+      - name: Remove temporary workflow and commit
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-tour-cards-hidden-default.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/components/MosqueFieldVisitsPanel.tsx .github/workflows/apply-tour-cards-hidden-default.yml
+          git commit -m "Hide tour cards by default"
+          git push origin main
