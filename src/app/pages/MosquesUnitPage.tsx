@@ -18,6 +18,7 @@ import {
   Clock3,
   ExternalLink,
   Eye,
+  FileSpreadsheet,
   FileText,
   Filter,
   MapPin,
@@ -48,6 +49,7 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { MosqueFieldVisitsPanel } from '../components/MosqueFieldVisitsPanel';
+import { appendExcelReportSheet, excelReportDateStamp } from '../utils/excelReport';
 import {
   Dialog,
   DialogContent,
@@ -813,6 +815,43 @@ export const MosquesUnitPage: React.FC = () => {
     finally { setQuranStockSaving(false); }
   };
 
+  const exportQuranWarehouseExcel = (warehouse: MosqueQuranWarehouse) => {
+    const workbook = XLSX.utils.book_new();
+    appendExcelReportSheet(workbook, 'ملخص المكتبة', [{
+      'رمز المكتبة': warehouse.code || '-',
+      'اسم المكتبة': warehouse.name,
+      'الموقع': warehouse.location || '-',
+      'الحالة': warehouse.active ? 'مفعّلة' : 'غير مفعّلة',
+      'حالة الرصيد': warehouse.lowStock ? 'رصيد منخفض' : 'الرصيد آمن',
+      'إجمالي الرصيد': warehouse.balance.totalCount,
+      'الكبيرة': warehouse.balance.largeCount,
+      'المتوسطة': warehouse.balance.mediumCount,
+      'الصغيرة': warehouse.balance.smallCount,
+      'الحد الأدنى - كبيرة': warehouse.minLargeCount,
+      'الحد الأدنى - متوسطة': warehouse.minMediumCount,
+      'الحد الأدنى - صغيرة': warehouse.minSmallCount,
+      'النقص - كبيرة': warehouse.shortage.largeCount,
+      'النقص - متوسطة': warehouse.shortage.mediumCount,
+      'النقص - صغيرة': warehouse.shortage.smallCount,
+      'الملاحظات': warehouse.notes || '-',
+      'تاريخ التصدير': new Date().toLocaleString('ar-SA-u-ca-gregory'),
+    }]);
+    const movements = (quranStockDashboard?.recentMovements || []).filter((item) => item.warehouseId === warehouse.id);
+    appendExcelReportSheet(workbook, 'حركات المكتبة', movements.map((movement, index) => ({
+      'م': index + 1,
+      'رقم الحركة': movement.movementNumber,
+      'نوع الحركة': quranStockMovementDisplayLabel(movement),
+      'الموقع المستفيد': movement.site?.name || '-',
+      'كبيرة': movement.largeCount,
+      'متوسطة': movement.mediumCount,
+      'صغيرة': movement.smallCount,
+      'الإجمالي': movement.totalCount,
+      'التاريخ': new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory'),
+    })), 'لا توجد حركات مصاحف ظاهرة لهذه المكتبة');
+    XLSX.writeFile(workbook, `quran-warehouse-${warehouse.code || warehouse.id}-${excelReportDateStamp()}.xlsx`);
+    toast.success('تم تجهيز ملف Excel للمكتبة');
+  };
+
   const printQuranWarehouse = (warehouse: MosqueQuranWarehouse) => {
     const printWindow = window.open('', '_blank', 'width=1100,height=850');
     if (!printWindow) return toast.error('تعذر فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة ثم أعد المحاولة.');
@@ -1166,6 +1205,39 @@ ${quranStockMovementForm.notes}` : ''}`
     setQuranPrintSortDirection('asc');
   };
 
+  const exportQuranInventoryExcel = () => {
+    if (!quranPrintRows.length) return toast.info('لا توجد بيانات مصاحف مطابقة لمعايير التقرير');
+    const workbook = XLSX.utils.book_new();
+    appendExcelReportSheet(workbook, 'حصر المصاحف', quranPrintRows.map((row, index) => ({
+      'م': index + 1,
+      'المسجد / المصلى': row.site.name,
+      'النوع': siteTypeDisplayLabel(row.site),
+      'الموقع': [row.site.campusLocation, row.site.city, row.site.district].filter(Boolean).join(' — ') || '-',
+      'كبيرة': row.large,
+      'متوسطة': row.medium,
+      'صغيرة': row.small,
+      'الإجمالي': row.total,
+      'المسحوبة': row.damaged,
+      'المستهدف': row.target || 0,
+      'التغطية %': row.coverage ?? '-',
+      'الاحتياج': row.needed,
+      'آخر جرد': row.latest ? new Date(row.latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لم يجرد',
+    })));
+    appendExcelReportSheet(workbook, 'ملخص التقرير', [{
+      'عدد المواقع': quranPrintStats.sites,
+      'إجمالي المصاحف': quranPrintStats.total,
+      'الكبيرة': quranPrintStats.large,
+      'المتوسطة': quranPrintStats.medium,
+      'الصغيرة': quranPrintStats.small,
+      'المسحوبة': quranPrintStats.damaged,
+      'الاحتياج': quranPrintStats.needed,
+      'تاريخ التصدير': new Date().toLocaleString('ar-SA-u-ca-gregory'),
+    }]);
+    appendExcelReportSheet(workbook, 'الصور والمرفقات', siteMediaExcelRows(quranPrintRows.map((row) => row.site)), 'لا توجد صور أو مرفقات للمواقع الظاهرة في التقرير');
+    XLSX.writeFile(workbook, `quran-inventory-report-${excelReportDateStamp()}.xlsx`);
+    toast.success('تم تجهيز تقرير المصاحف بصيغة Excel مع ورقة الصور والمرفقات');
+  };
+
   const printQuranInventory = () => {
     if (!quranPrintRows.length) return toast.info('لا توجد بيانات مصاحف مطابقة لمعايير الطباعة');
     const printWindow = window.open('', '_blank', 'width=1400,height=950');
@@ -1222,6 +1294,71 @@ ${quranStockMovementForm.notes}` : ''}`
   }, [mapSites]);
 
   const publicUrlForSite = (site: MosqueSite) => `${window.location.origin}${window.location.pathname}#/mosques/public?site=${encodeURIComponent(site.publicToken)}`;
+
+  const siteExcelValue = (site: MosqueSite, key: SitePrintColumnKey) => {
+    const buildingCode = String(site.campusLocation || '').match(/\b(?:M|A|H)\d+\b/i)?.[0]?.toUpperCase() || '-';
+    const cityDistrict = [site.city, site.district].filter(Boolean).join(' — ') || '-';
+    if (key === 'name') return site.name;
+    if (key === 'type') return siteTypeDisplayLabel(site);
+    if (key === 'building') return buildingCode;
+    if (key === 'location') return site.campusLocation || '-';
+    if (key === 'cityDistrict') return cityDistrict;
+    if (key === 'area') return site.area ?? '-';
+    if (key === 'capacity') return site.capacity ?? '-';
+    if (key === 'imam') return site.imamName || '-';
+    if (key === 'muezzin') return site.muezzinName || '-';
+    if (key === 'khateeb') return site.khateebName || '-';
+    if (key === 'coordinatorName') return site.coordinatorName || '-';
+    if (key === 'contactPhone') return site.contactPhone || '-';
+    if (key === 'coordinates') return site.latitude != null && site.longitude != null ? `${site.latitude}, ${site.longitude}` : '-';
+    if (key === 'status') return siteStatusLabels[site.status] || site.status;
+    if (key === 'notes') return site.notes || '-';
+    return '-';
+  };
+
+  const siteMediaExcelRows = (rows: MosqueSite[]) => rows.flatMap((site) => {
+    const media = normalizeSiteMedia(site.images || null);
+    return [
+      ...media.photos.map((item, index) => ({
+        'المسجد / المصلى': site.name,
+        'نوع الموقع': siteTypeDisplayLabel(site),
+        'نوع المرفق': 'صورة',
+        'التصنيف': item.category === 'site_image' ? 'صورة الموقع / المبنى' : 'صورة المسجد / المصلى',
+        'الترتيب': index + 1,
+        'اسم الملف': item.fileName || `صورة ${index + 1}`,
+        'الوصف': item.description || '-',
+        'نوع الملف': item.mimeType || '-',
+        'الرابط': item.url || '-',
+        'معرف الملف': item.fileId || '-',
+      })),
+      ...media.documents.map((item, index) => ({
+        'المسجد / المصلى': site.name,
+        'نوع الموقع': siteTypeDisplayLabel(site),
+        'نوع المرفق': 'مستند',
+        'التصنيف': 'مستند / ملف',
+        'الترتيب': index + 1,
+        'اسم الملف': item.fileName || `مستند ${index + 1}`,
+        'الوصف': '-',
+        'نوع الملف': item.mimeType || '-',
+        'الرابط': item.url || '-',
+        'معرف الملف': item.fileId || '-',
+      })),
+    ];
+  });
+
+  const exportSitesExcel = (rows: MosqueSite[], filePrefix = 'mosques-sites-report') => {
+    if (!rows.length) return toast.info('لا توجد مساجد أو مصليات لتصديرها');
+    const selectedColumns = SITE_PRINT_COLUMNS.filter((column) => sitePrintColumns.includes(column.key));
+    if (!selectedColumns.length) return toast.info('حدد عمودًا واحدًا على الأقل للتقرير');
+    const workbook = XLSX.utils.book_new();
+    appendExcelReportSheet(workbook, 'المساجد والمصليات', rows.map((site, index) => Object.fromEntries([
+      ['م', index + 1],
+      ...selectedColumns.map((column) => [column.label, siteExcelValue(site, column.key)]),
+    ])));
+    appendExcelReportSheet(workbook, 'الصور والمرفقات', siteMediaExcelRows(rows), 'لا توجد صور أو مرفقات للمواقع المحددة');
+    XLSX.writeFile(workbook, `${filePrefix}-${excelReportDateStamp()}.xlsx`);
+    toast.success(`تم تجهيز Excel ويشمل ${rows.length} موقعًا وورقة مستقلة للصور والمرفقات`);
+  };
 
   const printSitesTable = (rows: MosqueSite[], mode: 'print' | 'preview' = 'print') => {
     if (!rows.length) {
@@ -2106,7 +2243,8 @@ ${quranStockMovementForm.notes}` : ''}`
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.leaves || []), 'الإجازات');
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.jobs || []), 'التوظيف');
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(quranInventoryItems.map((item) => ({ الموقع: item.site.name, النوع: siteTypeDisplayLabel(item.site as MosqueSite), كبير: item.latest?.largeCount || 0, متوسط: item.latest?.mediumCount || 0, صغير: item.latest?.smallCount || 0, الإجمالي: item.latest?.totalCount || 0, المسحوبة: quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.withdrawnStock?.totalCount || 0, المستهدف: quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.targetCount || 0, التغطية: quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.coveragePercent != null ? `${quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.coveragePercent}%` : '-', الاحتياج: quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.needCount || 0, 'آخر جرد': item.latest?.countedAt ? new Date(item.latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لم يجرد' }))), 'حصر المصاحف');
-      XLSX.writeFile(workbook, `mosques-unit-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      appendExcelReportSheet(workbook, 'الصور والمرفقات', siteMediaExcelRows(sites), 'لا توجد صور أو مرفقات مسجلة');
+      XLSX.writeFile(workbook, `mosques-unit-report-${excelReportDateStamp()}.xlsx`);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تصدير التقرير'); }
   };
 
@@ -2280,6 +2418,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" className={button3d} onClick={resetSiteFilters}><X className="ml-2 h-4 w-4" />مسح التصفية</Button>
                   {canPrint && visibleSites.length > 0 && <Button variant="outline" className={button3d} onClick={() => printSitesTable(visibleSites, 'preview')}><Eye className="ml-2 h-4 w-4" />معاينة التقرير</Button>}
+                  {canPrint && visibleSites.length > 0 && <Button className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={() => exportSitesExcel(visibleSites)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel ({visibleSites.length})</Button>}
                   {canPrint && visibleSites.length > 0 && <Button className={`${button3d} bg-sky-700 hover:bg-sky-800`} onClick={() => printSitesTable(visibleSites, 'print')}><Printer className="ml-2 h-4 w-4" />طباعة / PDF كجدول ({visibleSites.length})</Button>}
                 </div>
               </div>
@@ -2372,7 +2511,7 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>}
             </CardContent>
           </Card>
-          {visibleSites.length === 0 ? <Empty text="لا توجد مساجد أو مصليات مسجلة" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{visibleSites.map((site) => <SiteCard key={site.id} site={site} canEdit={canEdit && ['head', 'supervisor'].includes(role)} canDelete={canDelete && role === 'head'} canPrint={canPrint} onPreview={() => setPreviewSite(site)} onPrint={() => void printSiteCard(site)} onEdit={() => openSiteDialog(site)} onDelete={() => deleteSite(site)} onQr={() => setQrSite(site)} quranInventory={quranLatestBySite[site.id] as MosqueQuranInventory | null | undefined} />)}</div>}
+          {visibleSites.length === 0 ? <Empty text="لا توجد مساجد أو مصليات مسجلة" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{visibleSites.map((site) => <SiteCard key={site.id} site={site} canEdit={canEdit && ['head', 'supervisor'].includes(role)} canDelete={canDelete && role === 'head'} canPrint={canPrint} onPreview={() => setPreviewSite(site)} onPrint={() => void printSiteCard(site)} onExcel={() => exportSitesExcel([site], `mosque-${site.publicToken || site.id}`)} onEdit={() => openSiteDialog(site)} onDelete={() => deleteSite(site)} onQr={() => setQrSite(site)} quranInventory={quranLatestBySite[site.id] as MosqueQuranInventory | null | undefined} />)}</div>}
         </TabsContent>
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="field-visits" className="space-y-4">
@@ -2461,6 +2600,7 @@ ${quranStockMovementForm.notes}` : ''}`
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                       <Button size="sm" variant="outline" className={button3d} onClick={() => setQuranWarehousePreview(warehouse)}><Eye className="ml-1 h-4 w-4" />معاينة</Button>
+                      <Button size="sm" className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={() => exportQuranWarehouseExcel(warehouse)}><FileSpreadsheet className="ml-1 h-4 w-4 text-white" />Excel</Button>
                       <Button size="sm" variant="outline" className={button3d} onClick={() => printQuranWarehouse(warehouse)}><Printer className="ml-1 h-4 w-4" />طباعة</Button>
                       {role === 'head' && <><Button size="sm" variant="outline" className={`${button3d} border-sky-200 text-sky-700`} onClick={() => openEditQuranWarehouse(warehouse)}><Pencil className="ml-1 h-4 w-4" />تعديل</Button><Button size="sm" variant="outline" className={`${button3d} border-red-200 text-red-700 hover:bg-red-50`} disabled={quranStockSaving} onClick={() => deleteQuranWarehouse(warehouse)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button></>}
                     </div>
@@ -2618,7 +2758,7 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">
-          <Card className={card3d}><CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" />التقارير والإحصائيات</CardTitle><CardDescription>تجميع بيانات الوحدة للتقارير الشهرية والسنوية مع التصدير.</CardDescription></CardHeader><CardContent><div className="grid gap-3 md:grid-cols-3"><ReportMetric label="إجمالي الطلبات" value={requests.length} /><ReportMetric label="المكتملة والمغلقة" value={requests.filter((x) => ['completed', 'closed'].includes(x.status)).length} /><ReportMetric label="البلاغات المفتوحة" value={tickets.filter((x) => !['closed', 'rejected'].includes(x.status)).length} /></div><div className="mt-5 flex flex-wrap gap-2">{canPrint && <Button variant="outline" className={button3d} onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة / حفظ PDF</Button>}<Button variant="outline" className={button3d} onClick={exportReportExcel}><FileText className="ml-2 h-4 w-4" />تصدير Excel</Button></div></CardContent></Card>
+          <Card className={card3d}><CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" />التقارير والإحصائيات</CardTitle><CardDescription>تجميع بيانات الوحدة للتقارير الشهرية والسنوية مع التصدير.</CardDescription></CardHeader><CardContent><div className="grid gap-3 md:grid-cols-3"><ReportMetric label="إجمالي الطلبات" value={requests.length} /><ReportMetric label="المكتملة والمغلقة" value={requests.filter((x) => ['completed', 'closed'].includes(x.status)).length} /><ReportMetric label="البلاغات المفتوحة" value={tickets.filter((x) => !['closed', 'rejected'].includes(x.status)).length} /></div><div className="mt-5 flex flex-wrap gap-2">{canPrint && <Button variant="outline" className={button3d} onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة / حفظ PDF</Button>}<Button className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={exportReportExcel}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button></div></CardContent></Card>
         </TabsContent>
 
         <TabsContent value="team" className="space-y-4">
@@ -2852,7 +2992,7 @@ ${quranStockMovementForm.notes}` : ''}`
               <Card><CardHeader className="pb-3"><CardTitle className="text-base">الملاحظات</CardTitle></CardHeader><CardContent className="text-sm leading-7 text-slate-700">{quranWarehousePreview.notes || 'لا توجد ملاحظات مسجلة.'}</CardContent></Card>
               <div><div className="mb-2 flex items-center justify-between"><p className="font-black text-slate-800">آخر حركات هذه المكتبة</p><Badge variant="outline">{(quranStockDashboard?.recentMovements || []).filter((item) => item.warehouseId === quranWarehousePreview.id).length} حركة ظاهرة</Badge></div><div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[850px] text-sm"><thead className="bg-slate-50"><tr><th className="p-3">رقم الحركة</th><th className="p-3">النوع</th><th className="p-3">الموقع المستفيد</th><th className="p-3">كبير</th><th className="p-3">متوسط</th><th className="p-3">صغير</th><th className="p-3">الإجمالي</th><th className="p-3">التاريخ</th></tr></thead><tbody>{(quranStockDashboard?.recentMovements || []).filter((item) => item.warehouseId === quranWarehousePreview.id).slice(0, 15).map((movement) => <tr key={movement.id} className="border-t"><td className="p-3 text-center font-mono text-xs">{movement.movementNumber}</td><td className="p-3 text-center">{quranStockMovementDisplayLabel(movement)}</td><td className="p-3 text-center">{movement.site?.name || '-'}</td><td className="p-3 text-center">{movement.largeCount}</td><td className="p-3 text-center">{movement.mediumCount}</td><td className="p-3 text-center">{movement.smallCount}</td><td className="p-3 text-center font-black">{movement.totalCount}</td><td className="p-3 text-center text-xs">{new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td></tr>)}{!(quranStockDashboard?.recentMovements || []).some((item) => item.warehouseId === quranWarehousePreview.id) && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">لا توجد حركات مصاحف ظاهرة لهذه المكتبة.</td></tr>}</tbody></table></div></div>
             </div>
-            <DialogFooter className="border-t bg-white p-4 md:px-6"><Button variant="outline" onClick={() => setQuranWarehousePreview(null)}>إغلاق</Button><Button variant="outline" onClick={() => printQuranWarehouse(quranWarehousePreview)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>{role === 'head' && <Button className="bg-sky-700 hover:bg-sky-600" onClick={() => { const warehouse = quranWarehousePreview; setQuranWarehousePreview(null); openEditQuranWarehouse(warehouse); }}><Pencil className="ml-2 h-4 w-4" />تعديل</Button>}</DialogFooter>
+            <DialogFooter className="border-t bg-white p-4 md:px-6"><Button variant="outline" onClick={() => setQuranWarehousePreview(null)}>إغلاق</Button><Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={() => exportQuranWarehouseExcel(quranWarehousePreview)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel</Button><Button variant="outline" onClick={() => printQuranWarehouse(quranWarehousePreview)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>{role === 'head' && <Button className="bg-sky-700 hover:bg-sky-600" onClick={() => { const warehouse = quranWarehousePreview; setQuranWarehousePreview(null); openEditQuranWarehouse(warehouse); }}><Pencil className="ml-2 h-4 w-4" />تعديل</Button>}</DialogFooter>
           </>}
         </DialogContent>
       </Dialog>
@@ -2944,6 +3084,7 @@ ${quranStockMovementForm.notes}` : ''}`
           <DialogFooter className="relative z-20 shrink-0 border-t border-sky-100 bg-white p-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] md:px-6">
             <Button variant="outline" className={button3d} onClick={() => setQuranPrintDialog(false)}>إلغاء</Button>
             <Button variant="outline" className={button3d} onClick={resetQuranPrintFilters}><RefreshCw className="ml-2 h-4 w-4" />مسح التصفية</Button>
+            <Button className={`min-w-36 ${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={exportQuranInventoryExcel} disabled={!quranPrintRows.length}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button>
             <Button className={`min-w-44 ${button3d} bg-sky-700 hover:bg-sky-600`} onClick={printQuranInventory} disabled={!quranPrintRows.length}><Printer className="ml-2 h-4 w-4" />طباعة / حفظ PDF</Button>
           </DialogFooter>
         </DialogContent>
@@ -3062,7 +3203,7 @@ ${quranStockMovementForm.notes}` : ''}`
             {previewSite.notes && <div className="rounded-2xl border bg-slate-50 p-4"><p className="text-xs text-muted-foreground">ملاحظات</p><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{previewSite.notes}</p></div>}
             {(() => { const media = normalizeSiteMedia(previewSite.images); return media.photos.length || media.documents.length ? <div className="space-y-4 rounded-2xl border bg-white p-4"><div className="flex items-center justify-between"><p className="font-black text-slate-800">الصور والمرفقات</p><Badge variant="outline">{media.photos.length + media.documents.length} ملف</Badge></div>{media.photos.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{media.photos.map((item, index) => <a key={`preview-photo-${index}`} href={item.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border bg-slate-50"><MosqueMediaImage item={item} alt={item.fileName || 'صورة الموقع'} className="h-32 w-full object-cover" /><div className="flex items-center justify-between gap-2 p-2"><span className="min-w-0 truncate text-xs font-semibold text-slate-700">{item.fileName || `صورة ${index + 1}`}</span><Badge variant="outline" className="shrink-0 text-[10px]">{item.category === 'site_image' ? 'الموقع' : 'المسجد'}</Badge></div></a>)}</div>}{media.documents.length > 0 && <div className="space-y-2">{media.documents.map((item, index) => <a key={`preview-doc-${index}`} href={item.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-xl border bg-slate-50 p-3 text-sm hover:bg-sky-50"><span className="min-w-0 truncate font-semibold text-slate-700"><FileText className="ml-2 inline h-4 w-4 text-sky-700" />{item.fileName || `مستند ${index + 1}`}</span><ExternalLink className="h-4 w-4 shrink-0 text-sky-700" /></a>)}</div>}</div> : null; })()}
             {(canPrint || (previewSite.latitude != null && previewSite.longitude != null)) && <div className="flex flex-wrap justify-end gap-2">
-              {canPrint && <Button variant="outline" className={button3d} onClick={() => void printSiteCard(previewSite)} disabled={printingSiteCard}>{printingSiteCard ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <Printer className="ml-2 h-4 w-4" />}{printingSiteCard ? 'جاري تجهيز الطباعة...' : 'طباعة بطاقة A4'}</Button>}
+              {canPrint && <Button className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={() => exportSitesExcel([previewSite], `mosque-${previewSite.publicToken || previewSite.id}`)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button>}{canPrint && <Button variant="outline" className={button3d} onClick={() => void printSiteCard(previewSite)} disabled={printingSiteCard}>{printingSiteCard ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <Printer className="ml-2 h-4 w-4" />}{printingSiteCard ? 'جاري تجهيز الطباعة...' : 'طباعة بطاقة A4'}</Button>}
               {previewSite.latitude != null && previewSite.longitude != null && <Button variant="outline" className={button3d} onClick={() => window.open(`https://www.google.com/maps?q=${previewSite.latitude},${previewSite.longitude}`, '_blank')}><MapPin className="ml-2 h-4 w-4" />فتح الموقع على الخريطة</Button>}
             </div>}
           </div>}
@@ -3132,7 +3273,7 @@ const Rule = ({ title, text }: { title: string; text: string }) => <div classNam
 const ReportMetric = ({ label, value }: { label: string; value: number }) => <div className="rounded-2xl border bg-gradient-to-b from-white to-sky-50 p-5 text-center shadow-sm"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-3xl font-black text-slate-800">{value}</p></div>;
 const MiniRow = ({ title, subtitle, status }: { title: string; subtitle: string; status: string }) => <div className="flex items-start justify-between gap-3 rounded-2xl border bg-white p-3"><div className="min-w-0"><p className="truncate font-bold">{title}</p><p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{subtitle}</p></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>;
 
-const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onEdit, onDelete, onQr, quranInventory }: { site: MosqueSite; canEdit: boolean; canDelete: boolean; canPrint: boolean; onPreview: () => void; onPrint: () => void; onEdit: () => void; onDelete: () => void; onQr: () => void; quranInventory?: MosqueQuranInventory | null }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-emerald-400 via-sky-500 to-blue-800" /><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2">{siteTypeDisplayLabel(site)}</Badge><h3 className="text-lg font-black text-slate-800">{site.name}</h3><p className="mt-1 text-sm text-muted-foreground">{site.city || '-'} — {site.district || '-'}</p></div><Badge variant="outline" className={site.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : site.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-50'}>{siteStatusLabels[site.status]}</Badge></div><div className="my-4 grid grid-cols-2 gap-3 rounded-2xl border bg-slate-50/70 p-3 text-sm"><Info label="الموقع داخل الجامعة" value={site.campusLocation || '-'} /><Info label="المساحة" value={site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'} /><Info label="الإمام" value={site.imamName || '-'} /><Info label="المؤذن" value={site.muezzinName || '-'} /><Info label="الطلبات" value={site._count?.requests || 0} /><Info label="البلاغات" value={site._count?.tickets || 0} /></div><div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/55 p-3"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-sm font-black text-emerald-900"><BookOpen className="h-4 w-4" />آخر جرد فعلي للمصاحف</div><Badge variant="outline" className="border-emerald-200 bg-white text-emerald-800">{quranInventory ? `${quranInventory.totalCount} مصحف` : 'لم يتم الجرد'}</Badge></div>{quranInventory && <div className="mt-2 grid grid-cols-4 gap-2 text-center text-xs"><div><span className="text-muted-foreground">كبير</span><b className="mr-1">{quranInventory.largeCount}</b></div><div><span className="text-muted-foreground">متوسط</span><b className="mr-1">{quranInventory.mediumCount}</b></div><div><span className="text-muted-foreground">صغير</span><b className="mr-1">{quranInventory.smallCount}</b></div><div><span className="text-muted-foreground">احتياج</span><b className="mr-1 text-amber-700">{quranInventory.neededCount}</b></div></div>}</div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Button variant="outline" className={siteActionButton} onClick={onQr}><QrCode className="h-4 w-4 shrink-0" />رمز QR</Button>{site.latitude != null && site.longitude != null && <Button variant="outline" className={siteActionButton} onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')}><MapPin className="h-4 w-4 shrink-0" />الخريطة</Button>}<Button variant="outline" className={siteActionButton} onClick={onPreview}><Eye className="h-4 w-4 shrink-0" />معاينة</Button>{canPrint && <Button variant="outline" className={siteActionButton} onClick={onPrint}><Printer className="h-4 w-4 shrink-0" />طباعة / PDF</Button>}{canEdit && <Button variant="outline" className={siteActionButton} onClick={onEdit}><Pencil className="h-4 w-4 shrink-0" />تعديل</Button>}{canDelete && <Button variant="outline" className={`${siteActionButton} border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700`} onClick={onDelete}><Trash2 className="h-4 w-4 shrink-0" />حذف</Button>}</div></CardContent></Card>;
+const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onExcel, onEdit, onDelete, onQr, quranInventory }: { site: MosqueSite; canEdit: boolean; canDelete: boolean; canPrint: boolean; onPreview: () => void; onPrint: () => void; onExcel: () => void; onEdit: () => void; onDelete: () => void; onQr: () => void; quranInventory?: MosqueQuranInventory | null }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-emerald-400 via-sky-500 to-blue-800" /><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2">{siteTypeDisplayLabel(site)}</Badge><h3 className="text-lg font-black text-slate-800">{site.name}</h3><p className="mt-1 text-sm text-muted-foreground">{site.city || '-'} — {site.district || '-'}</p></div><Badge variant="outline" className={site.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : site.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-50'}>{siteStatusLabels[site.status]}</Badge></div><div className="my-4 grid grid-cols-2 gap-3 rounded-2xl border bg-slate-50/70 p-3 text-sm"><Info label="الموقع داخل الجامعة" value={site.campusLocation || '-'} /><Info label="المساحة" value={site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'} /><Info label="الإمام" value={site.imamName || '-'} /><Info label="المؤذن" value={site.muezzinName || '-'} /><Info label="الطلبات" value={site._count?.requests || 0} /><Info label="البلاغات" value={site._count?.tickets || 0} /></div><div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/55 p-3"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-sm font-black text-emerald-900"><BookOpen className="h-4 w-4" />آخر جرد فعلي للمصاحف</div><Badge variant="outline" className="border-emerald-200 bg-white text-emerald-800">{quranInventory ? `${quranInventory.totalCount} مصحف` : 'لم يتم الجرد'}</Badge></div>{quranInventory && <div className="mt-2 grid grid-cols-4 gap-2 text-center text-xs"><div><span className="text-muted-foreground">كبير</span><b className="mr-1">{quranInventory.largeCount}</b></div><div><span className="text-muted-foreground">متوسط</span><b className="mr-1">{quranInventory.mediumCount}</b></div><div><span className="text-muted-foreground">صغير</span><b className="mr-1">{quranInventory.smallCount}</b></div><div><span className="text-muted-foreground">احتياج</span><b className="mr-1 text-amber-700">{quranInventory.neededCount}</b></div></div>}</div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Button variant="outline" className={siteActionButton} onClick={onQr}><QrCode className="h-4 w-4 shrink-0" />رمز QR</Button>{site.latitude != null && site.longitude != null && <Button variant="outline" className={siteActionButton} onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')}><MapPin className="h-4 w-4 shrink-0" />الخريطة</Button>}<Button variant="outline" className={siteActionButton} onClick={onPreview}><Eye className="h-4 w-4 shrink-0" />معاينة</Button>{canPrint && <Button className={`${siteActionButton} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={onExcel}><FileSpreadsheet className="h-4 w-4 shrink-0 text-white" />Excel</Button>}{canPrint && <Button variant="outline" className={siteActionButton} onClick={onPrint}><Printer className="h-4 w-4 shrink-0" />طباعة / PDF</Button>}{canEdit && <Button variant="outline" className={siteActionButton} onClick={onEdit}><Pencil className="h-4 w-4 shrink-0" />تعديل</Button>}{canDelete && <Button variant="outline" className={`${siteActionButton} border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700`} onClick={onDelete}><Trash2 className="h-4 w-4 shrink-0" />حذف</Button>}</div></CardContent></Card>;
 
 const QuickFilterBar = ({ label, onClear }: { label: string; onClear: () => void }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm"><span>العرض الحالي: <strong>{label}</strong></span><Button variant="outline" size="sm" className={button3d} onClick={onClear}>عرض الكل</Button></div>;
 

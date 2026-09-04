@@ -8,6 +8,7 @@ import {
   FileText,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   Image as ImageIcon,
   Loader2,
   MapPin,
@@ -23,6 +24,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import {
   mosqueApi,
   type MosqueFieldTour,
@@ -53,6 +55,7 @@ import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
 import { Progress } from './ui/progress';
 import { Textarea } from './ui/textarea';
+import { appendExcelReportSheet, excelReportDateStamp } from '../utils/excelReport';
 
 type Props = {
   sites: MosqueSite[];
@@ -1313,6 +1316,205 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     }).map(({ item }) => item);
   };
 
+  const visitMediaExcelRows = (visit: MosqueFieldVisit, selectedItems: MosqueFieldVisitItem[]) => [
+    ...(visit.attachments || []).map((attachment, index) => ({
+      'رقم الزيارة': visit.visitNumber,
+      'المسجد / المصلى': visit.site.name,
+      'المحور': 'مرفقات الزيارة',
+      'بند الفحص': '-',
+      'المرحلة': 'مرفق الزيارة',
+      'الترتيب': index + 1,
+      'اسم الملف': attachment.fileName || `مرفق ${index + 1}`,
+      'نوع الملف': attachment.mimeType || '-',
+      'تاريخ الالتقاط': attachment.capturedAt ? new Date(attachment.capturedAt).toLocaleString('ar-SA-u-ca-gregory') : '-',
+      'الرابط': attachment.url || '-',
+      'معرف الملف': attachment.fileId || '-',
+    })),
+    ...selectedItems.flatMap((item) => [
+      ...(item.beforeImages || []).map((attachment, index) => ({
+        'رقم الزيارة': visit.visitNumber,
+        'المسجد / المصلى': visit.site.name,
+        'المحور': item.category,
+        'بند الفحص': item.title,
+        'المرحلة': isActivityApprovalItem(item) ? 'مرفق اعتماد النشاط' : 'قبل المعالجة',
+        'الترتيب': index + 1,
+        'اسم الملف': attachment.fileName || `${isActivityApprovalItem(item) ? 'مرفق اعتماد' : 'قبل المعالجة'} ${index + 1}`,
+        'نوع الملف': attachment.mimeType || '-',
+        'تاريخ الالتقاط': attachment.capturedAt ? new Date(attachment.capturedAt).toLocaleString('ar-SA-u-ca-gregory') : '-',
+        'الرابط': attachment.url || '-',
+        'معرف الملف': attachment.fileId || '-',
+      })),
+      ...(item.afterImages || []).map((attachment, index) => ({
+        'رقم الزيارة': visit.visitNumber,
+        'المسجد / المصلى': visit.site.name,
+        'المحور': item.category,
+        'بند الفحص': item.title,
+        'المرحلة': 'بعد المعالجة',
+        'الترتيب': index + 1,
+        'اسم الملف': attachment.fileName || `بعد المعالجة ${index + 1}`,
+        'نوع الملف': attachment.mimeType || '-',
+        'تاريخ الالتقاط': attachment.capturedAt ? new Date(attachment.capturedAt).toLocaleString('ar-SA-u-ca-gregory') : '-',
+        'الرابط': attachment.url || '-',
+        'معرف الملف': attachment.fileId || '-',
+      })),
+    ]),
+  ];
+
+  const visitExcelCellValue = (item: MosqueFieldVisitItem, column: VisitReportColumnKey) => {
+    if (column === 'category') return item.category;
+    if (column === 'title') return item.title;
+    if (column === 'status') return getItemStatusLabel(item);
+    if (column === 'priority') return priorityLabels[item.priority] || item.priority;
+    if (column === 'note') {
+      const census = isQuranFieldVisitItem(item) ? quranInventorySummary(item) : '';
+      return [item.note, census].filter(Boolean).join(' — ') || '-';
+    }
+    if (column === 'responsible') return item.responsibleEntity || '-';
+    if (column === 'due_date') return item.dueDate ? new Date(item.dueDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-';
+    if (column === 'resolution') return resolutionLabels[item.resolutionStatus] || item.resolutionStatus;
+    if (column === 'resolution_note') return item.resolutionNote || '-';
+    if (column === 'treatment_images') return isActivityApprovalItem(item)
+      ? `${item.beforeImages?.length || 0} مرفق اعتماد`
+      : `${item.beforeImages?.length || 0}/${item.afterImages?.length || 0}`;
+    return '-';
+  };
+
+  const exportVisitExcel = (visit: MosqueFieldVisit) => {
+    const configured = getConfiguredVisitItems(visit.items || []);
+    const selectedItems = printTreatmentOnly
+      ? configured.filter((item) => item.status === 'needs_action' || (item.beforeImages || []).length || (item.afterImages || []).length)
+      : configured;
+    if (!selectedItems.length) return toast.info('لا توجد بنود مطابقة لمعايير التقرير');
+    const workbook = XLSX.utils.book_new();
+    appendExcelReportSheet(workbook, 'ملخص الزيارة', [{
+      'عنوان التقرير': visitPrintTitle.trim() || `تقرير زيارة ميدانية — ${visit.site.name}`,
+      'رقم الزيارة': visit.visitNumber,
+      'المسجد / المصلى': visit.site.name,
+      'نوع الزيارة': visitTypeLabels[visit.visitType] || visit.visitType,
+      'التاريخ': new Date(visit.visitDate).toLocaleString('ar-SA-u-ca-gregory'),
+      'الحالة العامة': overallLabels[visit.overallStatus] || visit.overallStatus,
+      'الأولوية': priorityLabels[visit.priority] || visit.priority,
+      'حالة الزيارة': visitStatusLabels[visit.workflowStatus] || visit.workflowStatus,
+      'فريق الزيارة': (visit.teamMembers || []).join('، ') || '-',
+      'ممثل الموقع': visit.representativeName || '-',
+      'الملاحظات العامة': visit.generalNotes || '-',
+      'التوصيات': visit.recommendations || '-',
+      'نوع التقرير': printTreatmentOnly ? 'تقرير المعالجة المصور' : 'تقرير الفحص الميداني',
+    }]);
+
+    if (printTreatmentOnly) {
+      appendExcelReportSheet(workbook, 'المعالجة', selectedItems.map((item, index) => ({
+        'م': index + 1,
+        'المحور': item.category,
+        'بند الفحص': item.title,
+        'النتيجة': getItemStatusLabel(item),
+        'الأولوية': priorityLabels[item.priority] || item.priority,
+        'الملاحظة': item.note || '-',
+        'الجهة المسؤولة': item.responsibleEntity || '-',
+        'تاريخ الاستحقاق': item.dueDate ? new Date(item.dueDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-',
+        'حالة المعالجة': resolutionLabels[item.resolutionStatus] || item.resolutionStatus,
+        'الإجراء / المعالجة المنفذة': item.resolutionNote || '-',
+        'صور / مرفقات قبل': item.beforeImages?.length || 0,
+        'صور بعد': item.afterImages?.length || 0,
+      })));
+    } else {
+      const selectedColumns = visitReportColumns.filter((column) => visitPrintColumns.includes(column.key));
+      appendExcelReportSheet(workbook, 'بنود الفحص', selectedItems.map((item, index) => Object.fromEntries([
+        ['م', index + 1],
+        ...selectedColumns.map((column) => [column.label, visitExcelCellValue(item, column.key)]),
+      ])));
+    }
+
+    appendExcelReportSheet(workbook, 'الصور والمرفقات', visitMediaExcelRows(visit, selectedItems), 'لا توجد صور أو مرفقات مطابقة لهذا التقرير');
+    XLSX.writeFile(workbook, `field-visit-${visit.visitNumber}-${excelReportDateStamp()}.xlsx`);
+    toast.success('تم تجهيز Excel للزيارة مع ورقة مستقلة للصور والمرفقات');
+  };
+
+  const exportProgramExcel = () => {
+    if (!filteredVisits.length) return toast.info('لا توجد زيارات مطابقة لمعايير التقرير');
+    const openCount = (visit: MosqueFieldVisit) => visit.items.filter((item) => item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
+    const urgentCount = (visit: MosqueFieldVisit) => visit.items.filter((item) => item.priority === 'urgent' && item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
+    const overdueCount = (visit: MosqueFieldVisit) => visit.items.filter((item) => item.status === 'needs_action' && item.dueDate && new Date(item.dueDate).getTime() < Date.now() && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
+    const cellValue = (visit: MosqueFieldVisit, column: ProgramReportColumnKey) => {
+      if (column === 'visit_number') return visit.visitNumber;
+      if (column === 'site') return visit.site.name;
+      if (column === 'visit_type') return visitTypeLabels[visit.visitType] || visit.visitType;
+      if (column === 'date') return new Date(visit.visitDate).toLocaleDateString('ar-SA-u-ca-gregory');
+      if (column === 'tour') return visit.tour ? [visit.tour.tourNumber, visit.tour.title].filter(Boolean).join(' — ') : '-';
+      if (column === 'location') return [visit.site.campusLocation, visit.site.district, visit.site.city].filter(Boolean).join(' — ') || '-';
+      if (column === 'overall') return overallLabels[visit.overallStatus] || visit.overallStatus;
+      if (column === 'priority') return priorityLabels[visit.priority] || visit.priority;
+      if (column === 'open_items') return openCount(visit);
+      if (column === 'urgent_items') return urgentCount(visit);
+      if (column === 'overdue_items') return overdueCount(visit);
+      if (column === 'workflow') return visitStatusLabels[visit.workflowStatus] || visit.workflowStatus;
+      if (column === 'team') return (visit.teamMembers || []).join('، ') || '-';
+      if (column === 'representative') return visit.representativeName || '-';
+      if (column === 'attachments') return visit.attachments?.length || 0;
+      if (column === 'treatment_images') {
+        const before = visit.items.reduce((total, item) => total + (item.beforeImages?.length || 0), 0);
+        const after = visit.items.reduce((total, item) => total + (item.afterImages?.length || 0), 0);
+        return `${before}/${after}`;
+      }
+      return '-';
+    };
+    const selectedColumns = programReportColumns.filter((column) => programPrintColumns.includes(column.key));
+    const workbook = XLSX.utils.book_new();
+    appendExcelReportSheet(workbook, 'ملخص التقرير', [{
+      'عنوان التقرير': programReportTitle.trim() || 'تقرير البرنامج الميداني للمساجد والمصليات',
+      'عدد الزيارات': filteredVisits.length,
+      'عدد المواقع': new Set(filteredVisits.map((visit) => visit.siteId)).size,
+      'الملاحظات المفتوحة': filteredVisits.reduce((total, visit) => total + openCount(visit), 0),
+      'العاجلة': filteredVisits.reduce((total, visit) => total + urgentCount(visit), 0),
+      'المتأخرة': filteredVisits.reduce((total, visit) => total + overdueCount(visit), 0),
+      'تاريخ التصدير': new Date().toLocaleString('ar-SA-u-ca-gregory'),
+    }]);
+    appendExcelReportSheet(workbook, 'الزيارات', filteredVisits.map((visit, index) => Object.fromEntries([
+      ['م', index + 1],
+      ...selectedColumns.map((column) => [column.label, cellValue(visit, column.key)]),
+    ])));
+    appendExcelReportSheet(workbook, 'الصور والمرفقات', filteredVisits.flatMap((visit) => visitMediaExcelRows(visit, visit.items || [])), 'لا توجد صور أو مرفقات للزيارات المطابقة');
+    XLSX.writeFile(workbook, `field-program-report-${excelReportDateStamp()}.xlsx`);
+    toast.success('تم تجهيز تقرير البرنامج بصيغة Excel مع الصور والمرفقات كرابط قابل للفتح');
+  };
+
+  const exportTourTreatmentExcel = (tour: MosqueFieldTour) => {
+    const tourVisits = (tour.visits || [])
+      .map((tourVisit) => visits.find((visit) => visit.id === tourVisit.id))
+      .filter((visit): visit is MosqueFieldVisit => Boolean(visit));
+    if (!tourVisits.length) return toast.info('لا توجد زيارات مرتبطة بهذه الجولة');
+    const workbook = XLSX.utils.book_new();
+    appendExcelReportSheet(workbook, 'ملخص الجولة', [{
+      'رقم الجولة': tour.tourNumber,
+      'عنوان الجولة': tour.title,
+      'تاريخ الجولة': new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory'),
+      'النطاق': tour.scope || '-',
+      'فريق الجولة': (tour.teamMembers || []).join('، ') || '-',
+      'عدد الزيارات': tourVisits.length,
+      'الحالة': tourStatusLabels[tour.status] || tour.status,
+    }]);
+    const treatmentItems = tourVisits.flatMap((visit) => (visit.items || [])
+      .filter((item) => item.status === 'needs_action' || (item.beforeImages || []).length || (item.afterImages || []).length)
+      .map((item) => ({ visit, item })));
+    appendExcelReportSheet(workbook, 'المعالجة', treatmentItems.map(({ visit, item }, index) => ({
+      'م': index + 1,
+      'رقم الزيارة': visit.visitNumber,
+      'المسجد / المصلى': visit.site.name,
+      'المحور': item.category,
+      'بند الفحص': item.title,
+      'الأولوية': priorityLabels[item.priority] || item.priority,
+      'الملاحظة': item.note || '-',
+      'الجهة المسؤولة': item.responsibleEntity || '-',
+      'حالة المعالجة': resolutionLabels[item.resolutionStatus] || item.resolutionStatus,
+      'الإجراء / المعالجة المنفذة': item.resolutionNote || '-',
+      'قبل': item.beforeImages?.length || 0,
+      'بعد': item.afterImages?.length || 0,
+    })));
+    appendExcelReportSheet(workbook, 'الصور والمرفقات', tourVisits.flatMap((visit) => visitMediaExcelRows(visit, (visit.items || []).filter((item) => item.status === 'needs_action' || (item.beforeImages || []).length || (item.afterImages || []).length))), 'لا توجد صور أو مرفقات معالجة في الجولة');
+    XLSX.writeFile(workbook, `field-tour-${tour.tourNumber}-${excelReportDateStamp()}.xlsx`);
+    toast.success('تم تجهيز Excel للجولة مع سجل صور قبل / بعد المعالجة');
+  };
+
   const printVisit = async (visit: MosqueFieldVisit, includeImages: boolean) => {
     const report = window.open('', '_blank', 'width=1200,height=850');
     if (!report) {
@@ -1550,6 +1752,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         <div><CardTitle className="flex items-center gap-2 text-xl"><Route className="h-5 w-5 text-emerald-700" />البرنامج الميداني للمساجد والمصليات</CardTitle><CardDescription className="mt-2">الجولات والزيارات مرتبطة مباشرة بالسجلات الحالية للمساجد والمصليات، مع متابعة الملاحظات والصور قبل المعالجة وبعدها.</CardDescription></div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void load()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button>
+          {canPrint && <Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={exportProgramExcel}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel</Button>}
           {canPrint && <Button variant="outline" onClick={openProgramPrintDialog}><Printer className="ml-2 h-4 w-4" />تقرير البرنامج</Button>}
           {canAdd && <Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white focus-visible:ring-emerald-500" onClick={openTour}><CalendarDays className="ml-2 h-4 w-4 text-white" />إنشاء جولة</Button>}
           {canAdd && <Button className="bg-sky-700 hover:bg-sky-800" onClick={() => openNewVisit()}><Plus className="ml-2 h-4 w-4" />زيارة مستقلة</Button>}
@@ -1625,7 +1828,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     </div> : <div className={`${tourCardsVisible ? 'grid' : 'hidden'} gap-4 md:grid-cols-2 xl:grid-cols-3`}>
       {tours.map((tour) => <Card key={tour.id} className="overflow-hidden">
         <CardHeader className="border-b bg-gradient-to-l from-emerald-50/70 to-white"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{tour.title}</CardTitle><CardDescription className="mt-1">{tour.tourNumber}</CardDescription></div><Badge variant="outline">{tourStatusLabels[tour.status]}</Badge></div></CardHeader>
-        <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-36 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between rounded-lg bg-white px-2 py-1.5 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) openVisit(full); }}><span>{visit.site.name}</span><span className="text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}{canPrint && <Button size="sm" variant="outline" className="w-full border-emerald-200 text-emerald-800" onClick={() => void printTourTreatmentReport(tour)}><ImageIcon className="ml-2 h-4 w-4" />تقرير المعالجة المصور قبل / بعد</Button>}</CardContent>
+        <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-36 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between rounded-lg bg-white px-2 py-1.5 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) openVisit(full); }}><span>{visit.site.name}</span><span className="text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}{canPrint && <div className="grid gap-2 sm:grid-cols-2"><Button size="sm" className="w-full border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={() => exportTourTreatmentExcel(tour)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button><Button size="sm" variant="outline" className="w-full border-emerald-200 text-emerald-800" onClick={() => void printTourTreatmentReport(tour)}><ImageIcon className="ml-2 h-4 w-4" />تقرير المعالجة المصور قبل / بعد</Button></div>}</CardContent>
       </Card>)}
       {!tours.length && <Empty message="لم يتم إنشاء جولات ميدانية بعد" />}
     </div>}
@@ -1675,7 +1878,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
             </div>
           </div>
         </div>
-        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setProgramPrintDialog(false)}>إلغاء</Button><Button onClick={printProgramReport} disabled={!filteredVisits.length}><Printer className="ml-2 h-4 w-4" />متابعة إلى الطباعة</Button></DialogFooter>
+        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setProgramPrintDialog(false)}>إلغاء</Button><Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={exportProgramExcel} disabled={!filteredVisits.length}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button><Button onClick={printProgramReport} disabled={!filteredVisits.length}><Printer className="ml-2 h-4 w-4" />متابعة إلى الطباعة</Button></DialogFooter>
       </DialogContent>
     </Dialog>
 
@@ -1767,6 +1970,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPrintTarget(null)} disabled={preparingPrint}>إلغاء</Button>
+            <Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={() => printTarget && exportVisitExcel(printTarget)} disabled={preparingPrint || (!printTreatmentOnly && !configuredPrintItems.length) || (printTreatmentOnly && !printTreatmentCount)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button>
             <Button className="bg-sky-700 text-white hover:bg-sky-800" onClick={() => void confirmVisitPrint()} disabled={preparingPrint || (!printTreatmentOnly && !configuredPrintItems.length) || (printTreatmentOnly && !printTreatmentCount)}>{preparingPrint ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Printer className="ml-2 h-4 w-4" />}{preparingPrint ? 'جاري إعداد التقرير...' : 'متابعة إلى الطباعة'}</Button>
           </DialogFooter>
         </>}
@@ -1824,6 +2028,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setViewingVisit(null)}>إغلاق</Button>
+            {canPrint && <Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={() => { resetVisitPrintOptions(viewingVisit); exportVisitExcel(viewingVisit); }}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button>}
             {canPrint && <Button variant="outline" onClick={() => requestVisitPrint(viewingVisit)}><Printer className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
             {canEdit && <Button onClick={() => { const visit = viewingVisit; setViewingVisit(null); openVisit(visit); }}><Pencil className="ml-2 h-4 w-4" />تعديل الزيارة</Button>}
           </DialogFooter>
