@@ -634,7 +634,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [visits, setVisits] = React.useState<MosqueFieldVisit[]>([]);
   const [template, setTemplate] = React.useState<MosqueFieldVisitItem[]>([]);
   const [view, setView] = React.useState<'visits' | 'tours'>('visits');
-  const [tourCardsVisible, setTourCardsVisible] = React.useState(true);
+  const [tourCardsVisible, setTourCardsVisible] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const [siteFilter, setSiteFilter] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('');
@@ -1573,7 +1573,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex rounded-xl border bg-slate-50 p-1">
             <Button size="sm" variant={view === 'visits' ? 'default' : 'ghost'} onClick={() => setView('visits')}>الزيارات</Button>
-            <Button size="sm" variant={view === 'tours' ? 'default' : 'ghost'} onClick={() => setView('tours')}>الجولات</Button>
+            <Button size="sm" variant={view === 'tours' ? 'default' : 'ghost'} onClick={() => { setView('tours'); setTourCardsVisible(false); }}>الجولات</Button>
           </div>
           {view === 'tours' && <Button type="button" size="sm" variant="outline" className={tourCardsVisible ? 'border-slate-300 text-slate-700' : 'border-emerald-300 bg-emerald-50 text-emerald-800'} onClick={() => setTourCardsVisible((current) => !current)}>{tourCardsVisible ? <EyeOff className="ml-2 h-4 w-4" /> : <Eye className="ml-2 h-4 w-4" />}{tourCardsVisible ? 'إخفاء بطاقات الجولات' : 'إظهار بطاقات الجولات'}</Button>}
           {view === 'visits' && <div className="flex-1 space-y-2 md:max-w-5xl">
