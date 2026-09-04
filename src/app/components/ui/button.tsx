@@ -34,24 +34,54 @@ const buttonVariants = cva(
   },
 );
 
+const buttonText = (node: React.ReactNode): string => {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(buttonText).join(" ");
+  if (React.isValidElement(node)) {
+    return buttonText((node.props as { children?: React.ReactNode }).children);
+  }
+  return "";
+};
+
+const semanticActionClass = (children: React.ReactNode) => {
+  const label = buttonText(children).replace(/\s+/g, " ").trim();
+  if (!label) return "";
+
+  // جميع أزرار الإلغاء والحذف تكون حمراء بنص أبيض في كامل المنصة.
+  if (/(?:إلغاء|الغاء|حذف)/.test(label)) {
+    return "border-red-600 bg-red-600 text-white hover:border-red-700 hover:bg-red-700 hover:text-white focus-visible:ring-red-500/30 dark:border-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700";
+  }
+
+  // جميع أزرار الإنشاء والحفظ وحفظ التعديلات تكون خضراء بنص أبيض في كامل المنصة.
+  if (/(?:إنشاء|انشاء|حفظ)/.test(label)) {
+    return "border-emerald-600 bg-emerald-600 text-white hover:border-emerald-700 hover:bg-emerald-700 hover:text-white focus-visible:ring-emerald-500/30 dark:border-emerald-600 dark:bg-emerald-600 dark:text-white dark:hover:bg-emerald-700";
+  }
+
+  return "";
+};
+
 function Button({
   className,
   variant,
   size,
   asChild = false,
+  children,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
   }) {
   const Comp = asChild ? Slot : "button";
+  const actionClass = semanticActionClass(children);
 
   return (
     <Comp
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant, size, className }), actionClass)}
       {...props}
-    />
+    >
+      {children}
+    </Comp>
   );
 }
 
