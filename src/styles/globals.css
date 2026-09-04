@@ -759,3 +759,38 @@ label[data-app-required-label="true"]::after {
   display: none !important;
 }
 
+/* ===== Mobile pinch zoom and horizontal pan freedom ===== */
+/*
+ * The app shell intentionally clips normal layout overflow, but on touch devices
+ * the user must still be able to pinch-zoom and pan the visual viewport in both
+ * directions. These rules override only the horizontal clipping behavior while
+ * keeping the responsive width constraints that prevent accidental overflow at 100%.
+ */
+@media (max-width: 1023px), (pointer: coarse) {
+  html {
+    overflow-x: auto !important;
+    overscroll-behavior-x: auto !important;
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+
+  body,
+  #root {
+    overflow-x: visible !important;
+    overscroll-behavior-x: auto !important;
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+
+  .future-app-shell,
+  .app-content-row,
+  .app-main,
+  .mobile-page-shell {
+    overflow-x: auto !important;
+    overscroll-behavior-x: auto !important;
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+
+  .app-main {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
