@@ -55,7 +55,7 @@ import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
 import { Progress } from './ui/progress';
 import { Textarea } from './ui/textarea';
-import { appendExcelReportSheet, excelReportDateStamp } from '../utils/excelReport';
+import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
 
 type Props = {
   sites: MosqueSite[];
@@ -1379,7 +1379,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     return '-';
   };
 
-  const exportVisitExcel = (visit: MosqueFieldVisit) => {
+  const exportVisitExcel = async (visit: MosqueFieldVisit) => {
     const configured = getConfiguredVisitItems(visit.items || []);
     const selectedItems = printTreatmentOnly
       ? configured.filter((item) => item.status === 'needs_action' || (item.beforeImages || []).length || (item.afterImages || []).length)
@@ -1426,11 +1426,11 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     }
 
     appendExcelReportSheet(workbook, 'الصور والمرفقات', visitMediaExcelRows(visit, selectedItems), 'لا توجد صور أو مرفقات مطابقة لهذا التقرير');
-    XLSX.writeFile(workbook, `field-visit-${visit.visitNumber}-${excelReportDateStamp()}.xlsx`);
+    await writeProfessionalExcel(workbook, `field-visit-${visit.visitNumber}-${excelReportDateStamp()}.xlsx`, { title: visitPrintTitle.trim() || `تقرير زيارة ميدانية — ${visit.site.name}`, subtitle: `${visit.visitNumber} — ${new Date(visit.visitDate).toLocaleDateString('ar-SA-u-ca-gregory')}`, orientation: 'landscape', imageLoader: async (fileId, url) => fileId ? mosqueApi.mediaBlob(fileId) : (url ? fetch(url).then((response) => response.ok ? response.blob() : null) : null) });
     toast.success('تم تجهيز Excel للزيارة مع ورقة مستقلة للصور والمرفقات');
   };
 
-  const exportProgramExcel = () => {
+  const exportProgramExcel = async () => {
     if (!filteredVisits.length) return toast.info('لا توجد زيارات مطابقة لمعايير التقرير');
     const openCount = (visit: MosqueFieldVisit) => visit.items.filter((item) => item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
     const urgentCount = (visit: MosqueFieldVisit) => visit.items.filter((item) => item.priority === 'urgent' && item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
@@ -1474,11 +1474,11 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       ...selectedColumns.map((column) => [column.label, cellValue(visit, column.key)]),
     ])));
     appendExcelReportSheet(workbook, 'الصور والمرفقات', filteredVisits.flatMap((visit) => visitMediaExcelRows(visit, visit.items || [])), 'لا توجد صور أو مرفقات للزيارات المطابقة');
-    XLSX.writeFile(workbook, `field-program-report-${excelReportDateStamp()}.xlsx`);
+    await writeProfessionalExcel(workbook, `field-program-report-${excelReportDateStamp()}.xlsx`, { title: programReportTitle.trim() || 'تقرير البرنامج الميداني للمساجد والمصليات', subtitle: `عدد الزيارات: ${filteredVisits.length}`, orientation: 'landscape', metrics: [{ label: 'إجمالي المواقع', value: summary.totalSites, tone: 'blue' }, { label: 'تمت زيارتها', value: summary.visitedSites, tone: 'green' }, { label: 'المتبقية', value: summary.remainingSites, tone: 'amber' }, { label: 'نسبة التغطية', value: `${summary.coveragePercent}%`, tone: 'green' }, { label: 'الملاحظات المفتوحة', value: summary.openItems, tone: 'amber' }, { label: 'عاجلة', value: summary.urgentItems, tone: 'red' }], imageLoader: async (fileId, url) => fileId ? mosqueApi.mediaBlob(fileId) : (url ? fetch(url).then((response) => response.ok ? response.blob() : null) : null) });
     toast.success('تم تجهيز تقرير البرنامج بصيغة Excel مع الصور والمرفقات كرابط قابل للفتح');
   };
 
-  const exportTourTreatmentExcel = (tour: MosqueFieldTour) => {
+  const exportTourTreatmentExcel = async (tour: MosqueFieldTour) => {
     const tourVisits = (tour.visits || [])
       .map((tourVisit) => visits.find((visit) => visit.id === tourVisit.id))
       .filter((visit): visit is MosqueFieldVisit => Boolean(visit));
@@ -1511,7 +1511,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       'بعد': item.afterImages?.length || 0,
     })));
     appendExcelReportSheet(workbook, 'الصور والمرفقات', tourVisits.flatMap((visit) => visitMediaExcelRows(visit, (visit.items || []).filter((item) => item.status === 'needs_action' || (item.beforeImages || []).length || (item.afterImages || []).length))), 'لا توجد صور أو مرفقات معالجة في الجولة');
-    XLSX.writeFile(workbook, `field-tour-${tour.tourNumber}-${excelReportDateStamp()}.xlsx`);
+    await writeProfessionalExcel(workbook, `field-tour-${tour.tourNumber}-${excelReportDateStamp()}.xlsx`, { title: `تقرير المعالجة المصور — ${tour.title}`, subtitle: `${tour.tourNumber} — سجل قبل / بعد المعالجة`, orientation: 'landscape', imageLoader: async (fileId, url) => fileId ? mosqueApi.mediaBlob(fileId) : (url ? fetch(url).then((response) => response.ok ? response.blob() : null) : null) });
     toast.success('تم تجهيز Excel للجولة مع سجل صور قبل / بعد المعالجة');
   };
 

@@ -49,7 +49,7 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { MosqueFieldVisitsPanel } from '../components/MosqueFieldVisitsPanel';
-import { appendExcelReportSheet, excelReportDateStamp } from '../utils/excelReport';
+import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
 import {
   Dialog,
   DialogContent,
@@ -815,7 +815,7 @@ export const MosquesUnitPage: React.FC = () => {
     finally { setQuranStockSaving(false); }
   };
 
-  const exportQuranWarehouseExcel = (warehouse: MosqueQuranWarehouse) => {
+  const exportQuranWarehouseExcel = async (warehouse: MosqueQuranWarehouse) => {
     const workbook = XLSX.utils.book_new();
     appendExcelReportSheet(workbook, 'ملخص المكتبة', [{
       'رمز المكتبة': warehouse.code || '-',
@@ -848,7 +848,7 @@ export const MosquesUnitPage: React.FC = () => {
       'الإجمالي': movement.totalCount,
       'التاريخ': new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory'),
     })), 'لا توجد حركات مصاحف ظاهرة لهذه المكتبة');
-    XLSX.writeFile(workbook, `quran-warehouse-${warehouse.code || warehouse.id}-${excelReportDateStamp()}.xlsx`);
+    await writeProfessionalExcel(workbook, `quran-warehouse-${warehouse.code || warehouse.id}-${excelReportDateStamp()}.xlsx`, { title: `بطاقة مكتبة المصاحف — ${warehouse.name}`, subtitle: 'الرصيد الحالي وحدود الأمان وحركة المكتبة', orientation: 'landscape', imageLoader: async (fileId, url) => fileId ? mosqueApi.mediaBlob(fileId) : (url ? fetch(url).then((response) => response.ok ? response.blob() : null) : null) });
     toast.success('تم تجهيز ملف Excel للمكتبة');
   };
 
@@ -1205,7 +1205,7 @@ ${quranStockMovementForm.notes}` : ''}`
     setQuranPrintSortDirection('asc');
   };
 
-  const exportQuranInventoryExcel = () => {
+  const exportQuranInventoryExcel = async () => {
     if (!quranPrintRows.length) return toast.info('لا توجد بيانات مصاحف مطابقة لمعايير التقرير');
     const workbook = XLSX.utils.book_new();
     appendExcelReportSheet(workbook, 'حصر المصاحف', quranPrintRows.map((row, index) => ({
@@ -1234,7 +1234,7 @@ ${quranStockMovementForm.notes}` : ''}`
       'تاريخ التصدير': new Date().toLocaleString('ar-SA-u-ca-gregory'),
     }]);
     appendExcelReportSheet(workbook, 'الصور والمرفقات', siteMediaExcelRows(quranPrintRows.map((row) => row.site)), 'لا توجد صور أو مرفقات للمواقع الظاهرة في التقرير');
-    XLSX.writeFile(workbook, `quran-inventory-report-${excelReportDateStamp()}.xlsx`);
+    await writeProfessionalExcel(workbook, `quran-inventory-report-${excelReportDateStamp()}.xlsx`, { title: 'تقرير إدارة وحصر المصاحف', subtitle: `عدد المواقع: ${quranPrintRows.length}`, orientation: 'landscape', metrics: [{ label: 'المواقع', value: quranPrintStats.sites, tone: 'blue' }, { label: 'إجمالي المصاحف', value: quranPrintStats.total, tone: 'green' }, { label: 'الكبيرة', value: quranPrintStats.large }, { label: 'المتوسطة', value: quranPrintStats.medium }, { label: 'الصغيرة', value: quranPrintStats.small }, { label: 'المسحوبة', value: quranPrintStats.damaged, tone: 'red' }, { label: 'الاحتياج', value: quranPrintStats.needed, tone: 'amber' }], imageLoader: async (fileId, url) => fileId ? mosqueApi.mediaBlob(fileId) : (url ? fetch(url).then((response) => response.ok ? response.blob() : null) : null) });
     toast.success('تم تجهيز تقرير المصاحف بصيغة Excel مع ورقة الصور والمرفقات');
   };
 
@@ -1346,7 +1346,7 @@ ${quranStockMovementForm.notes}` : ''}`
     ];
   });
 
-  const exportSitesExcel = (rows: MosqueSite[], filePrefix = 'mosques-sites-report') => {
+  const exportSitesExcel = async (rows: MosqueSite[], filePrefix = 'mosques-sites-report') => {
     if (!rows.length) return toast.info('لا توجد مساجد أو مصليات لتصديرها');
     const selectedColumns = SITE_PRINT_COLUMNS.filter((column) => sitePrintColumns.includes(column.key));
     if (!selectedColumns.length) return toast.info('حدد عمودًا واحدًا على الأقل للتقرير');
@@ -1356,7 +1356,7 @@ ${quranStockMovementForm.notes}` : ''}`
       ...selectedColumns.map((column) => [column.label, siteExcelValue(site, column.key)]),
     ])));
     appendExcelReportSheet(workbook, 'الصور والمرفقات', siteMediaExcelRows(rows), 'لا توجد صور أو مرفقات للمواقع المحددة');
-    XLSX.writeFile(workbook, `${filePrefix}-${excelReportDateStamp()}.xlsx`);
+    await writeProfessionalExcel(workbook, `${filePrefix}-${excelReportDateStamp()}.xlsx`, { title: rows.length === 1 ? `بطاقة ${rows[0].name}` : 'جدول المساجد والمصليات الجامعية', subtitle: `عدد المواقع: ${rows.length}`, orientation: selectedColumns.length > 6 ? 'landscape' : 'portrait', imageLoader: async (fileId, url) => fileId ? mosqueApi.mediaBlob(fileId) : (url ? fetch(url).then((response) => response.ok ? response.blob() : null) : null) });
     toast.success(`تم تجهيز Excel ويشمل ${rows.length} موقعًا وورقة مستقلة للصور والمرفقات`);
   };
 
@@ -2244,7 +2244,7 @@ ${quranStockMovementForm.notes}` : ''}`
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.jobs || []), 'التوظيف');
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(quranInventoryItems.map((item) => ({ الموقع: item.site.name, النوع: siteTypeDisplayLabel(item.site as MosqueSite), كبير: item.latest?.largeCount || 0, متوسط: item.latest?.mediumCount || 0, صغير: item.latest?.smallCount || 0, الإجمالي: item.latest?.totalCount || 0, المسحوبة: quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.withdrawnStock?.totalCount || 0, المستهدف: quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.targetCount || 0, التغطية: quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.coveragePercent != null ? `${quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.coveragePercent}%` : '-', الاحتياج: quranStockDashboard?.sites.find((row) => row.site.id === item.site.id)?.needCount || 0, 'آخر جرد': item.latest?.countedAt ? new Date(item.latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لم يجرد' }))), 'حصر المصاحف');
       appendExcelReportSheet(workbook, 'الصور والمرفقات', siteMediaExcelRows(sites), 'لا توجد صور أو مرفقات مسجلة');
-      XLSX.writeFile(workbook, `mosques-unit-report-${excelReportDateStamp()}.xlsx`);
+      await writeProfessionalExcel(workbook, `mosques-unit-report-${excelReportDateStamp()}.xlsx`, { title: 'التقرير الشامل لوحدة العناية بالمساجد والمصليات الجامعية', subtitle: 'تجميع بيانات المواقع والطلبات والبلاغات والإجازات والتوظيف والمصاحف', orientation: 'landscape', imageLoader: async (fileId, url) => fileId ? mosqueApi.mediaBlob(fileId) : (url ? fetch(url).then((response) => response.ok ? response.blob() : null) : null) });
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تصدير التقرير'); }
   };
 
