@@ -663,6 +663,8 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [viewingVisit, setViewingVisit] = React.useState<MosqueFieldVisit | null>(null);
   const [deletingVisit, setDeletingVisit] = React.useState<MosqueFieldVisit | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [tourAction, setTourAction] = React.useState<{ tour: MosqueFieldTour; action: 'delete' | 'cancel' } | null>(null);
+  const [tourActionSaving, setTourActionSaving] = React.useState(false);
   const [printTarget, setPrintTarget] = React.useState<MosqueFieldVisit | null>(null);
   const [includePrintImages, setIncludePrintImages] = React.useState(true);
   const [printTreatmentOnly, setPrintTreatmentOnly] = React.useState(false);
@@ -828,10 +830,30 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
 
   const updateTourStatus = async (tour: MosqueFieldTour, status: MosqueFieldTour['status']) => {
     try {
-      await mosqueApi.updateFieldTour(tour.id, { status, notes: tour.notes || null });
-      setTours((current) => current.map((item) => item.id === tour.id ? { ...item, status } : item));
+      const updated = await mosqueApi.updateFieldTour(tour.id, { status, notes: tour.notes || null });
+      setTours((current) => current.map((item) => item.id === tour.id ? { ...item, ...updated } : item));
       toast.success('تم تحديث حالة الجولة');
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تحديث الجولة'); }
+  };
+
+  const runTourAction = async () => {
+    if (!tourAction) return;
+    try {
+      setTourActionSaving(true);
+      if (tourAction.action === 'delete') {
+        await mosqueApi.deleteFieldTour(tourAction.tour.id);
+        toast.success(`تم حذف الجولة ${tourAction.tour.tourNumber}`);
+      } else {
+        await mosqueApi.updateFieldTour(tourAction.tour.id, { status: 'cancelled', notes: tourAction.tour.notes || null });
+        toast.success(`تم إلغاء الجولة ${tourAction.tour.tourNumber} مع الاحتفاظ بسجلها التاريخي`);
+      }
+      setTourAction(null);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : tourAction.action === 'delete' ? 'تعذر حذف الجولة' : 'تعذر إلغاء الجولة');
+    } finally {
+      setTourActionSaving(false);
+    }
   };
 
   const openNewVisit = (preset?: { siteId?: string; tourId?: string }) => {
@@ -1820,7 +1842,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
             <Button size="sm" variant="outline" className="border-sky-200 text-sky-700 hover:bg-sky-50" onClick={() => setViewingVisit(visit)}><Eye className="ml-1 h-4 w-4" />عرض</Button>
             {canPrint && <Button size="sm" variant="outline" onClick={() => requestVisitPrint(visit)}><Printer className="ml-1 h-4 w-4" />تقرير</Button>}
             {canEdit && <Button size="sm" onClick={() => openVisit(visit)}><Pencil className="ml-1 h-4 w-4" />تعديل</Button>}
-            {canDelete && <Button size="sm" variant="destructive" className="!border-red-700 !bg-red-600 !text-white shadow-sm hover:!bg-red-700 hover:!text-white" onClick={() => setDeletingVisit(visit)}><Trash2 className="ml-1 h-4 w-4 text-white" />حذف</Button>}
+            {visit.canDelete === true && <Button size="sm" variant="destructive" className="!border-red-700 !bg-red-600 !text-white shadow-sm hover:!bg-red-700 hover:!text-white" onClick={() => setDeletingVisit(visit)}><Trash2 className="ml-1 h-4 w-4 text-white" />حذف</Button>}
           </div>
         </CardContent>
       </Card>)}
@@ -1828,7 +1850,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     </div> : <div className={`${tourCardsVisible ? 'grid' : 'hidden'} gap-4 md:grid-cols-2 xl:grid-cols-3`}>
       {tours.map((tour) => <Card key={tour.id} className="overflow-hidden">
         <CardHeader className="border-b bg-gradient-to-l from-emerald-50/70 to-white"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{tour.title}</CardTitle><CardDescription className="mt-1">{tour.tourNumber}</CardDescription></div><Badge variant="outline">{tourStatusLabels[tour.status]}</Badge></div></CardHeader>
-        <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-36 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between rounded-lg bg-white px-2 py-1.5 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) openVisit(full); }}><span>{visit.site.name}</span><span className="text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}{canPrint && <div className="grid gap-2 sm:grid-cols-2"><Button size="sm" className="w-full border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={() => exportTourTreatmentExcel(tour)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button><Button size="sm" variant="outline" className="w-full border-emerald-200 text-emerald-800" onClick={() => void printTourTreatmentReport(tour)}><ImageIcon className="ml-2 h-4 w-4" />تقرير المعالجة المصور قبل / بعد</Button></div>}</CardContent>
+        <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-36 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between rounded-lg bg-white px-2 py-1.5 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) openVisit(full); }}><span>{visit.site.name}</span><span className="text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).filter(([value]) => value !== 'cancelled' || tour.canCancel === true || tour.status === 'cancelled').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}{canPrint && <div className="grid gap-2 sm:grid-cols-2"><Button size="sm" className="w-full border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={() => exportTourTreatmentExcel(tour)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button><Button size="sm" variant="outline" className="w-full border-emerald-200 text-emerald-800" onClick={() => void printTourTreatmentReport(tour)}><ImageIcon className="ml-2 h-4 w-4" />تقرير المعالجة المصور قبل / بعد</Button></div>}{tour.canDelete === true && <Button size="sm" variant="destructive" className="w-full !border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => setTourAction({ tour, action: 'delete' })}><Trash2 className="ml-2 h-4 w-4 text-white" />حذف الجولة</Button>}{tour.canDelete !== true && tour.canCancel === true && tour.status !== 'cancelled' && <Button size="sm" variant="destructive" className="w-full !border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => setTourAction({ tour, action: 'cancel' })}><X className="ml-2 h-4 w-4 text-white" />إلغاء الجولة</Button>}</CardContent>
       </Card>)}
       {!tours.length && <Empty message="لم يتم إنشاء جولات ميدانية بعد" />}
     </div>}
@@ -2032,6 +2054,19 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
             {canPrint && <Button variant="outline" onClick={() => requestVisitPrint(viewingVisit)}><Printer className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
             {canEdit && <Button onClick={() => { const visit = viewingVisit; setViewingVisit(null); openVisit(visit); }}><Pencil className="ml-2 h-4 w-4" />تعديل الزيارة</Button>}
           </DialogFooter>
+        </>}
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={Boolean(tourAction)} onOpenChange={(open) => { if (!open && !tourActionSaving) setTourAction(null); }}>
+      <DialogContent className="sm:max-w-[540px]" dir="rtl">
+        {tourAction && <>
+          <DialogHeader className="text-right">
+            <DialogTitle className="flex items-center gap-2 text-red-700">{tourAction.action === 'delete' ? <Trash2 className="h-5 w-5" /> : <X className="h-5 w-5" />}{tourAction.action === 'delete' ? 'حذف الجولة الميدانية' : 'إلغاء الجولة الميدانية'}</DialogTitle>
+            <DialogDescription>{tourAction.action === 'delete' ? `سيتم حذف الجولة ${tourAction.tour.tourNumber} والزيارات المجدولة التابعة لها. الحذف متاح لمنشئ الجولة قبل بدء التنفيذ، أو لمسؤول المنصة عند الضرورة.` : `سيتم إلغاء الجولة ${tourAction.tour.tourNumber} مع الاحتفاظ بسجل الجولة والزيارات المرتبطة بها لأغراض التوثيق والمراجعة.`}</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">{tourAction.action === 'delete' ? 'هذا الإجراء نهائي ولا يمكن التراجع عنه.' : 'الإلغاء يحفظ السجل التاريخي ولا يحذف البيانات السابقة.'}</div>
+          <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setTourAction(null)} disabled={tourActionSaving}>إلغاء</Button><Button variant="destructive" className="!border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => void runTourAction()} disabled={tourActionSaving}>{tourActionSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin text-white" /> : tourAction.action === 'delete' ? <Trash2 className="ml-2 h-4 w-4 text-white" /> : <X className="ml-2 h-4 w-4 text-white" />}{tourAction.action === 'delete' ? 'تأكيد الحذف' : 'تأكيد الإلغاء'}</Button></DialogFooter>
         </>}
       </DialogContent>
     </Dialog>

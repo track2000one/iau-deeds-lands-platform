@@ -112,6 +112,9 @@ export type MosqueFieldVisit = {
   recommendations?: string | null;
   attachments: MosqueFieldVisitAttachment[];
   createdBy?: string | null;
+  isOwner?: boolean;
+  hasStarted?: boolean;
+  canDelete?: boolean;
   createdAt: string;
   updatedAt: string;
   site: Pick<MosqueSite, 'id' | 'publicToken' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation' | 'status'>;
@@ -129,6 +132,10 @@ export type MosqueFieldTour = {
   status: 'scheduled' | 'in_progress' | 'completed' | 'postponed' | 'cancelled';
   notes?: string | null;
   createdBy?: string | null;
+  isOwner?: boolean;
+  hasStarted?: boolean;
+  canDelete?: boolean;
+  canCancel?: boolean;
   createdAt: string;
   updatedAt: string;
   visits?: Array<Pick<MosqueFieldVisit, 'id' | 'visitNumber' | 'siteId' | 'visitDate' | 'workflowStatus' | 'overallStatus' | 'priority' | 'site'>>;
@@ -487,6 +494,7 @@ export const mosqueApi = {
   fieldTours: () => apiJson<MosqueFieldTour[]>('/api/mosques/field-tours'),
   createFieldTour: (input: Record<string, unknown>) => apiJson<MosqueFieldTour>('/api/mosques/field-tours', { method: 'POST', body: JSON.stringify(input) }),
   updateFieldTour: (id: string, input: Record<string, unknown>) => apiJson<MosqueFieldTour>(`/api/mosques/field-tours/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  deleteFieldTour: (id: string) => apiJson<void>(`/api/mosques/field-tours/${id}`, { method: 'DELETE' }),
   fieldVisits: (filters: { siteId?: string; tourId?: string; workflowStatus?: string } = {}) => apiJson<MosqueFieldVisit[]>(`/api/mosques/field-visits?${new URLSearchParams(filters).toString()}`),
   fieldVisit: (id: string) => apiJson<MosqueFieldVisit>(`/api/mosques/field-visits/${id}`),
   fieldVisitSummary: () => apiJson<MosqueFieldVisitSummary>('/api/mosques/field-visits/summary'),
