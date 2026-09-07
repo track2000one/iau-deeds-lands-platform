@@ -75,9 +75,11 @@ export type MosqueFieldVisitQuranInventoryDetails = {
 
 
 export type MosqueFieldVisitQuranRackDetails = {
+  itemType?: 'individual_stand' | 'shelf_unit';
   presentCount?: number | null;
   targetCount?: number | null;
   capacityCount?: number | null;
+  quranCapacityCount?: number | null;
   goodCount?: number | null;
   damagedCount?: number | null;
   capturedFrom?: 'field_visit';
@@ -391,12 +393,17 @@ export type MosqueQuranStockDashboard = {
 };
 
 
+
+export type MosqueQuranEquipmentType = 'individual_stand' | 'shelf_unit';
+
 export type MosqueQuranRackInventory = {
   id: string;
   siteId: string;
+  itemType: MosqueQuranEquipmentType;
   presentCount: number;
   targetCount: number;
   capacityCount: number;
+  quranCapacityCount: number;
   goodCount: number;
   damagedCount: number;
   surplusCount?: number;
@@ -413,6 +420,7 @@ export type MosqueQuranRackMovement = {
   id: string;
   movementNumber: string;
   movementType: 'surplus_to_stock' | 'stock_to_site' | 'receipt' | 'stock_damage' | 'adjustment_in' | 'adjustment_out';
+  itemType: MosqueQuranEquipmentType;
   siteId?: string | null;
   quantity: number;
   movementAt: string;
@@ -422,22 +430,40 @@ export type MosqueQuranRackMovement = {
   createdAt: string;
 };
 
+export type MosqueQuranRackTypeSummary = {
+  centralStock: number;
+  countedSites: number;
+  totalPresent: number;
+  totalGood: number;
+  totalDamaged: number;
+  totalSurplus: number;
+  totalShortage: number;
+  totalQuranCapacity: number;
+};
+
 export type MosqueQuranRackDashboard = {
   summary: {
     centralStock: number;
+    centralStockIndividualStands: number;
+    centralStockShelfUnits: number;
     countedSites: number;
+    countedEntries: number;
     totalPresent: number;
     totalGood: number;
     totalDamaged: number;
     totalSurplus: number;
     totalShortage: number;
+    totalQuranCapacity: number;
+    byType: Record<MosqueQuranEquipmentType, MosqueQuranRackTypeSummary>;
   };
   sites: Array<{
     site: Pick<MosqueSite, 'id' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation' | 'status'>;
+    itemType: MosqueQuranEquipmentType;
     latest: MosqueQuranRackInventory | null;
     presentCount: number;
     targetCount: number;
     capacityCount: number;
+    quranCapacityCount: number;
     goodCount: number;
     damagedCount: number;
     surplusCount: number;
