@@ -1,0 +1,36 @@
+name: Apply Tour Owner Permissions UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-tour-owner-permissions-ui.py'
+      - '.github/workflows/apply-tour-owner-permissions-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply ownership UI policy
+        run: python3 scripts/apply-tour-owner-permissions-ui.py
+      - name: Build frontend
+        run: npm run build
+      - name: Commit source change and cleanup
+        run: |
+          rm -f scripts/apply-tour-owner-permissions-ui.py .github/workflows/apply-tour-owner-permissions-ui.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'Show other users mosque tours as read only'
+          git push
