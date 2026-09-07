@@ -394,6 +394,116 @@ const normalizeQuranChecklistItems = (items: MosqueFieldVisitItem[] = []) => {
 const quranInventoryDetails = (item: MosqueFieldVisitItem): MosqueFieldVisitQuranInventoryDetails =>
   (item.details?.quranInventory || {}) as MosqueFieldVisitQuranInventoryDetails;
 
+type QuranInventoryConsistency = {
+  valid: boolean;
+  total: number | null;
+  withdrawal: number;
+  message: string | null;
+};
+
+const quranInventorySnapshot = (details: MosqueFieldVisitQuranInventoryDetails) => {
+  const largeCount = Number(details.largeCount || 0);
+  const mediumCount = Number(details.mediumCount || 0);
+  const smallCount = Number(details.smallCount || 0);
+  const recommendedWithdrawalCount = Number(details.recommendedWithdrawalCount || 0);
+  return {
+    largeCount,
+    mediumCount,
+    smallCount,
+    recommendedWithdrawalCount,
+    totalCount: largeCount + mediumCount + smallCount,
+  };
+};
+
+const validateQuranInventoryConsistency = (details: MosqueFieldVisitQuranInventoryDetails): QuranInventoryConsistency => {
+  const counts = [details.largeCount, details.mediumCount, details.smallCount];
+  if (!counts.every((value) => value != null && Number.isFinite(Number(value)))) {
+    return { valid: true, total: null, withdrawal: Number(details.recommendedWithdrawalCount || 0), message: null };
+  }
+  const total = counts.reduce((sum, value) => sum + Number(value || 0), 0);
+  const withdrawal = Math.max(0, Number(details.recommendedWithdrawalCount || 0));
+  if (withdrawal > total) {
+    return {
+      valid: false,
+      total,
+      withdrawal,
+      message: `العدد المقترح للسحب (${withdrawal}) يتجاوز إجمالي المصاحف المسجلة (${total}). راجع أعداد الأحجام أو العدد المقترح للسحب.`,
+    };
+  }
+  return { valid: true, total, withdrawal, message: null };
+};
+
+const prepareQuranInventoryReconciliation = (
+  details: MosqueFieldVisitQuranInventoryDetails,
+  currentUsername: string,
+) => {
+  const validation = validateQuranInventoryConsistency(details);
+  const now = new Date().toISOString();
+  if (!validation.valid) {
+    return {
+      error: null as string | null,
+      needsCorrection: true,
+      details: {
+        ...details,
+        reconciliationStatus: 'needs_correction' as const,
+        reconciliationMessage: validation.message,
+        correctionDetectedAt: details.correctionDetectedAt || now,
+        correctionDetectedBy: details.correctionDetectedBy || currentUsername || null,
+        correctionBaseline: details.correctionBaseline || quranInventorySnapshot(details),
+      },
+    };
+  }
+
+  if (details.reconciliationStatus === 'needs_correction') {
+    const reason = String(details.correctionReason || '').trim();
+    if (!reason) {
+      return {
+        error: 'تم تصحيح أرقام جرد المصاحف، لكن يجب كتابة سبب التصحيح قبل حفظ الزيارة.',
+        needsCorrection: false,
+        details,
+      };
+    }
+    const before = details.correctionBaseline || quranInventorySnapshot(details);
+    const after = quranInventorySnapshot(details);
+    return {
+      error: null as string | null,
+      needsCorrection: false,
+      details: {
+        ...details,
+        reconciliationStatus: 'corrected' as const,
+        reconciliationMessage: null,
+        correctionReason: null,
+        correctionDetectedAt: null,
+        correctionDetectedBy: null,
+        correctionBaseline: null,
+        correctionHistory: [
+          ...(details.correctionHistory || []),
+          {
+            correctedAt: now,
+            correctedBy: currentUsername || null,
+            reason,
+            before,
+            after,
+          },
+        ],
+      },
+    };
+  }
+
+  return {
+    error: null as string | null,
+    needsCorrection: false,
+    details: {
+      ...details,
+      reconciliationStatus: details.reconciliationStatus === 'corrected' ? 'corrected' as const : 'valid' as const,
+      reconciliationMessage: null,
+    },
+  };
+};
+
+const quranVisitNeedsCorrection = (visit: Pick<MosqueFieldVisit, 'items'>) =>
+  (visit.items || []).some((item) => isQuranFieldVisitItem(item) && quranInventoryDetails(item).reconciliationStatus === 'needs_correction');
+
 const quranInventorySummary = (item: MosqueFieldVisitItem) => {
   const details = quranInventoryDetails(item);
   const values = [details.largeCount, details.mediumCount, details.smallCount];
@@ -514,8 +624,12 @@ const QuranFieldInventoryEditor: React.FC<{
     : null;
   const target = stock?.targetCount || 0;
   const need = total == null || target <= 0 ? null : Math.max(0, target - total);
+  const consistency = validateQuranInventoryConsistency(details);
+  const storedNeedsCorrection = details.reconciliationStatus === 'needs_correction';
+  const readyForCorrection = storedNeedsCorrection && consistency.valid;
+  const lastCorrection = details.correctionHistory?.[details.correctionHistory.length - 1] || null;
   return <div className="md:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
-    <div className="mb-3 flex flex-wrap items-start justify-between gap-2"><div><b className="text-sm text-emerald-950">الجرد الميداني لرصيد المسجد / المصلى</b><p className="mt-1 text-[11px] leading-5 text-slate-600">أدخل العدد الفعلي الموجود داخل المسجد أو المصلى أثناء الزيارة. هذه الأعداد تخص رصيد الموقع فقط ولا تُضاف إلى مخزون مكتبة المصاحف. قبل إقفال الجرد التأسيسي تُسجل كتحديث تأسيسي للموقع، وبعد الإقفال تُحفظ كجرد دوري جديد.</p></div><Badge variant="outline" className={baselineClosed ? 'border-sky-300 bg-white text-sky-700' : 'border-amber-300 bg-white text-amber-700'}>{baselineClosed ? 'جرد دوري' : 'الجرد التأسيسي مفتوح'}</Badge></div>
+    <div className="mb-3 flex flex-wrap items-start justify-between gap-2"><div><b className="text-sm text-emerald-950">الجرد الميداني لرصيد المسجد / المصلى</b><p className="mt-1 text-[11px] leading-5 text-slate-600">أدخل العدد الفعلي الموجود داخل المسجد أو المصلى أثناء الزيارة. هذه الأعداد تخص رصيد الموقع فقط ولا تُضاف إلى مخزون مكتبة المصاحف. قبل إقفال الجرد التأسيسي تُسجل كتحديث تأسيسي للموقع، وبعد الإقفال تُحفظ كجرد دوري جديد.</p></div><div className="flex flex-wrap gap-2"><Badge variant="outline" className={baselineClosed ? 'border-sky-300 bg-white text-sky-700' : 'border-amber-300 bg-white text-amber-700'}>{baselineClosed ? 'جرد دوري' : 'الجرد التأسيسي مفتوح'}</Badge>{storedNeedsCorrection && <Badge className="bg-amber-600 text-white">يحتاج تصحيح بيانات</Badge>}{details.reconciliationStatus === 'corrected' && <Badge className="bg-emerald-700 text-white">تم التصحيح</Badge>}</div></div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Field label="المصاحف الكبيرة *"><Input type="number" min="0" value={numericValue('largeCount')} onChange={(event) => updateNumber('largeCount', event.target.value)} /></Field>
       <Field label="المصاحف المتوسطة *"><Input type="number" min="0" value={numericValue('mediumCount')} onChange={(event) => updateNumber('mediumCount', event.target.value)} /></Field>
@@ -526,6 +640,11 @@ const QuranFieldInventoryEditor: React.FC<{
       <Field label="إجمالي العد الفعلي"><Input readOnly value={total == null ? '' : total} className="bg-white font-black" /></Field>
       <Field label="الاحتياج وفق المستهدف"><Input readOnly value={need == null ? (target > 0 ? '' : 'المستهدف غير محدد') : need} className="bg-white font-black" /></Field>
     </div>
+    {(!consistency.valid || storedNeedsCorrection) && <div className={`mt-3 rounded-2xl border p-3 ${readyForCorrection ? 'border-sky-300 bg-sky-50' : 'border-amber-300 bg-amber-50'}`}>
+      <div className="flex items-start gap-2"><AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${readyForCorrection ? 'text-sky-700' : 'text-amber-700'}`} /><div className="min-w-0 flex-1"><b className={`text-xs ${readyForCorrection ? 'text-sky-900' : 'text-amber-900'}`}>{readyForCorrection ? 'تم تعديل الأرقام وأصبحت متسقة — أكمل سبب التصحيح ثم احفظ الزيارة' : 'بيانات جرد المصاحف تحتاج إلى تصحيح'}</b><p className="mt-1 text-[11px] leading-5 text-slate-700">{consistency.message || details.reconciliationMessage || 'راجع الأعداد المسجلة قبل ترحيلها إلى الجرد الرسمي للموقع.'}</p></div></div>
+      {storedNeedsCorrection && <div className="mt-3"><Field label="سبب تصحيح الجرد *"><Textarea rows={2} value={details.correctionReason || ''} onChange={(event) => onChange({ correctionReason: event.target.value })} placeholder="مثال: خطأ في إدخال عدد المصاحف المتوسطة أثناء الزيارة، وتمت مراجعة العد الفعلي." /></Field><p className="mt-1 text-[10px] text-slate-500">لن تُفقد القيم القديمة؛ سيحفظ النظام قبل/بعد التصحيح واسم المستخدم والتاريخ وسبب التعديل ضمن سجل الزيارة.</p></div>}
+    </div>}
+    {lastCorrection && <div className="mt-3 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-[11px] text-emerald-900"><b>آخر تصحيح موثق:</b> {lastCorrection.reason} — {new Date(lastCorrection.correctedAt).toLocaleString('ar-SA-u-ca-gregory')}{lastCorrection.correctedBy ? ` — بواسطة ${lastCorrection.correctedBy}` : ''}</div>}
     <div className="mt-3 grid gap-2 text-[11px] text-slate-600 sm:grid-cols-3"><div className="rounded-xl bg-white px-3 py-2">رصيد الموقع النظامي الحالي: <b>{stock?.systemStock.totalCount ?? 0}</b></div><div className="rounded-xl bg-white px-3 py-2">العدد المستهدف: <b>{target > 0 ? target : 'غير محدد'}</b></div><div className="rounded-xl bg-white px-3 py-2">آخر جرد: <b>{stock?.latestInventory?.countedAt ? new Date(stock.latestInventory.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لا يوجد'}</b></div></div>
   </div>;
 };
@@ -1093,11 +1212,15 @@ const updateQuranRackDetails = (index: number, patch: Partial<MosqueFieldVisitQu
 
   const syncQuranVisitInventory = async (visit: MosqueFieldVisit) => {
     const item = (visit.items || []).find(isQuranFieldVisitItem);
-    if (!item) return;
+    if (!item) return null;
     const details = quranInventoryDetails(item);
     const counts = [details.largeCount, details.mediumCount, details.smallCount];
-    if (!counts.every((value) => value != null && Number.isFinite(Number(value)))) return;
-    const total = counts.reduce((sum, value) => sum + Number(value || 0), 0);
+    if (!counts.every((value) => value != null && Number.isFinite(Number(value)))) return null;
+    const consistency = validateQuranInventoryConsistency(details);
+    if (!consistency.valid || details.reconciliationStatus === 'needs_correction') {
+      return { synced: false, needsCorrection: true, message: consistency.message || details.reconciliationMessage || 'بيانات جرد المصاحف تحتاج إلى تصحيح.' };
+    }
+    const total = consistency.total || 0;
     const stock = quranStockDashboard?.sites.find((row) => row.site.id === visit.siteId) || null;
     const target = stock?.targetCount || 0;
     const conditionLabel = details.conditionStatus === 'good' ? 'سليمة' : details.conditionStatus === 'needs_attention' ? 'توجد ملاحظات / تالفة' : 'لم يتم التحقق';
@@ -1125,7 +1248,7 @@ const updateQuranRackDetails = (index: number, patch: Partial<MosqueFieldVisitQu
       });
       setQuranOpeningBaselineStatus(response.state);
       toast.success('تم تسجيل أعداد المصاحف في الجرد التأسيسي للمسجد / المصلى دون إضافتها إلى مخزون المكتبة');
-      return;
+      return { synced: true, needsCorrection: false, message: null };
     }
 
     await mosqueApi.createQuranInventory({
@@ -1139,6 +1262,7 @@ const updateQuranRackDetails = (index: number, patch: Partial<MosqueFieldVisitQu
       notes,
     });
     toast.success('تم تحديث رصيد المسجد / المصلى من الزيارة كجرد دوري جديد دون تغيير مخزون المكتبة');
+    return { synced: true, needsCorrection: false, message: null };
   };
 
 
@@ -1479,6 +1603,24 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
       return;
     }
 
+    let quranReconciliationError: string | null = null;
+    const preparedVisitItems = visitForm.items.map((item) => {
+      if (!isQuranFieldVisitItem(item)) return item;
+      const result = prepareQuranInventoryReconciliation(quranInventoryDetails(item), currentUsername);
+      if (result.error) quranReconciliationError = result.error;
+      return {
+        ...item,
+        details: {
+          ...(item.details || {}),
+          quranInventory: result.details,
+        },
+      };
+    });
+    if (quranReconciliationError) {
+      toast.error(quranReconciliationError);
+      return;
+    }
+
     try {
       setSaving(true);
       const payload = {
@@ -1487,7 +1629,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
         visitDate: new Date(visitForm.visitDate).toISOString(),
         departureAt: visitForm.departureAt ? new Date(visitForm.departureAt).toISOString() : null,
         teamMembers,
-        items: visitForm.items.map((item) => ({
+        items: preparedVisitItems.map((item) => ({
           ...item,
           category: isManualFieldVisitItem(item) ? (String(item.category || '').trim() || 'بند إضافي') : item.category,
           title: isManualFieldVisitItem(item) ? String(item.title || '').trim() : item.title,
@@ -1499,13 +1641,19 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
         ? await mosqueApi.updateFieldVisit(editingVisit.id, payload)
         : await mosqueApi.createFieldVisit(payload);
       toast.success(editingVisit ? 'تم تحديث الزيارة وحفظ نتائجها' : 'تم إنشاء الزيارة الميدانية');
-      try { await syncQuranVisitInventory(savedVisit); } catch (error) { toast.warning('تم حفظ الزيارة، لكن تعذر تحديث جرد المصاحف: ' + (error instanceof Error ? error.message : 'خطأ غير معروف')); }
+      let quranSyncResult: { synced: boolean; needsCorrection: boolean; message: string | null } | null = null;
+      try {
+        quranSyncResult = await syncQuranVisitInventory(savedVisit);
+        if (quranSyncResult?.needsCorrection) {
+          toast.warning('تم حفظ الزيارة بنجاح، وتوجد ملاحظة على بيانات جرد المصاحف تحتاج إلى تصحيح قبل ترحيلها إلى جرد الموقع. افتح الزيارة واضغط تعديل لتصحيح الأعداد.');
+        }
+      } catch (error) { toast.warning('تم حفظ الزيارة، لكن تعذر تحديث جرد المصاحف: ' + (error instanceof Error ? error.message : 'خطأ غير معروف')); }
       try { await syncQuranRackVisitInventory(savedVisit); } catch (error) { toast.warning('تم حفظ الزيارة، لكن تعذر تحديث جرد تجهيزات المصاحف: ' + (error instanceof Error ? error.message : 'خطأ غير معروف')); }
       const refreshedQuranStock = await mosqueApi.quranStockDashboard().catch(() => quranStockDashboard);
       if (refreshedQuranStock) setQuranStockDashboard(refreshedQuranStock);
       const refreshedRackStock = await mosqueApi.quranRackDashboard().catch(() => quranRackDashboard);
       if (refreshedRackStock) setQuranRackDashboard(refreshedRackStock);
-      await syncQuranSupplyRequest(savedVisit, refreshedQuranStock);
+      if (!quranSyncResult?.needsCorrection) await syncQuranSupplyRequest(savedVisit, refreshedQuranStock);
       setVisitDialog(false);
       await load();
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر حفظ الزيارة'); }
@@ -2091,7 +2239,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
     {view === 'visits' ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {filteredVisits.map((visit) => <Card key={visit.id} className="overflow-hidden border-slate-200 shadow-sm">
         <CardHeader className="border-b bg-gradient-to-l from-slate-50 to-white pb-4">
-          <div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{visit.site.name}</CardTitle><CardDescription className="mt-1">{visit.visitNumber}</CardDescription></div><StatusBadge status={visit.workflowStatus} /></div>
+          <div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{visit.site.name}</CardTitle><CardDescription className="mt-1">{visit.visitNumber}</CardDescription></div><div className="flex flex-col items-end gap-1.5"><StatusBadge status={visit.workflowStatus} />{quranVisitNeedsCorrection(visit) && <Badge className="bg-amber-600 text-white"><AlertTriangle className="ml-1 h-3 w-3" />جرد المصاحف يحتاج تصحيح</Badge>}</div></div>
         </CardHeader>
         <CardContent className="space-y-3 pt-4 text-sm">
           <InfoLine label="نوع الزيارة" value={visitTypeLabels[visit.visitType]} />
