@@ -44,7 +44,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/apply-quran-inventory-reconciliation.yml
-          git rm scripts/apply-quran-inventory-reconciliation.py
+          git rm -f scripts/apply-quran-inventory-reconciliation.py
           git add src/app/api/mosques.ts src/app/components/MosqueFieldVisitsPanel.tsx
           git commit -m "Add Quran visit inventory correction workflow"
           git push origin main
