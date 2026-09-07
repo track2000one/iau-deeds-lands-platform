@@ -15,13 +15,35 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+const REMEMBER_LOGIN_ENABLED_KEY = 'iau.login.rememberCredentials';
+const REMEMBER_LOGIN_EMAIL_KEY = 'iau.login.rememberedEmail';
+
+const readRememberLoginEnabled = () => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(REMEMBER_LOGIN_ENABLED_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+const readRememberedEmail = () => {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.localStorage.getItem(REMEMBER_LOGIN_EMAIL_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(readRememberedEmail);
   const [password, setPassword] = useState('');
+  const [rememberCredentials, setRememberCredentials] = useState(readRememberLoginEnabled);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,12 +56,69 @@ export const LoginPage: React.FC = () => {
     document.documentElement.lang = newLang;
   };
 
+  const handleRememberCredentialsChange = (checked: boolean) => {
+    setRememberCredentials(checked);
+
+    if (!checked) {
+      try {
+        window.localStorage.removeItem(REMEMBER_LOGIN_ENABLED_KEY);
+        window.localStorage.removeItem(REMEMBER_LOGIN_EMAIL_KEY);
+      } catch {
+        // قد تكون مساحة التخزين محجوبة بسياسة المتصفح؛ لا نمنع تسجيل الدخول بسبب ذلك.
+      }
+    }
+  };
+
+  const saveCredentialsAfterSuccessfulLogin = async (normalizedEmail: string) => {
+    if (!rememberCredentials) return;
+
+    try {
+      window.localStorage.setItem(REMEMBER_LOGIN_ENABLED_KEY, '1');
+      window.localStorage.setItem(REMEMBER_LOGIN_EMAIL_KEY, normalizedEmail);
+    } catch {
+      // البريد فقط وسيلة راحة محلية، ولا يؤثر تعذر حفظه على المصادقة.
+    }
+
+    // كلمة المرور لا تُحفظ في localStorage مطلقًا. عند دعم المتصفح لواجهة
+    // Credential Management API نمررها إلى مدير كلمات المرور الآمن الخاص بالمتصفح.
+    try {
+      const credentialWindow = window as typeof window & {
+        PasswordCredential?: new (data: { id: string; password: string; name?: string }) => Credential;
+      };
+      const PasswordCredentialConstructor = credentialWindow.PasswordCredential;
+
+      if (PasswordCredentialConstructor && navigator.credentials?.store) {
+        const credential = new PasswordCredentialConstructor({
+          id: normalizedEmail,
+          password,
+          name: normalizedEmail,
+        });
+        await navigator.credentials.store(credential);
+      }
+    } catch {
+      // بعض المتصفحات تدير الحفظ تلقائيًا عبر autocomplete أو قد تمنع التخزين البرمجي.
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
 
     try {
-      await login(email.trim(), password);
+      const normalizedEmail = email.trim();
+      await login(normalizedEmail, password);
+
+      if (rememberCredentials) {
+        await saveCredentialsAfterSuccessfulLogin(normalizedEmail);
+      } else {
+        try {
+          window.localStorage.removeItem(REMEMBER_LOGIN_ENABLED_KEY);
+          window.localStorage.removeItem(REMEMBER_LOGIN_EMAIL_KEY);
+        } catch {
+          // لا نمنع تسجيل الدخول إذا تعذر الوصول لمساحة التخزين المحلية.
+        }
+      }
+
       toast.success(isArabic ? 'تم تسجيل الدخول بنجاح' : 'Login successful');
 
       // منسوبو المساجد (إمام/مؤذن/خطيب/خطيب متعاون) يذهبون مباشرة
@@ -405,9 +484,39 @@ export const LoginPage: React.FC = () => {
         .neo-form-row {
           display: flex;
           align-items: center;
-          justify-content: flex-end;
-          min-height: 18px;
+          justify-content: space-between;
+          gap: 12px;
+          min-height: 20px;
           padding-inline: 5px;
+        }
+
+        .neo-remember {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          color: #5f6b77;
+          font-size: 10.5px;
+          font-weight: 800;
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .neo-remember input {
+          width: 15px;
+          height: 15px;
+          flex: 0 0 auto;
+          margin: 0;
+          accent-color: var(--neo-accent);
+          cursor: pointer;
+        }
+
+        .neo-remember input:focus-visible {
+          outline: 2px solid rgba(24,75,119,.28);
+          outline-offset: 2px;
+        }
+
+        .neo-remember span {
+          white-space: nowrap;
         }
 
         .neo-forgot {
@@ -602,7 +711,18 @@ export const LoginPage: React.FC = () => {
           }
 
           .neo-form-row {
-            min-height: 13px;
+            gap: 8px;
+            min-height: 16px;
+          }
+
+          .neo-remember {
+            gap: 5px;
+            font-size: 8.5px;
+          }
+
+          .neo-remember input {
+            width: 13px;
+            height: 13px;
           }
 
           .neo-forgot {
@@ -695,7 +815,7 @@ export const LoginPage: React.FC = () => {
               </div>
             </header>
 
-            <form onSubmit={handleSubmit} className="neo-form">
+            <form onSubmit={handleSubmit} className="neo-form" autoComplete="on">
               <div className="neo-field-group">
                 <label className="neo-field-label" htmlFor="email">
                   {isArabic ? 'البريد الإلكتروني' : 'Email'}
@@ -704,6 +824,7 @@ export const LoginPage: React.FC = () => {
                   <User className="neo-input-icon" aria-hidden="true" />
                   <input
                     id="email"
+                    name="username"
                     className="neo-input"
                     type="email"
                     value={email}
@@ -711,7 +832,7 @@ export const LoginPage: React.FC = () => {
                     placeholder={isArabic ? 'أدخل البريد الإلكتروني' : 'Enter email'}
                     required
                     disabled={isLoading}
-                    autoComplete="email"
+                    autoComplete="username"
                     dir="ltr"
                   />
                 </div>
@@ -725,6 +846,7 @@ export const LoginPage: React.FC = () => {
                   <Lock className="neo-input-icon" aria-hidden="true" />
                   <input
                     id="password"
+                    name="password"
                     className="neo-input"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
@@ -751,6 +873,22 @@ export const LoginPage: React.FC = () => {
               </div>
 
               <div className="neo-form-row">
+                <label
+                  className="neo-remember"
+                  title={isArabic
+                    ? 'يُحفظ اسم المستخدم محليًا، وتُحفظ كلمة المرور بواسطة مدير كلمات المرور في المتصفح عند دعمه.'
+                    : 'The username is remembered locally; the password is stored by the browser password manager when supported.'}
+                >
+                  <input
+                    type="checkbox"
+                    checked={rememberCredentials}
+                    onChange={(event) => handleRememberCredentialsChange(event.target.checked)}
+                    disabled={isLoading}
+                    aria-label={isArabic ? 'حفظ اسم المستخدم وكلمة المرور' : 'Save username and password'}
+                  />
+                  <span>{isArabic ? 'حفظ اسم المستخدم وكلمة المرور' : 'Save username & password'}</span>
+                </label>
+
                 <Link to="/forgot-password" className="neo-forgot">
                   {isArabic ? 'نسيت كلمة المرور؟' : 'Forgot password?'}
                 </Link>
