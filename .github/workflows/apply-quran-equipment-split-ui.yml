@@ -1,0 +1,432 @@
+name: Apply Quran Equipment Split UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-quran-equipment-split-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Split Quran stand and shelf UI
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          import textwrap
+
+          def replace_once(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f'Anchor not found: {label}')
+              return text.replace(old, new, 1)
+
+          api_path = Path('src/app/api/mosques.ts')
+          api = api_path.read_text(encoding='utf-8')
+
+          old_details = '''export type MosqueFieldVisitQuranRackDetails = {
+            presentCount?: number | null;
+            targetCount?: number | null;
+            capacityCount?: number | null;
+            goodCount?: number | null;
+            damagedCount?: number | null;
+            capturedFrom?: 'field_visit';
+          };'''
+          new_details = '''export type MosqueFieldVisitQuranRackDetails = {
+            itemType?: 'individual_stand' | 'shelf_unit';
+            presentCount?: number | null;
+            targetCount?: number | null;
+            capacityCount?: number | null;
+            quranCapacityCount?: number | null;
+            goodCount?: number | null;
+            damagedCount?: number | null;
+            capturedFrom?: 'field_visit';
+          };'''
+          api = replace_once(api, old_details, new_details, 'Quran equipment visit details type')
+
+          start = api.find('export type MosqueQuranRackInventory = {')
+          end = api.find('export type MosqueQuranOpeningBaselineStatus = {', start)
+          if start < 0 or end < 0:
+              raise SystemExit('Unable to locate Quran equipment API type block')
+          rack_types = textwrap.dedent(r'''
+          export type MosqueQuranEquipmentType = 'individual_stand' | 'shelf_unit';
+
+          export type MosqueQuranRackInventory = {
+            id: string;
+            siteId: string;
+            itemType: MosqueQuranEquipmentType;
+            presentCount: number;
+            targetCount: number;
+            capacityCount: number;
+            quranCapacityCount: number;
+            goodCount: number;
+            damagedCount: number;
+            surplusCount?: number;
+            shortageCount?: number;
+            remainingCapacity?: number | null;
+            countedAt: string;
+            countedBy?: string | null;
+            countedByName?: string | null;
+            notes?: string | null;
+            createdAt: string;
+          };
+
+          export type MosqueQuranRackMovement = {
+            id: string;
+            movementNumber: string;
+            movementType: 'surplus_to_stock' | 'stock_to_site' | 'receipt' | 'stock_damage' | 'adjustment_in' | 'adjustment_out';
+            itemType: MosqueQuranEquipmentType;
+            siteId?: string | null;
+            quantity: number;
+            movementAt: string;
+            notes?: string | null;
+            createdBy?: string | null;
+            createdByName?: string | null;
+            createdAt: string;
+          };
+
+          export type MosqueQuranRackTypeSummary = {
+            centralStock: number;
+            countedSites: number;
+            totalPresent: number;
+            totalGood: number;
+            totalDamaged: number;
+            totalSurplus: number;
+            totalShortage: number;
+            totalQuranCapacity: number;
+          };
+
+          export type MosqueQuranRackDashboard = {
+            summary: {
+              centralStock: number;
+              centralStockIndividualStands: number;
+              centralStockShelfUnits: number;
+              countedSites: number;
+              countedEntries: number;
+              totalPresent: number;
+              totalGood: number;
+              totalDamaged: number;
+              totalSurplus: number;
+              totalShortage: number;
+              totalQuranCapacity: number;
+              byType: Record<MosqueQuranEquipmentType, MosqueQuranRackTypeSummary>;
+            };
+            sites: Array<{
+              site: Pick<MosqueSite, 'id' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation' | 'status'>;
+              itemType: MosqueQuranEquipmentType;
+              latest: MosqueQuranRackInventory | null;
+              presentCount: number;
+              targetCount: number;
+              capacityCount: number;
+              quranCapacityCount: number;
+              goodCount: number;
+              damagedCount: number;
+              surplusCount: number;
+              shortageCount: number;
+              remainingCapacity: number | null;
+            }>;
+            recentMovements: MosqueQuranRackMovement[];
+          };
+
+          ''')
+          api = api[:start] + rack_types + api[end:]
+          api_path.write_text(api, encoding='utf-8')
+
+          panel_path = Path('src/app/components/MosqueFieldVisitsPanel.tsx')
+          panel = panel_path.read_text(encoding='utf-8')
+
+          old_profile = "  'توفر دواليب ورفوف المصاحف بحالة مناسبة': 'required_availability',"
+          new_profile = "  'توفر دواليب ورفوف المصاحف بحالة مناسبة': 'required_availability',\n  'توفر حوامل المصاحف الفردية وكفاية عددها وسلامتها': 'required_availability',\n  'توفر رفوف ودواليب المصاحف وكفاية سعتها وسلامتها': 'required_availability',"
+          panel = replace_once(panel, old_profile, new_profile, 'Quran equipment status profiles')
+
+          helper_start = panel.find("const QURAN_RACK_ITEM_TITLE = 'توفر دواليب ورفوف المصاحف بحالة مناسبة';")
+          helper_end = panel.find('const QuranFieldInventoryEditor: React.FC<{', helper_start)
+          if helper_start < 0 or helper_end < 0:
+              raise SystemExit('Unable to locate Quran equipment helper block')
+
+          rack_helpers = textwrap.dedent(r'''
+          type QuranEquipmentItemType = 'individual_stand' | 'shelf_unit';
+          const QURAN_INDIVIDUAL_STAND_ITEM_TITLE = 'توفر حوامل المصاحف الفردية وكفاية عددها وسلامتها';
+          const QURAN_SHELF_ITEM_TITLE = 'توفر رفوف ودواليب المصاحف وكفاية سعتها وسلامتها';
+          const LEGACY_QURAN_RACK_ITEM_TITLE = 'توفر دواليب ورفوف المصاحف بحالة مناسبة';
+          const isQuranRackFieldVisitItem = (item: Pick<MosqueFieldVisitItem, 'title'>) =>
+            item.title === QURAN_INDIVIDUAL_STAND_ITEM_TITLE || item.title === QURAN_SHELF_ITEM_TITLE || item.title === LEGACY_QURAN_RACK_ITEM_TITLE;
+          const quranEquipmentItemType = (item: Pick<MosqueFieldVisitItem, 'title' | 'details'>): QuranEquipmentItemType => {
+            if (item.title === QURAN_INDIVIDUAL_STAND_ITEM_TITLE) return 'individual_stand';
+            if (item.title === QURAN_SHELF_ITEM_TITLE) return 'shelf_unit';
+            const stored = item.details?.quranRackInventory as MosqueFieldVisitQuranRackDetails | undefined;
+            return stored?.itemType === 'individual_stand' ? 'individual_stand' : 'shelf_unit';
+          };
+          const quranEquipmentLabel = (itemType: QuranEquipmentItemType) => itemType === 'individual_stand' ? 'حوامل المصاحف الفردية' : 'رفوف ودواليب المصاحف';
+          const quranRackDetails = (item: MosqueFieldVisitItem): MosqueFieldVisitQuranRackDetails => {
+            const stored = (item.details?.quranRackInventory || {}) as MosqueFieldVisitQuranRackDetails;
+            return { ...stored, itemType: stored.itemType || quranEquipmentItemType(item) };
+          };
+
+          const quranRackSummary = (item: MosqueFieldVisitItem) => {
+            const details = quranRackDetails(item);
+            const itemType = quranEquipmentItemType(item);
+            const values = [details.presentCount, details.targetCount, details.capacityCount, details.goodCount, details.damagedCount];
+            if (!values.every((value) => value != null && Number.isFinite(Number(value)))) return '';
+            const present = Number(details.presentCount || 0);
+            const target = Number(details.targetCount || 0);
+            const capacity = Number(details.capacityCount || 0);
+            const good = Number(details.goodCount || 0);
+            const damaged = Number(details.damagedCount || 0);
+            const quranCapacity = itemType === 'shelf_unit' ? Number(details.quranCapacityCount || 0) : 0;
+            const surplus = Math.max(good - target, 0);
+            const shortage = Math.max(target - good, 0);
+            const remaining = capacity > 0 ? Math.max(capacity - present, 0) : null;
+            const shelfCapacityText = itemType === 'shelf_unit' ? ` — سعة المصاحف الإجمالية ${quranCapacity}` : ' — كل حامل مخصص لمصحف واحد';
+            return `${quranEquipmentLabel(itemType)}: الموجود ${present} — المستهدف ${target} — الحد الاستيعابي للوحدات ${capacity || 'غير محدد'} — الصالح ${good} — التالف ${damaged}${shelfCapacityText} — الفائض ${surplus} — العجز ${shortage}${remaining == null ? '' : ` — وحدات يمكن استيعابها ${remaining}`}`;
+          };
+
+          const QuranRackInventoryEditor: React.FC<{
+            item: MosqueFieldVisitItem;
+            dashboard: MosqueQuranRackDashboard | null;
+            siteRow: MosqueQuranRackDashboard['sites'][number] | null;
+            onChange: (patch: Partial<MosqueFieldVisitQuranRackDetails>) => void;
+          }> = ({ item, dashboard, siteRow, onChange }) => {
+            const details = quranRackDetails(item);
+            const itemType = quranEquipmentItemType(item);
+            const label = quranEquipmentLabel(itemType);
+            const keys: Array<keyof Pick<MosqueFieldVisitQuranRackDetails, 'presentCount' | 'targetCount' | 'capacityCount' | 'goodCount' | 'damagedCount'>> = ['presentCount', 'targetCount', 'capacityCount', 'goodCount', 'damagedCount'];
+            const numericValue = (key: keyof MosqueFieldVisitQuranRackDetails) => details[key] == null ? '' : String(details[key]);
+            const updateNumber = (key: keyof MosqueFieldVisitQuranRackDetails, value: string) => onChange({ [key]: value === '' ? null : Math.max(0, Math.trunc(Number(value) || 0)) });
+            const baseReady = keys.every((key) => details[key] != null && Number.isFinite(Number(details[key])));
+            const shelfCapacityReady = itemType !== 'shelf_unit' || (details.quranCapacityCount != null && Number.isFinite(Number(details.quranCapacityCount)));
+            const ready = baseReady && shelfCapacityReady;
+            const present = Number(details.presentCount || 0);
+            const target = Number(details.targetCount || 0);
+            const capacity = Number(details.capacityCount || 0);
+            const good = Number(details.goodCount || 0);
+            const damaged = Number(details.damagedCount || 0);
+            const quranCapacity = Number(details.quranCapacityCount || 0);
+            const surplus = ready ? Math.max(good - target, 0) : null;
+            const shortage = ready ? Math.max(target - good, 0) : null;
+            const remaining = ready && capacity > 0 ? Math.max(capacity - present, 0) : null;
+            const unclassified = ready ? Math.max(present - good - damaged, 0) : null;
+            const typeSummary = dashboard?.summary.byType?.[itemType];
+            const unitWord = itemType === 'individual_stand' ? 'حامل' : 'رف / دولاب';
+            return <div className="md:col-span-2 rounded-2xl border border-teal-200 bg-teal-50/45 p-4">
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                <div><b className="text-sm text-teal-950">جرد {label}</b><p className="mt-1 text-[11px] leading-5 text-slate-600">{itemType === 'individual_stand' ? 'الحامل الفردي يحمل مصحفًا واحدًا فقط. سجّل عدد الحوامل الموجودة والمطلوبة وحالتها ليظهر الفائض أو العجز بصورة مستقلة عن الرفوف.' : 'الرف أو الدولاب يحمل أكثر من مصحف. سجّل عدد وحدات الرفوف/الدواليب بالإضافة إلى السعة الإجمالية للمصاحف التي تستوعبها.'}</p></div>
+                <Badge variant="outline" className="border-teal-300 bg-white text-teal-800">رصيد المخزون المركزي لـ {label}: {typeSummary?.centralStock ?? 0}</Badge>
+              </div>
+              <div className={`grid gap-3 sm:grid-cols-2 ${itemType === 'shelf_unit' ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
+                <Field label={`العدد الموجود من ${unitWord} *`}><Input type="number" min="0" value={numericValue('presentCount')} onChange={(event) => updateNumber('presentCount', event.target.value)} /></Field>
+                <Field label={`العدد المستهدف من ${unitWord} *`}><Input type="number" min="0" value={numericValue('targetCount')} onChange={(event) => updateNumber('targetCount', event.target.value)} /></Field>
+                <Field label={`الحد الاستيعابي لعدد ${unitWord} *`}><Input type="number" min="0" value={numericValue('capacityCount')} onChange={(event) => updateNumber('capacityCount', event.target.value)} /></Field>
+                <Field label="العدد الصالح *"><Input type="number" min="0" value={numericValue('goodCount')} onChange={(event) => updateNumber('goodCount', event.target.value)} /></Field>
+                <Field label="التالف / يحتاج صيانة *"><Input type="number" min="0" value={numericValue('damagedCount')} onChange={(event) => updateNumber('damagedCount', event.target.value)} /></Field>
+                {itemType === 'shelf_unit' && <Field label="السعة الإجمالية للمصاحف *"><Input type="number" min="0" value={numericValue('quranCapacityCount')} onChange={(event) => updateNumber('quranCapacityCount', event.target.value)} placeholder="مثال: 120 مصحف" /></Field>}
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">آخر رصيد مسجل: <b>{siteRow?.presentCount ?? 0}</b></div>
+                <div className={`rounded-xl border px-3 py-2 text-xs ${surplus && surplus > 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white'}`}>الفائض القابل للترحيل: <b>{surplus ?? '-'}</b></div>
+                <div className={`rounded-xl border px-3 py-2 text-xs ${shortage && shortage > 0 ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white'}`}>العجز: <b>{shortage ?? '-'}</b></div>
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">وحدات يمكن استيعابها: <b>{capacity > 0 ? (remaining ?? '-') : 'غير محدد'}</b></div>
+                <div className={`rounded-xl border px-3 py-2 text-xs ${unclassified && unclassified > 0 ? 'border-sky-300 bg-sky-50 text-sky-800' : 'border-slate-200 bg-white'}`}>غير مصنف بالحالة: <b>{unclassified ?? '-'}</b></div>
+              </div>
+              {itemType === 'shelf_unit' && <div className="mt-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">سعة المصاحف التي تستوعبها الرفوف/الدواليب الحالية: <b>{ready ? quranCapacity : '-'}</b> مصحف. هذا الرقم منفصل عن عدد وحدات الرفوف نفسها.</div>}
+              {ready && capacity > 0 && target > capacity && <p className="mt-2 text-xs font-bold text-red-700">العدد المستهدف يتجاوز الحد الاستيعابي لعدد الوحدات؛ عدّل القيم قبل حفظ الزيارة.</p>}
+              {ready && capacity > 0 && present > capacity && <p className="mt-2 text-xs font-bold text-red-700">العدد الموجود يتجاوز الحد الاستيعابي المسجل لعدد الوحدات.</p>}
+              {ready && good + damaged > present && <p className="mt-2 text-xs font-bold text-red-700">مجموع العدد الصالح والتالف لا يمكن أن يتجاوز العدد الموجود.</p>}
+              {itemType === 'shelf_unit' && present > 0 && quranCapacity <= 0 && <p className="mt-2 text-xs font-bold text-red-700">أدخل السعة الإجمالية للمصاحف التي تستوعبها الرفوف والدواليب الموجودة.</p>}
+            </div>;
+          };
+
+          ''')
+          panel = panel[:helper_start] + rack_helpers + panel[helper_end:]
+
+          old_selected = "  const selectedQuranRackStock = quranRackDashboard?.sites.find((row) => row.site.id === visitForm.siteId) || null;"
+          new_selected = "  const getSelectedQuranRackStock = (itemType: QuranEquipmentItemType) => quranRackDashboard?.sites.find((row) => row.site.id === visitForm.siteId && row.itemType === itemType) || null;"
+          panel = replace_once(panel, old_selected, new_selected, 'selected Quran equipment row')
+
+          update_start = panel.find('const updateQuranRackDetails = (index: number, patch: Partial<MosqueFieldVisitQuranRackDetails>) => {')
+          update_end = panel.find('  const applyQuranQuantityAssessment = () => {', update_start)
+          if update_start < 0 or update_end < 0:
+              raise SystemExit('Unable to locate Quran equipment update function')
+          new_update = textwrap.dedent(r'''
+          const updateQuranRackDetails = (index: number, patch: Partial<MosqueFieldVisitQuranRackDetails>) => {
+            const item = visitForm.items[index];
+            const itemType = quranEquipmentItemType(item);
+            const currentDetails = quranRackDetails(item);
+            const merged = { ...currentDetails, ...patch, itemType, capturedFrom: 'field_visit' as const };
+            const required = [merged.presentCount, merged.targetCount, merged.capacityCount, merged.goodCount, merged.damagedCount];
+            const baseReady = required.every((value) => value != null && Number.isFinite(Number(value)));
+            const shelfCapacityReady = itemType !== 'shelf_unit' || (merged.quranCapacityCount != null && Number.isFinite(Number(merged.quranCapacityCount)));
+            const ready = baseReady && shelfCapacityReady;
+            const needsAction = ready && (Number(merged.damagedCount || 0) > 0 || Number(merged.goodCount || 0) < Number(merged.targetCount || 0));
+            setVisitItem(index, {
+              details: { ...(item.details || {}), quranRackInventory: merged },
+              ...(ready ? { status: needsAction ? 'needs_action' : 'good' } : {}),
+            });
+          };
+
+          ''')
+          panel = panel[:update_start] + new_update + panel[update_end:]
+
+          sync_start = panel.find('const syncQuranRackVisitInventory = async (visit: MosqueFieldVisit) => {')
+          sync_end = panel.find('  const syncQuranSupplyRequest = async', sync_start)
+          if sync_start < 0 or sync_end < 0:
+              raise SystemExit('Unable to locate Quran equipment sync/movement functions')
+          sync_block = textwrap.dedent(r'''
+          const syncQuranRackVisitInventory = async (visit: MosqueFieldVisit) => {
+            const items = (visit.items || []).filter(isQuranRackFieldVisitItem).filter((item) => item.status !== 'not_applicable');
+            for (const item of items) {
+              const itemType = quranEquipmentItemType(item);
+              const details = quranRackDetails(item);
+              const values = [details.presentCount, details.targetCount, details.capacityCount, details.goodCount, details.damagedCount];
+              if (!values.every((value) => value != null && Number.isFinite(Number(value)))) continue;
+              if (itemType === 'shelf_unit' && (details.quranCapacityCount == null || !Number.isFinite(Number(details.quranCapacityCount)))) continue;
+              await mosqueApi.createQuranRackInventory({
+                siteId: visit.siteId,
+                itemType,
+                presentCount: Number(details.presentCount || 0),
+                targetCount: Number(details.targetCount || 0),
+                capacityCount: Number(details.capacityCount || 0),
+                quranCapacityCount: itemType === 'shelf_unit' ? Number(details.quranCapacityCount || 0) : 0,
+                goodCount: Number(details.goodCount || 0),
+                damagedCount: Number(details.damagedCount || 0),
+                countedAt: visit.visitDate,
+                notes: `مصدر الجرد: الزيارة الميدانية ${visit.visitNumber}. النوع: ${quranEquipmentLabel(itemType)}.`,
+              });
+            }
+          };
+
+          const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentItemType, movementType: 'surplus_to_stock' | 'stock_to_site', quantity: number) => {
+            if (quantity <= 0) return;
+            const row = quranRackDashboard?.sites.find((item) => item.site.id === siteId && item.itemType === itemType);
+            if (!row) return;
+            const label = quranEquipmentLabel(itemType);
+            const actionLabel = movementType === 'surplus_to_stock' ? `ترحيل فائض ${label} إلى المخزون المركزي` : `صرف ${label} من المخزون للموقع`;
+            if (!window.confirm(`${actionLabel} — ${row.site.name}\nالكمية: ${quantity}\nهل تريد المتابعة؟`)) return;
+            const key = `${siteId}-${itemType}-${movementType}`;
+            try {
+              setRackMovementKey(key);
+              const response = await mosqueApi.createQuranRackMovement({
+                siteId,
+                itemType,
+                movementType,
+                quantity,
+                notes: movementType === 'surplus_to_stock'
+                  ? `ترحيل فائض ${label} من ${row.site.name} إلى المخزون المركزي.`
+                  : `صرف ${label} من المخزون المركزي إلى ${row.site.name} لسد العجز.`,
+              });
+              setQuranRackDashboard(response.dashboard);
+              toast.success(movementType === 'surplus_to_stock' ? `تم ترحيل ${quantity} من ${label} إلى المخزون المركزي` : `تم صرف ${quantity} من ${label} للموقع`);
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : `تعذر تنفيذ حركة ${label}`);
+            } finally {
+              setRackMovementKey(null);
+            }
+          };
+
+          ''')
+          panel = panel[:sync_start] + sync_block + panel[sync_end:]
+
+          validation_start = panel.find('const rackCensusItem = visitForm.items.find(isQuranRackFieldVisitItem);')
+          validation_end = panel.find("    if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus) && visitForm.items.some", validation_start)
+          if validation_start < 0 or validation_end < 0:
+              raise SystemExit('Unable to locate Quran equipment validation block')
+          validation = textwrap.dedent(r'''
+          const rackCensusItems = visitForm.items.filter(isQuranRackFieldVisitItem).filter((item) => item.status !== 'not_applicable');
+          if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
+            for (const rackCensusItem of rackCensusItems) {
+              const itemType = quranEquipmentItemType(rackCensusItem);
+              const label = quranEquipmentLabel(itemType);
+              const details = quranRackDetails(rackCensusItem);
+              const values = [details.presentCount, details.targetCount, details.capacityCount, details.goodCount, details.damagedCount];
+              if (values.some((value) => value == null || !Number.isFinite(Number(value)))) { toast.error(`أدخل جرد ${label}: الموجود والمستهدف والحد الاستيعابي والصالح والتالف قبل إكمال الزيارة`); return; }
+              if (itemType === 'shelf_unit' && (details.quranCapacityCount == null || !Number.isFinite(Number(details.quranCapacityCount)))) { toast.error('أدخل السعة الإجمالية للمصاحف التي تستوعبها الرفوف والدواليب قبل إكمال الزيارة'); return; }
+              const present = Number(details.presentCount || 0);
+              const target = Number(details.targetCount || 0);
+              const capacity = Number(details.capacityCount || 0);
+              const good = Number(details.goodCount || 0);
+              const damaged = Number(details.damagedCount || 0);
+              const quranCapacity = Number(details.quranCapacityCount || 0);
+              if (good + damaged > present) { toast.error(`مجموع العدد الصالح والتالف في ${label} لا يمكن أن يتجاوز العدد الموجود`); return; }
+              if (capacity > 0 && target > capacity) { toast.error(`العدد المستهدف من ${label} لا يمكن أن يتجاوز الحد الاستيعابي لعدد الوحدات`); return; }
+              if (capacity > 0 && present > capacity) { toast.error(`العدد الموجود من ${label} يتجاوز الحد الاستيعابي المسجل لعدد الوحدات`); return; }
+              if (itemType === 'shelf_unit' && present > 0 && quranCapacity <= 0) { toast.error('السعة الإجمالية للمصاحف في الرفوف والدواليب يجب أن تكون أكبر من صفر عند وجود رفوف بالموقع'); return; }
+            }
+          }
+
+          ''')
+          panel = panel[:validation_start] + validation + panel[validation_end:]
+
+          panel = panel.replace("try { await syncQuranRackVisitInventory(savedVisit); } catch (error) { toast.warning('تم حفظ الزيارة، لكن تعذر تحديث جرد حوامل المصاحف: ' + (error instanceof Error ? error.message : 'خطأ غير معروف')); }", "try { await syncQuranRackVisitInventory(savedVisit); } catch (error) { toast.warning('تم حفظ الزيارة، لكن تعذر تحديث جرد تجهيزات المصاحف: ' + (error instanceof Error ? error.message : 'خطأ غير معروف')); }", 1)
+
+          old_editor_render = "{isQuranRackFieldVisitItem(item) && item.status !== 'not_applicable' && <QuranRackInventoryEditor item={item} dashboard={quranRackDashboard} siteRow={selectedQuranRackStock} onChange={(patch) => updateQuranRackDetails(index, patch)} />}"
+          new_editor_render = "{isQuranRackFieldVisitItem(item) && item.status !== 'not_applicable' && <QuranRackInventoryEditor item={item} dashboard={quranRackDashboard} siteRow={getSelectedQuranRackStock(quranEquipmentItemType(item))} onChange={(patch) => updateQuranRackDetails(index, patch)} />}"
+          panel = replace_once(panel, old_editor_render, new_editor_render, 'Quran equipment editor render')
+
+          old_readonly = "{isQuranRackFieldVisitItem(item) && quranRackSummary(item) && <ReadOnlyNote label=\"جرد حوامل المصاحف\" value={quranRackSummary(item)} />}"
+          new_readonly = "{isQuranRackFieldVisitItem(item) && quranRackSummary(item) && <ReadOnlyNote label={`جرد ${quranEquipmentLabel(quranEquipmentItemType(item))}`} value={quranRackSummary(item)} />}"
+          panel = replace_once(panel, old_readonly, new_readonly, 'Quran equipment readonly report label')
+
+          panel = replace_once(panel,
+              "      const census = isQuranFieldVisitItem(item) ? quranInventorySummary(item) : '';",
+              "      const census = isQuranFieldVisitItem(item) ? quranInventorySummary(item) : isQuranRackFieldVisitItem(item) ? quranRackSummary(item) : '';",
+              'Excel Quran equipment summary')
+
+          card_pattern = re.compile(r'\{quranRackDashboard && <Card className="border-teal-200 bg-gradient-to-l from-teal-50/80 via-white to-emerald-50/50">.*?</Card>\}', re.S)
+          card_match = card_pattern.search(panel)
+          if not card_match:
+              raise SystemExit('Unable to locate Quran equipment dashboard card')
+          card = textwrap.dedent(r'''
+          {quranRackDashboard && <Card className="border-teal-200 bg-gradient-to-l from-teal-50/80 via-white to-emerald-50/50">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div><CardTitle className="text-lg text-teal-950">مخزون تجهيزات المصاحف</CardTitle><CardDescription className="mt-1">تم فصل الحامل الفردي الذي يحمل مصحفًا واحدًا عن الرف أو الدولاب الذي يستوعب عدة مصاحف. لكل نوع جرد وفائض وعجز ورصيد مركزي مستقل.</CardDescription></div>
+                <div className="flex flex-wrap gap-2"><Badge className="w-fit bg-emerald-700 text-white">الحوامل الفردية: {quranRackDashboard.summary.byType?.individual_stand?.centralStock ?? quranRackDashboard.summary.centralStockIndividualStands ?? 0}</Badge><Badge className="w-fit bg-teal-700 text-white">الرفوف والدواليب: {quranRackDashboard.summary.byType?.shelf_unit?.centralStock ?? quranRackDashboard.summary.centralStockShelfUnits ?? 0}</Badge></div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {(['individual_stand', 'shelf_unit'] as QuranEquipmentItemType[]).map((itemType) => {
+                const label = quranEquipmentLabel(itemType);
+                const typeSummary = quranRackDashboard.summary.byType?.[itemType];
+                const rows = quranRackDashboard.sites.filter((row) => row.itemType === itemType);
+                const issueRows = rows.filter((row) => row.surplusCount > 0 || row.shortageCount > 0);
+                const centralStock = typeSummary?.centralStock ?? 0;
+                return <section key={itemType} className="rounded-2xl border border-teal-100 bg-white/80 p-4 shadow-sm">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h4 className="font-black text-slate-900">{label}</h4><p className="mt-1 text-[11px] text-slate-500">{itemType === 'individual_stand' ? 'كل حامل فردي = مصحف واحد.' : 'عدد الرفوف/الدواليب منفصل عن عدد المصاحف التي تستوعبها.'}</p></div><Badge variant="outline" className="border-teal-300 bg-teal-50 text-teal-800">الرصيد المركزي: {centralStock}</Badge></div>
+                  <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-xl border bg-white p-3 text-center"><small className="text-slate-500">المواقع المجردة</small><b className="mt-1 block text-xl">{typeSummary?.countedSites ?? 0}</b></div><div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center"><small className="text-emerald-700">فائض المواقع</small><b className="mt-1 block text-xl text-emerald-800">{typeSummary?.totalSurplus ?? 0}</b></div><div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center"><small className="text-amber-700">احتياج المواقع</small><b className="mt-1 block text-xl text-amber-800">{typeSummary?.totalShortage ?? 0}</b></div><div className="rounded-xl border bg-white p-3 text-center"><small className="text-slate-500">{itemType === 'shelf_unit' ? 'سعة المصاحف' : 'التالف'}</small><b className="mt-1 block text-xl">{itemType === 'shelf_unit' ? (typeSummary?.totalQuranCapacity ?? 0) : (typeSummary?.totalDamaged ?? 0)}</b></div></div>
+                  {issueRows.length ? <div className="grid gap-3 lg:grid-cols-2">{issueRows.map((row) => { const capacityAllowance = row.remainingCapacity == null ? row.shortageCount : Math.min(row.shortageCount, row.remainingCapacity); const issueQty = Math.max(0, Math.min(row.shortageCount, centralStock, capacityAllowance)); const keyBase = `${row.site.id}-${itemType}`; return <div key={keyBase} className="rounded-2xl border bg-white p-3 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-2"><div><b className="text-sm text-slate-900">{row.site.name}</b><p className="mt-1 text-[11px] text-slate-500">الموجود {row.presentCount} · الصالح {row.goodCount} · المستهدف {row.targetCount} · حد الوحدات {row.capacityCount || 'غير محدد'}{itemType === 'shelf_unit' ? ` · سعة المصاحف ${row.quranCapacityCount || 0}` : ''}</p></div><div className="flex gap-1">{row.surplusCount > 0 && <Badge className="bg-emerald-100 text-emerald-800">فائض {row.surplusCount}</Badge>}{row.shortageCount > 0 && <Badge className="bg-amber-100 text-amber-800">عجز {row.shortageCount}</Badge>}</div></div>{canEdit && <div className="mt-3 flex flex-wrap gap-2">{row.surplusCount > 0 && <Button type="button" size="sm" className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" disabled={Boolean(rackMovementKey)} onClick={() => void applyQuranRackMovement(row.site.id, itemType, 'surplus_to_stock', row.surplusCount)}>{rackMovementKey === `${keyBase}-surplus_to_stock` && <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" />}ترحيل الفائض ({row.surplusCount})</Button>}{row.shortageCount > 0 && <Button type="button" size="sm" className="border border-teal-700 bg-teal-700 text-white hover:bg-teal-800 hover:text-white" disabled={Boolean(rackMovementKey) || issueQty <= 0} onClick={() => void applyQuranRackMovement(row.site.id, itemType, 'stock_to_site', issueQty)}>{rackMovementKey === `${keyBase}-stock_to_site` && <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" />}صرف من المخزون ({issueQty})</Button>}</div>}</div>; })}</div> : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">لا يوجد فائض أو عجز مسجل في {label} حاليًا.</div>}
+                </section>;
+              })}
+            </CardContent>
+          </Card>}
+          ''').strip()
+          panel = panel[:card_match.start()] + card + panel[card_match.end():]
+
+          panel_path.write_text(panel, encoding='utf-8')
+
+      - name: Build frontend
+        run: |
+          npm run build
+          grep -q 'توفر حوامل المصاحف الفردية وكفاية عددها وسلامتها' src/app/components/MosqueFieldVisitsPanel.tsx
+          grep -q 'توفر رفوف ودواليب المصاحف وكفاية سعتها وسلامتها' src/app/components/MosqueFieldVisitsPanel.tsx
+          grep -q 'quranCapacityCount' src/app/api/mosques.ts
+          grep -q 'كل حامل فردي = مصحف واحد' src/app/components/MosqueFieldVisitsPanel.tsx
+      - name: Commit source change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-quran-equipment-split-ui.yml
+          git add src/app/api/mosques.ts src/app/components/MosqueFieldVisitsPanel.tsx
+          git commit -m "Separate Quran stands from shelves in field inventory"
+          git push origin HEAD:main
