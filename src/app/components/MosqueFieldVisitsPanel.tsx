@@ -417,20 +417,20 @@ const quranInventorySnapshot = (details: MosqueFieldVisitQuranInventoryDetails) 
 
 const validateQuranInventoryConsistency = (details: MosqueFieldVisitQuranInventoryDetails): QuranInventoryConsistency => {
   const counts = [details.largeCount, details.mediumCount, details.smallCount];
+  const withdrawal = Math.max(0, Number(details.recommendedWithdrawalCount || 0));
   if (!counts.every((value) => value != null && Number.isFinite(Number(value)))) {
-    return { valid: true, total: null, withdrawal: Number(details.recommendedWithdrawalCount || 0), message: null };
+    return { valid: true, total: null, withdrawal, message: null };
   }
   const total = counts.reduce((sum, value) => sum + Number(value || 0), 0);
-  const withdrawal = Math.max(0, Number(details.recommendedWithdrawalCount || 0));
-  if (withdrawal > total) {
-    return {
-      valid: false,
-      total,
-      withdrawal,
-      message: `العدد المقترح للسحب (${withdrawal}) يتجاوز إجمالي المصاحف المسجلة (${total}). راجع أعداد الأحجام أو العدد المقترح للسحب.`,
-    };
-  }
+  // العدد المقترح للسحب/الاستبدال ملاحظة ميدانية مستقلة، ولا يدخل في حساب
+  // إجمالي المصاحف حسب الأحجام أو الاحتياج وفق المستهدف.
   return { valid: true, total, withdrawal, message: null };
+};
+
+const isLegacyWithdrawalCouplingCorrection = (details: MosqueFieldVisitQuranInventoryDetails) => {
+  if (details.reconciliationStatus !== 'needs_correction') return false;
+  const message = String(details.reconciliationMessage || '');
+  return message.includes('العدد المقترح للسحب') && message.includes('يتجاوز إجمالي المصاحف');
 };
 
 const prepareQuranInventoryReconciliation = (
@@ -450,6 +450,22 @@ const prepareQuranInventoryReconciliation = (
         correctionDetectedAt: details.correctionDetectedAt || now,
         correctionDetectedBy: details.correctionDetectedBy || currentUsername || null,
         correctionBaseline: details.correctionBaseline || quranInventorySnapshot(details),
+      },
+    };
+  }
+
+  if (isLegacyWithdrawalCouplingCorrection(details)) {
+    return {
+      error: null as string | null,
+      needsCorrection: false,
+      details: {
+        ...details,
+        reconciliationStatus: 'valid' as const,
+        reconciliationMessage: null,
+        correctionReason: null,
+        correctionDetectedAt: null,
+        correctionDetectedBy: null,
+        correctionBaseline: null,
       },
     };
   }
@@ -502,7 +518,11 @@ const prepareQuranInventoryReconciliation = (
 };
 
 const quranVisitNeedsCorrection = (visit: Pick<MosqueFieldVisit, 'items'>) =>
-  (visit.items || []).some((item) => isQuranFieldVisitItem(item) && quranInventoryDetails(item).reconciliationStatus === 'needs_correction');
+  (visit.items || []).some((item) => {
+    if (!isQuranFieldVisitItem(item)) return false;
+    const details = quranInventoryDetails(item);
+    return details.reconciliationStatus === 'needs_correction' && !isLegacyWithdrawalCouplingCorrection(details);
+  });
 
 const quranInventorySummary = (item: MosqueFieldVisitItem) => {
   const details = quranInventoryDetails(item);
@@ -625,7 +645,7 @@ const QuranFieldInventoryEditor: React.FC<{
   const target = stock?.targetCount || 0;
   const need = total == null || target <= 0 ? null : Math.max(0, target - total);
   const consistency = validateQuranInventoryConsistency(details);
-  const storedNeedsCorrection = details.reconciliationStatus === 'needs_correction';
+  const storedNeedsCorrection = details.reconciliationStatus === 'needs_correction' && !isLegacyWithdrawalCouplingCorrection(details);
   const readyForCorrection = storedNeedsCorrection && consistency.valid;
   const lastCorrection = details.correctionHistory?.[details.correctionHistory.length - 1] || null;
   return <div className="md:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
@@ -634,12 +654,13 @@ const QuranFieldInventoryEditor: React.FC<{
       <Field label="المصاحف الكبيرة *"><Input type="number" min="0" value={numericValue('largeCount')} onChange={(event) => updateNumber('largeCount', event.target.value)} /></Field>
       <Field label="المصاحف المتوسطة *"><Input type="number" min="0" value={numericValue('mediumCount')} onChange={(event) => updateNumber('mediumCount', event.target.value)} /></Field>
       <Field label="المصاحف الصغيرة *"><Input type="number" min="0" value={numericValue('smallCount')} onChange={(event) => updateNumber('smallCount', event.target.value)} /></Field>
-      <Field label="المقترح سحبها / استبدالها"><Input type="number" min="0" value={numericValue('recommendedWithdrawalCount')} onChange={(event) => updateNumber('recommendedWithdrawalCount', event.target.value)} /></Field>
+      <Field label="المقترح سحبها / استبدالها — مستقل"><Input type="number" min="0" value={numericValue('recommendedWithdrawalCount')} onChange={(event) => updateNumber('recommendedWithdrawalCount', event.target.value)} /></Field>
       <Field label="سلامة المصاحف *"><NativeSelect value={details.conditionStatus || 'not_checked'} onChange={(event) => onChange({ conditionStatus: event.target.value as MosqueFieldVisitQuranInventoryDetails['conditionStatus'] })}><option value="not_checked">لم يتم التحقق</option><option value="good">سليمة</option><option value="needs_attention">توجد مصاحف تالفة / تحتاج معالجة</option></NativeSelect></Field>
       <Field label="التحقق من جهة الطباعة *"><NativeSelect value={details.publisherStatus || 'not_checked'} onChange={(event) => onChange({ publisherStatus: event.target.value as MosqueFieldVisitQuranInventoryDetails['publisherStatus'] })}><option value="not_checked">لم يتم التحقق</option><option value="approved">تم التحقق / معتمدة</option><option value="needs_review">تحتاج مراجعة أو توجد ملاحظة</option></NativeSelect></Field>
       <Field label="إجمالي العد الفعلي"><Input readOnly value={total == null ? '' : total} className="bg-white font-black" /></Field>
       <Field label="الاحتياج وفق المستهدف"><Input readOnly value={need == null ? (target > 0 ? '' : 'المستهدف غير محدد') : need} className="bg-white font-black" /></Field>
     </div>
+    <div className="mt-2 rounded-xl border border-sky-200 bg-sky-50/80 px-3 py-2 text-[11px] leading-5 text-sky-900"><b>تنبيه حسابي:</b> «المقترح سحبها / استبدالها» حقل مستقل للتوصية الميدانية، ولا يدخل في مجموع المصاحف الكبيرة والمتوسطة والصغيرة ولا في حساب الاحتياج وفق المستهدف.</div>
     {(!consistency.valid || storedNeedsCorrection) && <div className={`mt-3 rounded-2xl border p-3 ${readyForCorrection ? 'border-sky-300 bg-sky-50' : 'border-amber-300 bg-amber-50'}`}>
       <div className="flex items-start gap-2"><AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${readyForCorrection ? 'text-sky-700' : 'text-amber-700'}`} /><div className="min-w-0 flex-1"><b className={`text-xs ${readyForCorrection ? 'text-sky-900' : 'text-amber-900'}`}>{readyForCorrection ? 'تم تعديل الأرقام وأصبحت متسقة — أكمل سبب التصحيح ثم احفظ الزيارة' : 'بيانات جرد المصاحف تحتاج إلى تصحيح'}</b><p className="mt-1 text-[11px] leading-5 text-slate-700">{consistency.message || details.reconciliationMessage || 'راجع الأعداد المسجلة قبل ترحيلها إلى الجرد الرسمي للموقع.'}</p></div></div>
       {storedNeedsCorrection && <div className="mt-3"><Field label="سبب تصحيح الجرد *"><Textarea rows={2} value={details.correctionReason || ''} onChange={(event) => onChange({ correctionReason: event.target.value })} placeholder="مثال: خطأ في إدخال عدد المصاحف المتوسطة أثناء الزيارة، وتمت مراجعة العد الفعلي." /></Field><p className="mt-1 text-[10px] text-slate-500">لن تُفقد القيم القديمة؛ سيحفظ النظام قبل/بعد التصحيح واسم المستخدم والتاريخ وسبب التعديل ضمن سجل الزيارة.</p></div>}
@@ -1217,7 +1238,7 @@ const updateQuranRackDetails = (index: number, patch: Partial<MosqueFieldVisitQu
     const counts = [details.largeCount, details.mediumCount, details.smallCount];
     if (!counts.every((value) => value != null && Number.isFinite(Number(value)))) return null;
     const consistency = validateQuranInventoryConsistency(details);
-    if (!consistency.valid || details.reconciliationStatus === 'needs_correction') {
+    if (!consistency.valid || (details.reconciliationStatus === 'needs_correction' && !isLegacyWithdrawalCouplingCorrection(details))) {
       return { synced: false, needsCorrection: true, message: consistency.message || details.reconciliationMessage || 'بيانات جرد المصاحف تحتاج إلى تصحيح.' };
     }
     const total = consistency.total || 0;
