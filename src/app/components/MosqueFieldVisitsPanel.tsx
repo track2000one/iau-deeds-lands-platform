@@ -36,6 +36,8 @@ import {
   type MosqueQuranStockDashboard,
   type MosqueQuranOpeningBaselineStatus,
   type MosqueFieldVisitQuranInventoryDetails,
+  type MosqueFieldVisitQuranRackDetails,
+  type MosqueQuranRackDashboard,
   type MosqueRequest,
   type MosqueSite,
 } from '../api/mosques';
@@ -365,6 +367,72 @@ const quranInventorySummary = (item: MosqueFieldVisitItem) => {
   return `الجرد الميداني للموقع: إجمالي ${total} — كبير ${Number(details.largeCount || 0)} — متوسط ${Number(details.mediumCount || 0)} — صغير ${Number(details.smallCount || 0)} — المقترح سحبها/استبدالها ${Number(details.recommendedWithdrawalCount || 0)} — الحالة ${condition} — جهة الطباعة ${publisher}`;
 };
 
+
+const QURAN_RACK_ITEM_TITLE = 'توفر دواليب ورفوف المصاحف بحالة مناسبة';
+const isQuranRackFieldVisitItem = (item: Pick<MosqueFieldVisitItem, 'title'>) => item.title === QURAN_RACK_ITEM_TITLE;
+const quranRackDetails = (item: MosqueFieldVisitItem): MosqueFieldVisitQuranRackDetails =>
+  (item.details?.quranRackInventory || {}) as MosqueFieldVisitQuranRackDetails;
+
+const quranRackSummary = (item: MosqueFieldVisitItem) => {
+  const details = quranRackDetails(item);
+  const values = [details.presentCount, details.targetCount, details.capacityCount, details.goodCount, details.damagedCount];
+  if (!values.every((value) => value != null && Number.isFinite(Number(value)))) return '';
+  const present = Number(details.presentCount || 0);
+  const target = Number(details.targetCount || 0);
+  const capacity = Number(details.capacityCount || 0);
+  const good = Number(details.goodCount || 0);
+  const damaged = Number(details.damagedCount || 0);
+  const surplus = Math.max(good - target, 0);
+  const shortage = Math.max(target - good, 0);
+  const remaining = capacity > 0 ? Math.max(capacity - present, 0) : null;
+  return `حوامل المصاحف: الموجود ${present} — المستهدف ${target} — الحد الاستيعابي ${capacity || 'غير محدد'} — الصالح ${good} — التالف ${damaged} — الفائض ${surplus} — العجز ${shortage}${remaining == null ? '' : ` — السعة المتبقية ${remaining}`}`;
+};
+
+const QuranRackInventoryEditor: React.FC<{
+  item: MosqueFieldVisitItem;
+  dashboard: MosqueQuranRackDashboard | null;
+  siteRow: MosqueQuranRackDashboard['sites'][number] | null;
+  onChange: (patch: Partial<MosqueFieldVisitQuranRackDetails>) => void;
+}> = ({ item, dashboard, siteRow, onChange }) => {
+  const details = quranRackDetails(item);
+  const keys: Array<keyof Pick<MosqueFieldVisitQuranRackDetails, 'presentCount' | 'targetCount' | 'capacityCount' | 'goodCount' | 'damagedCount'>> = ['presentCount', 'targetCount', 'capacityCount', 'goodCount', 'damagedCount'];
+  const numericValue = (key: typeof keys[number]) => details[key] == null ? '' : String(details[key]);
+  const updateNumber = (key: typeof keys[number], value: string) => onChange({ [key]: value === '' ? null : Math.max(0, Math.trunc(Number(value) || 0)) });
+  const ready = keys.every((key) => details[key] != null && Number.isFinite(Number(details[key])));
+  const present = Number(details.presentCount || 0);
+  const target = Number(details.targetCount || 0);
+  const capacity = Number(details.capacityCount || 0);
+  const good = Number(details.goodCount || 0);
+  const damaged = Number(details.damagedCount || 0);
+  const surplus = ready ? Math.max(good - target, 0) : null;
+  const shortage = ready ? Math.max(target - good, 0) : null;
+  const remaining = ready && capacity > 0 ? Math.max(capacity - present, 0) : null;
+  const unclassified = ready ? Math.max(present - good - damaged, 0) : null;
+  return <div className="md:col-span-2 rounded-2xl border border-teal-200 bg-teal-50/45 p-4">
+    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+      <div><b className="text-sm text-teal-950">الجرد العددي لحوامل / رفوف المصاحف</b><p className="mt-1 text-[11px] leading-5 text-slate-600">سجّل الموجود والمستهدف والحد الاستيعابي. يحسب النظام الفائض والعجز تلقائيًا، ولا ينتقل الفائض إلى المخزون المركزي إلا بحركة ترحيل مستقلة للحفاظ على السجل.</p></div>
+      <Badge variant="outline" className="border-teal-300 bg-white text-teal-800">رصيد المخزون المركزي: {dashboard?.summary.centralStock ?? 0}</Badge>
+    </div>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <Field label="العدد الموجود فعليًا *"><Input type="number" min="0" value={numericValue('presentCount')} onChange={(event) => updateNumber('presentCount', event.target.value)} /></Field>
+      <Field label="العدد المستهدف للموقع *"><Input type="number" min="0" value={numericValue('targetCount')} onChange={(event) => updateNumber('targetCount', event.target.value)} /></Field>
+      <Field label="الحد الاستيعابي *"><Input type="number" min="0" value={numericValue('capacityCount')} onChange={(event) => updateNumber('capacityCount', event.target.value)} /></Field>
+      <Field label="الحوامل الصالحة *"><Input type="number" min="0" value={numericValue('goodCount')} onChange={(event) => updateNumber('goodCount', event.target.value)} /></Field>
+      <Field label="التالفة / تحتاج صيانة *"><Input type="number" min="0" value={numericValue('damagedCount')} onChange={(event) => updateNumber('damagedCount', event.target.value)} /></Field>
+    </div>
+    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">آخر رصيد مسجل: <b>{siteRow?.presentCount ?? 0}</b></div>
+      <div className={`rounded-xl border px-3 py-2 text-xs ${surplus && surplus > 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white'}`}>الفائض القابل للترحيل: <b>{surplus ?? '-'}</b></div>
+      <div className={`rounded-xl border px-3 py-2 text-xs ${shortage && shortage > 0 ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white'}`}>العجز: <b>{shortage ?? '-'}</b></div>
+      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">السعة المتبقية: <b>{capacity > 0 ? (remaining ?? '-') : 'غير محددة'}</b></div>
+      <div className={`rounded-xl border px-3 py-2 text-xs ${unclassified && unclassified > 0 ? 'border-sky-300 bg-sky-50 text-sky-800' : 'border-slate-200 bg-white'}`}>غير مصنف بالحالة: <b>{unclassified ?? '-'}</b></div>
+    </div>
+    {ready && capacity > 0 && target > capacity && <p className="mt-2 text-xs font-bold text-red-700">العدد المستهدف يتجاوز الحد الاستيعابي؛ عدّل القيم قبل حفظ الزيارة.</p>}
+    {ready && capacity > 0 && present > capacity && <p className="mt-2 text-xs font-bold text-red-700">العدد الموجود يتجاوز الحد الاستيعابي المسجل.</p>}
+    {ready && good + damaged > present && <p className="mt-2 text-xs font-bold text-red-700">مجموع الحوامل الصالحة والتالفة لا يمكن أن يتجاوز العدد الموجود.</p>}
+  </div>;
+};
+
 const QuranFieldInventoryEditor: React.FC<{
   item: MosqueFieldVisitItem;
   stock: MosqueQuranStockDashboard['sites'][number] | null;
@@ -631,6 +699,8 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [saving, setSaving] = React.useState(false);
   const [summary, setSummary] = React.useState<MosqueFieldVisitSummary>(emptySummary);
   const [quranStockDashboard, setQuranStockDashboard] = React.useState<MosqueQuranStockDashboard | null>(null);
+  const [quranRackDashboard, setQuranRackDashboard] = React.useState<MosqueQuranRackDashboard | null>(null);
+  const [rackMovementKey, setRackMovementKey] = React.useState<string | null>(null);
   const [quranOpeningBaselineStatus, setQuranOpeningBaselineStatus] = React.useState<MosqueQuranOpeningBaselineStatus | null>(null);
   const [quranSupplyRequests, setQuranSupplyRequests] = React.useState<MosqueRequest[]>([]);
   const [tours, setTours] = React.useState<MosqueFieldTour[]>([]);
@@ -687,17 +757,19 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryData, tourData, visitData, checklist, quranStockData, requestRows, baselineStatus] = await Promise.all([
+      const [summaryData, tourData, visitData, checklist, quranStockData, quranRackData, requestRows, baselineStatus] = await Promise.all([
         mosqueApi.fieldVisitSummary(),
         mosqueApi.fieldTours(),
         mosqueApi.fieldVisits(),
         mosqueApi.fieldVisitChecklist(),
         mosqueApi.quranStockDashboard(),
+        mosqueApi.quranRackDashboard().catch(() => null as MosqueQuranRackDashboard | null),
         mosqueApi.requests().catch(() => [] as MosqueRequest[]),
         mosqueApi.quranOpeningBaselineStatus().catch(() => null as MosqueQuranOpeningBaselineStatus | null),
       ]);
       setSummary(summaryData);
       setQuranStockDashboard(quranStockData);
+      setQuranRackDashboard(quranRackData);
       setQuranOpeningBaselineStatus(baselineStatus);
       setQuranSupplyRequests(requestRows.filter(isQuranSupplyRequest));
       setTours(tourData);
@@ -898,6 +970,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   };
 
   const selectedQuranStock = quranStockDashboard?.sites.find((row) => row.site.id === visitForm.siteId) || null;
+  const selectedQuranRackStock = quranRackDashboard?.sites.find((row) => row.site.id === visitForm.siteId) || null;
   const selectedQuranSupplyRequest = React.useMemo(() => {
     const rows = quranSupplyRequests
       .filter((request) => request.siteId === visitForm.siteId && !['closed', 'rejected'].includes(request.status))
@@ -915,6 +988,20 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       },
     });
   };
+
+
+const updateQuranRackDetails = (index: number, patch: Partial<MosqueFieldVisitQuranRackDetails>) => {
+  const item = visitForm.items[index];
+  const currentDetails = quranRackDetails(item);
+  const merged = { ...currentDetails, ...patch, capturedFrom: 'field_visit' as const };
+  const required = [merged.presentCount, merged.targetCount, merged.capacityCount, merged.goodCount, merged.damagedCount];
+  const ready = required.every((value) => value != null && Number.isFinite(Number(value)));
+  const needsAction = ready && (Number(merged.damagedCount || 0) > 0 || Number(merged.goodCount || 0) < Number(merged.targetCount || 0));
+  setVisitItem(index, {
+    details: { ...(item.details || {}), quranRackInventory: merged },
+    ...(ready ? { status: needsAction ? 'needs_action' : 'good' } : {}),
+  });
+};
 
   const applyQuranQuantityAssessment = () => {
     const itemIndex = visitForm.items.findIndex(isQuranFieldVisitItem);
@@ -984,6 +1071,51 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     });
     toast.success('تم تحديث رصيد المسجد / المصلى من الزيارة كجرد دوري جديد دون تغيير مخزون المكتبة');
   };
+
+
+const syncQuranRackVisitInventory = async (visit: MosqueFieldVisit) => {
+  const item = (visit.items || []).find(isQuranRackFieldVisitItem);
+  if (!item || item.status === 'not_applicable') return;
+  const details = quranRackDetails(item);
+  const values = [details.presentCount, details.targetCount, details.capacityCount, details.goodCount, details.damagedCount];
+  if (!values.every((value) => value != null && Number.isFinite(Number(value)))) return;
+  await mosqueApi.createQuranRackInventory({
+    siteId: visit.siteId,
+    presentCount: Number(details.presentCount || 0),
+    targetCount: Number(details.targetCount || 0),
+    capacityCount: Number(details.capacityCount || 0),
+    goodCount: Number(details.goodCount || 0),
+    damagedCount: Number(details.damagedCount || 0),
+    countedAt: visit.visitDate,
+    notes: `مصدر الجرد: الزيارة الميدانية ${visit.visitNumber}.`,
+  });
+};
+
+const applyQuranRackMovement = async (siteId: string, movementType: 'surplus_to_stock' | 'stock_to_site', quantity: number) => {
+  if (quantity <= 0) return;
+  const row = quranRackDashboard?.sites.find((item) => item.site.id === siteId);
+  if (!row) return;
+  const actionLabel = movementType === 'surplus_to_stock' ? 'ترحيل الفائض إلى مخزون حوامل المصاحف' : 'صرف حوامل من المخزون للموقع';
+  if (!window.confirm(`${actionLabel} — ${row.site.name}\nالكمية: ${quantity}\nهل تريد المتابعة؟`)) return;
+  const key = `${siteId}-${movementType}`;
+  try {
+    setRackMovementKey(key);
+    const response = await mosqueApi.createQuranRackMovement({
+      siteId,
+      movementType,
+      quantity,
+      notes: movementType === 'surplus_to_stock'
+        ? `ترحيل فائض حوامل المصاحف من ${row.site.name} إلى المخزون المركزي.`
+        : `صرف حوامل مصاحف من المخزون المركزي إلى ${row.site.name} لسد العجز.`,
+    });
+    setQuranRackDashboard(response.dashboard);
+    toast.success(movementType === 'surplus_to_stock' ? `تم ترحيل ${quantity} حامل إلى المخزون المركزي` : `تم صرف ${quantity} حامل للموقع`);
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'تعذر تنفيذ حركة حوامل المصاحف');
+  } finally {
+    setRackMovementKey(null);
+  }
+};
 
   const syncQuranSupplyRequest = async (visit: MosqueFieldVisit, dashboardOverride?: MosqueQuranStockDashboard | null) => {
     const stock = (dashboardOverride || quranStockDashboard)?.sites.find((row) => row.site.id === visit.siteId) || null;
@@ -1241,6 +1373,22 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       if (!details.conditionStatus || details.conditionStatus === 'not_checked') { toast.error('حدد نتيجة سلامة المصاحف في بند المصاحف'); return; }
       if (!details.publisherStatus || details.publisherStatus === 'not_checked') { toast.error('حدد نتيجة التحقق من جهة طباعة المصاحف'); return; }
     }
+
+const rackCensusItem = visitForm.items.find(isQuranRackFieldVisitItem);
+if (rackCensusItem && rackCensusItem.status !== 'not_applicable' && ['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
+  const details = quranRackDetails(rackCensusItem);
+  const values = [details.presentCount, details.targetCount, details.capacityCount, details.goodCount, details.damagedCount];
+  if (values.some((value) => value == null || !Number.isFinite(Number(value)))) { toast.error('أدخل جرد حوامل المصاحف: الموجود والمستهدف والحد الاستيعابي والصالح والتالف قبل إكمال الزيارة'); return; }
+  const present = Number(details.presentCount || 0);
+  const target = Number(details.targetCount || 0);
+  const capacity = Number(details.capacityCount || 0);
+  const good = Number(details.goodCount || 0);
+  const damaged = Number(details.damagedCount || 0);
+  if (good + damaged > present) { toast.error('مجموع حوامل المصاحف الصالحة والتالفة لا يمكن أن يتجاوز العدد الموجود'); return; }
+  if (capacity > 0 && target > capacity) { toast.error('العدد المستهدف لحوامل المصاحف لا يمكن أن يتجاوز الحد الاستيعابي للموقع'); return; }
+  if (capacity > 0 && present > capacity) { toast.error('العدد الموجود من حوامل المصاحف يتجاوز الحد الاستيعابي المسجل للموقع'); return; }
+}
+
     if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus) && visitForm.items.some((item) => item.status === 'not_checked')) {
       toast.error('لا يمكن إكمال الزيارة مع وجود بنود لم يتم التحقق منها');
       return;
@@ -1267,8 +1415,11 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         : await mosqueApi.createFieldVisit(payload);
       toast.success(editingVisit ? 'تم تحديث الزيارة وحفظ نتائجها' : 'تم إنشاء الزيارة الميدانية');
       try { await syncQuranVisitInventory(savedVisit); } catch (error) { toast.warning('تم حفظ الزيارة، لكن تعذر تحديث جرد المصاحف: ' + (error instanceof Error ? error.message : 'خطأ غير معروف')); }
+      try { await syncQuranRackVisitInventory(savedVisit); } catch (error) { toast.warning('تم حفظ الزيارة، لكن تعذر تحديث جرد حوامل المصاحف: ' + (error instanceof Error ? error.message : 'خطأ غير معروف')); }
       const refreshedQuranStock = await mosqueApi.quranStockDashboard().catch(() => quranStockDashboard);
       if (refreshedQuranStock) setQuranStockDashboard(refreshedQuranStock);
+      const refreshedRackStock = await mosqueApi.quranRackDashboard().catch(() => quranRackDashboard);
+      if (refreshedRackStock) setQuranRackDashboard(refreshedRackStock);
       await syncQuranSupplyRequest(savedVisit, refreshedQuranStock);
       setVisitDialog(false);
       await load();
@@ -1389,7 +1540,8 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     if (column === 'priority') return priorityLabels[item.priority] || item.priority;
     if (column === 'note') {
       const census = isQuranFieldVisitItem(item) ? quranInventorySummary(item) : '';
-      return [item.note, census].filter(Boolean).join(' — ') || '-';
+      const rackCensus = isQuranRackFieldVisitItem(item) ? quranRackSummary(item) : '';
+      return [item.note, census, rackCensus].filter(Boolean).join(' — ') || '-';
     }
     if (column === 'responsible') return item.responsibleEntity || '-';
     if (column === 'due_date') return item.dueDate ? new Date(item.dueDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-';
@@ -1586,7 +1738,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         case 'title': return item.title;
         case 'status': return getItemStatusLabel(item);
         case 'priority': return priorityLabels[item.priority] || item.priority;
-        case 'note': { const census = isQuranFieldVisitItem(item) ? quranInventorySummary(item) : ''; return [item.note, census].filter(Boolean).join(' — ') || '-'; }
+        case 'note': { const census = isQuranFieldVisitItem(item) ? quranInventorySummary(item) : ''; const rackCensus = isQuranRackFieldVisitItem(item) ? quranRackSummary(item) : ''; return [item.note, census, rackCensus].filter(Boolean).join(' — ') || '-'; }
         case 'responsible': return item.responsibleEntity || '-';
         case 'due_date': return item.dueDate ? new Date(item.dueDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-';
         case 'resolution': return resolutionLabels[item.resolutionStatus] || item.resolutionStatus;
@@ -1792,6 +1944,15 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       <Metric label="عاجلة" value={summary.urgentItems} icon={AlertTriangle} tone="red" />
       <Metric label="متأخرة" value={summary.overdueItems} icon={AlertTriangle} tone="amber" />
     </div>
+
+
+{quranRackDashboard && <Card className="border-teal-200 bg-gradient-to-l from-teal-50/80 via-white to-emerald-50/50">
+  <CardHeader className="pb-3"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="text-lg text-teal-950">مخزون حوامل المصاحف</CardTitle><CardDescription className="mt-1">موازنة الحوامل بين المواقع: يسجل الفائض أولًا في المخزون المركزي، ثم يصرف للمسجد أو المصلى الذي لديه عجز.</CardDescription></div><Badge className="w-fit bg-teal-700 text-white">الرصيد المركزي: {quranRackDashboard.summary.centralStock}</Badge></div></CardHeader>
+  <CardContent className="space-y-4">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-xl border bg-white p-3 text-center"><small className="text-slate-500">تم جردها</small><b className="mt-1 block text-xl">{quranRackDashboard.summary.countedSites}</b></div><div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center"><small className="text-emerald-700">فائض المواقع</small><b className="mt-1 block text-xl text-emerald-800">{quranRackDashboard.summary.totalSurplus}</b></div><div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center"><small className="text-amber-700">احتياج المواقع</small><b className="mt-1 block text-xl text-amber-800">{quranRackDashboard.summary.totalShortage}</b></div><div className="rounded-xl border bg-white p-3 text-center"><small className="text-slate-500">التالف</small><b className="mt-1 block text-xl">{quranRackDashboard.summary.totalDamaged}</b></div></div>
+    {(quranRackDashboard.sites.some((row) => row.surplusCount > 0 || row.shortageCount > 0)) ? <div className="grid gap-3 lg:grid-cols-2">{quranRackDashboard.sites.filter((row) => row.surplusCount > 0 || row.shortageCount > 0).map((row) => { const capacityAllowance = row.remainingCapacity == null ? row.shortageCount : Math.min(row.shortageCount, row.remainingCapacity); const issueQty = Math.max(0, Math.min(row.shortageCount, quranRackDashboard.summary.centralStock, capacityAllowance)); return <div key={row.site.id} className="rounded-2xl border bg-white p-3 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-2"><div><b className="text-sm text-slate-900">{row.site.name}</b><p className="mt-1 text-[11px] text-slate-500">الموجود {row.presentCount} · الصالح {row.goodCount} · المستهدف {row.targetCount} · الاستيعاب {row.capacityCount || 'غير محدد'}</p></div><div className="flex gap-1">{row.surplusCount > 0 && <Badge className="bg-emerald-100 text-emerald-800">فائض {row.surplusCount}</Badge>}{row.shortageCount > 0 && <Badge className="bg-amber-100 text-amber-800">عجز {row.shortageCount}</Badge>}</div></div>{canEdit && <div className="mt-3 flex flex-wrap gap-2">{row.surplusCount > 0 && <Button type="button" size="sm" className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" disabled={Boolean(rackMovementKey)} onClick={() => void applyQuranRackMovement(row.site.id, 'surplus_to_stock', row.surplusCount)}>{rackMovementKey === `${row.site.id}-surplus_to_stock` && <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" />}ترحيل الفائض ({row.surplusCount})</Button>}{row.shortageCount > 0 && <Button type="button" size="sm" className="border border-teal-700 bg-teal-700 text-white hover:bg-teal-800 hover:text-white" disabled={Boolean(rackMovementKey) || issueQty <= 0} onClick={() => void applyQuranRackMovement(row.site.id, 'stock_to_site', issueQty)}>{rackMovementKey === `${row.site.id}-stock_to_site` && <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" />}صرف من المخزون ({issueQty})</Button>}</div>}</div>; })}</div> : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">لا يوجد فائض أو عجز مسجل في حوامل المصاحف حاليًا.</div>}
+  </CardContent>
+</Card>}
 
     <Card>
       <CardContent className="pt-5">
@@ -2041,7 +2202,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
                   <div className="flex flex-wrap gap-2"><Badge variant="outline">{getItemStatusLabel(item)}</Badge><Badge variant="outline">{priorityLabels[item.priority]}</Badge></div>
                 </div>
                 {item.note && <ReadOnlyNote label="الملاحظة" value={item.note} />}
-                {isQuranFieldVisitItem(item) && quranInventorySummary(item) && <ReadOnlyNote label="الجرد الميداني للمصاحف" value={quranInventorySummary(item)} />}
+                {isQuranFieldVisitItem(item) && quranInventorySummary(item) && <ReadOnlyNote label="الجرد الميداني للمصاحف" value={quranInventorySummary(item)} />}{isQuranRackFieldVisitItem(item) && quranRackSummary(item) && <ReadOnlyNote label="جرد حوامل المصاحف" value={quranRackSummary(item)} />}
                 {item.status === 'needs_action' && <div className="grid gap-2 border-t border-amber-200 pt-3 sm:grid-cols-3"><InfoBox label="الجهة المسؤولة" value={item.responsibleEntity || '-'} /><InfoBox label="المهلة" value={item.dueDate ? new Date(item.dueDate).toLocaleDateString('ar-SA-u-ca-gregory') : '-'} /><InfoBox label="حالة المعالجة" value={resolutionLabels[item.resolutionStatus]} /></div>}
                 {item.resolutionNote && <ReadOnlyNote label="ملاحظة المعالجة" value={item.resolutionNote} />}
                 {isActivityApprovalItem(item) ? (item.beforeImages.length > 0 && <div className="border-t pt-3"><VisitImages label="مرفقات اعتماد النشاط" images={item.beforeImages} /></div>) : ((item.beforeImages.length > 0 || item.afterImages.length > 0) && <div className="grid gap-3 border-t pt-3 sm:grid-cols-2"><VisitImages label="صور قبل المعالجة" images={item.beforeImages} /><VisitImages label="صور بعد المعالجة" images={item.afterImages} /></div>)}
@@ -2089,7 +2250,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         <DialogHeader className="text-right"><DialogTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-sky-700" />{editingVisit ? `توثيق الزيارة ${editingVisit.visitNumber}` : 'إنشاء زيارة ميدانية'}</DialogTitle><DialogDescription>تُحفظ الزيارة في السجل التاريخي للمسجد أو المصلى المحدد، وتنتقل الملاحظات المفتوحة إلى المتابعة.</DialogDescription></DialogHeader>
         <div className="grid gap-4 rounded-2xl border bg-slate-50/70 p-4 md:grid-cols-3"><Field label="المسجد أو المصلى *"><NativeSelect value={visitForm.siteId} onChange={(event) => setVisitForm({ ...visitForm, siteId: event.target.value })} disabled={Boolean(editingVisit?.tourId)}><option value="">اختر الموقع</option>{sites.map((site) => { const activeVisit = activeVisitBySite.get(site.id); const blocked = !editingVisit && Boolean(activeVisit); return <option key={site.id} value={site.id} disabled={blocked}>{site.name} — {site.campusLocation || site.city || ''}{blocked ? ` — زيارة قائمة ${activeVisit!.visitNumber}` : ''}</option>; })}</NativeSelect></Field><Field label="نوع الزيارة"><NativeSelect value={visitForm.visitType} onChange={(event) => setVisitForm({ ...visitForm, visitType: event.target.value as MosqueFieldVisit['visitType'] })}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field><Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field><Field label="ممثل الموقع"><Input value={visitForm.representativeName} onChange={(event) => setVisitForm({ ...visitForm, representativeName: event.target.value })} /></Field><Field label="حالة سجل الزيارة"><NativeSelect value={visitForm.workflowStatus} onChange={(event) => setVisitForm({ ...visitForm, workflowStatus: event.target.value as MosqueFieldVisit['workflowStatus'] })}>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><div className="md:col-span-3"><Field label="منفذ الزيارة"><Input value={visitForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field><p className="mt-1 text-[11px] text-slate-500">يُسجل اسم المستخدم الحالي تلقائيًا. السجلات السابقة تحتفظ بأسماء الفريق المحفوظة تاريخيًا.</p></div><Field label="الحالة العامة"><NativeSelect value={visitForm.overallStatus} onChange={(event) => setVisitForm({ ...visitForm, overallStatus: event.target.value as MosqueFieldVisit['overallStatus'] })}>{Object.entries(overallLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="الأولوية العامة"><NativeSelect value={visitForm.priority} onChange={(event) => setVisitForm({ ...visitForm, priority: event.target.value as MosqueFieldVisit['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field></div>
         {visitForm.siteId && <QuranVisitStockLink dashboard={quranStockDashboard} siteId={visitForm.siteId} linkedRequest={selectedQuranSupplyRequest} onApplyQuantity={applyQuranQuantityAssessment} />}
-        <div className="space-y-3"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">تتغير خيارات النتيجة تلقائيًا حسب نوع بند الفحص، ويمكن إضافة بنود ميدانية غير موجودة في القائمة الأساسية لتدخل في نفس مسار الاعتماد والمتابعة.</p></div><div className="flex flex-wrap items-center gap-2"><Button type="button" size="sm" variant="outline" className="border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100" onClick={addManualVisitItem}><Plus className="ml-1 h-4 w-4" />إضافة بند ميداني</Button><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div></div>{visitForm.items.map((item, index) => <Card id={isManualFieldVisitItem(item) && index === visitForm.items.length - 1 ? 'manual-field-visit-item-last' : undefined} key={item.id || `visit-item-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center">{isManualFieldVisitItem(item) ? <div className="min-w-0 flex-1 rounded-xl border border-sky-200 bg-sky-50/60 p-3"><div className="mb-2 flex items-center justify-between gap-2"><Badge variant="outline" className="border-sky-300 bg-white text-sky-800">بند مضاف يدويًا</Badge><Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => removeManualVisitItem(index)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button></div><div className="grid gap-2 md:grid-cols-[180px_1fr]"><Input value={item.category || ''} onChange={(event) => setVisitItem(index, { category: event.target.value })} maxLength={120} placeholder="التصنيف — مثال: السلامة" /><Input value={item.title || ''} onChange={(event) => setVisitItem(index, { title: event.target.value })} maxLength={300} placeholder="اكتب البند الذي تريد فحصه *" /></div></div> : <div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div>}<NativeSelect className="lg:w-64" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{getItemStatusOptions(item).map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{isQuranFieldVisitItem(item) && <QuranFieldInventoryEditor item={item} stock={selectedQuranStock} baselineClosed={quranOpeningBaselineStatus?.closed ?? null} onChange={(patch) => updateQuranInventoryDetails(index, patch)} />}{isActivityApprovalItem(item) && !['not_available', 'not_applicable', 'not_checked'].includes(item.status) && <ActivityApprovalEvidenceField files={item.beforeImages || []} loading={uploadingKey === `${index}-activityApprovalEvidence`} onFiles={(files) => void uploadActivityApprovalEvidence(index, files)} onRemove={(fileIndex) => removeItemImage(index, 'beforeImages', fileIndex)} />}{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label={['resolved', 'closed'].includes(item.resolutionStatus) ? 'وصف الإجراء / المعالجة المنفذة *' : 'وصف الإجراء / المعالجة المنفذة'}><Textarea rows={2} value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} placeholder="اكتب ما تم تنفيذه لمعالجة الملاحظة" /></Field><div className={(isActivityApprovalItem(item) || isQuranFieldVisitItem(item)) ? 'hidden' : 'md:col-span-2 rounded-2xl border border-emerald-200 bg-white p-3'}><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><b className="text-sm text-emerald-900">سجل المعالجة المصور — قبل / بعد</b><p className="mt-1 text-[11px] text-slate-500">وثّق الحالة قبل المعالجة، ثم أضف صورة بعد التنفيذ لإغلاق الملاحظة والتحقق منها.</p></div><div className="flex gap-2"><Badge variant="outline">قبل: {(item.beforeImages || []).length}</Badge><Badge variant="outline">بعد: {(item.afterImages || []).length}</Badge></div></div><div className="grid gap-3 md:grid-cols-2"><ImageField label="صور قبل المعالجة *" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label={item.resolutionStatus === 'closed' ? 'صور بعد المعالجة *' : 'صور بعد المعالجة'} images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div></div></div>}</CardContent></Card>)}</div>
+        <div className="space-y-3"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">تتغير خيارات النتيجة تلقائيًا حسب نوع بند الفحص، ويمكن إضافة بنود ميدانية غير موجودة في القائمة الأساسية لتدخل في نفس مسار الاعتماد والمتابعة.</p></div><div className="flex flex-wrap items-center gap-2"><Button type="button" size="sm" variant="outline" className="border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100" onClick={addManualVisitItem}><Plus className="ml-1 h-4 w-4" />إضافة بند ميداني</Button><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div></div>{visitForm.items.map((item, index) => <Card id={isManualFieldVisitItem(item) && index === visitForm.items.length - 1 ? 'manual-field-visit-item-last' : undefined} key={item.id || `visit-item-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center">{isManualFieldVisitItem(item) ? <div className="min-w-0 flex-1 rounded-xl border border-sky-200 bg-sky-50/60 p-3"><div className="mb-2 flex items-center justify-between gap-2"><Badge variant="outline" className="border-sky-300 bg-white text-sky-800">بند مضاف يدويًا</Badge><Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => removeManualVisitItem(index)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button></div><div className="grid gap-2 md:grid-cols-[180px_1fr]"><Input value={item.category || ''} onChange={(event) => setVisitItem(index, { category: event.target.value })} maxLength={120} placeholder="التصنيف — مثال: السلامة" /><Input value={item.title || ''} onChange={(event) => setVisitItem(index, { title: event.target.value })} maxLength={300} placeholder="اكتب البند الذي تريد فحصه *" /></div></div> : <div className="min-w-0 flex-1"><Badge variant="outline" className="mb-1">{item.category}</Badge><p className="font-bold text-slate-800">{item.title}</p></div>}<NativeSelect className="lg:w-64" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{getItemStatusOptions(item).map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></div>{isQuranFieldVisitItem(item) && <QuranFieldInventoryEditor item={item} stock={selectedQuranStock} baselineClosed={quranOpeningBaselineStatus?.closed ?? null} onChange={(patch) => updateQuranInventoryDetails(index, patch)} />}{isQuranRackFieldVisitItem(item) && item.status !== 'not_applicable' && <QuranRackInventoryEditor item={item} dashboard={quranRackDashboard} siteRow={selectedQuranRackStock} onChange={(patch) => updateQuranRackDetails(index, patch)} />}{isActivityApprovalItem(item) && !['not_available', 'not_applicable', 'not_checked'].includes(item.status) && <ActivityApprovalEvidenceField files={item.beforeImages || []} loading={uploadingKey === `${index}-activityApprovalEvidence`} onFiles={(files) => void uploadActivityApprovalEvidence(index, files)} onRemove={(fileIndex) => removeItemImage(index, 'beforeImages', fileIndex)} />}{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label={['resolved', 'closed'].includes(item.resolutionStatus) ? 'وصف الإجراء / المعالجة المنفذة *' : 'وصف الإجراء / المعالجة المنفذة'}><Textarea rows={2} value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} placeholder="اكتب ما تم تنفيذه لمعالجة الملاحظة" /></Field><div className={(isActivityApprovalItem(item) || isQuranFieldVisitItem(item)) ? 'hidden' : 'md:col-span-2 rounded-2xl border border-emerald-200 bg-white p-3'}><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><b className="text-sm text-emerald-900">سجل المعالجة المصور — قبل / بعد</b><p className="mt-1 text-[11px] text-slate-500">وثّق الحالة قبل المعالجة، ثم أضف صورة بعد التنفيذ لإغلاق الملاحظة والتحقق منها.</p></div><div className="flex gap-2"><Badge variant="outline">قبل: {(item.beforeImages || []).length}</Badge><Badge variant="outline">بعد: {(item.afterImages || []).length}</Badge></div></div><div className="grid gap-3 md:grid-cols-2"><ImageField label="صور قبل المعالجة *" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label={item.resolutionStatus === 'closed' ? 'صور بعد المعالجة *' : 'صور بعد المعالجة'} images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div></div></div>}</CardContent></Card>)}</div>
         <div className="grid gap-4 md:grid-cols-2"><Field label="الملاحظات العامة"><Textarea rows={4} value={visitForm.generalNotes} onChange={(event) => setVisitForm({ ...visitForm, generalNotes: event.target.value })} /></Field><Field label="التوصيات"><Textarea rows={4} value={visitForm.recommendations} onChange={(event) => setVisitForm({ ...visitForm, recommendations: event.target.value })} /></Field></div>
         <VisitAttachmentField attachments={visitForm.attachments} loading={uploadingKey === 'visit-attachments'} onFiles={(files) => void uploadVisitAttachments(files)} onRemove={removeVisitAttachment} onDescriptionChange={updateVisitAttachmentDescription} />
         <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setVisitDialog(false)}>إلغاء</Button>{editingVisit && canPrint && <Button variant="outline" onClick={() => requestVisitPrint({ ...editingVisit, ...visitForm, teamMembers: splitMembers(visitForm.teamMembers), visitDate: new Date(visitForm.visitDate).toISOString(), departureAt: visitForm.departureAt ? new Date(visitForm.departureAt).toISOString() : null } as MosqueFieldVisit)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>}<Button onClick={() => void saveVisit()} disabled={saving || Boolean(uploadingKey)}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}{editingVisit ? 'حفظ نتائج الزيارة' : 'إنشاء الزيارة'}</Button></DialogFooter>
