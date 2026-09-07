@@ -150,6 +150,7 @@ export type MosqueFieldVisit = {
   createdBy?: string | null;
   isOwner?: boolean;
   hasStarted?: boolean;
+  canEdit?: boolean;
   canDelete?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -170,6 +171,7 @@ export type MosqueFieldTour = {
   createdBy?: string | null;
   isOwner?: boolean;
   hasStarted?: boolean;
+  canEdit?: boolean;
   canDelete?: boolean;
   canCancel?: boolean;
   createdAt: string;
