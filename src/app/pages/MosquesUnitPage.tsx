@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import { QRCodeSVG } from 'qrcode.react';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
+import quranLibrary3dIcon from '../../assets/quran-library-3d.svg';
 import 'leaflet/dist/leaflet.css';
 import {
   AlertTriangle,
@@ -2548,7 +2549,14 @@ ${quranStockMovementForm.notes}` : ''}`
           <Card className={`${card3d} overflow-hidden border-amber-200/80`}>
             <CardHeader className="gap-4 border-b border-amber-100 bg-gradient-to-l from-amber-50 via-white to-emerald-50 xl:flex-row xl:items-center xl:justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2 text-xl"><span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-300 to-emerald-500 text-white shadow-[0_0_20px_rgba(245,158,11,0.35)]"><BookOpen className="h-5 w-5" /></span>مكتبة المصاحف</CardTitle>
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <span className="group relative inline-flex h-12 w-12 shrink-0 items-center justify-center">
+                    <span className="absolute -inset-1 rounded-[18px] bg-gradient-to-br from-amber-300/55 via-emerald-400/40 to-cyan-300/30 blur-md transition duration-300 group-hover:blur-lg" />
+                    <span className="absolute inset-0 rounded-2xl bg-white/45 shadow-[0_10px_24px_rgba(15,118,110,0.24),0_0_18px_rgba(245,158,11,0.2)]" />
+                    <img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="relative h-11 w-11 rounded-2xl object-cover shadow-[0_7px_14px_rgba(15,23,42,0.25),0_0_20px_rgba(245,158,11,0.24)] ring-1 ring-amber-200/90 transition duration-300 group-hover:-translate-y-0.5 group-hover:scale-105" />
+                  </span>
+                  مكتبة المصاحف
+                </CardTitle>
                 <CardDescription className="mt-2">رصيد داخلي لوحدة العناية بالمساجد والمصليات. عند إضافة مصاحف لأي مسجد أو مصلى تُخصم الكمية تلقائيًا من مكتبة المصاحف مع حفظ سجل الحركة.</CardDescription>
               </div>
               {role === 'head' && <div className="flex flex-wrap gap-2">
@@ -2591,7 +2599,10 @@ ${quranStockMovementForm.notes}` : ''}`
 
               {(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 && <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">تنبيه رصيد منخفض</p><p className="mt-1">رصيد مكتبة المصاحف تحت الحد الأدنى، وإجمالي الكمية المطلوب توفيرها للوصول إلى حدود الأمان هو {quranStockDashboard?.summary.shortageTotal || 0} مصحف.</p></div></div>}
 
-              {!quranStockDashboard?.warehouses.length ? <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/50 p-8 text-center"><BookOpen className="mx-auto h-10 w-10 text-amber-600" /><p className="mt-3 font-black text-slate-800">لم يتم إنشاء مكتبة المصاحف بعد</p><p className="mt-1 text-sm text-muted-foreground">ابدأ بإنشاء مكتبة المصاحف ثم أضف رصيدها. بعد ذلك تتم إضافة المصاحف من داخل بطاقة المسجد أو المصلى مع الخصم التلقائي من المكتبة.</p>{role === 'head' && <Button className="mt-4 bg-emerald-700 hover:bg-emerald-600" onClick={openQuranWarehouse}><Plus className="ml-2 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}</div> : <div className="grid gap-4 xl:grid-cols-2">{quranStockDashboard.warehouses.map((warehouse) => (
+              {!quranStockDashboard?.warehouses.length ? <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/50 p-8 text-center"><span className="relative mx-auto flex h-16 w-16 items-center justify-center">
+                  <span className="absolute -inset-1 rounded-[22px] bg-gradient-to-br from-amber-300/45 via-emerald-400/35 to-cyan-300/25 blur-md" />
+                  <img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="relative h-14 w-14 rounded-[20px] object-cover shadow-[0_8px_18px_rgba(15,23,42,0.24),0_0_18px_rgba(245,158,11,0.22)] ring-1 ring-amber-200/80" />
+                </span><p className="mt-3 font-black text-slate-800">لم يتم إنشاء مكتبة المصاحف بعد</p><p className="mt-1 text-sm text-muted-foreground">ابدأ بإنشاء مكتبة المصاحف ثم أضف رصيدها. بعد ذلك تتم إضافة المصاحف من داخل بطاقة المسجد أو المصلى مع الخصم التلقائي من المكتبة.</p>{role === 'head' && <Button className="mt-4 bg-emerald-700 hover:bg-emerald-600" onClick={openQuranWarehouse}><Plus className="ml-2 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}</div> : <div className="grid gap-4 xl:grid-cols-2">{quranStockDashboard.warehouses.map((warehouse) => (
                 <Card key={warehouse.id} className={`border-2 ${warehouse.lowStock ? 'border-red-200 bg-red-50/20' : 'border-emerald-200 bg-emerald-50/20'}`}>
                   <CardContent className="p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2999,7 +3010,7 @@ ${quranStockMovementForm.notes}` : ''}`
 
       <Dialog open={quranWarehouseDialog} onOpenChange={(open) => { setQuranWarehouseDialog(open); if (!open) setEditingQuranWarehouse(null); }}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-amber-200/80 sm:max-w-[820px]" dir="rtl">
-          <DialogHeader className="border-b border-amber-100 bg-gradient-to-l from-amber-50 via-white to-emerald-50 p-5 text-right"><DialogTitle className="flex items-center gap-2 text-xl font-black"><BookOpen className="h-5 w-5 text-emerald-700" />{editingQuranWarehouse ? 'تعديل مكتبة المصاحف' : 'إنشاء مكتبة المصاحف'}</DialogTitle><DialogDescription>{editingQuranWarehouse ? 'تعديل بيانات المكتبة وحدود الأمان وحالة التفعيل دون المساس بسجل حركات المصاحف.' : 'مكتبة المصاحف هي الرصيد الداخلي للوحدة، وتُربط بها إضافات المصاحف للمساجد والمصليات تلقائيًا.'}</DialogDescription></DialogHeader>
+          <DialogHeader className="border-b border-amber-100 bg-gradient-to-l from-amber-50 via-white to-emerald-50 p-5 text-right"><DialogTitle className="flex items-center gap-2 text-xl font-black"><img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="h-8 w-8 rounded-xl object-cover shadow-[0_4px_10px_rgba(15,23,42,0.22),0_0_12px_rgba(245,158,11,0.2)] ring-1 ring-amber-200/80" />{editingQuranWarehouse ? 'تعديل مكتبة المصاحف' : 'إنشاء مكتبة المصاحف'}</DialogTitle><DialogDescription>{editingQuranWarehouse ? 'تعديل بيانات المكتبة وحدود الأمان وحالة التفعيل دون المساس بسجل حركات المصاحف.' : 'مكتبة المصاحف هي الرصيد الداخلي للوحدة، وتُربط بها إضافات المصاحف للمساجد والمصليات تلقائيًا.'}</DialogDescription></DialogHeader>
           <div className="max-h-[calc(92vh-150px)] space-y-4 overflow-y-auto p-5 md:p-6">
             <div className="grid gap-4 md:grid-cols-2"><Field label="اسم المكتبة *"><Input value={quranWarehouseForm.name} onChange={(e) => setQuranWarehouseForm({ ...quranWarehouseForm, name: e.target.value })} placeholder="مثال: مكتبة المصاحف" /></Field><Field label="رمز المكتبة"><Input value={quranWarehouseForm.code} onChange={(e) => setQuranWarehouseForm({ ...quranWarehouseForm, code: e.target.value })} placeholder="يولد تلقائيًا عند تركه فارغًا" /></Field><div className="md:col-span-2"><Field label="موقع المكتبة"><Input value={quranWarehouseForm.location} onChange={(e) => setQuranWarehouseForm({ ...quranWarehouseForm, location: e.target.value })} placeholder="المبنى / الحرم / الغرفة أو الوصف المكاني" /></Field></div><Field label="حالة المكتبة"><NativeSelect value={quranWarehouseForm.active === false ? 'inactive' : 'active'} onChange={(e) => setQuranWarehouseForm({ ...quranWarehouseForm, active: e.target.value === 'active' })}><option value="active">مفعّل</option><option value="inactive">غير مفعّل / موقوف</option></NativeSelect></Field></div>
             <Card className="border-amber-200"><CardHeader className="pb-3"><CardTitle className="text-base">حدود التنبيه للرصيد</CardTitle><CardDescription>عندما يقل الرصيد عن هذه الحدود يظهر تنبيه تلقائي بالحاجة إلى إضافة رصيد للمكتبة.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-3"><Field label="الحد الأدنى للكبير"><Input type="number" min="0" step="1" value={quranWarehouseForm.minLargeCount} onChange={(e) => setQuranWarehouseForm({ ...quranWarehouseForm, minLargeCount: e.target.value })} /></Field><Field label="الحد الأدنى للمتوسط"><Input type="number" min="0" step="1" value={quranWarehouseForm.minMediumCount} onChange={(e) => setQuranWarehouseForm({ ...quranWarehouseForm, minMediumCount: e.target.value })} /></Field><Field label="الحد الأدنى للصغير"><Input type="number" min="0" step="1" value={quranWarehouseForm.minSmallCount} onChange={(e) => setQuranWarehouseForm({ ...quranWarehouseForm, minSmallCount: e.target.value })} /></Field></CardContent></Card>
