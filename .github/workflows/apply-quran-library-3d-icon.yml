@@ -1,0 +1,38 @@
+name: Apply Quran Library 3D Icon
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-quran-library-3d-icon.py'
+      - '.github/workflows/apply-quran-library-3d-icon.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply Quran library 3D icon
+        run: python3 scripts/apply-quran-library-3d-icon.py
+      - name: Verify frontend build
+        run: npm run build
+      - name: Commit implementation and cleanup
+        run: |
+          rm -f scripts/apply-quran-library-3d-icon.py .github/workflows/apply-quran-library-3d-icon.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'Use premium 3D Quran library icon'
+          git push
