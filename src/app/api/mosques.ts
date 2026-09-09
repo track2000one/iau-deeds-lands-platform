@@ -23,6 +23,36 @@ export type MosqueSiteMediaLibrary = {
   documents: MosqueSiteDocumentItem[];
 };
 
+export type MosqueBuilding = {
+  id: string;
+  buildingNumber: string;
+  name?: string | null;
+  campusLocation?: string | null;
+  city?: string | null;
+  district?: string | null;
+  expectedUsers?: number | null;
+  coverageStatus: 'unassessed' | 'covered' | 'needs_prayer_room' | 'under_feasibility_study' | 'not_feasible_alternative' | 'under_implementation';
+  creationFeasibility: 'available' | 'unavailable' | 'under_study';
+  unavailableReason?: string | null;
+  approvedAlternative?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  sites?: Array<{
+    id: string;
+    name: string;
+    siteType: 'mosque' | 'jami' | 'prayer_room';
+    prayerRoomGender?: 'men' | 'women' | null;
+  spatialRelation?: 'inside_building' | 'independent';
+  buildingId?: string | null;
+  floor?: string | null;
+  roomNumber?: string | null;
+  building?: Pick<MosqueBuilding, 'id' | 'buildingNumber' | 'name' | 'coverageStatus' | 'creationFeasibility'> | null;
+    status: 'active' | 'maintenance' | 'temporarily_closed';
+  }>;
+  _count?: { sites: number };
+};
+
 export type MosqueSite = {
   id: string;
   publicToken: string;
@@ -605,6 +635,10 @@ export const mosqueApi = {
   me: () => apiJson<{ role: MosqueModuleRole; siteId?: string | null; personnelRole?: string | null; userId: string; username: string; isAdmin: boolean; fullPermissionAccess?: boolean; accessSource?: string }>('/api/mosques/me'),
   dashboard: () => apiJson<MosqueDashboard>('/api/mosques/dashboard'),
   sites: () => apiJson<MosqueSite[]>('/api/mosques/sites'),
+  buildings: () => apiJson<MosqueBuilding[]>('/api/mosques/buildings'),
+  createBuilding: (input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>('/api/mosques/buildings', { method: 'POST', body: JSON.stringify(input) }),
+  updateBuilding: (id: string, input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>(`/api/mosques/buildings/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  deleteBuilding: (id: string) => apiJson<void>(`/api/mosques/buildings/${id}`, { method: 'DELETE' }),
   createSite: (input: Partial<MosqueSite>) => apiJson<MosqueSite>('/api/mosques/sites', { method: 'POST', body: JSON.stringify(input) }),
   updateSite: (id: string, input: Partial<MosqueSite>) => apiJson<MosqueSite>(`/api/mosques/sites/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteSite: (id: string) => apiJson<void>(`/api/mosques/sites/${id}`, { method: 'DELETE' }),
