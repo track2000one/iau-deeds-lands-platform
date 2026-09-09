@@ -30,6 +30,8 @@ export type MosqueBuilding = {
   campusLocation?: string | null;
   city?: string | null;
   district?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   expectedUsers?: number | null;
   coverageStatus: 'unassessed' | 'covered' | 'needs_prayer_room' | 'under_feasibility_study' | 'not_feasible_alternative' | 'under_implementation';
   creationFeasibility: 'available' | 'unavailable' | 'under_study';

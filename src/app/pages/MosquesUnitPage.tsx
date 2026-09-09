@@ -207,7 +207,7 @@ const emptySite = {
   status: 'active', imamName: '', muezzinName: '', khateebName: '', coordinatorName: '', supervisorName: '', contactPhone: '', supervisorUserId: '', notes: '',
 };
 const emptyBuilding = {
-  buildingNumber: '', name: '', campusLocation: '', city: 'الدمام', district: '', expectedUsers: '',
+  buildingNumber: '', name: '', campusLocation: '', city: 'الدمام', district: '', latitude: '', longitude: '', expectedUsers: '',
   coverageStatus: 'unassessed', creationFeasibility: 'under_study', unavailableReason: '', approvedAlternative: '', notes: '',
 };
 const emptyRequest = { siteId: '', requestType: 'maintenance', priority: 'medium', description: '', notes: '', file: null as File | null };
@@ -523,6 +523,8 @@ export const MosquesUnitPage: React.FC = () => {
   const [buildingDialog, setBuildingDialog] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<MosqueBuilding | null>(null);
   const [buildingForm, setBuildingForm] = useState<any>(emptyBuilding);
+  const [showBuildingMap, setShowBuildingMap] = useState(false);
+  const [locatingBuilding, setLocatingBuilding] = useState(false);
   const [siteDialog, setSiteDialog] = useState(false);
   const [editingSite, setEditingSite] = useState<MosqueSite | null>(null);
   const [siteForm, setSiteForm] = useState<any>(emptySite);
@@ -1789,6 +1791,8 @@ ${quranStockMovementForm.notes}` : ''}`
       campusLocation: building.campusLocation || '',
       city: building.city || '',
       district: building.district || '',
+      latitude: building.latitude ?? '',
+      longitude: building.longitude ?? '',
       expectedUsers: building.expectedUsers ?? '',
       coverageStatus: building.coverageStatus || 'unassessed',
       creationFeasibility: building.creationFeasibility || 'under_study',
@@ -1796,13 +1800,62 @@ ${quranStockMovementForm.notes}` : ''}`
       approvedAlternative: building.approvedAlternative || '',
       notes: building.notes || '',
     } : emptyBuilding);
+    setShowBuildingMap(Boolean(building?.latitude != null && building?.longitude != null));
     setBuildingDialog(true);
   };
+
+  const buildingPickerCoordinates = useMemo(() => {
+    const latitude = Number(buildingForm.latitude);
+    const longitude = Number(buildingForm.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return undefined;
+    return { latitude, longitude };
+  }, [buildingForm.latitude, buildingForm.longitude]);
+
+  const updateBuildingCoordinates = React.useCallback((coordinates: { latitude: number; longitude: number }) => {
+    setBuildingForm((current: any) => ({
+      ...current,
+      latitude: Number(coordinates.latitude.toFixed(6)),
+      longitude: Number(coordinates.longitude.toFixed(6)),
+    }));
+  }, []);
+
+  const captureCurrentBuildingLocation = React.useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error('المتصفح لا يدعم تحديد الموقع الجغرافي');
+      return;
+    }
+    setLocatingBuilding(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        updateBuildingCoordinates({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        setShowBuildingMap(true);
+        setLocatingBuilding(false);
+        toast.success('تم تحديد موقع المبنى وتعبئة الإحداثيات');
+      },
+      (error) => {
+        setLocatingBuilding(false);
+        toast.error(error.code === error.PERMISSION_DENIED
+          ? 'يرجى السماح للمتصفح باستخدام الموقع الجغرافي ثم إعادة المحاولة'
+          : 'تعذر تحديد الموقع الحالي. تأكد من تفعيل خدمة الموقع في الجهاز');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
+    );
+  }, [updateBuildingCoordinates]);
 
   const saveBuilding = async () => {
     if (!String(buildingForm.buildingNumber || '').trim()) return toast.error('رقم المبنى مطلوب');
     if (buildingForm.creationFeasibility === 'unavailable' && !String(buildingForm.unavailableReason || '').trim()) {
       return toast.error('سبب تعذر إنشاء المصلى مطلوب');
+    }
+    const hasLatitude = String(buildingForm.latitude ?? '').trim() !== '';
+    const hasLongitude = String(buildingForm.longitude ?? '').trim() !== '';
+    if (hasLatitude !== hasLongitude) return toast.error('أدخل خط العرض وخط الطول معًا');
+    if (hasLatitude) {
+      const latitude = Number(buildingForm.latitude);
+      const longitude = Number(buildingForm.longitude);
+      if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return toast.error('خط العرض غير صحيح');
+      if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return toast.error('خط الطول غير صحيح');
     }
     setSaving(true);
     try {
@@ -1810,6 +1863,8 @@ ${quranStockMovementForm.notes}` : ''}`
         ...buildingForm,
         buildingNumber: String(buildingForm.buildingNumber).trim(),
         name: String(buildingForm.name || '').trim() || null,
+        latitude: String(buildingForm.latitude ?? '').trim() === '' ? null : Number(buildingForm.latitude),
+        longitude: String(buildingForm.longitude ?? '').trim() === '' ? null : Number(buildingForm.longitude),
         expectedUsers: buildingForm.expectedUsers === '' ? null : Number(buildingForm.expectedUsers),
         unavailableReason: buildingForm.creationFeasibility === 'unavailable' ? (String(buildingForm.unavailableReason || '').trim() || null) : null,
         approvedAlternative: String(buildingForm.approvedAlternative || '').trim() || null,
@@ -2626,12 +2681,14 @@ ${quranStockMovementForm.notes}` : ''}`
             const men = building.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'men' && site.status !== 'temporarily_closed');
             const women = building.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'women' && site.status !== 'temporarily_closed');
             const mosque = building.sites?.some((site) => ['mosque', 'jami'].includes(site.siteType) && site.status !== 'temporarily_closed');
+            const hasCoordinates = Number.isFinite(Number(building.latitude)) && Number.isFinite(Number(building.longitude));
             return <Card key={building.id} className={card3d}>
               <CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2 border-sky-200 bg-sky-50 text-sky-800">مبنى رقم {building.buildingNumber}</Badge><CardTitle className="text-lg">{building.name || ('مبنى ' + building.buildingNumber)}</CardTitle><CardDescription>{[building.campusLocation, building.city, building.district].filter(Boolean).join(' — ') || 'لم يحدد الموقع'}</CardDescription></div><Badge variant="outline">{buildingCoverageStatusLabels[building.coverageStatus] || building.coverageStatus}</Badge></div></CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-2 text-xs"><div className={'rounded-xl border p-2 text-center ' + (men ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'bg-slate-50 text-slate-500')}>مصلى رجال: <b>{men ? 'موجود' : 'غير موجود'}</b></div><div className={'rounded-xl border p-2 text-center ' + (women ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'bg-slate-50 text-slate-500')}>مصلى نساء: <b>{women ? 'موجود' : 'غير موجود'}</b></div></div>
                 {mosque && <div className="rounded-xl border border-blue-200 bg-blue-50 p-2 text-center text-xs font-bold text-blue-800">يوجد مسجد / جامع مرتبط بالمبنى</div>}
                 <Info label="إمكانية إنشاء مصلى" value={buildingFeasibilityLabels[building.creationFeasibility] || building.creationFeasibility} />
+                {hasCoordinates && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200 bg-sky-50/70 p-2 text-xs"><div><span className="font-bold text-slate-700">إحداثيات المبنى: </span><span dir="ltr" className="font-mono text-sky-800">{Number(building.latitude).toFixed(6)}, {Number(building.longitude).toFixed(6)}</span></div><a className="inline-flex items-center gap-1 font-bold text-sky-700 hover:underline" href={'https://www.google.com/maps?q=' + building.latitude + ',' + building.longitude} target="_blank" rel="noreferrer"><MapPin className="h-3.5 w-3.5" />فتح الموقع</a></div>}
                 {building.unavailableReason && <Info label="سبب عدم الإمكانية" value={building.unavailableReason} />}
                 {building.approvedAlternative && <Info label="البديل المعتمد" value={building.approvedAlternative} />}
                 <div className="rounded-xl border bg-slate-50 p-2 text-xs text-slate-600">المواقع المرتبطة: <b>{building._count?.sites ?? building.sites?.length ?? 0}</b></div>
@@ -3036,6 +3093,22 @@ ${quranStockMovementForm.notes}` : ''}`
             <Field label="عدد المستفيدين التقريبي"><Input type="number" min="0" value={buildingForm.expectedUsers} onChange={(e) => setBuildingForm({ ...buildingForm, expectedUsers: e.target.value })} /></Field>
             <Field label="المدينة"><Input value={buildingForm.city} onChange={(e) => setBuildingForm({ ...buildingForm, city: e.target.value })} /></Field>
             <Field label="الحي"><Input value={buildingForm.district} onChange={(e) => setBuildingForm({ ...buildingForm, district: e.target.value })} /></Field>
+            <Field label="خط العرض Latitude"><Input type="number" step="any" dir="ltr" value={buildingForm.latitude} onChange={(e) => setBuildingForm({ ...buildingForm, latitude: e.target.value })} placeholder="26.3927" /></Field>
+            <Field label="خط الطول Longitude"><Input type="number" step="any" dir="ltr" value={buildingForm.longitude} onChange={(e) => setBuildingForm({ ...buildingForm, longitude: e.target.value })} placeholder="50.1926" /></Field>
+            <div className="md:col-span-2 space-y-3 rounded-2xl border border-sky-200 bg-sky-50/40 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" className={'h-11 ' + button3d} onClick={captureCurrentBuildingLocation} disabled={locatingBuilding}>
+                  {locatingBuilding ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <MapPin className="ml-2 h-4 w-4" />}
+                  {locatingBuilding ? 'جاري تحديد الموقع...' : 'تحديد موقعي الحالي'}
+                </Button>
+                <Button type="button" variant="outline" className={'h-11 ' + button3d} onClick={() => setShowBuildingMap((current) => !current)}>
+                  <MapPin className="ml-2 h-4 w-4" />
+                  {showBuildingMap ? 'إخفاء الخريطة' : 'تحديد موقع المبنى من الخريطة'}
+                </Button>
+                {buildingPickerCoordinates && <div className="flex min-h-11 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-xs font-semibold text-emerald-800" dir="ltr">{buildingPickerCoordinates.latitude.toFixed(6)}, {buildingPickerCoordinates.longitude.toFixed(6)}</div>}
+              </div>
+              {showBuildingMap && <div className="overflow-hidden rounded-2xl border border-sky-200 bg-white p-1 shadow-sm"><MapCoordinatePicker coordinates={buildingPickerCoordinates} onChange={updateBuildingCoordinates} /></div>}
+            </div>
             <Field label="حالة التغطية"><NativeSelect value={buildingForm.coverageStatus} onChange={(e) => setBuildingForm({ ...buildingForm, coverageStatus: e.target.value })}><option value="unassessed">لم يتم التقييم</option><option value="covered">مغطى بخدمة الصلاة</option><option value="needs_prayer_room">يحتاج مصلى</option><option value="under_feasibility_study">قيد دراسة إمكانية الإنشاء</option><option value="under_implementation">مصلى تحت التنفيذ</option><option value="not_feasible_alternative">تعذر الإنشاء / بديل معتمد</option></NativeSelect></Field>
             <Field label="إمكانية إنشاء مصلى"><NativeSelect value={buildingForm.creationFeasibility} onChange={(e) => setBuildingForm({ ...buildingForm, creationFeasibility: e.target.value })}><option value="under_study">قيد الدراسة</option><option value="available">متاح إنشاء مصلى</option><option value="unavailable">غير متاح إنشاء مصلى</option></NativeSelect></Field>
             {buildingForm.creationFeasibility === 'unavailable' && <Field label="سبب عدم إمكانية الإنشاء *"><Textarea rows={3} value={buildingForm.unavailableReason} onChange={(e) => setBuildingForm({ ...buildingForm, unavailableReason: e.target.value })} placeholder="عدم توفر مساحة، اشتراطات السلامة، طبيعة المبنى..." /></Field>}
