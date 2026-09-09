@@ -1,0 +1,226 @@
+name: Fix Mobile PDF Visible Content
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-mobile-pdf-visible-content.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Add html2canvas
+        run: npm install html2canvas@1.4.1 --save
+
+      - name: Replace PDF renderer with browser-rasterized renderer
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/app/pages/ReportsPage.tsx')
+          s = path.read_text(encoding='utf-8')
+          start = s.index('  const exportToPDF = async (')
+          end = s.index('\n\n  const handlePrint = (', start)
+
+          replacement = r'''  const exportToPDF = async (
+    data: any[],
+    columns: any[],
+    title: string,
+    filename: string,
+    settings?: PrintSettings,
+    filters?: ReportFilters
+  ) => {
+    let renderFrame: HTMLIFrameElement | null = null;
+
+    try {
+      const [{ jsPDF }, html2canvasModule] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas'),
+      ]);
+      const html2canvas = html2canvasModule.default;
+      const reportRows = Array.isArray(data) ? data : [];
+      const totalAreaValue = reportRows.reduce(
+        (sum, item) => sum + (Number.isFinite(Number(item?.area)) ? Number(item.area) : 0),
+        0
+      );
+      const hasArea = reportRows.some((item) => item?.area !== undefined && item?.area !== null && item?.area !== '');
+      const html = buildPrintableReportHtml(
+        reportRows,
+        columns,
+        title,
+        {
+          total: reportRows.length,
+          ...(hasArea ? { totalArea: totalAreaValue.toLocaleString() } : {}),
+        },
+        settings,
+        filters
+      );
+
+      renderFrame = document.createElement('iframe');
+      renderFrame.setAttribute('aria-hidden', 'true');
+      renderFrame.style.position = 'fixed';
+      renderFrame.style.left = '-20000px';
+      renderFrame.style.top = '0';
+      renderFrame.style.width = '1123px';
+      renderFrame.style.height = '794px';
+      renderFrame.style.border = '0';
+      renderFrame.style.pointerEvents = 'none';
+      renderFrame.style.background = '#ffffff';
+      document.body.appendChild(renderFrame);
+
+      const frameDocument = renderFrame.contentDocument;
+      if (!frameDocument) {
+        throw new Error('تعذر إنشاء مساحة تجهيز التقرير.');
+      }
+
+      frameDocument.open();
+      frameDocument.write(html);
+      frameDocument.close();
+
+      await new Promise<void>((resolve) => {
+        const finish = () => window.setTimeout(resolve, 250);
+        if (frameDocument.readyState === 'complete') finish();
+        else renderFrame?.addEventListener('load', finish, { once: true });
+      });
+
+      if (frameDocument.fonts?.ready) {
+        await frameDocument.fonts.ready;
+      }
+
+      const noPrint = frameDocument.querySelector('.no-print') as HTMLElement | null;
+      if (noPrint) noPrint.style.display = 'none';
+
+      const reportElement = frameDocument.querySelector('.report') as HTMLElement | null;
+      if (!reportElement) {
+        throw new Error('تعذر العثور على محتوى التقرير.');
+      }
+
+      const canvas = await html2canvas(reportElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        logging: false,
+        imageTimeout: 15000,
+        windowWidth: 1123,
+        scrollX: 0,
+        scrollY: 0,
+      });
+
+      if (!canvas.width || !canvas.height) {
+        throw new Error('تم إنشاء صورة تقرير فارغة.');
+      }
+
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 4;
+      const contentWidth = pageWidth - margin * 2;
+      const contentHeight = pageHeight - margin * 2;
+      const sourcePageHeight = Math.max(
+        1,
+        Math.floor(canvas.width * (contentHeight / contentWidth))
+      );
+
+      let offsetY = 0;
+      let pageIndex = 0;
+
+      while (offsetY < canvas.height) {
+        const sliceHeight = Math.min(sourcePageHeight, canvas.height - offsetY);
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceHeight;
+        const ctx = sliceCanvas.getContext('2d');
+        if (!ctx) throw new Error('تعذر تجهيز صفحة PDF.');
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        ctx.drawImage(
+          canvas,
+          0,
+          offsetY,
+          canvas.width,
+          sliceHeight,
+          0,
+          0,
+          canvas.width,
+          sliceHeight
+        );
+
+        if (pageIndex > 0) pdf.addPage('a4', 'landscape');
+        const imageHeight = contentWidth * (sliceHeight / canvas.width);
+        pdf.addImage(
+          sliceCanvas.toDataURL('image/png'),
+          'PNG',
+          margin,
+          margin,
+          contentWidth,
+          imageHeight,
+          undefined,
+          'FAST'
+        );
+
+        offsetY += sliceHeight;
+        pageIndex += 1;
+      }
+
+      const safeFilename = sanitizePdfFilename(filename) + '_' + new Date().toISOString().split('T')[0] + '.pdf';
+      const pdfBlob = pdf.output('blob');
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = objectUrl;
+      downloadLink.download = safeFilename;
+      downloadLink.rel = 'noopener';
+      downloadLink.style.display = 'none';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+
+      toast.success('تم تنزيل PDF بالمحتوى العربي كاملًا.');
+    } catch (error) {
+      console.error('PDF Export Error:', error);
+      toast.error('تعذر إنشاء PDF. استخدم «معاينة وطباعة» مؤقتًا.');
+    } finally {
+      renderFrame?.remove();
+    }
+  };'''
+
+          s = s[:start] + replacement + s[end:]
+          path.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Verify frontend build
+        run: npm run build
+
+      - name: Commit fix and cleanup workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/fix-mobile-pdf-visible-content.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/app/pages/ReportsPage.tsx package.json package-lock.json .github/workflows/fix-mobile-pdf-visible-content.yml
+          git commit -m 'Fix blank Arabic content in downloaded PDF reports'
+          git push origin main
