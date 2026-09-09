@@ -1,0 +1,55 @@
+name: Fix Mosque Building Linkage Types
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-mosque-building-linkage-types.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Correct MosqueSite building linkage type fields
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/app/api/mosques.ts')
+          s = p.read_text(encoding='utf-8')
+
+          bad = """    prayerRoomGender?: 'men' | 'women' | null;\n  spatialRelation?: 'inside_building' | 'independent';\n  buildingId?: string | null;\n  floor?: string | null;\n  roomNumber?: string | null;\n  building?: Pick<MosqueBuilding, 'id' | 'buildingNumber' | 'name' | 'coverageStatus' | 'creationFeasibility'> | null;\n    status: 'active' | 'maintenance' | 'temporarily_closed';"""
+          good = """    prayerRoomGender?: 'men' | 'women' | null;\n    status: 'active' | 'maintenance' | 'temporarily_closed';"""
+          if bad not in s:
+              raise SystemExit('Expected malformed MosqueBuilding.sites type block not found')
+          s = s.replace(bad, good, 1)
+
+          target = """export type MosqueSite = {\n  id: string;\n  publicToken: string;\n  name: string;\n  siteType: 'mosque' | 'jami' | 'prayer_room';\n  prayerRoomGender?: 'men' | 'women' | null;"""
+          replacement = target + """\n  spatialRelation?: 'inside_building' | 'independent';\n  buildingId?: string | null;\n  floor?: string | null;\n  roomNumber?: string | null;\n  building?: Pick<MosqueBuilding, 'id' | 'buildingNumber' | 'name' | 'coverageStatus' | 'creationFeasibility'> | null;"""
+          if target not in s:
+              raise SystemExit('MosqueSite type insertion marker not found')
+          s = s.replace(target, replacement, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Verify frontend build
+        run: npm run build
+      - name: Commit correction and cleanup
+        run: |
+          rm -f .github/workflows/fix-mosque-building-linkage-types.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/app/api/mosques.ts .github/workflows/fix-mosque-building-linkage-types.yml
+          git commit -m 'Fix mosque building linkage frontend types'
+          git push origin main
