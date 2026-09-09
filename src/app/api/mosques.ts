@@ -43,11 +43,6 @@ export type MosqueBuilding = {
     name: string;
     siteType: 'mosque' | 'jami' | 'prayer_room';
     prayerRoomGender?: 'men' | 'women' | null;
-  spatialRelation?: 'inside_building' | 'independent';
-  buildingId?: string | null;
-  floor?: string | null;
-  roomNumber?: string | null;
-  building?: Pick<MosqueBuilding, 'id' | 'buildingNumber' | 'name' | 'coverageStatus' | 'creationFeasibility'> | null;
     status: 'active' | 'maintenance' | 'temporarily_closed';
   }>;
   _count?: { sites: number };
@@ -59,6 +54,11 @@ export type MosqueSite = {
   name: string;
   siteType: 'mosque' | 'jami' | 'prayer_room';
   prayerRoomGender?: 'men' | 'women' | null;
+  spatialRelation?: 'inside_building' | 'independent';
+  buildingId?: string | null;
+  floor?: string | null;
+  roomNumber?: string | null;
+  building?: Pick<MosqueBuilding, 'id' | 'buildingNumber' | 'name' | 'coverageStatus' | 'creationFeasibility'> | null;
   city?: string | null;
   district?: string | null;
   campusLocation?: string | null;
