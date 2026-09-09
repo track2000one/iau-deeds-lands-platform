@@ -22,6 +22,19 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Repair patch script literals
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/apply-mosque-building-linkage.mjs')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace("{building.name || `مبنى ${building.buildingNumber}`}", "{building.name || ('مبنى ' + building.buildingNumber)}")
+          s = s.replace("className={`rounded-xl border p-2 text-center ${men ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'bg-slate-50 text-slate-500'}`}", "className={'rounded-xl border p-2 text-center ' + (men ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'bg-slate-50 text-slate-500')}")
+          s = s.replace("className={`rounded-xl border p-2 text-center ${women ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'bg-slate-50 text-slate-500'}`}", "className={'rounded-xl border p-2 text-center ' + (women ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'bg-slate-50 text-slate-500')}")
+          s = s.replace("{building.name ? ` — ${building.name}` : ''}", "{building.name ? (' — ' + building.name) : ''}")
+          p.write_text(s, encoding='utf-8')
+          PY
       - name: Apply mosque building linkage UI
         run: node scripts/apply-mosque-building-linkage.mjs
       - name: Verify frontend build
