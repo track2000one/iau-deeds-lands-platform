@@ -1,0 +1,37 @@
+name: Apply Mobile PDF Download Reports
+
+on:
+  push:
+    paths:
+      - 'scripts/apply-mobile-pdf-download-reports.mjs'
+      - '.github/workflows/apply-mobile-pdf-download-reports.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Apply direct mobile PDF download
+        run: node scripts/apply-mobile-pdf-download-reports.mjs
+      - name: Verify frontend build
+        run: npm run build
+      - name: Commit implementation and cleanup
+        run: |
+          rm -f scripts/apply-mobile-pdf-download-reports.mjs
+          rm -f .github/workflows/apply-mobile-pdf-download-reports.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix direct PDF downloads on mobile reports"
+          git push
