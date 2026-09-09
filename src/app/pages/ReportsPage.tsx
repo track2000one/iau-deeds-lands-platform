@@ -74,6 +74,47 @@ const FANAN_FONT_FAMILY = "'Fanan', Tahoma, Arial, sans-serif";
 const getFananFontAbsoluteUrl = () =>
   new URL(fananFontUrl, window.location.origin).href;
 
+let fananPdfFontBase64Promise: Promise<string> | null = null;
+
+const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = '';
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const chunk = bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return window.btoa(binary);
+};
+
+const getFananPdfFontBase64 = async () => {
+  if (!fananPdfFontBase64Promise) {
+    fananPdfFontBase64Promise = fetch(getFananFontAbsoluteUrl())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load PDF font: ${response.status}`);
+        }
+        return response.arrayBuffer();
+      })
+      .then(arrayBufferToBase64)
+      .catch((error) => {
+        fananPdfFontBase64Promise = null;
+        throw error;
+      });
+  }
+
+  return fananPdfFontBase64Promise;
+};
+
+const sanitizePdfFilename = (value: string) =>
+  String(value || 'report')
+    .trim()
+    .replace(/[\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '_')
+    .slice(0, 90) || 'report';
+
 const inspectionWorkflowLabels: Record<string, string> = {
   new: 'جديدة',
   under_review: 'قيد المراجعة',
@@ -1825,7 +1866,7 @@ export const ReportsPage: React.FC = () => {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
-  const exportToPDF = (
+  const exportToPDF = async (
     data: any[],
     columns: any[],
     title: string,
@@ -1834,22 +1875,195 @@ export const ReportsPage: React.FC = () => {
     filters?: ReportFilters
   ) => {
     try {
-      const html = buildPrintableReportHtml(
-        data,
-        columns,
-        title,
-        {
-          total: Array.isArray(data) ? data.length : 0,
-        },
-        settings,
-        filters
-      );
+      const [{ jsPDF }, autoTableModule, fontBase64] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+        getFananPdfFontBase64(),
+      ]);
 
-      openPrintableHtml(html, true);
-      toast.success('تم فتح نافذة الطباعة. اختر Save as PDF للحفظ بصيغة PDF.');
+      const autoTable = autoTableModule.default;
+      const enabledColumns = columns.filter((column) => column.enabled);
+      const reportRows = Array.isArray(data) ? data : [];
+      const effectiveSettings = {
+        ...defaultPrintSettings,
+        ...(settings || {}),
+        reportTitle: settings?.reportTitle || title,
+      };
+
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+        putOnlyUsedFonts: true,
+      });
+
+      doc.addFileToVFS('Fanan.ttf', fontBase64);
+      doc.addFont('Fanan.ttf', 'Fanan', 'normal');
+      doc.setFont('Fanan', 'normal');
+      doc.setR2L(true);
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const currentDate = new Date();
+      const dateString = currentDate.toLocaleDateString('ar-SA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      const timeString = currentDate.toLocaleTimeString('ar-SA', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      const hexToRgb = (hex: string): [number, number, number] => {
+        const normalized = String(hex || '#1f4e79').replace('#', '');
+        const expanded = normalized.length === 3
+          ? normalized.split('').map((char) => char + char).join('')
+          : normalized.padEnd(6, '0').slice(0, 6);
+        const value = Number.parseInt(expanded, 16);
+        if (!Number.isFinite(value)) return [31, 78, 121];
+        return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+      };
+
+      const headerRgb = hexToRgb(effectiveSettings.headerColor);
+
+      doc.setFontSize(15);
+      doc.setTextColor(15, 23, 42);
+      doc.text(effectiveSettings.universityName, pageWidth / 2, 11, { align: 'center' });
+
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(effectiveSettings.platformName, pageWidth / 2, 16, { align: 'center' });
+
+      doc.setFontSize(13);
+      doc.setTextColor(...headerRgb);
+      doc.text(effectiveSettings.reportTitle, pageWidth / 2, 23, { align: 'center' });
+
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`التاريخ: ${dateString}`, pageWidth - 8, 29, { align: 'right' });
+      doc.text(`الوقت: ${timeString}`, 8, 29, { align: 'left' });
+
+      doc.setFontSize(9);
+      doc.setTextColor(31, 41, 55);
+      doc.text(`إجمالي السجلات: ${reportRows.length}`, pageWidth - 8, 35, { align: 'right' });
+
+      const activeFilters = filters
+        ? [
+            filters.region ? `المنطقة: ${filters.region}` : '',
+            filters.city ? `المدينة: ${filters.city}` : '',
+            filters.district ? `الحي: ${filters.district}` : '',
+            filters.usageType ? `نوع الاستخدام: ${filters.usageType}` : '',
+            filters.isPlanned !== 'all'
+              ? `مخططة: ${filters.isPlanned === 'planned' ? 'نعم' : 'لا'}`
+              : '',
+            filters.coordinates !== 'all'
+              ? `الإحداثيات: ${filters.coordinates === 'with' ? 'يوجد' : 'لا يوجد'}`
+              : '',
+            filters.attachments !== 'all'
+              ? `المرفقات: ${filters.attachments === 'with' ? 'يوجد' : 'لا يوجد'}`
+              : '',
+          ].filter(Boolean)
+        : [];
+
+      let tableStartY = 40;
+      if (activeFilters.length > 0) {
+        doc.setFontSize(7.5);
+        doc.setTextColor(71, 85, 105);
+        const filterText = activeFilters.join(' | ');
+        const filterLines = doc.splitTextToSize(filterText, pageWidth - 16);
+        doc.text(filterLines, pageWidth - 8, 39, { align: 'right' });
+        tableStartY = 41 + filterLines.length * 3.5;
+      }
+
+      const tableHead = [[
+        '#',
+        ...enabledColumns.map((column) => String(column.label || column.key || '')),
+      ]];
+
+      const tableBody = reportRows.map((item, index) => [
+        String(index + 1),
+        ...enabledColumns.map((column) => String(formatCellValue(item, column.key) ?? '-')),
+      ]);
+
+      const columnStyles: Record<number, any> = {
+        0: { cellWidth: 8, halign: 'center' },
+      };
+
+      enabledColumns.forEach((column, index) => {
+        const key = String(column.key || '').toLowerCase();
+        const targetIndex = index + 1;
+
+        if (/description|propertydescription|locationname|recipiententity|tenant|owner/.test(key)) {
+          columnStyles[targetIndex] = { cellWidth: 50, halign: 'right' };
+        } else if (/deednumber|receiptnumber|contractnumber|inspectionnumber/.test(key)) {
+          columnStyles[targetIndex] = { cellWidth: 30, halign: 'center' };
+        }
+      });
+
+      autoTable(doc, {
+        head: tableHead,
+        body: tableBody,
+        startY: tableStartY,
+        theme: 'grid',
+        margin: { top: 10, right: 7, bottom: 13, left: 7 },
+        styles: {
+          font: 'Fanan',
+          fontStyle: 'normal',
+          fontSize: enabledColumns.length >= 10 ? 6.1 : enabledColumns.length >= 8 ? 6.7 : 7.3,
+          cellPadding: 1.45,
+          halign: 'center',
+          valign: 'middle',
+          overflow: 'linebreak',
+          textColor: [31, 41, 55],
+          lineColor: [218, 226, 234],
+          lineWidth: 0.15,
+          minCellHeight: 6.5,
+        },
+        headStyles: {
+          font: 'Fanan',
+          fontStyle: 'normal',
+          fillColor: headerRgb,
+          textColor: [255, 255, 255],
+          halign: 'center',
+          valign: 'middle',
+          lineColor: headerRgb,
+          lineWidth: 0.15,
+        },
+        alternateRowStyles: {
+          fillColor: [247, 250, 252],
+        },
+        columnStyles,
+        didDrawPage: (hookData) => {
+          doc.setFont('Fanan', 'normal');
+          doc.setFontSize(7);
+          doc.setTextColor(100, 116, 139);
+
+          const footer = effectiveSettings.footerText || effectiveSettings.platformName;
+          doc.text(footer, pageWidth - 7, pageHeight - 5, { align: 'right' });
+          doc.text(`صفحة ${hookData.pageNumber}`, 7, pageHeight - 5, { align: 'left' });
+        },
+      });
+
+      const safeFilename = sanitizePdfFilename(filename) + '_' + currentDate.toISOString().split('T')[0] + '.pdf';
+      const pdfBlob = doc.output('blob');
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      const downloadLink = document.createElement('a');
+
+      downloadLink.href = objectUrl;
+      downloadLink.download = safeFilename;
+      downloadLink.rel = 'noopener';
+      downloadLink.style.display = 'none';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+      toast.success('تم تنزيل ملف PDF مباشرة على الجهاز.');
     } catch (error) {
       console.error('PDF Export Error:', error);
-      toast.error(t('reports.exportError') || 'فشل في التصدير');
+      toast.error('تعذر إنشاء ملف PDF. استخدم «معاينة وطباعة» كخيار بديل.');
     }
   };
 
@@ -2457,7 +2671,7 @@ export const ReportsPage: React.FC = () => {
                     className="w-full h-10 md:h-11 text-sm md:text-base"
                   >
                     <FileText className="h-4 w-4 ml-2 text-red-600" />
-                    PDF
+                    تنزيل PDF
                   </Button>
 
                   <Button
