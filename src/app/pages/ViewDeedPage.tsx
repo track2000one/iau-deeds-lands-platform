@@ -417,6 +417,7 @@ export const ViewDeedPage: React.FC = () => {
   } = useDeeds() as any;
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [printOptionsOpen, setPrintOptionsOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [uploadTab, setUploadTab] = useState<UiAttachmentType>('deed');
   const [backendAttachments, setBackendAttachments] = useState<BackendAttachment[]>([]);
@@ -710,7 +711,7 @@ export const ViewDeedPage: React.FC = () => {
     return [...remoteAttachments, ...localAttachments];
   };
 
-  const handlePrintDeed = () => {
+  const handlePrintDeed = (includeAttachments: boolean) => {
     if (!deed || !canPrint) return;
 
     const printWindow = window.open('', '_blank', 'width=1100,height=850');
@@ -951,13 +952,13 @@ export const ViewDeedPage: React.FC = () => {
       <div class="notes">${escapePrintHtml(deed.notes)}</div>
     </section>
 
-    <section class="section">
+    ${includeAttachments ? `<section class="section">
       <div class="section-title">المرفقات والوثائق</div>
       <div class="attachments-summary">إجمالي المرفقات المرتبطة بالصك: <strong>${allAttachments.length.toLocaleString('ar-SA')}</strong></div>
       ${allAttachments.length
         ? `<ol class="attachments">${allAttachments.map((item, index) => `<li><strong>${index + 1}.</strong> ${escapePrintHtml(item.category)} — ${escapePrintHtml(item.name)}</li>`).join('')}</ol>`
         : '<div class="empty">لا توجد مرفقات مرتبطة بهذا الصك.</div>'}
-    </section>
+    </section>` : ''}
 
     <footer class="footer">
       <span>منصة إدارة الصكوك والأراضي — جامعة الإمام عبدالرحمن بن فيصل</span>
@@ -1291,9 +1292,9 @@ export const ViewDeedPage: React.FC = () => {
               {canPrint && (
                 <Button
                   variant="outline"
-                  onClick={handlePrintDeed}
+                  onClick={() => setPrintOptionsOpen(true)}
                   className="text-sm md:text-base"
-                  title="طباعة تقرير الصك بحجم A4"
+                  title="خيارات طباعة تقرير الصك"
                 >
                   <Printer className="h-3 w-3 md:h-4 md:w-4 mr-2" />
                   طباعة
@@ -1791,6 +1792,51 @@ export const ViewDeedPage: React.FC = () => {
           </Tabs>
         </CardContent>
       </Card>
+
+      <Dialog open={printOptionsOpen} onOpenChange={setPrintOptionsOpen}>
+        <DialogContent className="sm:max-w-lg" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-right text-lg md:text-xl">خيارات الطباعة</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-3 pt-2">
+            <Button
+              type="button"
+              className="h-auto min-h-20 justify-start gap-3 whitespace-normal px-4 py-4 text-right"
+              onClick={() => {
+                setPrintOptionsOpen(false);
+                handlePrintDeed(true);
+              }}
+            >
+              <Printer className="h-5 w-5 shrink-0" />
+              <span className="flex min-w-0 flex-col items-start gap-1">
+                <span className="font-bold">طباعة مع المرفقات</span>
+                <span className="text-xs font-normal opacity-85">
+                  يتضمن التقرير قسم المرفقات والوثائق المرتبطة بالصك.
+                </span>
+              </span>
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto min-h-20 justify-start gap-3 whitespace-normal px-4 py-4 text-right"
+              onClick={() => {
+                setPrintOptionsOpen(false);
+                handlePrintDeed(false);
+              }}
+            >
+              <FileText className="h-5 w-5 shrink-0" />
+              <span className="flex min-w-0 flex-col items-start gap-1">
+                <span className="font-bold">طباعة بدون المرفقات</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  يطبع بيانات الصك والموقع والملاحظات فقط دون قسم المرفقات.
+                </span>
+              </span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
