@@ -50,6 +50,7 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { MosqueFieldVisitsPanel } from '../components/MosqueFieldVisitsPanel';
+import { BuildingExcelImportManager, isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
 import {
   Dialog,
@@ -466,6 +467,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [dashboard, setDashboard] = useState<MosqueDashboard | null>(null);
   const [sites, setSites] = useState<MosqueSite[]>([]);
   const [buildings, setBuildings] = useState<MosqueBuilding[]>([]);
+  const officialBuildings = useMemo(() => buildings.filter((building) => !isPendingImportedBuilding(building)), [buildings]);
   const [requests, setRequests] = useState<MosqueRequest[]>([]);
   const [tickets, setTickets] = useState<MosqueTicket[]>([]);
   const [leaves, setLeaves] = useState<MosqueLeave[]>([]);
@@ -1890,7 +1892,7 @@ ${quranStockMovementForm.notes}` : ''}`
     }
   };
 
-  const selectedSiteBuilding = buildings.find((building) => building.id === siteForm.buildingId) || null;
+  const selectedSiteBuilding = officialBuildings.find((building) => building.id === siteForm.buildingId) || null;
   const selectedBuildingHasMen = Boolean(selectedSiteBuilding?.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'men' && site.status !== 'temporarily_closed'));
   const selectedBuildingHasWomen = Boolean(selectedSiteBuilding?.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'women' && site.status !== 'temporarily_closed'));
 
@@ -2667,17 +2669,25 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>
               {role === 'head' && canAdd && <Button className={button3d} onClick={() => openBuildingDialog()}><Plus className="ml-2 h-4 w-4" />إضافة مبنى</Button>}
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <BuildingExcelImportManager
+                buildings={buildings}
+                role={role}
+                canAdd={canAdd}
+                canEdit={canEdit}
+                canDelete={canDelete}
+                onReload={loadAll}
+              />
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <ReportMetric label="إجمالي المباني" value={buildings.length} />
-                <ReportMetric label="مغطاة بخدمة الصلاة" value={buildings.filter((x) => x.coverageStatus === 'covered').length} />
-                <ReportMetric label="تحتاج مصلى" value={buildings.filter((x) => x.coverageStatus === 'needs_prayer_room').length} />
-                <ReportMetric label="قيد الدراسة / التنفيذ" value={buildings.filter((x) => ['under_feasibility_study', 'under_implementation'].includes(x.coverageStatus)).length} />
-                <ReportMetric label="تعذر الإنشاء + بديل" value={buildings.filter((x) => x.coverageStatus === 'not_feasible_alternative').length} />
+                <ReportMetric label="إجمالي المباني المعتمدة" value={officialBuildings.length} />
+                <ReportMetric label="مغطاة بخدمة الصلاة" value={officialBuildings.filter((x) => x.coverageStatus === 'covered').length} />
+                <ReportMetric label="تحتاج مصلى" value={officialBuildings.filter((x) => x.coverageStatus === 'needs_prayer_room').length} />
+                <ReportMetric label="قيد الدراسة / التنفيذ" value={officialBuildings.filter((x) => ['under_feasibility_study', 'under_implementation'].includes(x.coverageStatus)).length} />
+                <ReportMetric label="تعذر الإنشاء + بديل" value={officialBuildings.filter((x) => x.coverageStatus === 'not_feasible_alternative').length} />
               </div>
             </CardContent>
           </Card>
-          {!buildings.length ? <Empty text="لم تتم إضافة مباني إلى سجل تغطية المصليات بعد" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{buildings.map((building) => {
+          {!officialBuildings.length ? <Empty text="لم تتم إضافة مبانٍ معتمدة إلى سجل تغطية المصليات بعد" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{officialBuildings.map((building) => {
             const men = building.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'men' && site.status !== 'temporarily_closed');
             const women = building.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'women' && site.status !== 'temporarily_closed');
             const mosque = building.sites?.some((site) => ['mosque', 'jami'].includes(site.siteType) && site.status !== 'temporarily_closed');
@@ -3139,7 +3149,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 {siteForm.siteType === 'prayer_room' && <Field label="فئة المصلى *"><NativeSelect className="h-11" value={siteForm.prayerRoomGender || ''} onChange={(e) => setSiteForm({ ...siteForm, prayerRoomGender: e.target.value })}><option value="">اختر الفئة</option><option value="men">رجال</option><option value="women">نساء</option></NativeSelect></Field>}
                 <Field label="الارتباط المكاني *"><NativeSelect className="h-11" value={siteForm.spatialRelation || 'independent'} onChange={(e) => setSiteForm({ ...siteForm, spatialRelation: e.target.value, buildingId: e.target.value === 'inside_building' ? siteForm.buildingId : '', floor: e.target.value === 'inside_building' ? siteForm.floor : '', roomNumber: e.target.value === 'inside_building' ? siteForm.roomNumber : '' })}><option value="independent">موقع مستقل</option><option value="inside_building">داخل مبنى جامعي</option></NativeSelect></Field>
                 {siteForm.spatialRelation === 'inside_building' && <>
-                  <Field label="رقم المبنى *"><NativeSelect className="h-11" value={siteForm.buildingId || ''} onChange={(e) => setSiteForm({ ...siteForm, buildingId: e.target.value })}><option value="">اختر المبنى</option>{buildings.map((building) => <option key={building.id} value={building.id}>{building.buildingNumber}{building.name ? (' — ' + building.name) : ''}</option>)}</NativeSelect></Field>
+                  <Field label="رقم المبنى *"><NativeSelect className="h-11" value={siteForm.buildingId || ''} onChange={(e) => setSiteForm({ ...siteForm, buildingId: e.target.value })}><option value="">اختر المبنى</option>{officialBuildings.map((building) => <option key={building.id} value={building.id}>{building.buildingNumber}{building.name ? (' — ' + building.name) : ''}</option>)}</NativeSelect></Field>
                   <Field label="الدور"><Input className="h-11" value={siteForm.floor || ''} onChange={(e) => setSiteForm({ ...siteForm, floor: e.target.value })} placeholder="مثال: الأرضي" /></Field>
                   <Field label="رقم الغرفة / الموقع الداخلي"><Input className="h-11" value={siteForm.roomNumber || ''} onChange={(e) => setSiteForm({ ...siteForm, roomNumber: e.target.value })} placeholder="مثال: 012 أو الجناح الشرقي" /></Field>
                 </>}
