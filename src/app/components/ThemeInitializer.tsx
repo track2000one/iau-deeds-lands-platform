@@ -5,6 +5,10 @@ import {
   applyAppearanceTheme,
   getThemeById,
 } from '../theme/appearanceThemes';
+import {
+  applyUserDisplayPreferences,
+  loadUserDisplayPreferences,
+} from '../theme/userDisplayPreferences';
 
 type FontControlSettings = {
   fontFamily: string;
@@ -1529,6 +1533,7 @@ export const ThemeInitializer: React.FC = () => {
     const normalizedTheme = getThemeById(storedTheme);
 
     applyAppearanceTheme(normalizedTheme.id);
+    const displayPreferences = loadUserDisplayPreferences(username);
 
     try {
       const storedFont = localStorage.getItem(keys.font);
@@ -1552,6 +1557,8 @@ export const ThemeInitializer: React.FC = () => {
         headingFontWeight: '800',
       });
     }
+
+    applyUserDisplayPreferences(displayPreferences);
 
     if (!storedTheme) {
       localStorage.setItem(keys.theme, DEFAULT_THEME_ID);

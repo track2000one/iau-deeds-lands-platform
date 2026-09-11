@@ -1,11 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  BookmarkPlus,
   Check,
+  Layers3,
+  PaintBucket,
   Palette,
+  RefreshCw,
   RotateCcw,
   Save,
   ShieldCheck,
   Sun,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -41,7 +46,97 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import { NativeSelect } from '../components/ui/native-select';
+import { Input } from '../components/ui/input';
+import {
+  EMPTY_USER_THEME_COLORS,
+  createSavedUserTheme,
+  extractUserThemeColors,
+  loadUserThemeLibrary,
+  mergeUserThemeColors,
+  saveUserThemeLibrary,
+  type SavedUserTheme,
+  type UserThemeColors,
+} from '../theme/userThemeLibrary';
 import { toast } from 'sonner';
+
+const THEME_COLOR_PRESETS: Array<{
+  name: string;
+  description: string;
+  colors: UserThemeColors;
+}> = [
+  {
+    name: 'الأزرق الجامعي',
+    description: 'أزرق رسمي هادئ مناسب للعمل الإداري اليومي.',
+    colors: {
+      backgroundColor: '#eef4f9',
+      surfaceColor: '#ffffff',
+      sidebarColor: '#f7fafc',
+      topbarColor: '#ffffff',
+      primaryColor: '#245b86',
+      secondaryColor: '#5f7891',
+      accentColor: '#2f8195',
+      sidebarTextColor: '#20384f',
+    },
+  },
+  {
+    name: 'الزمرد الإداري',
+    description: 'أخضر بترولي رسمي مع خلفيات فاتحة مريحة.',
+    colors: {
+      backgroundColor: '#eef7f4',
+      surfaceColor: '#ffffff',
+      sidebarColor: '#f5fbf8',
+      topbarColor: '#ffffff',
+      primaryColor: '#176b5b',
+      secondaryColor: '#4f7f75',
+      accentColor: '#2b8f7c',
+      sidebarTextColor: '#21483f',
+    },
+  },
+  {
+    name: 'الرمادي التنفيذي',
+    description: 'محايد ورسمي مع تباين واضح للنصوص والجداول.',
+    colors: {
+      backgroundColor: '#f0f2f4',
+      surfaceColor: '#fbfcfd',
+      sidebarColor: '#f5f6f7',
+      topbarColor: '#fafbfc',
+      primaryColor: '#445d73',
+      secondaryColor: '#687b8c',
+      accentColor: '#607d8b',
+      sidebarTextColor: '#2e3f4d',
+    },
+  },
+  {
+    name: 'الرملي الهادئ',
+    description: 'درجات دافئة خفيفة تقلل إجهاد العين في الاستخدام الطويل.',
+    colors: {
+      backgroundColor: '#f7f3ec',
+      surfaceColor: '#fffdfa',
+      sidebarColor: '#fbf8f2',
+      topbarColor: '#fffdfa',
+      primaryColor: '#805f36',
+      secondaryColor: '#8a7356',
+      accentColor: '#9a7646',
+      sidebarTextColor: '#514231',
+    },
+  },
+];
+
+const THEME_COLOR_CONTROLS: Array<{
+  key: keyof UserThemeColors;
+  label: string;
+  description: string;
+  fallback: string;
+}> = [
+  { key: 'backgroundColor', label: 'خلفية المنصة', description: 'الخلفية العامة خلف الصفحات والمحتوى.', fallback: '#eef4f9' },
+  { key: 'surfaceColor', label: 'البطاقات والأسطح', description: 'لون البطاقات والنوافذ والأسطح الرئيسية.', fallback: '#ffffff' },
+  { key: 'sidebarColor', label: 'القائمة الجانبية', description: 'لون خلفية قائمة التنقل الرئيسية.', fallback: '#f7fafc' },
+  { key: 'topbarColor', label: 'الشريط العلوي', description: 'لون شريط الأدوات أعلى المنصة.', fallback: '#ffffff' },
+  { key: 'primaryColor', label: 'اللون الأساسي', description: 'للأزرار والعناصر المحددة والهوية الرئيسية.', fallback: '#245b86' },
+  { key: 'secondaryColor', label: 'اللون الثانوي', description: 'للعناصر الثانوية والمساندة.', fallback: '#5f7891' },
+  { key: 'accentColor', label: 'لون الإبراز', description: 'للتأكيد البصري والعناصر المساعدة.', fallback: '#2f8195' },
+  { key: 'sidebarTextColor', label: 'نص القائمة', description: 'لون الكتابة والأيقونات داخل القائمة الجانبية.', fallback: '#20384f' },
+];
 
 const getUserKey = (username?: string | null) => {
   const safeUser = username?.trim() || 'guest';
@@ -164,6 +259,39 @@ const PreferenceToggle: React.FC<{
   </label>
 );
 
+const ThemeColorControl: React.FC<{
+  label: string;
+  description: string;
+  value?: string;
+  fallback: string;
+  onChange: (value: string) => void;
+  onReset: () => void;
+}> = ({ label, description, value, fallback, onChange, onReset }) => (
+  <div className="rounded-2xl border bg-background/55 p-4">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="font-bold">{label}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+      </div>
+      <input
+        type="color"
+        value={value || fallback}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-14 cursor-pointer rounded-xl border bg-transparent p-1"
+        aria-label={label}
+      />
+    </div>
+    <div className="mt-3 flex items-center justify-between gap-2">
+      <code className="rounded-lg border bg-background px-2 py-1 text-xs" dir="ltr">
+        {value || 'لون الثيم الأساسي'}
+      </code>
+      <Button type="button" size="sm" variant="ghost" onClick={onReset}>
+        إعادة
+      </Button>
+    </div>
+  </div>
+);
+
 export const AppearanceSettingsPage: React.FC = () => {
   const { username } = useAuth();
   const [selectedTheme, setSelectedTheme] =
@@ -178,6 +306,8 @@ export const AppearanceSettingsPage: React.FC = () => {
   const savedDisplayPreferencesRef = useRef<UserDisplayPreferences>({
     ...DEFAULT_USER_DISPLAY_PREFERENCES,
   });
+  const [savedColorThemes, setSavedColorThemes] = useState<SavedUserTheme[]>([]);
+  const [customThemeName, setCustomThemeName] = useState('');
 
   const applyThemeAndDisplay = (
     themeId: ThemeId,
@@ -196,6 +326,7 @@ export const AppearanceSettingsPage: React.FC = () => {
     const storedTheme = localStorage.getItem(keys.theme);
     const current = getThemeById(storedTheme);
     const storedDisplay = loadUserDisplayPreferences(username);
+    setSavedColorThemes(loadUserThemeLibrary(username));
 
     setSelectedTheme(current.id);
     setSavedTheme(current.id);
@@ -241,6 +372,69 @@ export const AppearanceSettingsPage: React.FC = () => {
     });
     setDisplayPreferences(next);
     applyThemeAndDisplay(selectedTheme, next);
+  };
+
+  const updateThemeColor = (key: keyof UserThemeColors, value: string) => {
+    updateDisplayPreferences({
+      [key]: value,
+    } as Partial<UserDisplayPreferences>);
+  };
+
+  const applyThemeColorPreset = (colors: UserThemeColors) => {
+    updateDisplayPreferences(colors);
+    toast.info('تم تطبيق لوحة الألوان للمعاينة');
+  };
+
+  const clearCustomThemeColors = () => {
+    updateDisplayPreferences({ ...EMPTY_USER_THEME_COLORS });
+    toast.info('تم الرجوع إلى ألوان الثيم الأساسي للمعاينة');
+  };
+
+  const persistThemeLibrary = (next: SavedUserTheme[]) => {
+    setSavedColorThemes(next);
+    saveUserThemeLibrary(username, next);
+  };
+
+  const saveCurrentColorTheme = () => {
+    const name = customThemeName.trim();
+    if (!name) {
+      toast.error('اكتب اسمًا للثيم قبل الحفظ');
+      return;
+    }
+
+    const saved = createSavedUserTheme(name, selectedTheme, displayPreferences);
+    persistThemeLibrary([saved, ...savedColorThemes].slice(0, 24));
+    setCustomThemeName('');
+    toast.success('تم حفظ الثيم في مكتبتك ويمكن الرجوع إليه في أي وقت');
+  };
+
+  const previewSavedColorTheme = (saved: SavedUserTheme) => {
+    const baseTheme = getThemeById(saved.baseThemeId);
+    const next = mergeUserThemeColors(displayPreferences, saved.colors);
+    setSelectedTheme(baseTheme.id);
+    setDisplayPreferences(next);
+    applyThemeAndDisplay(baseTheme.id, next);
+    toast.info('تم تطبيق الثيم المحفوظ للمعاينة؛ احفظ الإعدادات لاعتماده');
+  };
+
+  const updateSavedColorTheme = (saved: SavedUserTheme) => {
+    const next = savedColorThemes.map((item) =>
+      item.id === saved.id
+        ? {
+            ...item,
+            baseThemeId: selectedTheme,
+            colors: extractUserThemeColors(displayPreferences),
+            updatedAt: new Date().toISOString(),
+          }
+        : item
+    );
+    persistThemeLibrary(next);
+    toast.success('تم تحديث الثيم المحفوظ بالألوان الحالية');
+  };
+
+  const deleteSavedColorTheme = (id: string) => {
+    persistThemeLibrary(savedColorThemes.filter((item) => item.id !== id));
+    toast.success('تم حذف الثيم من مكتبتك');
   };
 
   const saveSettings = () => {
@@ -304,8 +498,8 @@ export const AppearanceSettingsPage: React.FC = () => {
               إعدادات المظهر وسهولة الاستخدام
             </h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              تحكم في المظهر والخط وحجم القراءة وألوان النص وكثافة الواجهة،
-              مع خيارات إضافية تقلل الحركة وتوضح موضع التركيز لتسهيل الاستخدام اليومي.
+              تحكم في المظهر والخط وحجم القراءة وألوان النص والخلفية والقائمة والثيم،
+              مع إمكانية حفظ أكثر من ثيم شخصي والرجوع إليه في أي وقت.
             </p>
           </div>
 
@@ -597,6 +791,224 @@ export const AppearanceSettingsPage: React.FC = () => {
             عند استخدام مظهر داكن تتولى المنصة ضبط ألوان النص تلقائيًا لحماية
             التباين والوضوح، بينما تبقى إعدادات الخط والحجم والتباعد فعالة.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card id="custom-theme-colors" className="future-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <PaintBucket className="h-5 w-5" />
+            ألوان الخلفية والقائمة والثيمات الشخصية
+          </CardTitle>
+          <CardDescription>
+            خصص خلفية المنصة والقائمة والشريط العلوي والألوان الأساسية، ثم احفظ أكثر من ثيم باسم تختاره.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <Layers3 className="h-4 w-4 text-primary" />
+              <p className="font-bold">لوحات ألوان جاهزة</p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {THEME_COLOR_PRESETS.map((preset) => (
+                <button
+                  key={preset.name}
+                  type="button"
+                  onClick={() => applyThemeColorPreset(preset.colors)}
+                  className="rounded-2xl border bg-background/60 p-4 text-right transition hover:-translate-y-0.5 hover:border-primary/40"
+                >
+                  <p className="font-bold">{preset.name}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{preset.description}</p>
+                  <div className="mt-3 grid grid-cols-4 gap-1.5">
+                    {[
+                      preset.colors.backgroundColor,
+                      preset.colors.sidebarColor,
+                      preset.colors.primaryColor,
+                      preset.colors.accentColor,
+                    ].map((color, index) => (
+                      <span
+                        key={index}
+                        className="h-8 rounded-lg border shadow-sm"
+                        style={{ background: color }}
+                      />
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {THEME_COLOR_CONTROLS.map((control) => (
+              <ThemeColorControl
+                key={control.key}
+                label={control.label}
+                description={control.description}
+                fallback={control.fallback}
+                value={displayPreferences[control.key] || ''}
+                onChange={(value) => updateThemeColor(control.key, value)}
+                onReset={() => updateThemeColor(control.key, '')}
+              />
+            ))}
+          </div>
+
+          <div
+            className="overflow-hidden rounded-3xl border p-4"
+            style={{ background: displayPreferences.backgroundColor || '#eef4f9' }}
+          >
+            <div
+              className="rounded-2xl border p-3 shadow-sm"
+              style={{ background: displayPreferences.topbarColor || '#ffffff' }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-bold">معاينة الثيم</span>
+                <span
+                  className="h-8 w-20 rounded-xl"
+                  style={{ background: displayPreferences.primaryColor || '#245b86' }}
+                />
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-[110px_1fr] gap-3">
+              <div
+                className="rounded-2xl border p-3"
+                style={{
+                  background: displayPreferences.sidebarColor || '#f7fafc',
+                  color: displayPreferences.sidebarTextColor || '#20384f',
+                }}
+              >
+                <p className="text-xs font-bold">القائمة</p>
+                <div className="mt-3 space-y-2">
+                  {[0, 1, 2].map((item) => (
+                    <div
+                      key={item}
+                      className="h-8 rounded-lg border"
+                      style={{
+                        background:
+                          item === 1
+                            ? displayPreferences.primaryColor || '#245b86'
+                            : 'rgba(255,255,255,.55)',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[0, 1].map((item) => (
+                  <div
+                    key={item}
+                    className="min-h-28 rounded-2xl border p-4 shadow-sm"
+                    style={{ background: displayPreferences.surfaceColor || '#ffffff' }}
+                  >
+                    <div
+                      className="h-3 w-1/2 rounded-full"
+                      style={{ background: displayPreferences.primaryColor || '#245b86' }}
+                    />
+                    <div
+                      className="mt-4 h-2 w-4/5 rounded-full"
+                      style={{ background: displayPreferences.secondaryColor || '#5f7891' }}
+                    />
+                    <div
+                      className="mt-2 h-2 w-2/3 rounded-full"
+                      style={{ background: displayPreferences.accentColor || '#2f8195' }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="custom-theme-name">اسم الثيم الشخصي</Label>
+                <Input
+                  id="custom-theme-name"
+                  value={customThemeName}
+                  onChange={(event) => setCustomThemeName(event.target.value)}
+                  placeholder="مثال: الثيم الأزرق المريح"
+                  maxLength={60}
+                />
+              </div>
+              <Button type="button" onClick={saveCurrentColorTheme}>
+                <BookmarkPlus className="ml-2 h-4 w-4" />
+                حفظ كثيم جديد
+              </Button>
+              <Button type="button" variant="outline" onClick={clearCustomThemeColors}>
+                <RotateCcw className="ml-2 h-4 w-4" />
+                ألوان الثيم الأساسي
+              </Button>
+            </div>
+
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              حفظ الثيم يضيفه إلى مكتبتك. لتعيين الألوان الحالية كمظهر افتراضي للحساب استخدم زر «حفظ الإعدادات» أعلى الصفحة.
+            </p>
+
+            <div className="mt-5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-bold">ثيماتي المحفوظة</p>
+                  <p className="text-xs text-muted-foreground">يمكن حفظ حتى 24 ثيمًا لكل مستخدم.</p>
+                </div>
+                <Badge variant="secondary">{savedColorThemes.length} ثيم</Badge>
+              </div>
+
+              {savedColorThemes.length === 0 ? (
+                <div className="rounded-2xl border border-dashed bg-background/40 p-6 text-center text-sm text-muted-foreground">
+                  لم تحفظ ثيمات شخصية بعد. اختر الألوان ثم اكتب اسمًا واضغط «حفظ كثيم جديد».
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {savedColorThemes.map((saved) => (
+                    <div key={saved.id} className="rounded-2xl border bg-background/55 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-bold">{saved.name}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            آخر تحديث {new Date(saved.updatedAt).toLocaleDateString('ar-SA')}
+                          </p>
+                        </div>
+                        <BookmarkPlus className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="mt-3 grid grid-cols-4 gap-1.5">
+                        {[
+                          saved.colors.backgroundColor || '#eef4f9',
+                          saved.colors.sidebarColor || '#f7fafc',
+                          saved.colors.primaryColor || '#245b86',
+                          saved.colors.accentColor || '#2f8195',
+                        ].map((color, index) => (
+                          <span
+                            key={index}
+                            className="h-8 rounded-lg border"
+                            style={{ background: color }}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                        <Button type="button" size="sm" onClick={() => previewSavedColorTheme(saved)}>
+                          تطبيق
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => updateSavedColorTheme(saved)}>
+                          <RefreshCw className="ml-1 h-3.5 w-3.5" />
+                          تحديث
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => deleteSavedColorTheme(saved.id)}
+                        >
+                          <Trash2 className="ml-1 h-3.5 w-3.5" />
+                          حذف
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
