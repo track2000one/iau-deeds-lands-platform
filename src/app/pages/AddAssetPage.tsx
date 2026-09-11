@@ -28,6 +28,8 @@ import { AppDateField } from '../components/AppDateField';
 import { AssetOfficialTemplateFields } from '../components/AssetOfficialTemplateFields';
 import { createAsset, extractAssetData, uploadAssetFile } from '../api/assets';
 import type { AssetSmartExtraction, AssetSmartExtractionFields } from '../api/assets';
+import { mosqueApi, type MosqueBuilding } from '../api/mosques';
+import { getAssetCentralBuildingId, withCentralBuildingId } from '../utils/centralBuildingLink';
 import type { AssetInput, AssetStatus } from '../../types/asset';
 
 type AssetAttachmentCategory =
@@ -217,6 +219,15 @@ export const AddAssetPage: React.FC = () => {
   const [smartExtraction, setSmartExtraction] = useState<AssetSmartExtraction | null>(null);
   const [smartExtracting, setSmartExtracting] = useState(false);
   const [smartExtractionMessage, setSmartExtractionMessage] = useState('');
+  const [centralBuildings, setCentralBuildings] = useState<MosqueBuilding[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    mosqueApi.buildings()
+      .then((items) => { if (active) setCentralBuildings(items || []); })
+      .catch(() => { if (active) setCentralBuildings([]); });
+    return () => { active = false; };
+  }, []);
 
   const totalAttachments = useMemo(
     () => Object.values(attachments).reduce((total, files) => total + files.length, 0),
@@ -225,6 +236,32 @@ export const AddAssetPage: React.FC = () => {
 
   const setField = <K extends keyof AssetInput>(key: K, value: AssetInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const selectCentralBuilding = (buildingId: string) => {
+    if (buildingId === '__manual__') {
+      setForm((current) => ({
+        ...current,
+        excelPayload: withCentralBuildingId(current.excelPayload, null),
+      }));
+      return;
+    }
+
+    const building = centralBuildings.find((item) => item.id === buildingId);
+    if (!building) return;
+    const coordinates =
+      building.latitude != null && building.longitude != null
+        ? `${building.latitude},${building.longitude}`
+        : undefined;
+
+    setForm((current) => ({
+      ...current,
+      building: building.name || building.buildingNumber,
+      buildingNumber: building.buildingNumber,
+      city: building.city || current.city || '',
+      coordinates: coordinates || current.coordinates || '',
+      excelPayload: withCentralBuildingId(current.excelPayload, building.id),
+    }));
   };
 
   const updatePurchaseFinancials = (rawValue: number | null, rate = Number(form.vatRate ?? SAUDI_STANDARD_VAT_RATE)) => {
@@ -899,11 +936,35 @@ export const AddAssetPage: React.FC = () => {
             <Input value={form.department || ''} onChange={(e) => setField('department', e.target.value)} placeholder="اسم الجهة" />
           </div>
           <div className="space-y-2">
-            <Label>المبنى</Label>
+            <Label>المبنى — السجل المركزي</Label>
+            <Select
+              value={getAssetCentralBuildingId(form) || '__manual__'}
+              onValueChange={selectCentralBuilding}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="اختر المبنى من السجل المركزي" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__manual__">بدون ربط مركزي / إدخال يدوي</SelectItem>
+                {centralBuildings.map((building) => (
+                  <SelectItem key={building.id} value={building.id}>
+                    {building.buildingNumber} — {building.name || 'بدون مسمى'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="relative">
               <Building2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={form.building || ''} onChange={(e) => setField('building', e.target.value)} className="pr-9" placeholder="اسم أو رقم المبنى" />
+              <Input
+                value={form.building || ''}
+                onChange={(e) => setField('building', e.target.value)}
+                className="pr-9"
+                placeholder="الوصف التشغيلي للمبنى"
+              />
             </div>
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              اختيار مبنى من السجل المركزي يحفظ معرفًا ثابتًا مع الأصل، ويبقى اسم/رقم المبنى للعرض والتوافق مع السجلات السابقة.
+            </p>
           </div>
           <div className="space-y-2">
             <Label>الدور</Label>

@@ -5,6 +5,7 @@ import {
   Building2,
   Database,
   Landmark,
+  Link2,
   MapPin,
   Pencil,
   Plus,
@@ -16,9 +17,19 @@ import {
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
 import { mosqueApi, type MosqueBuilding } from '../api/mosques';
-import { getAssets } from '../api/assets';
-import { getAccountingTransformationRecords } from '../api/accountingTransformation';
-import type { AssetRecord } from '../../types/asset';
+import { getAsset, getAssets, updateAsset } from '../api/assets';
+import { getAccountingTransformationRecords, updateAccountingTransformationRecord } from '../api/accountingTransformation';
+import {
+  getAccountingCentralBuildingId,
+  getAssetCentralBuildingId,
+  isAccountingLinkedToCentralBuilding,
+  isAssetLinkedToCentralBuilding,
+  normalizeCentralBuildingKey,
+  resolveUniqueLegacyBuildingForAccounting,
+  resolveUniqueLegacyBuildingForAsset,
+  withCentralBuildingId,
+} from '../utils/centralBuildingLink';
+import type { AssetInput, AssetRecord } from '../../types/asset';
 import type { AccountingTransformationRecord } from '../../types/accountingTransformation';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -79,52 +90,13 @@ const coverageLabels: Record<string, string> = {
   under_implementation: 'مصلى تحت التنفيذ',
 };
 
-const normalizeKey = (value: unknown) =>
-  String(value ?? '')
-    .trim()
-    .toLocaleLowerCase('ar')
-    .replace(/[\s\-_/\\]+/g, '');
+const normalizeKey = normalizeCentralBuildingKey;
 
-const safeNumber = (value: unknown) => {
-  if (value === '' || value == null) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
+const buildingMatchesAsset = (building: MosqueBuilding, asset: AssetRecord, allBuildings: MosqueBuilding[]) =>
+  isAssetLinkedToCentralBuilding(building, asset, allBuildings);
 
-const buildingMatchesAsset = (building: MosqueBuilding, asset: AssetRecord) => {
-  const number = normalizeKey(building.buildingNumber);
-  const name = normalizeKey(building.name);
-  const assetNumber = normalizeKey(asset.buildingNumber);
-  const assetBuilding = normalizeKey(asset.building);
-
-  return Boolean(
-    (number && (assetNumber === number || assetBuilding === number)) ||
-      (name && assetBuilding === name)
-  );
-};
-
-const buildingMatchesAccounting = (
-  building: MosqueBuilding,
-  record: AccountingTransformationRecord
-) => {
-  const number = normalizeKey(building.buildingNumber);
-  const name = normalizeKey(building.name);
-  const searchable = normalizeKey(
-    [
-      record.entityName,
-      record.entityCode,
-      record.entityAssetNumber,
-      record.assetDescription,
-      record.city,
-      JSON.stringify(record.payload || {}),
-    ].join(' ')
-  );
-
-  return Boolean(
-    (number && searchable.includes(number)) ||
-      (name && searchable.includes(name))
-  );
-};
+const buildingMatchesAccounting = (building: MosqueBuilding, record: AccountingTransformationRecord, allBuildings: MosqueBuilding[]) =>
+  isAccountingLinkedToCentralBuilding(building, record, allBuildings);
 
 const linkedPrayerSiteCount = (building: MosqueBuilding) =>
   building._count?.sites ?? building.sites?.length ?? 0;
@@ -147,6 +119,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   >([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [migrating, setMigrating] = useState(false);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] =
@@ -210,9 +183,9 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
           mosqueSites > 0 ||
           building.coverageStatus !== 'unassessed' ||
           building.expectedUsers != null,
-        assets: assets.filter((asset) => buildingMatchesAsset(building, asset)).length,
+        assets: assets.filter((asset) => buildingMatchesAsset(building, asset, buildings)).length,
         accounting: accountingRecords.filter((record) =>
-          buildingMatchesAccounting(building, record)
+          buildingMatchesAccounting(building, record, buildings)
         ).length,
       });
     });
@@ -320,6 +293,80 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     }
   };
 
+  const migrateLegacyLinks = async () => {
+    if (migrating) return;
+
+    let linkedAssets = 0;
+    let linkedAccounting = 0;
+    let skippedAssets = 0;
+    let skippedAccounting = 0;
+    let failures = 0;
+
+    try {
+      setMigrating(true);
+
+      if (canViewAssets) {
+        for (const asset of assets) {
+          if (getAssetCentralBuildingId(asset)) continue;
+          const matched = resolveUniqueLegacyBuildingForAsset(buildings, asset);
+          if (!matched) { skippedAssets += 1; continue; }
+
+          try {
+            const fullAsset = await getAsset(asset.id);
+            if (getAssetCentralBuildingId(fullAsset)) continue;
+            const confirmed = resolveUniqueLegacyBuildingForAsset(buildings, fullAsset);
+            if (!confirmed || confirmed.id !== matched.id) { skippedAssets += 1; continue; }
+
+            const editable = { ...fullAsset } as unknown as Record<string, unknown>;
+            for (const key of ['id', 'assetNumber', 'custodian', 'createdBy', 'createdAt', 'updatedAt', 'movements', 'inventoryEvents', 'lossCases']) delete editable[key];
+            const input = {
+              ...editable,
+              itemNumber: String(fullAsset.itemNumber || fullAsset.assetNumber || '').trim(),
+              name: fullAsset.name,
+              category: fullAsset.category,
+              excelPayload: withCentralBuildingId(fullAsset.excelPayload, matched.id),
+              attachments: fullAsset.attachments || [],
+            } as AssetInput;
+            if (!input.itemNumber || !input.name || !input.category) { skippedAssets += 1; continue; }
+            await updateAsset(fullAsset.id, input);
+            linkedAssets += 1;
+          } catch {
+            failures += 1;
+          }
+        }
+      }
+
+      if (canViewAccounting) {
+        for (const record of accountingRecords) {
+          if (getAccountingCentralBuildingId(record)) continue;
+          const matched = resolveUniqueLegacyBuildingForAccounting(buildings, record);
+          if (!matched) { skippedAccounting += 1; continue; }
+          try {
+            await updateAccountingTransformationRecord(record.id, {
+              recordType: record.recordType,
+              ownershipMode: record.ownershipMode,
+              committeeStatus: record.committeeStatus,
+              payload: withCentralBuildingId(record.payload, matched.id),
+              attachments: Array.isArray(record.attachments) ? record.attachments : [],
+              notes: record.notes || null,
+            });
+            linkedAccounting += 1;
+          } catch {
+            failures += 1;
+          }
+        }
+      }
+
+      toast.success(
+        `اكتمل ربط السجلات القديمة: ${linkedAssets} أصل، ${linkedAccounting} سجل محاسبي. تم تجاوز ${skippedAssets + skippedAccounting} سجل غير واضح المطابقة.`
+      );
+      if (failures) toast.warning(`تعذر تحديث ${failures} سجل، ولم يتم تعديل بياناته.`);
+      await loadData();
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     const item = usage.get(deleteTarget.id);
@@ -371,7 +418,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
             <p className="mt-3 max-w-4xl leading-7 text-muted-foreground">
               يُعرّف المبنى مرة واحدة هنا برقم موحد واسم وموقع وخصائص أساسية، ثم
               تستخدمه وحدة العناية بالمساجد والمصليات ووحدة الأصول ولجنة متابعة
-              متطلبات التحول المحاسبي دون تكرار تعريف المبنى.
+              متطلبات التحول المحاسبي دون تكرار تعريف المبنى. الروابط الجديدة تحفظ بمعرف ثابت، ويمكن ترحيل السجلات القديمة ذات المطابقة الواضحة من زر الربط.
             </p>
           </div>
 
@@ -380,6 +427,12 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               تحديث
             </Button>
+            {canEdit && (canViewAssets || canViewAccounting) && (
+              <Button variant="outline" onClick={() => void migrateLegacyLinks()} disabled={migrating || loading}>
+                <Link2 className={`h-4 w-4 ${migrating ? 'animate-pulse' : ''}`} />
+                {migrating ? 'جاري ربط السجلات...' : 'ربط السجلات القديمة'}
+              </Button>
+            )}
             {canAdd && (
               <Button onClick={openCreate}>
                 <Plus className="h-4 w-4" />

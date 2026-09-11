@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { ArrowRight, FileText, Paperclip, Save, Upload, X } from 'lucide-react';
+import { ArrowRight, Building2, FileText, Paperclip, Save, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -34,6 +34,8 @@ import {
   updateAccountingTransformationRecord,
   uploadAccountingTransformationFile,
 } from '../api/accountingTransformation';
+import { mosqueApi, type MosqueBuilding } from '../api/mosques';
+import { getCentralBuildingIdFromPayload, withCentralBuildingId } from '../utils/centralBuildingLink';
 import { getOrganizationUnits } from '../api/organization';
 import type {
   AccountingCommitteeStatus,
@@ -91,6 +93,7 @@ export const AccountingTransformationFormPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [responsiblePartyOptions, setResponsiblePartyOptions] = useState<string[]>([]);
+  const [centralBuildings, setCentralBuildings] = useState<MosqueBuilding[]>([]);
   const [linkedAssetCheck, setLinkedAssetCheck] = useState<{
     status: 'idle' | 'checking' | 'deed_found' | 'found_without_deed' | 'not_found' | 'error';
     recordType?: AccountingRecordType;
@@ -100,6 +103,14 @@ export const AccountingTransformationFormPage: React.FC = () => {
     recordType === 'fixed_asset' ? (payload.X ?? '') : recordType === 'land' ? (payload.F ?? '') : ''
   ).trim();
   const currentLandHasDeed = useMemo(() => attachments.some(isOwnershipDeedAttachment), [attachments]);
+
+  useEffect(() => {
+    let active = true;
+    mosqueApi.buildings()
+      .then((items) => { if (active) setCentralBuildings(items || []); })
+      .catch(() => { if (active) setCentralBuildings([]); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -196,6 +207,15 @@ export const AccountingTransformationFormPage: React.FC = () => {
       }, [recordType, payload]);
 
   const setField = (column: string, value: unknown) => setPayload((current) => ({ ...current, [column]: value }));
+  const selectCentralBuilding = (buildingId: string) => {
+    if (!buildingId) {
+      setPayload((current) => withCentralBuildingId(current, null));
+      return;
+    }
+    const building = centralBuildings.find((item) => item.id === buildingId);
+    if (!building) return;
+    setPayload((current) => withCentralBuildingId(current, building.id));
+  };
   const changeType = (type: AccountingRecordType) => {
     if (editing) return;
     setRecordType(type);
@@ -324,6 +344,20 @@ export const AccountingTransformationFormPage: React.FC = () => {
             <div className="space-y-2"><Label>نوع الملكية</Label><NativeSelect value={ownershipMode} onChange={(e) => setOwnershipMode(e.target.value as AccountingOwnershipMode)}><option value="owned">مملوك</option><option value="leased">مستأجر</option><option value="other">أخرى</option></NativeSelect></div>
             <div className="space-y-2"><Label>حالة متابعة اللجنة</Label><NativeSelect value={committeeStatus} onChange={(e) => setCommitteeStatus(e.target.value as AccountingCommitteeStatus)}>{Object.entries(ACCOUNTING_COMMITTEE_STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect></div>
           </CardContent></Card>
+
+          {recordType === 'building' && (
+            <Card className="rounded-[24px] border-cyan-200/80 bg-cyan-50/30">
+              <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-cyan-700" />الربط بالسجل المركزي للمباني</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                <Label>المبنى المركزي</Label>
+                <NativeSelect value={getCentralBuildingIdFromPayload(payload)} onChange={(e) => selectCentralBuilding(e.target.value)}>
+                  <option value="">غير مرتبط بعد</option>
+                  {centralBuildings.map((building) => <option key={building.id} value={building.id}>{building.buildingNumber} — {building.name || 'بدون مسمى'}</option>)}
+                </NativeSelect>
+                <p className="text-[11px] leading-5 text-slate-500">يحفظ النظام معرف المبنى الثابت داخل السجل المحاسبي؛ لذلك لا ينقطع الارتباط عند تغيير اسم المبنى أو وصفه.</p>
+              </CardContent>
+            </Card>
+          )}
 
           {displayGroups.map(([groupKey, groupLabel], groupIndex) => {
             const fields = displayFields.filter((field) => field.g === groupKey);

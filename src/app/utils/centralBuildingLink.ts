@@ -85,7 +85,6 @@ export const resolveUniqueLegacyBuildingForAccounting = (
     [
       record.mofAssetNumber,
       record.entityAssetNumber,
-      record.recordNumber,
       record.payload?.D,
       record.payload?.E,
     ]

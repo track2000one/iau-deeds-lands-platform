@@ -11,6 +11,8 @@ import { AppDateField } from '../components/AppDateField';
 import { AssetOfficialTemplateFields } from '../components/AssetOfficialTemplateFields';
 import { normalizeFlexibleDateForInput } from '../../utils/dateUtils';
 import { getAsset, updateAsset, uploadAssetFile } from '../api/assets';
+import { mosqueApi, type MosqueBuilding } from '../api/mosques';
+import { getAssetCentralBuildingId, withCentralBuildingId } from '../utils/centralBuildingLink';
 import type { AssetAttachment, AssetInput, AssetStatus } from '../../types/asset';
 
 type UploadCategory = 'asset_images' | 'purchase_documents' | 'warranty_documents' | 'custody_documents' | 'other_documents';
@@ -44,6 +46,15 @@ export const EditAssetPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
+  const [centralBuildings, setCentralBuildings] = useState<MosqueBuilding[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    mosqueApi.buildings()
+      .then((items) => { if (active) setCentralBuildings(items || []); })
+      .catch(() => { if (active) setCentralBuildings([]); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!assetId) return;
@@ -75,6 +86,26 @@ export const EditAssetPage: React.FC = () => {
 
   const newFilesCount = useMemo(() => Object.values(newFiles).reduce((n, files) => n + files.length, 0), [newFiles]);
   const setField = <K extends keyof AssetInput>(key: K, value: AssetInput[K]) => setForm((current) => ({ ...current, [key]: value }));
+
+  const selectCentralBuilding = (buildingId: string) => {
+    if (buildingId === '__manual__') {
+      setForm((current) => ({ ...current, excelPayload: withCentralBuildingId(current.excelPayload, null) }));
+      return;
+    }
+    const building = centralBuildings.find((item) => item.id === buildingId);
+    if (!building) return;
+    const coordinates = building.latitude != null && building.longitude != null
+      ? `${building.latitude},${building.longitude}`
+      : undefined;
+    setForm((current) => ({
+      ...current,
+      building: building.name || building.buildingNumber,
+      buildingNumber: building.buildingNumber,
+      city: building.city || current.city || '',
+      coordinates: coordinates || current.coordinates || '',
+      excelPayload: withCentralBuildingId(current.excelPayload, building.id),
+    }));
+  };
 
   const handleSave = async () => {
     if (!assetId) return;
@@ -150,7 +181,7 @@ export const EditAssetPage: React.FC = () => {
         <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />الموقع الإداري</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
           <div><Label>الجهة / الإدارة</Label><Input value={form.department || ''} onChange={(e) => setField('department', e.target.value)} /></div>
-          <div><Label>المبنى</Label><div className="relative"><Building2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pr-9" value={form.building || ''} onChange={(e) => setField('building', e.target.value)} /></div></div>
+          <div className="space-y-2"><Label>المبنى — السجل المركزي</Label><Select value={getAssetCentralBuildingId(form) || '__manual__'} onValueChange={selectCentralBuilding}><SelectTrigger><SelectValue placeholder="اختر المبنى من السجل المركزي" /></SelectTrigger><SelectContent><SelectItem value="__manual__">بدون ربط مركزي / إدخال يدوي</SelectItem>{centralBuildings.map((building) => <SelectItem key={building.id} value={building.id}>{building.buildingNumber} — {building.name || 'بدون مسمى'}</SelectItem>)}</SelectContent></Select><div className="relative"><Building2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pr-9" value={form.building || ''} onChange={(e) => setField('building', e.target.value)} placeholder="الوصف التشغيلي للمبنى" /></div><p className="text-[11px] leading-5 text-muted-foreground">الرابط المركزي ثابت حتى عند تعديل اسم المبنى لاحقًا.</p></div>
           <div><Label>الدور</Label><Input value={form.floor || ''} onChange={(e) => setField('floor', e.target.value)} /></div>
           <div><Label>الغرفة / الموقع التفصيلي</Label><Input value={form.room || ''} onChange={(e) => setField('room', e.target.value)} /></div>
         </CardContent>
