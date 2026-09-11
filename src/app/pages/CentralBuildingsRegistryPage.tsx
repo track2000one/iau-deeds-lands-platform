@@ -109,8 +109,11 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const canEdit = isAdmin || hasPermission('central_buildings', 'canEdit');
   const canDelete = isAdmin || hasPermission('central_buildings', 'canDelete');
   const canViewAssets = isAdmin || hasPermission('assets', 'canView');
+  const canEditAssets = isAdmin || hasPermission('assets', 'canEdit');
   const canViewAccounting =
     isAdmin || hasPermission('accounting_transformation', 'canView');
+  const canEditAccounting =
+    isAdmin || hasPermission('accounting_transformation', 'canEdit');
 
   const [buildings, setBuildings] = useState<MosqueBuilding[]>([]);
   const [assets, setAssets] = useState<AssetRecord[]>([]);
@@ -305,7 +308,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     try {
       setMigrating(true);
 
-      if (canViewAssets) {
+      if (canEditAssets) {
         for (const asset of assets) {
           if (getAssetCentralBuildingId(asset)) continue;
           const matched = resolveUniqueLegacyBuildingForAsset(buildings, asset);
@@ -336,7 +339,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
         }
       }
 
-      if (canViewAccounting) {
+      if (canEditAccounting) {
         for (const record of accountingRecords) {
           if (getAccountingCentralBuildingId(record)) continue;
           const matched = resolveUniqueLegacyBuildingForAccounting(buildings, record);
@@ -427,7 +430,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               تحديث
             </Button>
-            {canEdit && (canViewAssets || canViewAccounting) && (
+            {canEdit && (canEditAssets || canEditAccounting) && (
               <Button variant="outline" onClick={() => void migrateLegacyLinks()} disabled={migrating || loading}>
                 <Link2 className={`h-4 w-4 ${migrating ? 'animate-pulse' : ''}`} />
                 {migrating ? 'جاري ربط السجلات...' : 'ربط السجلات القديمة'}
