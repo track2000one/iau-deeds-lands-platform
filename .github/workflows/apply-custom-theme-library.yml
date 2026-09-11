@@ -1,0 +1,38 @@
+name: Apply Custom Theme Library
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-custom-theme-library.mjs'
+      - '.github/workflows/apply-custom-theme-library.yml'
+      - 'src/app/theme/userDisplayPreferences.ts'
+      - 'src/app/theme/userThemeLibrary.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-custom-theme-library.mjs
+      - run: npm run build
+      - name: Commit changes
+        run: |
+          if git diff --quiet -- src/app/pages/AppearanceSettingsPage.tsx src/app/components/ThemeInitializer.tsx; then
+            echo "No source changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/AppearanceSettingsPage.tsx src/app/components/ThemeInitializer.tsx
+          git commit -m "Add custom theme colors and saved theme library"
+          git push
