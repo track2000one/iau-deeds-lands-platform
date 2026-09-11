@@ -148,6 +148,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'site-inspections', path: '/site-inspections', icon: ClipboardCheck, label: ui('معاينة أرض أو موقع', 'Land or Site Inspection'), module: 'site_inspections', action: 'canView' },
     { id: 'leased-lands-out', path: '/lands/leased-out', icon: MapPin, label: t('nav.leasedLandsOut'), module: 'leased_lands_out', action: 'canView' },
     { id: 'leased-lands-in', path: '/lands/leased-in', icon: MapPin, label: t('nav.leasedLandsIn'), module: 'leased_lands_in', action: 'canView' },
+    { id: 'central-buildings', path: '/buildings/registry', icon: Building, label: ui('السجل المركزي للمباني', 'Central Building Registry'), module: 'central_buildings', action: 'canView' },
     { id: 'leased-buildings-out', path: '/buildings/leased-out', icon: Building, label: t('nav.leasedBuildingsOut'), module: 'leased_buildings_out', action: 'canView' },
     { id: 'leased-buildings-in', path: '/buildings/leased-in', icon: Building, label: t('nav.leasedBuildingsIn'), module: 'leased_buildings_in', action: 'canView' },
     { id: 'contracts-followup', path: '/contracts/follow-up', icon: FileClock, label: ui('متابعة العقود', 'Contract Follow-up'), module: 'contracts_follow_up', action: 'canView' },
@@ -174,6 +175,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/site-inspections')) return 'site-inspections';
     if (path.startsWith('/lands/leased-out')) return 'leased-lands-out';
     if (path.startsWith('/lands/leased-in')) return 'leased-lands-in';
+    if (path.startsWith('/buildings/registry')) return 'central-buildings';
     if (path.startsWith('/buildings/leased-out')) return 'leased-buildings-out';
     if (path.startsWith('/buildings/leased-in')) return 'leased-buildings-in';
     if (path.startsWith('/contracts/follow-up')) return 'contracts-followup';

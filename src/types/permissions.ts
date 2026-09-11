@@ -8,6 +8,7 @@ export type ModuleName =
   | 'leased_lands_in'
   | 'leased_buildings_out'
   | 'leased_buildings_in'
+  | 'central_buildings'
   | 'contracts_follow_up'
   | 'assets'
   | 'accounting_transformation'
@@ -55,6 +56,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   leased_lands_in: 'الأراضي المستأجرة',
   leased_buildings_out: 'المباني المؤجرة',
   leased_buildings_in: 'المباني المستأجرة',
+  central_buildings: 'السجل المركزي للمباني',
   contracts_follow_up: 'متابعة العقود',
   assets: 'وحدة الأصول',
   accounting_transformation: 'لجنة متابعة متطلبات التحول المحاسبي',
@@ -74,6 +76,7 @@ export const MODULE_LABELS_EN: Record<ModuleName, string> = {
   leased_lands_in: 'Leased Lands (In)',
   leased_buildings_out: 'Leased Buildings (Out)',
   leased_buildings_in: 'Leased Buildings (In)',
+  central_buildings: 'Central Building Registry',
   contracts_follow_up: 'Contract Follow-up',
   assets: 'Assets Unit',
   accounting_transformation: 'Accounting Transformation Requirements Committee',
@@ -115,6 +118,7 @@ export const createEmptyPermissions = (): UserPermissions => ({
   leased_lands_in: { ...NONE },
   leased_buildings_out: { ...NONE },
   leased_buildings_in: { ...NONE },
+  central_buildings: { ...NONE },
   contracts_follow_up: { ...NONE },
   assets: { ...NONE },
   accounting_transformation: { ...NONE },
@@ -134,6 +138,7 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   leased_lands_in: { ...FULL },
   leased_buildings_out: { ...FULL },
   leased_buildings_in: { ...FULL },
+  central_buildings: { ...FULL },
   contracts_follow_up: { ...FULL },
   assets: { ...FULL },
   accounting_transformation: { ...FULL },
@@ -169,6 +174,16 @@ export const normalizePermissions = (
     ) {
       output[moduleName].canView = true;
     }
+  }
+
+  // Backward compatibility: current users of the three building-dependent modules
+  // can view the shared master registry even before an administrator explicitly
+  // saves the new central_buildings permission in their profile. Mutations remain off.
+  if (!permissions?.central_buildings) {
+    output.central_buildings.canView =
+      output.assets.canView ||
+      output.accounting_transformation.canView ||
+      output.mosques.canView;
   }
 
   return output;

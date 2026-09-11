@@ -2493,7 +2493,7 @@ ${quranStockMovementForm.notes}` : ''}`
           >
             <option value="overview">الرئيسية</option>
             <option value="sites">المساجد والمصليات</option>
-            {['head', 'supervisor'].includes(role) && <option value="buildings">تغطية المباني</option>}
+            {['head', 'supervisor'].includes(role) && <option value="buildings">تغطية المباني بخدمة الصلاة</option>}
             {['head', 'supervisor'].includes(role) && <option value="field-visits">الجولات والزيارات</option>}
             {['head', 'supervisor', 'personnel'].includes(role) && <option value="quran">المصاحف</option>}
             {['head', 'supervisor', 'personnel'].includes(role) && <option value="requests">الطلبات</option>}
@@ -2511,7 +2511,7 @@ ${quranStockMovementForm.notes}` : ''}`
         <TabsList className="hidden h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border bg-white/80 p-2 sm:flex [&>[data-slot=tabs-trigger]]:min-w-max [&>[data-slot=tabs-trigger]]:flex-none">
           <TabsTrigger value="overview">الرئيسية</TabsTrigger>
           <TabsTrigger value="sites">المساجد والمصليات</TabsTrigger>
-          {['head', 'supervisor'].includes(role) && <TabsTrigger value="buildings">تغطية المباني</TabsTrigger>}
+          {['head', 'supervisor'].includes(role) && <TabsTrigger value="buildings">تغطية المباني بخدمة الصلاة</TabsTrigger>}
           {['head', 'supervisor'].includes(role) && <TabsTrigger value="field-visits">الجولات والزيارات</TabsTrigger>}
           {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger value="quran">المصاحف</TabsTrigger>}
           {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger value="requests">الطلبات</TabsTrigger>}
@@ -2665,9 +2665,9 @@ ${quranStockMovementForm.notes}` : ''}`
             <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-sky-700" />تغطية المباني بخدمة الصلاة</CardTitle>
-                <CardDescription>سجل مستقل لجميع المباني، بما فيها المباني التي لا يوجد بها مصلى، مع توثيق إمكانية إنشاء مصلى والبديل المعتمد.</CardDescription>
+                <CardDescription>ملف خدمة الصلاة للمباني المعرفة في السجل المركزي، مع توثيق وجود المصلى والاحتياج وإمكانية الإنشاء والبديل المعتمد.</CardDescription>
               </div>
-              {role === 'head' && canAdd && <Button className={button3d} onClick={() => openBuildingDialog()}><Plus className="ml-2 h-4 w-4" />إضافة مبنى</Button>}
+              <Button className={button3d} variant="outline" onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />السجل المركزي للمباني</Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <BuildingExcelImportManager

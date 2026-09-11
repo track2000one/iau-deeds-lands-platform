@@ -34,6 +34,7 @@ const OrganizationManagementPage = lazy(() => import('./pages/OrganizationManage
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage })));
 const ArchivePage = lazy(() => import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage })));
 const AppearanceSettingsPage = lazy(() => import('./pages/AppearanceSettingsPage').then((m) => ({ default: m.AppearanceSettingsPage })));
+const CentralBuildingsRegistryPage = lazy(() => import('./pages/CentralBuildingsRegistryPage').then((m) => ({ default: m.CentralBuildingsRegistryPage })));
 const SiteInspectionsPage = lazy(() => import('./pages/SiteInspectionsPage').then((m) => ({ default: m.SiteInspectionsPage })));
 const SiteInspectionFormPage = lazy(() => import('./pages/SiteInspectionFormPage').then((m) => ({ default: m.SiteInspectionFormPage })));
 const ViewSiteInspectionPage = lazy(() => import('./pages/ViewSiteInspectionPage').then((m) => ({ default: m.ViewSiteInspectionPage })));
@@ -208,6 +209,7 @@ export const router = createHashRouter([
       {
         path: 'buildings',
         children: [
+          { path: 'registry', element: page(<CentralBuildingsRegistryPage />) },
           { path: 'leased-out', element: page(<LeasedBuildingsOutPage />) },
           { path: 'leased-out/new', element: adminOnly(<AddLeasedBuildingOutPage />) },
           { path: 'leased-in', element: page(<LeasedBuildingsInPage />) },
