@@ -5,6 +5,10 @@ import { DataProvider } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Layout } from './components/Layout';
 import { applyAppearanceTheme, getThemeById } from './theme/appearanceThemes';
+import {
+  applyUserDisplayPreferences,
+  loadUserDisplayPreferences,
+} from './theme/userDisplayPreferences';
 
 const lightGlassShells: Record<
   string,
@@ -161,8 +165,11 @@ export const Root = () => {
     const safeUser = username?.trim() || 'guest';
     const storedTheme = localStorage.getItem(`iau-appearance-theme:${safeUser}`);
     const theme = getThemeById(storedTheme);
+    const displayPreferences = loadUserDisplayPreferences(username);
+
     applyAppearanceTheme(theme.id);
     applyLightShellForGlassTheme(theme.id);
+    applyUserDisplayPreferences(displayPreferences);
 
     const observer = new MutationObserver(() => {
       applyLightShellForGlassTheme(root.dataset.appearanceTheme);
