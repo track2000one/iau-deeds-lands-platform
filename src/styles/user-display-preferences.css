@@ -1,0 +1,73 @@
+/* Per-user reading comfort and accessibility controls */
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--app-font-family, Tajawal, Cairo, Arial, sans-serif) !important;
+}
+
+body {
+  line-height: var(--app-user-line-height, 1.65) !important;
+}
+
+html[data-display-density='compact'] [data-slot='card-header'],
+html[data-display-density='compact'] [data-slot='card-content'],
+html[data-display-density='compact'] [data-slot='card-footer'] {
+  padding: 0.8rem !important;
+}
+
+html[data-display-density='compact'] th,
+html[data-display-density='compact'] td {
+  padding-block: 0.4rem !important;
+}
+
+html[data-display-density='spacious'] [data-slot='card-header'],
+html[data-display-density='spacious'] [data-slot='card-content'],
+html[data-display-density='spacious'] [data-slot='card-footer'] {
+  padding: 1.45rem !important;
+}
+
+html[data-display-density='spacious'] th,
+html[data-display-density='spacious'] td {
+  padding-block: 0.85rem !important;
+}
+
+html[data-display-density='spacious'] input,
+html[data-display-density='spacious'] select,
+html[data-display-density='spacious'] textarea {
+  min-height: 3rem;
+}
+
+html[data-reduce-motion='true'] {
+  scroll-behavior: auto !important;
+}
+
+html[data-reduce-motion='true'] *,
+html[data-reduce-motion='true'] *::before,
+html[data-reduce-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+html[data-enhanced-focus='true'] :focus-visible {
+  outline: 3px solid hsl(var(--ring)) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 5px hsl(var(--ring) / 0.16) !important;
+}
+
+html[data-underline-links='true'] a:not([role='button']) {
+  text-decoration: underline !important;
+  text-decoration-thickness: 0.08em !important;
+  text-underline-offset: 0.2em !important;
+}
+
+@media print {
+  html[data-reduce-motion],
+  html[data-display-density] {
+    --app-user-line-height: 1.5;
+  }
+}
