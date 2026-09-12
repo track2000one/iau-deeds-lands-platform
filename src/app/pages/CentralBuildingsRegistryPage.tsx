@@ -48,6 +48,8 @@ import {
 } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { BuildingExcelImportManager, getPendingBuildingImport, isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
+import { CentralBuildingsReports } from '../components/CentralBuildingsReports';
 import {
   Dialog,
   DialogContent,
@@ -242,19 +244,28 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     return output;
   }, [accountingRecords, assets, buildings]);
 
+  const approvedBuildings = useMemo(() => buildings.filter((building) => !isPendingImportedBuilding(building)), [buildings]);
+  const pendingBuildings = useMemo(() => buildings.filter((building) => isPendingImportedBuilding(building)), [buildings]);
+
   const filteredBuildings = useMemo(() => {
     const needle = normalizeKey(search);
     if (!needle) return buildings;
 
-    return buildings.filter((building) =>
-      [
+    return buildings.filter((building) => {
+      const pendingDraft = getPendingBuildingImport(building)?.draft;
+      return [
+        pendingDraft?.buildingNumber,
+        pendingDraft?.name,
+        pendingDraft?.campusLocation,
+        pendingDraft?.city,
+        pendingDraft?.district,
         building.buildingNumber,
         building.name,
         building.campusLocation,
         building.city,
         building.district,
-      ].some((value) => normalizeKey(value).includes(needle))
-    );
+      ].some((value) => normalizeKey(value).includes(needle));
+    });
   }, [buildings, search]);
 
   const buildingGroups = useMemo(() => {
@@ -308,14 +319,14 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     let mosque = 0;
     let asset = 0;
     let accounting = 0;
-    buildings.forEach((building) => {
+    approvedBuildings.forEach((building) => {
       const item = usage.get(building.id);
       if (item?.mosqueProfile) mosque += 1;
       if ((item?.assets || 0) > 0) asset += 1;
       if ((item?.accounting || 0) > 0) accounting += 1;
     });
     return { mosque, asset, accounting };
-  }, [buildings, usage]);
+  }, [approvedBuildings, usage]);
 
   const openCreate = () => {
     setEditingBuilding(null);
@@ -570,6 +581,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <CentralBuildingsReports buildings={buildings} usage={usage} usageLoading={usageLoading} />
             <Button variant="outline" onClick={() => void loadData()} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               تحديث
@@ -590,8 +602,20 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
         </div>
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Building2} label="إجمالي المباني" value={buildings.length} />
+      <BuildingExcelImportManager
+        buildings={buildings}
+        role="head"
+        canAdd={canAdd}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        onReload={loadData}
+        context="central"
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <StatCard icon={Database} label="إجمالي السجلات" value={buildings.length} />
+        <StatCard icon={Building2} label="مباني معتمدة" value={approvedBuildings.length} />
+        <StatCard icon={RefreshCw} label="معلق للمراجعة" value={pendingBuildings.length} />
         <StatCard icon={Landmark} label="العناية بالمساجد" value={usageLoading ? '…' : totals.mosque} />
         <StatCard icon={Boxes} label="وحدة الأصول" value={usageLoading ? '…' : totals.asset} />
         <StatCard icon={ShieldCheck} label="التحول المحاسبي" value={usageLoading ? '…' : totals.accounting} />
@@ -695,6 +719,12 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                         <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
                           {visibleBuildings.map((building) => {
                             const item = usage.get(building.id);
+                            const pendingEnvelope = getPendingBuildingImport(building);
+                            const displayNumber = pendingEnvelope?.draft.buildingNumber || building.buildingNumber;
+                            const displayName = pendingEnvelope?.draft.name || building.name;
+                            const displayCampus = pendingEnvelope?.draft.campusLocation || building.campusLocation;
+                            const displayCity = pendingEnvelope?.draft.city || building.city;
+                            const displayDistrict = pendingEnvelope?.draft.district || building.district;
                             const references =
                               (item?.mosqueSites || 0) +
                               (item?.assets || 0) +
@@ -707,22 +737,22 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <Badge variant="outline">مبنى {building.buildingNumber}</Badge>
-                                      <Badge variant="secondary">سجل مركزي</Badge>
+                                      <Badge variant="outline">مبنى {displayNumber || 'غير مدخل'}</Badge>
+                                      {pendingEnvelope ? <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">معلق — يحتاج اعتماد</Badge> : <Badge variant="secondary">سجل مركزي معتمد</Badge>}
                                     </div>
                                     <h3 className="mt-3 truncate text-lg font-black">
-                                      {building.name || 'بدون مسمى'}
+                                      {displayName || 'بدون مسمى'}
                                     </h3>
                                     <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
                                       <MapPin className="h-4 w-4" />
-                                      {[building.campusLocation, building.city, building.district]
+                                      {[displayCampus, displayCity, displayDistrict]
                                         .filter(Boolean)
                                         .join(' — ') || 'الموقع غير مكتمل'}
                                     </p>
                                   </div>
 
                                   <div className="flex gap-1">
-                                    {canEdit && (
+                                    {canEdit && !pendingEnvelope && (
                                       <Button size="icon" variant="outline" onClick={() => openEdit(building)} title="تعديل البيانات الأساسية">
                                         <Pencil className="h-4 w-4" />
                                       </Button>

@@ -83,6 +83,7 @@ type Props = {
   canEdit: boolean;
   canDelete: boolean;
   onReload: () => Promise<void> | void;
+  context?: 'mosque' | 'central';
 };
 
 const button3d = 'shadow-[0_4px_0_rgba(71,85,105,0.13),0_7px_12px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,1)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(71,85,105,0.12)]';
@@ -125,7 +126,7 @@ const normalizeFeasibility = (value: string): MosqueBuilding['creationFeasibilit
 const rowToDraft = (row: Record<string, unknown>): BuildingImportDraft => ({
   buildingNumber: readCell(row, ['رقم المبنى', 'رقم مبنى', 'building number', 'building no', 'building_number', 'buildingnumber']),
   name: readCell(row, ['اسم المبنى', 'اسم المنشأة', 'اسم المنشاه', 'المبنى', 'building name', 'name']),
-  campusLocation: readCell(row, ['الحرم', 'الموقع داخل الجامعة', 'الموقع داخل الجامعه', 'الموقع', 'campus', 'campus location', 'campus_location']),
+  campusLocation: readCell(row, ['الحرم', 'الحرم / الموقع الجامعي', 'الحرم/الموقع الجامعي', 'الموقع الجامعي', 'الموقع داخل الجامعة', 'الموقع داخل الجامعه', 'الموقع', 'campus', 'campus location', 'campus_location']),
   city: readCell(row, ['المدينة', 'المدينه', 'city']),
   district: readCell(row, ['الحي', 'district']),
   latitude: readCell(row, ['خط العرض', 'latitude', 'lat']),
@@ -178,6 +179,7 @@ const reviewNotes = (draft: BuildingImportDraft) => {
 const approvalBlockers = (draft: BuildingImportDraft) => {
   const blockers: string[] = [];
   if (!draft.buildingNumber) blockers.push('رقم المبنى');
+  if (!draft.name) blockers.push('اسم المبنى');
   if (draft.creationFeasibility === 'unavailable' && !draft.unavailableReason) blockers.push('سبب تعذر إنشاء المصلى');
 
   const hasLat = draft.latitude !== '';
@@ -212,7 +214,8 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
   </div>
 );
 
-export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, canAdd, canEdit, canDelete, onReload }) => {
+export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, canAdd, canEdit, canDelete, onReload, context = 'mosque' }) => {
+  const isCentral = context === 'central';
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importRows, setImportRows] = useState<BuildingImportEnvelope[]>([]);
@@ -285,27 +288,31 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
   };
 
   const downloadTemplate = () => {
-    const headers = [
-      'رقم المبنى',
-      'اسم المبنى',
-      'الموقع داخل الجامعة',
-      'المدينة',
-      'الحي',
-      'خط العرض',
-      'خط الطول',
-      'عدد المستفيدين',
-      'حالة التغطية',
-      'إمكانية إنشاء مصلى',
-      'سبب تعذر الإنشاء',
-      'البديل المعتمد',
-      'ملاحظات',
-    ];
-    const example = ['A101', 'كلية مثال', 'الحرم الشرقي', 'الدمام', '', '26.392700', '50.043800', '250', 'يحتاج مصلى', 'قيد الدراسة', '', '', ''];
+    const headers = isCentral
+      ? ['رقم المبنى', 'اسم المبنى', 'الحرم / الموقع الجامعي', 'المدينة', 'الحي', 'خط العرض', 'خط الطول', 'ملاحظات']
+      : [
+          'رقم المبنى',
+          'اسم المبنى',
+          'الموقع داخل الجامعة',
+          'المدينة',
+          'الحي',
+          'خط العرض',
+          'خط الطول',
+          'عدد المستفيدين',
+          'حالة التغطية',
+          'إمكانية إنشاء مصلى',
+          'سبب تعذر الإنشاء',
+          'البديل المعتمد',
+          'ملاحظات',
+        ];
+    const example = isCentral
+      ? ['A101', 'كلية مثال', 'الحرم الشرقي', 'الدمام', '', '26.392700', '50.043800', 'مبنى تعريفي تجريبي']
+      : ['A101', 'كلية مثال', 'الحرم الشرقي', 'الدمام', '', '26.392700', '50.043800', '250', 'يحتاج مصلى', 'قيد الدراسة', '', '', ''];
     const worksheet = XLSX.utils.aoa_to_sheet([headers, example]);
     worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(16, header.length + 5) }));
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'تغطية المباني');
-    XLSX.writeFile(workbook, 'قالب-استيراد-تغطية-المباني.xlsx');
+    XLSX.utils.book_append_sheet(workbook, worksheet, isCentral ? 'السجل المركزي للمباني' : 'تغطية المباني');
+    XLSX.writeFile(workbook, isCentral ? 'قالب-استيراد-السجل-المركزي-للمباني.xlsx' : 'قالب-استيراد-تغطية-المباني.xlsx');
   };
 
   const savePendingRows = async () => {
@@ -387,12 +394,12 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
       return;
     }
 
-    if (!window.confirm(`اعتماد السجل للمبنى ${reviewDraft.buildingNumber} ونقله إلى سجل المباني الرسمي؟`)) return;
+    if (!window.confirm(`اعتماد السجل للمبنى ${reviewDraft.buildingNumber} ونقله إلى ${isCentral ? 'السجل المركزي الرسمي للمباني' : 'سجل المباني الرسمي'}؟`)) return;
 
     setSavingReview(true);
     try {
       await mosqueApi.updateBuilding(reviewItem.building.id, finalPayload(reviewDraft));
-      toast.success('تم اعتماد السجل ونقله إلى سجل تغطية المباني الرسمي.');
+      toast.success(isCentral ? 'تم اعتماد السجل ونقله إلى السجل المركزي الرسمي للمباني.' : 'تم اعتماد السجل ونقله إلى سجل تغطية المباني الرسمي.');
       setReviewItem(null);
       setReviewDraft(null);
       await onReload();
@@ -428,7 +435,7 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
             استيراد Excel
           </Button>
           <div className="mr-auto text-xs text-slate-600">
-            جميع الصفوف المستوردة تحفظ أولًا <b>كمعلقة للمراجعة</b> ولا تعتمد تلقائيًا.
+            {isCentral ? <>جميع المباني المستوردة تحفظ أولًا <b>كمعلقة للمراجعة</b> ثم يعتمدها المسؤول قبل إتاحتها للوحدات.</> : <>جميع الصفوف المستوردة تحفظ أولًا <b>كمعلقة للمراجعة</b> ولا تعتمد تلقائيًا.</>}
           </div>
         </div>
       )}
