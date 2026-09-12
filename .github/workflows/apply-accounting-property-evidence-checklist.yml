@@ -21,11 +21,12 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: node scripts/apply-accounting-property-evidence-checklist.mjs
+      - run: node scripts/run-accounting-property-evidence-checklist.mjs
       - run: npm run build
       - name: Remove temporary automation files
         run: |
           rm scripts/apply-accounting-property-evidence-checklist.mjs
+          rm scripts/run-accounting-property-evidence-checklist.mjs
           rm .github/workflows/apply-accounting-property-evidence-checklist.yml
       - name: Commit integration changes
         run: |
