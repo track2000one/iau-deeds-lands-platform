@@ -1,10 +1,14 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import {
   AlertTriangle,
   CheckCircle2,
   ClipboardList,
+  Crosshair,
   FileSpreadsheet,
+  MapPinned,
   Pencil,
   RefreshCw,
   Save,
@@ -87,6 +91,17 @@ type Props = {
 };
 
 const button3d = 'shadow-[0_4px_0_rgba(71,85,105,0.13),0_7px_12px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,1)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(71,85,105,0.12)]';
+const DEFAULT_REVIEW_MAP_CENTER: [number, number] = [26.4207, 50.0888];
+
+const parseCoordinate = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const isValidLatitude = (value: number) => value >= -90 && value <= 90;
+const isValidLongitude = (value: number) => value >= -180 && value <= 180;
 
 const normalizeHeader = (value: unknown) =>
   String(value ?? '')
@@ -207,6 +222,27 @@ const finalPayload = (draft: BuildingImportDraft) => ({
   notes: draft.notes.trim() || null,
 });
 
+const ReviewMapClickSelector = ({ onPick }: { onPick: (latitude: number, longitude: number) => void }) => {
+  useMapEvents({
+    click(event) {
+      onPick(event.latlng.lat, event.latlng.lng);
+    },
+  });
+  return null;
+};
+
+const ReviewMapCenterSync = ({ position }: { position: [number, number] | null }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => map.invalidateSize(), 120);
+    if (position) map.setView(position, Math.max(map.getZoom(), 16), { animate: true });
+    return () => window.clearTimeout(timer);
+  }, [map, position]);
+
+  return null;
+};
+
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
     <Label>{label}</Label>
@@ -224,6 +260,8 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
   const [reviewItem, setReviewItem] = useState<PendingItem | null>(null);
   const [reviewDraft, setReviewDraft] = useState<BuildingImportDraft | null>(null);
   const [savingReview, setSavingReview] = useState(false);
+  const [reviewMapOpen, setReviewMapOpen] = useState(false);
+  const [locatingReview, setLocatingReview] = useState(false);
 
   const pendingItems = useMemo<PendingItem[]>(
     () => buildings.flatMap((building) => {
@@ -238,10 +276,51 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
   const openReview = (item: PendingItem) => {
     setReviewItem(item);
     setReviewDraft({ ...item.envelope.draft });
+    setReviewMapOpen(false);
+    setLocatingReview(false);
   };
 
   const updateDraft = (field: keyof BuildingImportDraft, value: string) => {
     setReviewDraft((previous) => previous ? { ...previous, [field]: value } : previous);
+  };
+
+  const reviewMapPosition = useMemo<[number, number] | null>(() => {
+    if (!reviewDraft) return null;
+    const latitude = parseCoordinate(reviewDraft.latitude);
+    const longitude = parseCoordinate(reviewDraft.longitude);
+    if (latitude == null || longitude == null) return null;
+    if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) return null;
+    return [latitude, longitude];
+  }, [reviewDraft?.latitude, reviewDraft?.longitude]);
+
+  const selectReviewMapPosition = (latitude: number, longitude: number) => {
+    setReviewDraft((previous) => previous ? {
+      ...previous,
+      latitude: latitude.toFixed(6),
+      longitude: longitude.toFixed(6),
+    } : previous);
+  };
+
+  const useCurrentReviewLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('المتصفح لا يدعم تحديد الموقع الحالي');
+      return;
+    }
+
+    setLocatingReview(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        selectReviewMapPosition(position.coords.latitude, position.coords.longitude);
+        setReviewMapOpen(true);
+        setLocatingReview(false);
+        toast.success('تم تحديد الموقع الحالي وتعبئة الإحداثيات');
+      },
+      () => {
+        setLocatingReview(false);
+        toast.error('تعذر الحصول على الموقع الحالي. تحقق من سماح المتصفح بالوصول للموقع.');
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+    );
   };
 
   const handleExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -622,8 +701,83 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
                 <Field label="المدينة"><Input value={reviewDraft.city} onChange={(e) => updateDraft('city', e.target.value)} /></Field>
                 <Field label="الحي"><Input value={reviewDraft.district} onChange={(e) => updateDraft('district', e.target.value)} /></Field>
                 <Field label="عدد المستفيدين المتوقع"><Input inputMode="numeric" value={reviewDraft.expectedUsers} onChange={(e) => updateDraft('expectedUsers', e.target.value)} /></Field>
-                <Field label="خط العرض"><Input dir="ltr" value={reviewDraft.latitude} onChange={(e) => updateDraft('latitude', e.target.value)} /></Field>
-                <Field label="خط الطول"><Input dir="ltr" value={reviewDraft.longitude} onChange={(e) => updateDraft('longitude', e.target.value)} /></Field>
+                <Field label="خط العرض"><Input dir="ltr" inputMode="decimal" value={reviewDraft.latitude} onChange={(e) => updateDraft('latitude', e.target.value)} /></Field>
+                <Field label="خط الطول"><Input dir="ltr" inputMode="decimal" value={reviewDraft.longitude} onChange={(e) => updateDraft('longitude', e.target.value)} /></Field>
+
+                <div className="md:col-span-2 rounded-2xl border border-sky-200 bg-gradient-to-l from-sky-50/80 via-white to-emerald-50/60 p-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 font-bold text-slate-800">
+                        <MapPinned className="h-4 w-4 text-sky-700" />
+                        تحديد موقع المبنى والإحداثيات من الخريطة
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">
+                        افتح الخريطة ثم انقر على موقع المبنى، وسيتم تعبئة خط العرض وخط الطول تلقائيًا ويمكن تعديلهما يدويًا بعد ذلك.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" onClick={useCurrentReviewLocation} disabled={locatingReview}>
+                        <Crosshair className={`h-4 w-4 ${locatingReview ? 'animate-pulse' : ''}`} />
+                        {locatingReview ? 'جاري التحديد...' : 'موقعي الحالي'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={reviewMapOpen ? 'secondary' : 'outline'}
+                        onClick={() => setReviewMapOpen((value) => !value)}
+                      >
+                        <MapPinned className="h-4 w-4" />
+                        {reviewMapOpen ? 'إخفاء الخريطة' : 'تحديد من الخريطة'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {reviewMapOpen && (
+                    <div className="mt-3 overflow-hidden rounded-2xl border bg-white">
+                      <div className="border-b bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        انقر على الخريطة لتثبيت موقع المبنى بدقة. يمكنك التكبير والتحريك، وستظهر الإحداثيات المختارة مباشرة في الحقول أعلاه.
+                      </div>
+                      <MapContainer
+                        center={reviewMapPosition || DEFAULT_REVIEW_MAP_CENTER}
+                        zoom={reviewMapPosition ? 17 : 12}
+                        scrollWheelZoom
+                        className="h-[320px] w-full"
+                        style={{ zIndex: 0 }}
+                      >
+                        <TileLayer
+                          attribution='&copy; OpenStreetMap contributors'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        <ReviewMapClickSelector onPick={selectReviewMapPosition} />
+                        <ReviewMapCenterSync position={reviewMapPosition} />
+                        {reviewMapPosition && (
+                          <CircleMarker
+                            center={reviewMapPosition}
+                            radius={9}
+                            pathOptions={{ color: '#0369a1', fillColor: '#0ea5e9', fillOpacity: 0.9, weight: 3 }}
+                          />
+                        )}
+                      </MapContainer>
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-xs">
+                        <span className="text-slate-600">
+                          {reviewMapPosition
+                            ? `الموقع المحدد: ${reviewMapPosition[0].toFixed(6)} ، ${reviewMapPosition[1].toFixed(6)}`
+                            : 'لم يتم تحديد موقع بعد'}
+                        </span>
+                        {reviewMapPosition && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setReviewDraft((previous) => previous ? { ...previous, latitude: '', longitude: '' } : previous)}
+                          >
+                            مسح الموقع
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <Field label="حالة التغطية">
                   <NativeSelect value={reviewDraft.coverageStatus} onChange={(e) => updateDraft('coverageStatus', e.target.value)}>
                     {Object.entries(coverageStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
