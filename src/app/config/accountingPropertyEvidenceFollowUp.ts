@@ -2,6 +2,19 @@ import type { PropertyEvidenceStatus } from './accountingPropertyEvidenceRequire
 
 export type EvidenceFollowUpPriority = 'low' | 'medium' | 'high';
 export type EvidenceFollowUpStatus = 'not_started' | 'in_progress' | 'waiting_external' | 'completed';
+export type EvidenceEscalationLevel = 'normal' | 'due_soon' | 'overdue' | 'critical';
+
+export const EVIDENCE_ESCALATION_CONFIG = {
+  dueSoonDays: 7,
+  criticalAfterDays: 14,
+} as const;
+
+export const EVIDENCE_ESCALATION_LABELS: Record<EvidenceEscalationLevel, string> = {
+  normal: 'ضمن المدة',
+  due_soon: 'قريب الاستحقاق',
+  overdue: 'متأخر',
+  critical: 'حرج',
+};
 
 export type EvidenceFollowUpFields = {
   responsibleParty?: string;
@@ -75,4 +88,23 @@ export const evidenceDueSoon = (
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diff = Math.ceil((due.getTime() - today.getTime()) / 86400000);
   return diff >= 0 && diff <= days;
+};
+
+export const getEvidenceEscalationLevel = (
+  evidenceStatus: PropertyEvidenceStatus,
+  dueDate?: string,
+  followUpStatus?: EvidenceFollowUpStatus,
+  now: Date = new Date()
+): EvidenceEscalationLevel => {
+  if (!isEvidenceTaskOpen(evidenceStatus, followUpStatus)) return 'normal';
+  const overdue = isEvidenceTaskOverdue(evidenceStatus, dueDate, followUpStatus, now);
+  if (overdue) {
+    return evidenceDaysPastDue(dueDate, now) >= EVIDENCE_ESCALATION_CONFIG.criticalAfterDays
+      ? 'critical'
+      : 'overdue';
+  }
+  if (evidenceDueSoon(evidenceStatus, dueDate, followUpStatus, EVIDENCE_ESCALATION_CONFIG.dueSoonDays, now)) {
+    return 'due_soon';
+  }
+  return 'normal';
 };

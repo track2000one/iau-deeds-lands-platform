@@ -8,12 +8,12 @@ import { Button } from '../components/ui/button';
 import { usePermissions } from '../../context/PermissionsContext';
 import { getAccountingTransformationCycles, getAccountingTransformationRecords, getAccountingTransformationStats } from '../api/accountingTransformation';
 import type { AccountingTransformationCycle, AccountingTransformationRecord, AccountingTransformationStats } from '../../types/accountingTransformation';
-import { isEvidenceTaskOverdue, type EvidenceFollowUpStatus } from '../config/accountingPropertyEvidenceFollowUp';
+import { getEvidenceEscalationLevel, type EvidenceFollowUpStatus } from '../config/accountingPropertyEvidenceFollowUp';
 import type { PropertyEvidenceStatus } from '../config/accountingPropertyEvidenceRequirements';
 
 const CONTROL_KEY = '__propertyControlAnalysis';
 
-const countOverdueEvidenceTasks = (records: AccountingTransformationRecord[]) => {
+const summarizeEvidenceEscalations = (records: AccountingTransformationRecord[]) => {
   const latestByTask = new Map<string, { updatedAt: number; status: PropertyEvidenceStatus; dueDate?: string; followUpStatus?: EvidenceFollowUpStatus }>();
   records.forEach((record) => {
     const raw = record.payload?.[CONTROL_KEY];
@@ -37,7 +37,14 @@ const countOverdueEvidenceTasks = (records: AccountingTransformationRecord[]) =>
       });
     });
   });
-  return Array.from(latestByTask.values()).filter((task) => isEvidenceTaskOverdue(task.status, task.dueDate, task.followUpStatus)).length;
+  const summary = { dueSoon: 0, overdue: 0, critical: 0 };
+  Array.from(latestByTask.values()).forEach((task) => {
+    const level = getEvidenceEscalationLevel(task.status, task.dueDate, task.followUpStatus);
+    if (level === 'due_soon') summary.dueSoon += 1;
+    if (level === 'overdue') summary.overdue += 1;
+    if (level === 'critical') { summary.critical += 1; summary.overdue += 1; }
+  });
+  return summary;
 };
 
 const EMPTY: AccountingTransformationStats = {
@@ -67,7 +74,7 @@ export const AccountingTransformationDashboardPage: React.FC = () => {
   const [stats, setStats] = useState<AccountingTransformationStats>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [cycles, setCycles] = useState<AccountingTransformationCycle[]>([]);
-  const [overdueEvidenceTasks, setOverdueEvidenceTasks] = useState(0);
+  const [evidenceEscalations, setEvidenceEscalations] = useState({ dueSoon: 0, overdue: 0, critical: 0 });
   const canAdd = isAdmin || hasPermission('accounting_transformation', 'canAdd');
 
   useEffect(() => {
@@ -87,9 +94,9 @@ export const AccountingTransformationDashboardPage: React.FC = () => {
     ])
       .then(([buildings, lands]) => {
         if (!active) return;
-        setOverdueEvidenceTasks(countOverdueEvidenceTasks([...(buildings.items || []), ...(lands.items || [])]));
+        setEvidenceEscalations(summarizeEvidenceEscalations([...(buildings.items || []), ...(lands.items || [])]));
       })
-      .catch(() => { if (active) setOverdueEvidenceTasks(0); });
+      .catch(() => { if (active) setEvidenceEscalations({ dueSoon: 0, overdue: 0, critical: 0 }); });
     return () => { active = false; };
   }, []);
 
@@ -114,7 +121,7 @@ export const AccountingTransformationDashboardPage: React.FC = () => {
 
           <section className="grid overflow-hidden rounded-[28px] border border-white/15 bg-[#071f47]/75 md:grid-cols-4">{hero.map(({ label, value, icon: Icon, tone }, index) => <div key={label} className={`flex items-center gap-4 p-5 ${index ? 'border-t border-white/10 md:border-t-0 md:border-r' : ''}`}><div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl border ${tone}`}><Icon className="h-6 w-6" /></div><div><p className="text-xs font-bold text-slate-300">{label}</p><p className="mt-1 text-3xl font-black">{loading ? '...' : value.toLocaleString('ar-SA')}</p></div></div>)}</section>
 
-          {overdueEvidenceTasks > 0 && <section className="grid gap-3 rounded-[24px] border border-red-300/25 bg-red-400/10 p-4 md:grid-cols-[1fr_auto] md:items-center"><div><p className="text-xs font-bold text-red-100">تنبيه مستندات الإثبات</p><p className="mt-1 font-black text-white">يوجد {overdueEvidenceTasks.toLocaleString('ar-SA')} مهمة متابعة متأخرة عن تاريخ الاستحقاق</p><p className="mt-1 text-xs text-red-100/80">راجع الجهة المسؤولة وآخر إجراء واتخذ اللازم لتحديث المستند أو استكماله.</p></div><Button variant="outline" className="border-red-200/30 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/accounting-transformation/evidence-dashboard')}><TriangleAlert className="ml-2 h-4 w-4" />عرض المتأخرات</Button></section>}
+          {evidenceEscalations.critical > 0 ? <section className="grid gap-3 rounded-[24px] border border-red-300/35 bg-red-600/20 p-4 md:grid-cols-[1fr_auto] md:items-center"><div><p className="text-xs font-bold text-red-100">تصعيد حرج — مستندات الإثبات</p><p className="mt-1 font-black text-white">يوجد {evidenceEscalations.critical.toLocaleString('ar-SA')} مهمة حرجة تجاوز تأخرها 14 يومًا</p><p className="mt-1 text-xs text-red-100/80">تحتاج إلى تدخل ومتابعة عاجلة مع الجهة المسؤولة وتوثيق آخر إجراء.</p></div><Button variant="outline" className="border-red-200/30 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/accounting-transformation/evidence-dashboard')}><TriangleAlert className="ml-2 h-4 w-4" />عرض الحالات الحرجة</Button></section> : evidenceEscalations.overdue > 0 ? <section className="grid gap-3 rounded-[24px] border border-red-300/25 bg-red-400/10 p-4 md:grid-cols-[1fr_auto] md:items-center"><div><p className="text-xs font-bold text-red-100">تنبيه مستندات الإثبات</p><p className="mt-1 font-black text-white">يوجد {evidenceEscalations.overdue.toLocaleString('ar-SA')} مهمة متابعة متأخرة عن تاريخ الاستحقاق</p><p className="mt-1 text-xs text-red-100/80">راجع الجهة المسؤولة وآخر إجراء واتخذ اللازم لتحديث المستند أو استكماله.</p></div><Button variant="outline" className="border-red-200/30 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/accounting-transformation/evidence-dashboard')}><TriangleAlert className="ml-2 h-4 w-4" />عرض المتأخرات</Button></section> : evidenceEscalations.dueSoon > 0 ? <section className="grid gap-3 rounded-[24px] border border-amber-300/25 bg-amber-300/10 p-4 md:grid-cols-[1fr_auto] md:items-center"><div><p className="text-xs font-bold text-amber-100">استحقاقات قريبة — مستندات الإثبات</p><p className="mt-1 font-black text-white">يوجد {evidenceEscalations.dueSoon.toLocaleString('ar-SA')} مهمة تستحق خلال 7 أيام</p><p className="mt-1 text-xs text-amber-100/80">يفضل استكمال المتابعة قبل تحولها إلى حالة متأخرة.</p></div><Button variant="outline" className="border-amber-200/30 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/accounting-transformation/evidence-dashboard')}><TriangleAlert className="ml-2 h-4 w-4" />عرض الاستحقاقات</Button></section> : null}
 
           {(currentCycle || openCycle) && <section className="grid gap-3 rounded-[24px] border border-white/15 bg-white/[.07] p-4 md:grid-cols-[1fr_auto] md:items-center"><div><p className="text-xs font-bold text-cyan-100">{openCycle ? 'توجد دورة تحديث قيد العمل' : 'الدورة الحالية المعتمدة'}</p><p className="mt-1 font-black text-white">{openCycle ? `#${openCycle.cycleNumber} — ${openCycle.name}` : currentCycle ? `#${currentCycle.cycleNumber} — ${currentCycle.name}` : ''}</p><p className="mt-1 text-xs text-slate-300">{openCycle ? `${openCycle.recordCount.toLocaleString('ar-SA')} سجل · ${openCycle.status === 'under_review' ? 'تحت المراجعة' : 'مسودة'}` : `${currentCycle?.recordCount.toLocaleString('ar-SA') || 0} سجل في الإصدار الحالي`}</p></div><Button variant="outline" className="border-white/15 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate(openCycle?.status === 'draft' ? `/accounting-transformation/import?cycle=${encodeURIComponent(openCycle.id)}` : '/accounting-transformation/cycles')}><RefreshCcw className="ml-2 h-4 w-4" />{openCycle?.status === 'draft' ? 'فتح دورة التحديث' : 'سجل الدورات'}</Button></section>}
 

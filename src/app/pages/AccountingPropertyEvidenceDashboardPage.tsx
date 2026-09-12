@@ -11,6 +11,8 @@ import {
   RefreshCcw,
   Search,
   ShieldCheck,
+  Printer,
+  Siren,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
@@ -31,13 +33,17 @@ import {
   type PropertyEvidenceStatus,
 } from '../config/accountingPropertyEvidenceRequirements';
 import {
+  EVIDENCE_ESCALATION_CONFIG,
+  EVIDENCE_ESCALATION_LABELS,
   EVIDENCE_FOLLOW_UP_STATUS_LABELS,
   EVIDENCE_PRIORITY_LABELS,
   defaultFollowUpStatus,
   evidenceDaysPastDue,
   evidenceDueSoon,
+  getEvidenceEscalationLevel,
   isEvidenceTaskOpen,
   isEvidenceTaskOverdue,
+  type EvidenceEscalationLevel,
   type EvidenceFollowUpPriority,
   type EvidenceFollowUpStatus,
 } from '../config/accountingPropertyEvidenceFollowUp';
@@ -69,7 +75,7 @@ type SavedControlAnalysis = {
   updatedAt?: string;
 };
 
-type FilterMode = 'all' | 'missing' | 'needs_update' | 'complete' | 'open' | 'overdue' | 'high_priority';
+type FilterMode = 'all' | 'missing' | 'needs_update' | 'complete' | 'open' | 'overdue' | 'critical' | 'high_priority';
 
 type DashboardTask = {
   key: string;
@@ -85,6 +91,7 @@ type DashboardTask = {
   overdue: boolean;
   daysPastDue: number;
   dueSoon: boolean;
+  escalation: EvidenceEscalationLevel;
 };
 
 type DashboardRow = {
@@ -100,6 +107,7 @@ type DashboardRow = {
   tasks: DashboardTask[];
   openTasks: number;
   overdueTasks: number;
+  criticalTasks: number;
   highPriorityOpen: number;
   dueSoonTasks: number;
   nearestDueDate?: string;
@@ -193,6 +201,7 @@ const buildRow = (profile: PropertyControlMemoProfile, records: AccountingTransf
         overdue,
         daysPastDue: overdue ? evidenceDaysPastDue(savedEntry?.dueDate) : 0,
         dueSoon: evidenceDueSoon(status, savedEntry?.dueDate, followUpStatus),
+        escalation: getEvidenceEscalationLevel(status, savedEntry?.dueDate, followUpStatus),
       });
     }
   });
@@ -203,6 +212,7 @@ const buildRow = (profile: PropertyControlMemoProfile, records: AccountingTransf
     : 0;
   const openTasks = tasks.filter((task) => task.open).length;
   const overdueTasks = tasks.filter((task) => task.overdue).length;
+  const criticalTasks = tasks.filter((task) => task.escalation === 'critical').length;
   const highPriorityOpen = tasks.filter((task) => task.open && task.priority === 'high').length;
   const dueSoonTasks = tasks.filter((task) => task.dueSoon && !task.overdue).length;
   const nearestDueDate = tasks
@@ -223,6 +233,7 @@ const buildRow = (profile: PropertyControlMemoProfile, records: AccountingTransf
     tasks,
     openTasks,
     overdueTasks,
+    criticalTasks,
     highPriorityOpen,
     dueSoonTasks,
     nearestDueDate,
@@ -276,6 +287,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
       if (filter === 'complete' && row.percentage < 100) return false;
       if (filter === 'open' && row.openTasks === 0) return false;
       if (filter === 'overdue' && row.overdueTasks === 0) return false;
+      if (filter === 'critical' && row.criticalTasks === 0) return false;
       if (filter === 'high_priority' && row.highPriorityOpen === 0) return false;
       if (!needle) return true;
       return normalize([
@@ -296,6 +308,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
   const totalNeedsUpdate = rows.reduce((sum, row) => sum + row.needsUpdate, 0);
   const totalOpenTasks = rows.reduce((sum, row) => sum + row.openTasks, 0);
   const totalOverdueTasks = rows.reduce((sum, row) => sum + row.overdueTasks, 0);
+  const totalCriticalTasks = rows.reduce((sum, row) => sum + row.criticalTasks, 0);
   const totalHighPriorityOpen = rows.reduce((sum, row) => sum + row.highPriorityOpen, 0);
   const taskRows = rows.flatMap((row) => row.tasks.map((task) => ({ row, task })));
   const filteredTaskRows = taskRows.filter(({ row, task }) => {
@@ -303,6 +316,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
     if (filter === 'needs_update' && task.status !== 'needs_update') return false;
     if (filter === 'open' && !task.open) return false;
     if (filter === 'overdue' && !task.overdue) return false;
+    if (filter === 'critical' && task.escalation !== 'critical') return false;
     if (filter === 'high_priority' && !(task.open && task.priority === 'high')) return false;
     if (filter === 'complete') return false;
     const needle = normalize(query);
@@ -312,6 +326,42 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
   const overallPercentage = totalRequirements
     ? Math.round(((totalAvailable + totalNeedsUpdate * 0.5) / totalRequirements) * 100)
     : 0;
+
+  const escapeHtml = (value: unknown) => String(value ?? '-')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+  const printEvidenceReport = () => {
+    const printable = filteredTaskRows.length ? filteredTaskRows : taskRows;
+    const popup = window.open('', '_blank', 'width=1200,height=850');
+    if (!popup) { toast.error('تعذر فتح نافذة الطباعة. تحقق من السماح بالنوافذ المنبثقة.'); return; }
+    const rowsHtml = printable.map(({ row, task }) => `
+      <tr class="${task.escalation}">
+        <td>${escapeHtml(row.profile.title)}</td>
+        <td>${escapeHtml(task.label)}</td>
+        <td>${escapeHtml(task.status === 'missing' ? 'ناقص' : 'يحتاج تحديث')}</td>
+        <td>${escapeHtml(EVIDENCE_ESCALATION_LABELS[task.escalation])}</td>
+        <td>${escapeHtml(task.responsible)}</td>
+        <td>${escapeHtml(EVIDENCE_PRIORITY_LABELS[task.priority])}</td>
+        <td>${escapeHtml(task.dueDate || '-')}</td>
+        <td>${task.daysPastDue ? escapeHtml(`${task.daysPastDue} يوم`) : '-'}</td>
+        <td>${escapeHtml(EVIDENCE_FOLLOW_UP_STATUS_LABELS[task.followUpStatus])}</td>
+        <td>${escapeHtml(task.lastAction || '-')}</td>
+      </tr>`).join('');
+    const generatedAt = new Date().toLocaleString('ar-SA');
+    popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير متابعة مستندات الإثبات</title><style>
+      @page{size:A4 landscape;margin:12mm} body{font-family:Arial,Tahoma,sans-serif;color:#111827;margin:0} h1{font-size:22px;margin:0 0 6px} .meta{font-size:11px;color:#475569;margin-bottom:14px}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 16px}.box{border:1px solid #cbd5e1;border-radius:8px;padding:8px;text-align:center}.box b{display:block;font-size:18px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:10px}th,td{border:1px solid #cbd5e1;padding:6px;vertical-align:top}th{background:#f1f5f9}.due_soon{background:#fffbeb}.overdue{background:#fef2f2}.critical{background:#fee2e2;font-weight:700}.legend{font-size:10px;margin-top:10px;color:#475569}@media print{button{display:none}}
+    </style></head><body><h1>تقرير متابعة مستندات الإثبات</h1><div class="meta">جامعة الإمام عبدالرحمن بن فيصل — لجنة متابعة متطلبات التحول المحاسبي<br>تاريخ إعداد التقرير: ${escapeHtml(generatedAt)} — معيار الحالة الحرجة: ${EVIDENCE_ESCALATION_CONFIG.criticalAfterDays} يومًا بعد الاستحقاق</div>
+    <div class="summary"><div class="box">المهام المفتوحة<b>${totalOpenTasks}</b></div><div class="box">المتأخرة<b>${totalOverdueTasks}</b></div><div class="box">الحرجة<b>${totalCriticalTasks}</b></div><div class="box">أولوية عالية<b>${totalHighPriorityOpen}</b></div></div>
+    <table><thead><tr><th>العقار</th><th>المستند</th><th>حالة المستند</th><th>التصعيد</th><th>المسؤول</th><th>الأولوية</th><th>الاستحقاق</th><th>مدة التأخير</th><th>حالة المتابعة</th><th>آخر إجراء</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+    <div class="legend">قريب الاستحقاق: خلال ${EVIDENCE_ESCALATION_CONFIG.dueSoonDays} أيام — متأخر: بعد تاريخ الاستحقاق — حرج: بعد ${EVIDENCE_ESCALATION_CONFIG.criticalAfterDays} يومًا من التأخير.</div></body></html>`);
+    popup.document.close();
+    popup.focus();
+    window.setTimeout(() => popup.print(), 250);
+  };
 
   return (
     <div className="mx-auto w-full max-w-[1780px] space-y-5 pb-8" dir="rtl">
@@ -326,6 +376,9 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
             <p className="mt-3 max-w-5xl text-sm leading-7 text-slate-300">متابعة اكتمال المعززات والمستندات الداعمة للعقارات محل تحليل السيطرة، مع إظهار المستندات الناقصة وما يحتاج تحديثًا والمسؤول والإجراء التالي دون إنشاء سجل مرفقات موازٍ.</p>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
+            <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={printEvidenceReport}>
+              <Printer className="ml-2 h-4 w-4" />طباعة تقرير المتابعة
+            </Button>
             <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => void load()} disabled={loading}>
               <RefreshCcw className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />تحديث
             </Button>
@@ -336,7 +389,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         {[
           ['الحالات', rows.length, FolderOpen, 'text-blue-700'],
           ['نسبة الاكتمال', `${overallPercentage}%`, FileCheck2, 'text-emerald-700'],
@@ -344,6 +397,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
           ['تحتاج تحديث', totalNeedsUpdate, FileWarning, 'text-amber-700'],
           ['مهام متابعة مفتوحة', totalOpenTasks, FolderOpen, 'text-sky-700'],
           ['مهام متأخرة', totalOverdueTasks, AlertTriangle, 'text-rose-700'],
+          ['مهام حرجة', totalCriticalTasks, Siren, 'text-red-900'],
         ].map(([label, value, Icon, tone]) => (
           <Card key={String(label)} className="rounded-2xl">
             <CardContent className="flex items-center gap-3 p-4">
@@ -370,6 +424,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
                 <option value="complete">مكتمل 100%</option>
                 <option value="open">مهام متابعة مفتوحة</option>
                 <option value="overdue">مهام متأخرة</option>
+                <option value="critical">مهام حرجة</option>
                 <option value="high_priority">أولوية عالية</option>
               </NativeSelect>
             </div>
@@ -378,6 +433,9 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
             </Button>
             <Button type="button" variant={filter === 'overdue' ? 'default' : 'outline'} onClick={() => setFilter(filter === 'overdue' ? 'all' : 'overdue')}>
               <AlertTriangle className="ml-2 h-4 w-4" />المتأخر فقط
+            </Button>
+            <Button type="button" variant={filter === 'critical' ? 'destructive' : 'outline'} onClick={() => setFilter(filter === 'critical' ? 'all' : 'critical')}>
+              <Siren className="ml-2 h-4 w-4" />الحرج فقط
             </Button>
           </div>
         </CardHeader>
@@ -452,6 +510,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-800">مفتوحة: {totalOpenTasks}</Badge>
               <Badge variant="outline" className="border-red-200 bg-red-50 text-red-800">متأخرة: {totalOverdueTasks}</Badge>
+              <Badge variant="outline" className="border-red-400 bg-red-100 text-red-950">حرجة: {totalCriticalTasks}</Badge>
               <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-800">أولوية عالية: {totalHighPriorityOpen}</Badge>
             </div>
           </div>
@@ -461,14 +520,15 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1500px] text-right text-sm">
                 <thead className="bg-slate-50 text-xs text-slate-600"><tr>
-                  <th className="px-4 py-3">العقار</th><th className="px-4 py-3">المستند</th><th className="px-4 py-3">حالة المستند</th><th className="px-4 py-3">المسؤول</th><th className="px-4 py-3">الأولوية</th><th className="px-4 py-3">الاستحقاق</th><th className="px-4 py-3">حالة المتابعة</th><th className="px-4 py-3">آخر إجراء</th><th className="px-4 py-3">فتح</th>
+                  <th className="px-4 py-3">العقار</th><th className="px-4 py-3">المستند</th><th className="px-4 py-3">حالة المستند</th><th className="px-4 py-3">التصعيد</th><th className="px-4 py-3">المسؤول</th><th className="px-4 py-3">الأولوية</th><th className="px-4 py-3">الاستحقاق</th><th className="px-4 py-3">حالة المتابعة</th><th className="px-4 py-3">آخر إجراء</th><th className="px-4 py-3">فتح</th>
                 </tr></thead>
                 <tbody className="divide-y">
                   {filteredTaskRows.map(({ row, task }) => (
-                    <tr key={`${row.profile.id}-${task.key}`} className={task.overdue ? 'bg-red-50/45 align-top' : 'align-top hover:bg-slate-50/70'}>
+                    <tr key={`${row.profile.id}-${task.key}`} className={task.escalation === 'critical' ? 'bg-red-100/70 align-top' : task.escalation === 'overdue' ? 'bg-red-50/45 align-top' : task.escalation === 'due_soon' ? 'bg-amber-50/55 align-top' : 'align-top hover:bg-slate-50/70'}>
                       <td className="px-4 py-4 font-black text-slate-900">{row.profile.title}</td>
                       <td className="max-w-[260px] px-4 py-4 text-xs leading-6 text-slate-700">{task.label}</td>
                       <td className="px-4 py-4"><Badge variant="outline" className={task.status === 'missing' ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}>{task.status === 'missing' ? 'ناقص' : 'يحتاج تحديث'}</Badge></td>
+                      <td className="px-4 py-4"><Badge variant="outline" className={task.escalation === 'critical' ? 'border-red-500 bg-red-100 text-red-950' : task.escalation === 'overdue' ? 'border-red-200 bg-red-50 text-red-800' : task.escalation === 'due_soon' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-slate-50 text-slate-700'}>{EVIDENCE_ESCALATION_LABELS[task.escalation]}</Badge></td>
                       <td className="max-w-[220px] px-4 py-4 text-xs leading-6 text-slate-700">{task.responsible}</td>
                       <td className="px-4 py-4"><Badge variant="outline">{EVIDENCE_PRIORITY_LABELS[task.priority]}</Badge></td>
                       <td className="px-4 py-4 text-xs">{task.dueDate || '-'}{task.overdue && <p className="mt-1 font-black text-red-700">متأخر {task.daysPastDue.toLocaleString('ar-SA')} يوم</p>}{!task.overdue && task.dueSoon && <p className="mt-1 font-bold text-amber-700">خلال 7 أيام</p>}</td>
