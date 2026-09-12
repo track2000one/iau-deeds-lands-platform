@@ -391,6 +391,9 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
             <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => void load()} disabled={loading}>
               <RefreshCcw className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />تحديث
             </Button>
+            <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/accounting-transformation/evidence-audit')}>
+              <History className="ml-2 h-4 w-4" />السجل الرقابي
+            </Button>
             <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/accounting-transformation/control-indicators')}>
               <ShieldCheck className="ml-2 h-4 w-4" />مؤشرات السيطرة
             </Button>

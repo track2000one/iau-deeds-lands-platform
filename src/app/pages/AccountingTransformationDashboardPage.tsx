@@ -59,6 +59,7 @@ const quickActions = [
   { label: 'تصنيف وترميز الأصول', description: 'المرجع الرسمي للترميز والحسابات والأعمار الإنتاجية وحدود الرسملة.', path: '/accounting-transformation/asset-classification', icon: Tags },
   { label: 'مؤشرات السيطرة على العقارات', description: 'تحليل العقارات التي يكون مالك الأصل فيها خلاف الجامعة وتوثيق المستندات والمعالجة قبل الاعتماد.', path: '/accounting-transformation/control-indicators', icon: ShieldCheck },
   { label: 'متابعة مستندات الإثبات', description: 'لوحة مركزية للحالات الأربع تعرض الاكتمال والمهام المفتوحة والمتأخرات والأولوية والمسؤول وآخر إجراء.', path: '/accounting-transformation/evidence-dashboard', icon: FolderCheck },
+  { label: 'السجل الرقابي المركزي', description: 'Audit Trail موحد لأحداث مستندات الإثبات مع هوية المنفذ والتوقيت والتغييرات والفلترة والطباعة والتصدير.', path: '/accounting-transformation/evidence-audit', icon: History },
   { label: 'إضافة سجل', description: 'إدخال يدوي عند الحاجة؛ المسار المفضل للتحديثات الجماعية هو نموذج ب عبر دورة تحديث.', path: '/accounting-transformation/new', icon: PlusCircle },
   { label: 'استيراد Excel', description: 'قراءة جميع أوراق الملف وربط نموذج ب والملفات القديمة بالسجل الرسمي.', path: '/accounting-transformation/import', icon: FileSpreadsheet },
   { label: 'التقارير', description: 'تقارير الحصر والجرد والتقييم وجودة واكتمال البيانات.', path: '/accounting-transformation/reports', icon: BarChart3 },
