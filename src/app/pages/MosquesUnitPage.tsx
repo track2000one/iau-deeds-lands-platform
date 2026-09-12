@@ -51,7 +51,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { MosqueFieldVisitsPanel } from '../components/MosqueFieldVisitsPanel';
 import { MosqueReportsCenter } from '../components/MosqueReportsCenter';
-import { BuildingExcelImportManager, isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
+import { isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
 import {
   Dialog,
@@ -662,6 +662,33 @@ export const MosquesUnitPage: React.FC = () => {
   useEffect(() => {
     if (!isAdmin && activeTab === 'roles') setActiveTab('team');
   }, [isAdmin, activeTab]);
+
+  // CENTRAL_BUILDING_GOVERNANCE_V1: when a mosque/prayer room is inside a university building,
+  // the central building registry is the authoritative source for shared location data.
+  useEffect(() => {
+    if (!siteDialog || siteForm.spatialRelation !== 'inside_building' || !siteForm.buildingId) return;
+    const building = officialBuildings.find((item) => item.id === siteForm.buildingId);
+    if (!building) return;
+    setSiteForm((current: any) => {
+      const next = {
+        ...current,
+        city: building.city || '',
+        district: building.district || '',
+        campusLocation: building.campusLocation || '',
+        latitude: building.latitude ?? '',
+        longitude: building.longitude ?? '',
+      };
+      if (
+        current.city === next.city &&
+        current.district === next.district &&
+        current.campusLocation === next.campusLocation &&
+        current.latitude === next.latitude &&
+        current.longitude === next.longitude
+      ) return current;
+      return next;
+    });
+    setShowSiteMap(false);
+  }, [siteDialog, siteForm.spatialRelation, siteForm.buildingId, officialBuildings]);
 
   const siteCities = useMemo(
     () => Array.from(new Set(sites.map((site) => site.city).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'ar')),
@@ -1847,38 +1874,24 @@ ${quranStockMovementForm.notes}` : ''}`
   }, [updateBuildingCoordinates]);
 
   const saveBuilding = async () => {
-    if (!String(buildingForm.buildingNumber || '').trim()) return toast.error('رقم المبنى مطلوب');
+    if (!editingBuilding) return toast.error('تعريف المبنى وتعديل بياناته الأساسية يتم من السجل المركزي للمباني');
     if (buildingForm.creationFeasibility === 'unavailable' && !String(buildingForm.unavailableReason || '').trim()) {
       return toast.error('سبب تعذر إنشاء المصلى مطلوب');
     }
-    const hasLatitude = String(buildingForm.latitude ?? '').trim() !== '';
-    const hasLongitude = String(buildingForm.longitude ?? '').trim() !== '';
-    if (hasLatitude !== hasLongitude) return toast.error('أدخل خط العرض وخط الطول معًا');
-    if (hasLatitude) {
-      const latitude = Number(buildingForm.latitude);
-      const longitude = Number(buildingForm.longitude);
-      if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return toast.error('خط العرض غير صحيح');
-      if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return toast.error('خط الطول غير صحيح');
-    }
     setSaving(true);
     try {
-      const payload = {
-        ...buildingForm,
-        buildingNumber: String(buildingForm.buildingNumber).trim(),
-        name: String(buildingForm.name || '').trim() || null,
-        latitude: String(buildingForm.latitude ?? '').trim() === '' ? null : Number(buildingForm.latitude),
-        longitude: String(buildingForm.longitude ?? '').trim() === '' ? null : Number(buildingForm.longitude),
+      await mosqueApi.updateBuilding(editingBuilding.id, {
         expectedUsers: buildingForm.expectedUsers === '' ? null : Number(buildingForm.expectedUsers),
+        coverageStatus: buildingForm.coverageStatus,
+        creationFeasibility: buildingForm.creationFeasibility,
         unavailableReason: buildingForm.creationFeasibility === 'unavailable' ? (String(buildingForm.unavailableReason || '').trim() || null) : null,
         approvedAlternative: String(buildingForm.approvedAlternative || '').trim() || null,
-      };
-      if (editingBuilding) await mosqueApi.updateBuilding(editingBuilding.id, payload);
-      else await mosqueApi.createBuilding(payload);
-      toast.success(editingBuilding ? 'تم تحديث بيانات تغطية المبنى' : 'تمت إضافة المبنى إلى سجل تغطية المصليات');
+      });
+      toast.success('تم تحديث ملف خدمة الصلاة للمبنى دون تعديل بياناته المركزية');
       setBuildingDialog(false);
       await loadAll();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر حفظ المبنى');
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ ملف خدمة الصلاة');
     } finally { setSaving(false); }
   };
 
@@ -1896,6 +1909,9 @@ ${quranStockMovementForm.notes}` : ''}`
   const selectedSiteBuilding = officialBuildings.find((building) => building.id === siteForm.buildingId) || null;
   const selectedBuildingHasMen = Boolean(selectedSiteBuilding?.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'men' && site.status !== 'temporarily_closed'));
   const selectedBuildingHasWomen = Boolean(selectedSiteBuilding?.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'women' && site.status !== 'temporarily_closed'));
+  const duplicatePrayerRoom = siteForm.spatialRelation === 'inside_building' && siteForm.siteType === 'prayer_room' && siteForm.buildingId && siteForm.prayerRoomGender
+    ? sites.find((site) => site.id !== editingSite?.id && site.buildingId === siteForm.buildingId && site.siteType === 'prayer_room' && site.prayerRoomGender === siteForm.prayerRoomGender) || null
+    : null;
 
   const openSiteDialog = (site?: MosqueSite) => {
     setEditingSite(site || null);
@@ -1959,6 +1975,19 @@ ${quranStockMovementForm.notes}` : ''}`
     if (!siteForm.name.trim()) return toast.error('اسم المسجد أو المصلى مطلوب');
     if (siteForm.siteType === 'prayer_room' && !siteForm.prayerRoomGender) return toast.error('حدد فئة المصلى: رجال أو نساء');
     if (siteForm.spatialRelation === 'inside_building' && !siteForm.buildingId) return toast.error('اختر رقم المبنى للموقع الموجود داخل مبنى');
+    const linkedBuilding = siteForm.spatialRelation === 'inside_building'
+      ? officialBuildings.find((building) => building.id === siteForm.buildingId) || null
+      : null;
+    if (siteForm.spatialRelation === 'inside_building' && !linkedBuilding) return toast.error('المبنى المحدد غير موجود أو غير معتمد في السجل المركزي');
+    if (siteForm.spatialRelation === 'inside_building' && siteForm.siteType === 'prayer_room' && siteForm.prayerRoomGender) {
+      const duplicate = sites.find((site) =>
+        site.id !== editingSite?.id &&
+        site.buildingId === siteForm.buildingId &&
+        site.siteType === 'prayer_room' &&
+        site.prayerRoomGender === siteForm.prayerRoomGender
+      );
+      if (duplicate) return toast.error(`يوجد بالفعل مصلى ${siteForm.prayerRoomGender === 'men' ? 'رجال' : 'نساء'} مرتبط بهذا المبنى باسم «${duplicate.name}». عدّل السجل الموجود بدل إنشاء سجل مكرر.`);
+    }
     setSaving(true);
     try {
       const nextMedia: MosqueSiteMediaLibrary = {
@@ -1978,8 +2007,17 @@ ${quranStockMovementForm.notes}` : ''}`
         else nextMedia.photos.push({ ...media, category: pending.kind });
       }
 
+      const effectiveLatitude = linkedBuilding ? linkedBuilding.latitude ?? null : (siteForm.latitude === '' ? null : Number(siteForm.latitude));
+      const effectiveLongitude = linkedBuilding ? linkedBuilding.longitude ?? null : (siteForm.longitude === '' ? null : Number(siteForm.longitude));
       const payload = {
         ...siteForm,
+        spatialRelation: siteForm.spatialRelation || 'independent',
+        buildingId: linkedBuilding?.id || null,
+        floor: linkedBuilding ? (siteForm.floor || null) : null,
+        roomNumber: linkedBuilding ? (siteForm.roomNumber || null) : null,
+        city: linkedBuilding ? (linkedBuilding.city || null) : (siteForm.city || null),
+        district: linkedBuilding ? (linkedBuilding.district || null) : (siteForm.district || null),
+        campusLocation: linkedBuilding ? (linkedBuilding.campusLocation || null) : (siteForm.campusLocation || null),
         // أسماء المسؤولين مصدرها سجل المنسوبين، لذلك لا نحفظ نسخة يدوية قد تصبح قديمة.
         imamName: null,
         muezzinName: null,
@@ -1988,9 +2026,9 @@ ${quranStockMovementForm.notes}` : ''}`
         area: siteForm.area === '' ? null : Number(siteForm.area),
         capacity: siteForm.capacity === '' ? null : Number(siteForm.capacity),
         quranTargetCount: siteForm.quranTargetCount === '' ? null : Number(siteForm.quranTargetCount),
-        latitude: siteForm.latitude === '' ? null : Number(siteForm.latitude),
-        longitude: siteForm.longitude === '' ? null : Number(siteForm.longitude),
-        mapUrl: siteForm.latitude !== '' && siteForm.longitude !== '' ? `https://www.google.com/maps?q=${siteForm.latitude},${siteForm.longitude}` : null,
+        latitude: effectiveLatitude,
+        longitude: effectiveLongitude,
+        mapUrl: effectiveLatitude != null && effectiveLongitude != null ? `https://www.google.com/maps?q=${effectiveLatitude},${effectiveLongitude}` : null,
         images: nextMedia,
       };
       const savedSite = editingSite
@@ -2671,14 +2709,10 @@ ${quranStockMovementForm.notes}` : ''}`
               <Button className={button3d} variant="outline" onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />السجل المركزي للمباني</Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              <BuildingExcelImportManager
-                buildings={buildings}
-                role={role}
-                canAdd={canAdd}
-                canEdit={canEdit}
-                canDelete={canDelete}
-                onReload={loadAll}
-              />
+              <div className="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-7 text-sky-950 md:flex-row md:items-center md:justify-between">
+                <div><strong>مصدر تعريف المباني: السجل المركزي للمباني.</strong><div className="text-xs text-sky-800">إضافة المبنى أو استيراده من Excel أو تعديل رقمه واسمه وموقعه وإحداثياته يتم مركزيًا. هذه الصفحة تحفظ فقط بيانات تغطية خدمة الصلاة.</div></div>
+                <Button type="button" variant="outline" className={button3d} onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />فتح السجل المركزي</Button>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <ReportMetric label="إجمالي المباني المعتمدة" value={officialBuildings.length} />
                 <ReportMetric label="مغطاة بخدمة الصلاة" value={officialBuildings.filter((x) => x.coverageStatus === 'covered').length} />
@@ -2703,7 +2737,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 {building.unavailableReason && <Info label="سبب عدم الإمكانية" value={building.unavailableReason} />}
                 {building.approvedAlternative && <Info label="البديل المعتمد" value={building.approvedAlternative} />}
                 <div className="rounded-xl border bg-slate-50 p-2 text-xs text-slate-600">المواقع المرتبطة: <b>{building._count?.sites ?? building.sites?.length ?? 0}</b></div>
-                {role === 'head' && <div className="flex gap-2">{canEdit && <Button variant="outline" size="sm" className={button3d} onClick={() => openBuildingDialog(building)}><Pencil className="ml-1 h-4 w-4" />تعديل</Button>}{canDelete && <Button variant="outline" size="sm" className="border-red-300 text-red-600" onClick={() => deleteBuilding(building)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button>}</div>}
+                {canEdit && ['head', 'supervisor'].includes(role) && <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" className={button3d} onClick={() => openBuildingDialog(building)}><Pencil className="ml-1 h-4 w-4" />ملف خدمة الصلاة</Button><Button variant="outline" size="sm" className={button3d} onClick={() => navigate('/buildings/registry')}><Building2 className="ml-1 h-4 w-4" />السجل المركزي</Button></div>}
               </CardContent>
             </Card>;
           })}</div>}
@@ -3105,38 +3139,30 @@ ${quranStockMovementForm.notes}` : ''}`
       </Dialog>
 
       <Dialog open={buildingDialog} onOpenChange={setBuildingDialog}>
-        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[850px]" dir="rtl">
-          <DialogHeader className="text-right"><DialogTitle>{editingBuilding ? 'تعديل بيانات تغطية المبنى' : 'إضافة مبنى إلى سجل التغطية'}</DialogTitle><DialogDescription>سجل المبنى مستقل عن المصليات، ويستخدم رقم المبنى للربط عند إنشاء مصلى رجال أو نساء.</DialogDescription></DialogHeader>
-          <div className="grid gap-4 py-3 md:grid-cols-2">
-            <Field label="رقم المبنى *"><Input value={buildingForm.buildingNumber} onChange={(e) => setBuildingForm({ ...buildingForm, buildingNumber: e.target.value })} placeholder="مثال: 550 أو D3" /></Field>
-            <Field label="اسم المبنى"><Input value={buildingForm.name} onChange={(e) => setBuildingForm({ ...buildingForm, name: e.target.value })} placeholder="مثال: كلية طب الأسنان" /></Field>
-            <Field label="الموقع داخل الجامعة"><Input value={buildingForm.campusLocation} onChange={(e) => setBuildingForm({ ...buildingForm, campusLocation: e.target.value })} /></Field>
-            <Field label="عدد المستفيدين التقريبي"><Input type="number" min="0" value={buildingForm.expectedUsers} onChange={(e) => setBuildingForm({ ...buildingForm, expectedUsers: e.target.value })} /></Field>
-            <Field label="المدينة"><Input value={buildingForm.city} onChange={(e) => setBuildingForm({ ...buildingForm, city: e.target.value })} /></Field>
-            <Field label="الحي"><Input value={buildingForm.district} onChange={(e) => setBuildingForm({ ...buildingForm, district: e.target.value })} /></Field>
-            <Field label="خط العرض Latitude"><Input type="number" step="any" dir="ltr" value={buildingForm.latitude} onChange={(e) => setBuildingForm({ ...buildingForm, latitude: e.target.value })} placeholder="26.3927" /></Field>
-            <Field label="خط الطول Longitude"><Input type="number" step="any" dir="ltr" value={buildingForm.longitude} onChange={(e) => setBuildingForm({ ...buildingForm, longitude: e.target.value })} placeholder="50.1926" /></Field>
-            <div className="md:col-span-2 space-y-3 rounded-2xl border border-sky-200 bg-sky-50/40 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" className={'h-11 ' + button3d} onClick={captureCurrentBuildingLocation} disabled={locatingBuilding}>
-                  {locatingBuilding ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <MapPin className="ml-2 h-4 w-4" />}
-                  {locatingBuilding ? 'جاري تحديد الموقع...' : 'تحديد موقعي الحالي'}
-                </Button>
-                <Button type="button" variant="outline" className={'h-11 ' + button3d} onClick={() => setShowBuildingMap((current) => !current)}>
-                  <MapPin className="ml-2 h-4 w-4" />
-                  {showBuildingMap ? 'إخفاء الخريطة' : 'تحديد موقع المبنى من الخريطة'}
-                </Button>
-                {buildingPickerCoordinates && <div className="flex min-h-11 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-xs font-semibold text-emerald-800" dir="ltr">{buildingPickerCoordinates.latitude.toFixed(6)}, {buildingPickerCoordinates.longitude.toFixed(6)}</div>}
+        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[900px]" dir="rtl">
+          <DialogHeader className="text-right"><DialogTitle>ملف خدمة الصلاة للمبنى</DialogTitle><DialogDescription>بيانات تعريف المبنى مصدرها السجل المركزي ولا تعدل من وحدة العناية. هنا يتم تحديث بيانات التغطية والاحتياج فقط.</DialogDescription></DialogHeader>
+          {editingBuilding && <div className="space-y-4 py-3">
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="font-black text-sky-950">البيانات المركزية للمبنى — للقراءة فقط</p><p className="mt-1 text-xs text-sky-800">أي تعديل على رقم المبنى أو مسماه أو موقعه أو إحداثياته يتم من السجل المركزي لينعكس على جميع الوحدات.</p></div><Button type="button" variant="outline" className={button3d} onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />فتح السجل المركزي</Button></div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <Info label="رقم المبنى" value={editingBuilding.buildingNumber} />
+                <Info label="اسم المبنى" value={editingBuilding.name || '-'} />
+                <Info label="الحرم / الموقع" value={editingBuilding.campusLocation || '-'} />
+                <Info label="المدينة" value={editingBuilding.city || '-'} />
+                <Info label="الحي" value={editingBuilding.district || '-'} />
+                <Info label="الإحداثيات" value={editingBuilding.latitude != null && editingBuilding.longitude != null ? `${editingBuilding.latitude}, ${editingBuilding.longitude}` : '-'} />
               </div>
-              {showBuildingMap && <div className="overflow-hidden rounded-2xl border border-sky-200 bg-white p-1 shadow-sm"><MapCoordinatePicker coordinates={buildingPickerCoordinates} onChange={updateBuildingCoordinates} /></div>}
             </div>
-            <Field label="حالة التغطية"><NativeSelect value={buildingForm.coverageStatus} onChange={(e) => setBuildingForm({ ...buildingForm, coverageStatus: e.target.value })}><option value="unassessed">لم يتم التقييم</option><option value="covered">مغطى بخدمة الصلاة</option><option value="needs_prayer_room">يحتاج مصلى</option><option value="under_feasibility_study">قيد دراسة إمكانية الإنشاء</option><option value="under_implementation">مصلى تحت التنفيذ</option><option value="not_feasible_alternative">تعذر الإنشاء / بديل معتمد</option></NativeSelect></Field>
-            <Field label="إمكانية إنشاء مصلى"><NativeSelect value={buildingForm.creationFeasibility} onChange={(e) => setBuildingForm({ ...buildingForm, creationFeasibility: e.target.value })}><option value="under_study">قيد الدراسة</option><option value="available">متاح إنشاء مصلى</option><option value="unavailable">غير متاح إنشاء مصلى</option></NativeSelect></Field>
-            {buildingForm.creationFeasibility === 'unavailable' && <Field label="سبب عدم إمكانية الإنشاء *"><Textarea rows={3} value={buildingForm.unavailableReason} onChange={(e) => setBuildingForm({ ...buildingForm, unavailableReason: e.target.value })} placeholder="عدم توفر مساحة، اشتراطات السلامة، طبيعة المبنى..." /></Field>}
-            <Field label="البديل المعتمد"><Textarea rows={3} value={buildingForm.approvedAlternative} onChange={(e) => setBuildingForm({ ...buildingForm, approvedAlternative: e.target.value })} placeholder="ربط بأقرب مصلى، مساحة متعددة الاستخدام، لوحات إرشادية..." /></Field>
-            <div className="md:col-span-2"><Field label="ملاحظات"><Textarea rows={3} value={buildingForm.notes} onChange={(e) => setBuildingForm({ ...buildingForm, notes: e.target.value })} /></Field></div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setBuildingDialog(false)}>إلغاء</Button><Button className={button3d} disabled={saving} onClick={saveBuilding}>{saving ? 'جاري الحفظ...' : 'حفظ بيانات المبنى'}</Button></DialogFooter>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="عدد المستفيدين المتوقع لخدمة الصلاة"><Input type="number" min="0" value={buildingForm.expectedUsers} onChange={(e) => setBuildingForm({ ...buildingForm, expectedUsers: e.target.value })} /></Field>
+              <Field label="حالة التغطية"><NativeSelect value={buildingForm.coverageStatus} onChange={(e) => setBuildingForm({ ...buildingForm, coverageStatus: e.target.value })}><option value="unassessed">لم يتم التقييم</option><option value="covered">مغطى بخدمة الصلاة</option><option value="needs_prayer_room">يحتاج مصلى</option><option value="under_feasibility_study">قيد دراسة إمكانية الإنشاء</option><option value="under_implementation">مصلى تحت التنفيذ</option><option value="not_feasible_alternative">تعذر الإنشاء / بديل معتمد</option></NativeSelect></Field>
+              <Field label="إمكانية إنشاء مصلى"><NativeSelect value={buildingForm.creationFeasibility} onChange={(e) => setBuildingForm({ ...buildingForm, creationFeasibility: e.target.value })}><option value="under_study">قيد الدراسة</option><option value="available">متاح إنشاء مصلى</option><option value="unavailable">غير متاح إنشاء مصلى</option></NativeSelect></Field>
+              {buildingForm.creationFeasibility === 'unavailable' && <Field label="سبب عدم إمكانية الإنشاء *"><Textarea rows={3} value={buildingForm.unavailableReason} onChange={(e) => setBuildingForm({ ...buildingForm, unavailableReason: e.target.value })} placeholder="عدم توفر مساحة، اشتراطات السلامة، طبيعة المبنى..." /></Field>}
+              <div className="md:col-span-2"><Field label="البديل المعتمد"><Textarea rows={3} value={buildingForm.approvedAlternative} onChange={(e) => setBuildingForm({ ...buildingForm, approvedAlternative: e.target.value })} placeholder="ربط بأقرب مصلى، مساحة متعددة الاستخدام، لوحات إرشادية..." /></Field></div>
+            </div>
+            {editingBuilding.notes && <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm"><strong>ملاحظات السجل المركزي:</strong><p className="mt-1 whitespace-pre-wrap text-slate-600">{editingBuilding.notes}</p></div>}
+          </div>}
+          <DialogFooter><Button variant="outline" onClick={() => setBuildingDialog(false)}>إلغاء</Button><Button className={button3d} disabled={saving || !editingBuilding} onClick={saveBuilding}>{saving ? 'جاري الحفظ...' : 'حفظ ملف خدمة الصلاة'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -3160,15 +3186,15 @@ ${quranStockMovementForm.notes}` : ''}`
                 {siteForm.siteType === 'prayer_room' && <Field label="فئة المصلى *"><NativeSelect className="h-11" value={siteForm.prayerRoomGender || ''} onChange={(e) => setSiteForm({ ...siteForm, prayerRoomGender: e.target.value })}><option value="">اختر الفئة</option><option value="men">رجال</option><option value="women">نساء</option></NativeSelect></Field>}
                 <Field label="الارتباط المكاني *"><NativeSelect className="h-11" value={siteForm.spatialRelation || 'independent'} onChange={(e) => setSiteForm({ ...siteForm, spatialRelation: e.target.value, buildingId: e.target.value === 'inside_building' ? siteForm.buildingId : '', floor: e.target.value === 'inside_building' ? siteForm.floor : '', roomNumber: e.target.value === 'inside_building' ? siteForm.roomNumber : '' })}><option value="independent">موقع مستقل</option><option value="inside_building">داخل مبنى جامعي</option></NativeSelect></Field>
                 {siteForm.spatialRelation === 'inside_building' && <>
-                  <Field label="رقم المبنى *"><NativeSelect className="h-11" value={siteForm.buildingId || ''} onChange={(e) => setSiteForm({ ...siteForm, buildingId: e.target.value })}><option value="">اختر المبنى</option>{officialBuildings.map((building) => <option key={building.id} value={building.id}>{building.buildingNumber}{building.name ? (' — ' + building.name) : ''}</option>)}</NativeSelect></Field>
+                  <Field label="رقم المبنى * — من السجل المركزي"><NativeSelect className="h-11" value={siteForm.buildingId || ''} onChange={(e) => setSiteForm({ ...siteForm, buildingId: e.target.value })}><option value="">اختر المبنى المعتمد</option>{officialBuildings.map((building) => <option key={building.id} value={building.id}>{building.buildingNumber}{building.name ? (' — ' + building.name) : ''}</option>)}</NativeSelect></Field>
                   <Field label="الدور"><Input className="h-11" value={siteForm.floor || ''} onChange={(e) => setSiteForm({ ...siteForm, floor: e.target.value })} placeholder="مثال: الأرضي" /></Field>
                   <Field label="رقم الغرفة / الموقع الداخلي"><Input className="h-11" value={siteForm.roomNumber || ''} onChange={(e) => setSiteForm({ ...siteForm, roomNumber: e.target.value })} placeholder="مثال: 012 أو الجناح الشرقي" /></Field>
                 </>}
-                {siteForm.spatialRelation === 'inside_building' && selectedSiteBuilding && <div className="md:col-span-2 lg:col-span-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-3"><div className="flex flex-wrap items-center gap-2 text-sm"><b>المبنى {selectedSiteBuilding.buildingNumber}</b><Badge variant="outline" className={selectedBuildingHasMen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-50 text-amber-700'}>مصلى رجال: {selectedBuildingHasMen ? 'موجود' : 'غير موجود'}</Badge><Badge variant="outline" className={selectedBuildingHasWomen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-50 text-amber-700'}>مصلى نساء: {selectedBuildingHasWomen ? 'موجود' : 'غير موجود'}</Badge><Badge variant="outline">{buildingFeasibilityLabels[selectedSiteBuilding.creationFeasibility] || selectedSiteBuilding.creationFeasibility}</Badge></div><p className="mt-2 text-xs text-slate-600">يعرض النظام المواقع المرتبطة بهذا المبنى لتفادي التكرار ودعم استكمال التغطية الرجالية والنسائية.</p></div>}
+                {siteForm.spatialRelation === 'inside_building' && selectedSiteBuilding && <div className="md:col-span-2 lg:col-span-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-3"><div className="flex flex-wrap items-center gap-2 text-sm"><b>المبنى {selectedSiteBuilding.buildingNumber}</b><Badge variant="outline" className={selectedBuildingHasMen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-50 text-amber-700'}>مصلى رجال: {selectedBuildingHasMen ? 'موجود' : 'غير موجود'}</Badge><Badge variant="outline" className={selectedBuildingHasWomen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-50 text-amber-700'}>مصلى نساء: {selectedBuildingHasWomen ? 'موجود' : 'غير موجود'}</Badge><Badge variant="outline">{buildingFeasibilityLabels[selectedSiteBuilding.creationFeasibility] || selectedSiteBuilding.creationFeasibility}</Badge></div><p className="mt-2 text-xs text-slate-600">يعرض النظام المواقع المرتبطة بهذا المبنى لتفادي التكرار. المدينة والحي والحرم والإحداثيات تورث تلقائيًا من السجل المركزي ولا تعدل من هنا.</p></div>}{duplicatePrayerRoom && <div className="md:col-span-2 lg:col-span-3 rounded-2xl border border-red-300 bg-red-50 p-3 text-sm leading-6 text-red-800"><strong>لا يمكن إنشاء سجل مكرر:</strong> يوجد بالفعل مصلى {siteForm.prayerRoomGender === 'men' ? 'رجال' : 'نساء'} في هذا المبنى باسم «{duplicatePrayerRoom.name}». استخدم تعديل السجل الموجود بدل إنشاء مصلى آخر من الفئة نفسها.</div>}
                 <Field label="الحالة"><NativeSelect className="h-11" value={siteForm.status} onChange={(e) => setSiteForm({ ...siteForm, status: e.target.value })}><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect></Field>
-                <Field label="المدينة"><Input className="h-11" value={siteForm.city} onChange={(e) => setSiteForm({ ...siteForm, city: e.target.value })} /></Field>
-                <Field label="الحي"><Input className="h-11" value={siteForm.district} onChange={(e) => setSiteForm({ ...siteForm, district: e.target.value })} /></Field>
-                <Field label="الموقع داخل الجامعة"><Input className="h-11" value={siteForm.campusLocation} onChange={(e) => setSiteForm({ ...siteForm, campusLocation: e.target.value })} placeholder="الحرم / المبنى / الكلية" /></Field>
+                <Field label={siteForm.spatialRelation === 'inside_building' ? 'المدينة — موروثة من السجل المركزي' : 'المدينة'}><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} value={siteForm.city} onChange={(e) => setSiteForm({ ...siteForm, city: e.target.value })} /></Field>
+                <Field label={siteForm.spatialRelation === 'inside_building' ? 'الحي — موروث من السجل المركزي' : 'الحي'}><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} value={siteForm.district} onChange={(e) => setSiteForm({ ...siteForm, district: e.target.value })} /></Field>
+                <Field label={siteForm.spatialRelation === 'inside_building' ? 'الحرم / الموقع — موروث من السجل المركزي' : 'الموقع داخل الجامعة'}><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} value={siteForm.campusLocation} onChange={(e) => setSiteForm({ ...siteForm, campusLocation: e.target.value })} placeholder="الحرم / المبنى / الكلية" /></Field>
                 {isAdmin && <Field label="المشرف المسؤول عن الموقع"><NativeSelect className="h-11" value={siteForm.supervisorUserId || ''} onChange={(e) => setSiteForm({ ...siteForm, supervisorUserId: e.target.value })}><option value="">بدون إسناد حالي</option>{staffUsers.filter((user) => user.moduleRole === 'supervisor').map((user) => <option key={user.uid} value={user.uid}>{user.username}</option>)}</NativeSelect></Field>}
                 <Field label="اسم المشرف (يدوي)"><Input className="h-11" value={siteForm.supervisorName} onChange={(e) => setSiteForm({ ...siteForm, supervisorName: e.target.value })} placeholder="اكتب اسم المشرف يدويًا" /><p className="mt-1 text-[11px] leading-5 text-muted-foreground">للتوثيق الاسمي فقط؛ لا ينشئ حسابًا ولا يمنح صلاحيات دخول.</p></Field>
               </CardContent>
@@ -3184,18 +3210,18 @@ ${quranStockMovementForm.notes}` : ''}`
               </CardContent>
             </Card>
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
-              <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-blue-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><MapPin className="h-5 w-5" />الموقع الجغرافي</CardTitle><CardDescription>يمكن إدخال الإحداثيات يدويًا أو التقاط الموقع الحالي من الجهاز.</CardDescription></CardHeader>
+              <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-blue-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><MapPin className="h-5 w-5" />الموقع الجغرافي</CardTitle><CardDescription>{siteForm.spatialRelation === 'inside_building' ? 'الإحداثيات موروثة تلقائيًا من السجل المركزي للمبنى. لتعديلها حدّث المبنى المركزي.' : 'يمكن إدخال الإحداثيات يدويًا أو التقاط الموقع الحالي من الجهاز.'}</CardDescription></CardHeader>
               <CardContent className="space-y-4 pt-5">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <Field label="خط العرض"><Input className="h-11" type="number" step="any" inputMode="decimal" value={siteForm.latitude} onChange={(e) => setSiteForm((current: any) => ({ ...current, latitude: e.target.value }))} placeholder="26.3927" /></Field>
-                  <Field label="خط الطول"><Input className="h-11" type="number" step="any" inputMode="decimal" value={siteForm.longitude} onChange={(e) => setSiteForm((current: any) => ({ ...current, longitude: e.target.value }))} placeholder="50.0438" /></Field>
+                  <Field label="خط العرض"><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} type="number" step="any" inputMode="decimal" value={siteForm.latitude} onChange={(e) => setSiteForm((current: any) => ({ ...current, latitude: e.target.value }))} placeholder="26.3927" /></Field>
+                  <Field label="خط الطول"><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} type="number" step="any" inputMode="decimal" value={siteForm.longitude} onChange={(e) => setSiteForm((current: any) => ({ ...current, longitude: e.target.value }))} placeholder="50.0438" /></Field>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                  <Button type="button" variant="outline" className={'h-11 ' + button3d} onClick={captureCurrentSiteLocation} disabled={locatingSite}>
+                  <Button type="button" variant="outline" className={'h-11 ' + button3d} onClick={captureCurrentSiteLocation} disabled={locatingSite || siteForm.spatialRelation === 'inside_building'}>
                     {locatingSite ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <MapPin className="ml-2 h-4 w-4" />}
                     {locatingSite ? 'جاري تحديد الموقع...' : 'تحديد موقعي الحالي'}
                   </Button>
-                  <Button type="button" variant="outline" className={'h-11 ' + button3d} onClick={() => setShowSiteMap((current) => !current)}>
+                  <Button type="button" variant="outline" className={'h-11 ' + button3d} onClick={() => setShowSiteMap((current) => !current)} disabled={siteForm.spatialRelation === 'inside_building'}>
                     <MapPin className="ml-2 h-4 w-4" />
                     {showSiteMap ? 'إخفاء الخريطة' : 'تحديد الموقع من الخريطة'}
                   </Button>
@@ -3205,7 +3231,7 @@ ${quranStockMovementForm.notes}` : ''}`
                     </div>
                   )}
                 </div>
-                {showSiteMap && (
+                {showSiteMap && siteForm.spatialRelation !== 'inside_building' && (
                   <div className="overflow-hidden rounded-2xl border border-sky-200 bg-white p-1 shadow-sm">
                     <MapCoordinatePicker coordinates={sitePickerCoordinates} onChange={updateSiteCoordinates} />
                   </div>
