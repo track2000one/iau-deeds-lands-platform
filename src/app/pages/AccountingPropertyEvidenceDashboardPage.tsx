@@ -30,6 +30,17 @@ import {
   getPropertyEvidenceRequirements,
   type PropertyEvidenceStatus,
 } from '../config/accountingPropertyEvidenceRequirements';
+import {
+  EVIDENCE_FOLLOW_UP_STATUS_LABELS,
+  EVIDENCE_PRIORITY_LABELS,
+  defaultFollowUpStatus,
+  evidenceDaysPastDue,
+  evidenceDueSoon,
+  isEvidenceTaskOpen,
+  isEvidenceTaskOverdue,
+  type EvidenceFollowUpPriority,
+  type EvidenceFollowUpStatus,
+} from '../config/accountingPropertyEvidenceFollowUp';
 import type {
   AccountingTransformationAttachment,
   AccountingTransformationRecord,
@@ -41,6 +52,12 @@ type EvidenceChecklistEntry = {
   status?: PropertyEvidenceStatus;
   attachmentKey?: string;
   notes?: string;
+  responsibleParty?: string;
+  dueDate?: string;
+  priority?: EvidenceFollowUpPriority;
+  followUpStatus?: EvidenceFollowUpStatus;
+  lastAction?: string;
+  lastActionAt?: string;
 };
 
 type SavedControlAnalysis = {
@@ -52,7 +69,23 @@ type SavedControlAnalysis = {
   updatedAt?: string;
 };
 
-type FilterMode = 'all' | 'missing' | 'needs_update' | 'complete';
+type FilterMode = 'all' | 'missing' | 'needs_update' | 'complete' | 'open' | 'overdue' | 'high_priority';
+
+type DashboardTask = {
+  key: string;
+  label: string;
+  status: PropertyEvidenceStatus;
+  responsible: string;
+  dueDate?: string;
+  priority: EvidenceFollowUpPriority;
+  followUpStatus: EvidenceFollowUpStatus;
+  lastAction?: string;
+  lastActionAt?: string;
+  open: boolean;
+  overdue: boolean;
+  daysPastDue: number;
+  dueSoon: boolean;
+};
 
 type DashboardRow = {
   profile: PropertyControlMemoProfile;
@@ -64,6 +97,12 @@ type DashboardRow = {
   missing: number;
   needsUpdate: number;
   totalRequirements: number;
+  tasks: DashboardTask[];
+  openTasks: number;
+  overdueTasks: number;
+  highPriorityOpen: number;
+  dueSoonTasks: number;
+  nearestDueDate?: string;
   responsible: string;
   nextAction: string;
   updatedAt?: string;
@@ -123,6 +162,7 @@ const buildRow = (profile: PropertyControlMemoProfile, records: AccountingTransf
   let available = 0;
   let missing = 0;
   let needsUpdate = 0;
+  const tasks: DashboardTask[] = [];
 
   requirements.forEach((requirement) => {
     const savedEntry = analysis.evidenceChecklist?.[requirement.key];
@@ -134,12 +174,41 @@ const buildRow = (profile: PropertyControlMemoProfile, records: AccountingTransf
     if (status === 'available') available += 1;
     else if (status === 'needs_update') needsUpdate += 1;
     else missing += 1;
+
+    if (status !== 'available') {
+      const followUpStatus = savedEntry?.followUpStatus || defaultFollowUpStatus(status);
+      const open = isEvidenceTaskOpen(status, followUpStatus);
+      const overdue = isEvidenceTaskOverdue(status, savedEntry?.dueDate, followUpStatus);
+      tasks.push({
+        key: requirement.key,
+        label: requirement.label,
+        status,
+        responsible: String(savedEntry?.responsibleParty || analysis.responsible || profile.responsible || 'غير محدد'),
+        dueDate: savedEntry?.dueDate,
+        priority: savedEntry?.priority || 'medium',
+        followUpStatus,
+        lastAction: savedEntry?.lastAction,
+        lastActionAt: savedEntry?.lastActionAt,
+        open,
+        overdue,
+        daysPastDue: overdue ? evidenceDaysPastDue(savedEntry?.dueDate) : 0,
+        dueSoon: evidenceDueSoon(status, savedEntry?.dueDate, followUpStatus),
+      });
+    }
   });
 
   const totalRequirements = requirements.length;
   const percentage = totalRequirements
     ? Math.round(((available + needsUpdate * 0.5) / totalRequirements) * 100)
     : 0;
+  const openTasks = tasks.filter((task) => task.open).length;
+  const overdueTasks = tasks.filter((task) => task.overdue).length;
+  const highPriorityOpen = tasks.filter((task) => task.open && task.priority === 'high').length;
+  const dueSoonTasks = tasks.filter((task) => task.dueSoon && !task.overdue).length;
+  const nearestDueDate = tasks
+    .filter((task) => task.open && task.dueDate)
+    .map((task) => task.dueDate as string)
+    .sort()[0];
 
   return {
     profile,
@@ -151,11 +220,17 @@ const buildRow = (profile: PropertyControlMemoProfile, records: AccountingTransf
     missing,
     needsUpdate,
     totalRequirements,
+    tasks,
+    openTasks,
+    overdueTasks,
+    highPriorityOpen,
+    dueSoonTasks,
+    nearestDueDate,
     responsible: String(analysis.responsible || profile.responsible || 'غير محدد'),
     nextAction: String(analysis.nextAction || profile.nextAction || 'غير محدد'),
     updatedAt: saved?.updatedAt,
   };
-};
+}
 
 const completionTone = (percentage: number) => {
   if (percentage >= 100) return 'border-emerald-200 bg-emerald-50 text-emerald-800';
@@ -199,6 +274,9 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
       if (filter === 'missing' && row.missing === 0) return false;
       if (filter === 'needs_update' && row.needsUpdate === 0) return false;
       if (filter === 'complete' && row.percentage < 100) return false;
+      if (filter === 'open' && row.openTasks === 0) return false;
+      if (filter === 'overdue' && row.overdueTasks === 0) return false;
+      if (filter === 'high_priority' && row.highPriorityOpen === 0) return false;
       if (!needle) return true;
       return normalize([
         row.profile.title,
@@ -207,6 +285,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
         row.nextAction,
         row.representative?.assetDescription,
         row.representative?.city,
+        ...row.tasks.flatMap((task) => [task.label, task.responsible, task.lastAction]),
       ].filter(Boolean).join(' ')).includes(needle);
     });
   }, [rows, query, filter]);
@@ -215,6 +294,21 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
   const totalAvailable = rows.reduce((sum, row) => sum + row.available, 0);
   const totalMissing = rows.reduce((sum, row) => sum + row.missing, 0);
   const totalNeedsUpdate = rows.reduce((sum, row) => sum + row.needsUpdate, 0);
+  const totalOpenTasks = rows.reduce((sum, row) => sum + row.openTasks, 0);
+  const totalOverdueTasks = rows.reduce((sum, row) => sum + row.overdueTasks, 0);
+  const totalHighPriorityOpen = rows.reduce((sum, row) => sum + row.highPriorityOpen, 0);
+  const taskRows = rows.flatMap((row) => row.tasks.map((task) => ({ row, task })));
+  const filteredTaskRows = taskRows.filter(({ row, task }) => {
+    if (filter === 'missing' && task.status !== 'missing') return false;
+    if (filter === 'needs_update' && task.status !== 'needs_update') return false;
+    if (filter === 'open' && !task.open) return false;
+    if (filter === 'overdue' && !task.overdue) return false;
+    if (filter === 'high_priority' && !(task.open && task.priority === 'high')) return false;
+    if (filter === 'complete') return false;
+    const needle = normalize(query);
+    if (!needle) return true;
+    return normalize([row.profile.title, task.label, task.responsible, task.lastAction].filter(Boolean).join(' ')).includes(needle);
+  });
   const overallPercentage = totalRequirements
     ? Math.round(((totalAvailable + totalNeedsUpdate * 0.5) / totalRequirements) * 100)
     : 0;
@@ -242,13 +336,14 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {[
           ['الحالات', rows.length, FolderOpen, 'text-blue-700'],
           ['نسبة الاكتمال', `${overallPercentage}%`, FileCheck2, 'text-emerald-700'],
-          ['متطلبات متوفرة', totalAvailable, CheckCircle2, 'text-teal-700'],
-          ['تحتاج تحديث', totalNeedsUpdate, FileWarning, 'text-amber-700'],
           ['مستندات ناقصة', totalMissing, AlertTriangle, 'text-red-700'],
+          ['تحتاج تحديث', totalNeedsUpdate, FileWarning, 'text-amber-700'],
+          ['مهام متابعة مفتوحة', totalOpenTasks, FolderOpen, 'text-sky-700'],
+          ['مهام متأخرة', totalOverdueTasks, AlertTriangle, 'text-rose-700'],
         ].map(([label, value, Icon, tone]) => (
           <Card key={String(label)} className="rounded-2xl">
             <CardContent className="flex items-center gap-3 p-4">
@@ -261,7 +356,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
 
       <Card className="rounded-[26px]">
         <CardHeader className="border-b bg-slate-50/70">
-          <div className="grid gap-3 lg:grid-cols-[1fr_220px_auto] lg:items-end">
+          <div className="grid gap-3 lg:grid-cols-[1fr_220px_auto_auto] lg:items-end">
             <div>
               <CardTitle className="text-base">متابعة الحالات</CardTitle>
               <div className="relative mt-3"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input className="pr-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="بحث بالعقار أو المسؤول أو الإجراء التالي..." /></div>
@@ -273,10 +368,16 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
                 <option value="missing">يوجد مستند ناقص</option>
                 <option value="needs_update">يوجد مستند يحتاج تحديث</option>
                 <option value="complete">مكتمل 100%</option>
+                <option value="open">مهام متابعة مفتوحة</option>
+                <option value="overdue">مهام متأخرة</option>
+                <option value="high_priority">أولوية عالية</option>
               </NativeSelect>
             </div>
             <Button type="button" variant={filter === 'missing' ? 'default' : 'outline'} onClick={() => setFilter(filter === 'missing' ? 'all' : 'missing')}>
               <AlertTriangle className="ml-2 h-4 w-4" />الناقص فقط
+            </Button>
+            <Button type="button" variant={filter === 'overdue' ? 'default' : 'outline'} onClick={() => setFilter(filter === 'overdue' ? 'all' : 'overdue')}>
+              <AlertTriangle className="ml-2 h-4 w-4" />المتأخر فقط
             </Button>
           </div>
         </CardHeader>
@@ -285,7 +386,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
           {!loading && !filteredRows.length && <div className="py-20 text-center text-sm text-slate-500">لا توجد حالات مطابقة للفلتر الحالي.</div>}
           {!loading && filteredRows.length > 0 && (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1180px] text-right text-sm">
+              <table className="w-full min-w-[1460px] text-right text-sm">
                 <thead className="bg-slate-50 text-xs text-slate-600">
                   <tr>
                     <th className="px-4 py-3">العقار / الحالة</th>
@@ -294,6 +395,9 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
                     <th className="px-4 py-3">متوفر</th>
                     <th className="px-4 py-3">يحتاج تحديث</th>
                     <th className="px-4 py-3">ناقص</th>
+                    <th className="px-4 py-3">مهام مفتوحة</th>
+                    <th className="px-4 py-3">متأخرة</th>
+                    <th className="px-4 py-3">أقرب استحقاق</th>
                     <th className="px-4 py-3">المسؤول</th>
                     <th className="px-4 py-3">الإجراء التالي</th>
                     <th className="px-4 py-3">الإجراء</th>
@@ -316,6 +420,9 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
                       <td className="px-4 py-4 font-black text-emerald-700">{row.available}</td>
                       <td className="px-4 py-4 font-black text-amber-700">{row.needsUpdate}</td>
                       <td className="px-4 py-4 font-black text-red-700">{row.missing}</td>
+                      <td className="px-4 py-4 font-black text-sky-700">{row.openTasks}</td>
+                      <td className="px-4 py-4 font-black text-rose-700">{row.overdueTasks}</td>
+                      <td className="px-4 py-4 text-xs text-slate-700">{row.nearestDueDate || '-'}</td>
                       <td className="max-w-[220px] px-4 py-4 text-xs leading-6 text-slate-700">{row.responsible}</td>
                       <td className="max-w-[320px] px-4 py-4 text-xs leading-6 text-slate-700">{row.nextAction}</td>
                       <td className="px-4 py-4">
@@ -329,6 +436,45 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
                           )}
                         </div>
                       </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[26px]">
+        <CardHeader className="border-b bg-slate-50/70">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><CardTitle className="text-base">مهام متابعة المستندات</CardTitle><p className="mt-1 text-xs text-slate-500">تفاصيل كل مستند ناقص أو يحتاج تحديثًا، مع المسؤول والاستحقاق والأولوية وآخر إجراء.</p></div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-800">مفتوحة: {totalOpenTasks}</Badge>
+              <Badge variant="outline" className="border-red-200 bg-red-50 text-red-800">متأخرة: {totalOverdueTasks}</Badge>
+              <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-800">أولوية عالية: {totalHighPriorityOpen}</Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {!filteredTaskRows.length ? <div className="py-12 text-center text-sm text-slate-500">لا توجد مهام متابعة مطابقة للفلتر الحالي.</div> : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1500px] text-right text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-600"><tr>
+                  <th className="px-4 py-3">العقار</th><th className="px-4 py-3">المستند</th><th className="px-4 py-3">حالة المستند</th><th className="px-4 py-3">المسؤول</th><th className="px-4 py-3">الأولوية</th><th className="px-4 py-3">الاستحقاق</th><th className="px-4 py-3">حالة المتابعة</th><th className="px-4 py-3">آخر إجراء</th><th className="px-4 py-3">فتح</th>
+                </tr></thead>
+                <tbody className="divide-y">
+                  {filteredTaskRows.map(({ row, task }) => (
+                    <tr key={`${row.profile.id}-${task.key}`} className={task.overdue ? 'bg-red-50/45 align-top' : 'align-top hover:bg-slate-50/70'}>
+                      <td className="px-4 py-4 font-black text-slate-900">{row.profile.title}</td>
+                      <td className="max-w-[260px] px-4 py-4 text-xs leading-6 text-slate-700">{task.label}</td>
+                      <td className="px-4 py-4"><Badge variant="outline" className={task.status === 'missing' ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}>{task.status === 'missing' ? 'ناقص' : 'يحتاج تحديث'}</Badge></td>
+                      <td className="max-w-[220px] px-4 py-4 text-xs leading-6 text-slate-700">{task.responsible}</td>
+                      <td className="px-4 py-4"><Badge variant="outline">{EVIDENCE_PRIORITY_LABELS[task.priority]}</Badge></td>
+                      <td className="px-4 py-4 text-xs">{task.dueDate || '-'}{task.overdue && <p className="mt-1 font-black text-red-700">متأخر {task.daysPastDue.toLocaleString('ar-SA')} يوم</p>}{!task.overdue && task.dueSoon && <p className="mt-1 font-bold text-amber-700">خلال 7 أيام</p>}</td>
+                      <td className="px-4 py-4 text-xs">{EVIDENCE_FOLLOW_UP_STATUS_LABELS[task.followUpStatus]}</td>
+                      <td className="max-w-[320px] px-4 py-4 text-xs leading-6 text-slate-700">{task.lastAction || '-'}{task.lastActionAt && <p className="mt-1 text-[10px] text-slate-400">{task.lastActionAt}</p>}</td>
+                      <td className="px-4 py-4">{row.representative ? <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/control-indicators`)}>متابعة</Button> : <span className="text-[11px] text-red-600">غير مرتبط</span>}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -6,8 +6,39 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { usePermissions } from '../../context/PermissionsContext';
-import { getAccountingTransformationCycles, getAccountingTransformationStats } from '../api/accountingTransformation';
-import type { AccountingTransformationCycle, AccountingTransformationStats } from '../../types/accountingTransformation';
+import { getAccountingTransformationCycles, getAccountingTransformationRecords, getAccountingTransformationStats } from '../api/accountingTransformation';
+import type { AccountingTransformationCycle, AccountingTransformationRecord, AccountingTransformationStats } from '../../types/accountingTransformation';
+import { isEvidenceTaskOverdue, type EvidenceFollowUpStatus } from '../config/accountingPropertyEvidenceFollowUp';
+import type { PropertyEvidenceStatus } from '../config/accountingPropertyEvidenceRequirements';
+
+const CONTROL_KEY = '__propertyControlAnalysis';
+
+const countOverdueEvidenceTasks = (records: AccountingTransformationRecord[]) => {
+  const latestByTask = new Map<string, { updatedAt: number; status: PropertyEvidenceStatus; dueDate?: string; followUpStatus?: EvidenceFollowUpStatus }>();
+  records.forEach((record) => {
+    const raw = record.payload?.[CONTROL_KEY];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+    const analysis = raw as Record<string, unknown>;
+    const profileId = String(analysis.memoProfileId || record.id);
+    const updatedAt = analysis.updatedAt ? Date.parse(String(analysis.updatedAt)) || 0 : 0;
+    const checklist = analysis.evidenceChecklist;
+    if (!checklist || typeof checklist !== 'object' || Array.isArray(checklist)) return;
+    Object.entries(checklist as Record<string, unknown>).forEach(([key, value]) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+      const entry = value as Record<string, unknown>;
+      const taskKey = `${profileId}:${key}`;
+      const existing = latestByTask.get(taskKey);
+      if (existing && existing.updatedAt > updatedAt) return;
+      latestByTask.set(taskKey, {
+        updatedAt,
+        status: (entry.status as PropertyEvidenceStatus) || 'missing',
+        dueDate: entry.dueDate ? String(entry.dueDate) : undefined,
+        followUpStatus: entry.followUpStatus as EvidenceFollowUpStatus | undefined,
+      });
+    });
+  });
+  return Array.from(latestByTask.values()).filter((task) => isEvidenceTaskOverdue(task.status, task.dueDate, task.followUpStatus)).length;
+};
 
 const EMPTY: AccountingTransformationStats = {
   total: 0, fixedAssets: 0, lands: 0, buildings: 0, censusReady: 0, inventoryReady: 0,
@@ -20,7 +51,7 @@ const quickActions = [
   { label: 'دورات تحديث البيانات', description: 'مصالحة ملفات الإدارات مع الإصدار السابق قبل المراجعة والاعتماد.', path: '/accounting-transformation/cycles', icon: History },
   { label: 'تصنيف وترميز الأصول', description: 'المرجع الرسمي للترميز والحسابات والأعمار الإنتاجية وحدود الرسملة.', path: '/accounting-transformation/asset-classification', icon: Tags },
   { label: 'مؤشرات السيطرة على العقارات', description: 'تحليل العقارات التي يكون مالك الأصل فيها خلاف الجامعة وتوثيق المستندات والمعالجة قبل الاعتماد.', path: '/accounting-transformation/control-indicators', icon: ShieldCheck },
-  { label: 'متابعة مستندات الإثبات', description: 'لوحة مركزية للحالات الأربع تعرض نسبة اكتمال ملف الإثبات والمستندات الناقصة وما يحتاج تحديثًا والمسؤول والإجراء التالي.', path: '/accounting-transformation/evidence-dashboard', icon: FolderCheck },
+  { label: 'متابعة مستندات الإثبات', description: 'لوحة مركزية للحالات الأربع تعرض الاكتمال والمهام المفتوحة والمتأخرات والأولوية والمسؤول وآخر إجراء.', path: '/accounting-transformation/evidence-dashboard', icon: FolderCheck },
   { label: 'إضافة سجل', description: 'إدخال يدوي عند الحاجة؛ المسار المفضل للتحديثات الجماعية هو نموذج ب عبر دورة تحديث.', path: '/accounting-transformation/new', icon: PlusCircle },
   { label: 'استيراد Excel', description: 'قراءة جميع أوراق الملف وربط نموذج ب والملفات القديمة بالسجل الرسمي.', path: '/accounting-transformation/import', icon: FileSpreadsheet },
   { label: 'التقارير', description: 'تقارير الحصر والجرد والتقييم وجودة واكتمال البيانات.', path: '/accounting-transformation/reports', icon: BarChart3 },
@@ -36,6 +67,7 @@ export const AccountingTransformationDashboardPage: React.FC = () => {
   const [stats, setStats] = useState<AccountingTransformationStats>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [cycles, setCycles] = useState<AccountingTransformationCycle[]>([]);
+  const [overdueEvidenceTasks, setOverdueEvidenceTasks] = useState(0);
   const canAdd = isAdmin || hasPermission('accounting_transformation', 'canAdd');
 
   useEffect(() => {
@@ -44,6 +76,20 @@ export const AccountingTransformationDashboardPage: React.FC = () => {
       .then(([data, cycleData]) => { if (!active) return; setStats(data || EMPTY); setCycles(cycleData || []); })
       .catch(() => { if (!active) return; setStats(EMPTY); setCycles([]); })
       .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      getAccountingTransformationRecords({ recordType: 'building', all: true }),
+      getAccountingTransformationRecords({ recordType: 'land', all: true }),
+    ])
+      .then(([buildings, lands]) => {
+        if (!active) return;
+        setOverdueEvidenceTasks(countOverdueEvidenceTasks([...(buildings.items || []), ...(lands.items || [])]));
+      })
+      .catch(() => { if (active) setOverdueEvidenceTasks(0); });
     return () => { active = false; };
   }, []);
 
@@ -67,6 +113,8 @@ export const AccountingTransformationDashboardPage: React.FC = () => {
           </section>
 
           <section className="grid overflow-hidden rounded-[28px] border border-white/15 bg-[#071f47]/75 md:grid-cols-4">{hero.map(({ label, value, icon: Icon, tone }, index) => <div key={label} className={`flex items-center gap-4 p-5 ${index ? 'border-t border-white/10 md:border-t-0 md:border-r' : ''}`}><div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl border ${tone}`}><Icon className="h-6 w-6" /></div><div><p className="text-xs font-bold text-slate-300">{label}</p><p className="mt-1 text-3xl font-black">{loading ? '...' : value.toLocaleString('ar-SA')}</p></div></div>)}</section>
+
+          {overdueEvidenceTasks > 0 && <section className="grid gap-3 rounded-[24px] border border-red-300/25 bg-red-400/10 p-4 md:grid-cols-[1fr_auto] md:items-center"><div><p className="text-xs font-bold text-red-100">تنبيه مستندات الإثبات</p><p className="mt-1 font-black text-white">يوجد {overdueEvidenceTasks.toLocaleString('ar-SA')} مهمة متابعة متأخرة عن تاريخ الاستحقاق</p><p className="mt-1 text-xs text-red-100/80">راجع الجهة المسؤولة وآخر إجراء واتخذ اللازم لتحديث المستند أو استكماله.</p></div><Button variant="outline" className="border-red-200/30 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/accounting-transformation/evidence-dashboard')}><TriangleAlert className="ml-2 h-4 w-4" />عرض المتأخرات</Button></section>}
 
           {(currentCycle || openCycle) && <section className="grid gap-3 rounded-[24px] border border-white/15 bg-white/[.07] p-4 md:grid-cols-[1fr_auto] md:items-center"><div><p className="text-xs font-bold text-cyan-100">{openCycle ? 'توجد دورة تحديث قيد العمل' : 'الدورة الحالية المعتمدة'}</p><p className="mt-1 font-black text-white">{openCycle ? `#${openCycle.cycleNumber} — ${openCycle.name}` : currentCycle ? `#${currentCycle.cycleNumber} — ${currentCycle.name}` : ''}</p><p className="mt-1 text-xs text-slate-300">{openCycle ? `${openCycle.recordCount.toLocaleString('ar-SA')} سجل · ${openCycle.status === 'under_review' ? 'تحت المراجعة' : 'مسودة'}` : `${currentCycle?.recordCount.toLocaleString('ar-SA') || 0} سجل في الإصدار الحالي`}</p></div><Button variant="outline" className="border-white/15 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate(openCycle?.status === 'draft' ? `/accounting-transformation/import?cycle=${encodeURIComponent(openCycle.id)}` : '/accounting-transformation/cycles')}><RefreshCcw className="ml-2 h-4 w-4" />{openCycle?.status === 'draft' ? 'فتح دورة التحديث' : 'سجل الدورات'}</Button></section>}
 
