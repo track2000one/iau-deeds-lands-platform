@@ -1,0 +1,40 @@
+name: Apply Accounting Evidence Dashboard
+
+on:
+  push:
+    branches:
+      - feat/accounting-evidence-dashboard
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/accounting-evidence-dashboard
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-accounting-evidence-dashboard.mjs
+      - run: npm run build
+      - name: Remove temporary automation files
+        run: |
+          rm scripts/apply-accounting-evidence-dashboard.mjs
+          rm .github/workflows/apply-accounting-evidence-dashboard.yml
+      - name: Commit integration changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "4189824+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+          else
+            git commit -m "Integrate central accounting evidence dashboard"
+            git push origin HEAD:feat/accounting-evidence-dashboard
+          fi
