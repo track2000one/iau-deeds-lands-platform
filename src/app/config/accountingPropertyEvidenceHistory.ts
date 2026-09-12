@@ -71,7 +71,7 @@ export const appendEvidenceHistoryFromChanges = <T extends EvidenceHistoryCompat
   next: T,
   at: string = new Date().toISOString()
 ): T => {
-  const history = [...(previous?.history || next.history || [])];
+  const history = [...(next.history || previous?.history || [])];
   const add = (event: EvidenceHistoryEvent) => history.push(event);
 
   if (!previous) {
@@ -130,13 +130,17 @@ export const getEvidenceDerivedMilestones = (
   entry: EvidenceHistoryCompatibleEntry,
   now: Date = new Date()
 ): EvidenceHistoryEvent[] => {
-  if (!entry.dueDate || entry.status === 'available' || entry.followUpStatus === 'completed') return [];
+  if (!entry.dueDate) return [];
   const due = new Date(`${entry.dueDate}T00:00:00`);
   if (Number.isNaN(due.getTime())) return [];
+  const closedEvent = [...(entry.history || [])]
+    .filter((event) => event.type === 'closed')
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))[0];
+  const effectiveEnd = closedEvent ? new Date(closedEvent.at) : now;
   const events: EvidenceHistoryEvent[] = [];
   const dueSoonAt = new Date(due);
   dueSoonAt.setDate(dueSoonAt.getDate() - 7);
-  if (dueSoonAt <= now) {
+  if (dueSoonAt <= effectiveEnd) {
     events.push({
       id: `system-due-soon-${entry.dueDate}`,
       type: 'note',
@@ -147,7 +151,7 @@ export const getEvidenceDerivedMilestones = (
   }
   const overdueAt = new Date(due);
   overdueAt.setDate(overdueAt.getDate() + 1);
-  if (overdueAt <= now) {
+  if (overdueAt <= effectiveEnd) {
     events.push({
       id: `system-overdue-${entry.dueDate}`,
       type: 'note',
@@ -156,10 +160,10 @@ export const getEvidenceDerivedMilestones = (
       summary: 'انتقلت المهمة إلى حالة متأخرة بعد تجاوز تاريخ الاستحقاق.',
     });
   }
-  const escalation: EvidenceEscalationLevel = getEvidenceEscalationLevel(entry.status || 'missing', entry.dueDate, entry.followUpStatus, now);
-  if (escalation === 'critical') {
-    const criticalAt = new Date(due);
-    criticalAt.setDate(criticalAt.getDate() + 14);
+  const criticalAt = new Date(due);
+  criticalAt.setDate(criticalAt.getDate() + 14);
+  const escalation: EvidenceEscalationLevel = getEvidenceEscalationLevel(entry.status || 'missing', entry.dueDate, entry.followUpStatus, effectiveEnd);
+  if (criticalAt <= effectiveEnd && escalation === 'critical') {
     events.push({
       id: `system-critical-${entry.dueDate}`,
       type: 'note',

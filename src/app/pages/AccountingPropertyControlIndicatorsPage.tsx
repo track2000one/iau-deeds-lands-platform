@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   Upload,
   ExternalLink,
+  History,
+  PlusCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
@@ -46,6 +48,12 @@ import {
   type EvidenceFollowUpPriority,
   type EvidenceFollowUpStatus,
 } from '../config/accountingPropertyEvidenceFollowUp';
+import {
+  appendEvidenceHistoryFromChanges,
+  createEvidenceHistoryEvent,
+  mergeEvidenceHistory,
+  type EvidenceHistoryEvent,
+} from '../config/accountingPropertyEvidenceHistory';
 
 const CONTROL_KEY = '__propertyControlAnalysis';
 
@@ -62,6 +70,7 @@ type EvidenceChecklistEntry = {
   followUpStatus?: EvidenceFollowUpStatus;
   lastAction?: string;
   lastActionAt?: string;
+  history?: EvidenceHistoryEvent[];
 };
 
 type ControlAnalysis = {
@@ -206,6 +215,8 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [attachments, setAttachments] = useState<AccountingTransformationAttachment[]>([]);
   const [uploadingEvidenceKey, setUploadingEvidenceKey] = useState('');
+  const [expandedHistoryKey, setExpandedHistoryKey] = useState('');
+  const [historyNoteDrafts, setHistoryNoteDrafts] = useState<Record<string, string>>({});
 
   const load = async () => {
     setLoading(true);
@@ -279,7 +290,8 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
     const daysPastDue = overdue ? evidenceDaysPastDue(saved?.dueDate) : 0;
     const dueSoon = evidenceDueSoon(status, saved?.dueDate, followUpStatus);
     const escalation = getEvidenceEscalationLevel(status, saved?.dueDate, followUpStatus);
-    return { requirement, saved, attachment: linkedAttachment, status, followUpStatus, overdue, daysPastDue, dueSoon, escalation };
+    const historyEvents = mergeEvidenceHistory({ ...(saved || {}), status, followUpStatus });
+    return { requirement, saved, attachment: linkedAttachment, status, followUpStatus, overdue, daysPastDue, dueSoon, escalation, historyEvents };
   }), [analysis.evidenceChecklist, attachments, evidenceRequirements]);
   const evidenceCompletionPercent = evidenceRows.length
     ? Math.round(evidenceRows.reduce((sum, row) => sum + (row.status === 'available' ? 1 : row.status === 'needs_update' ? 0.5 : 0), 0) / evidenceRows.length * 100)
@@ -315,6 +327,26 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
         },
       };
     });
+  };
+
+  const addEvidenceHistoryNote = (key: string) => {
+    const summary = (historyNoteDrafts[key] || '').trim();
+    if (!summary) { toast.error('اكتب تفاصيل المتابعة أولًا'); return; }
+    setAnalysis((prev) => {
+      const current = prev.evidenceChecklist?.[key] || { status: 'missing' as PropertyEvidenceStatus };
+      return {
+        ...prev,
+        evidenceChecklist: {
+          ...(prev.evidenceChecklist || {}),
+          [key]: {
+            ...current,
+            history: [...(current.history || []), createEvidenceHistoryEvent('note', summary)],
+          },
+        },
+      };
+    });
+    setHistoryNoteDrafts((prev) => ({ ...prev, [key]: '' }));
+    toast.success('تمت إضافة المتابعة إلى السجل الزمني؛ احفظ التحليل لتثبيتها');
   };
 
   const handleEvidenceUpload = async (key: string, label: string, file?: File | null) => {
@@ -364,11 +396,20 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
             ? 'missing'
             : 'partial'
         : analysis.documentCompleteness;
+      const savedAnalysis = readAnalysis(selected);
+      const historyAt = new Date().toISOString();
+      const nextEvidenceChecklist = Object.fromEntries(
+        Object.entries(analysis.evidenceChecklist || {}).map(([key, entry]) => [
+          key,
+          appendEvidenceHistoryFromChanges(savedAnalysis.evidenceChecklist?.[key], entry, historyAt),
+        ])
+      );
       const nextAnalysis: ControlAnalysis = {
         ...analysis,
+        evidenceChecklist: nextEvidenceChecklist,
         documentCompleteness: computedDocumentCompleteness,
         evidenceCompletionPercent,
-        updatedAt: new Date().toISOString(),
+        updatedAt: historyAt,
       };
       const updated = await updateAccountingTransformationRecord(selected.id, {
         recordType: selected.recordType,
@@ -479,7 +520,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3 p-4">
-                  {evidenceRows.map(({ requirement, attachment, status, saved, followUpStatus, overdue, daysPastDue, dueSoon }) => (
+                  {evidenceRows.map(({ requirement, attachment, status, saved, followUpStatus, overdue, daysPastDue, dueSoon, escalation, historyEvents }) => (
                     <div key={requirement.key} className="rounded-2xl border bg-white p-4 shadow-sm">
                       <div className="grid gap-3 lg:grid-cols-[1fr_180px_auto] lg:items-center">
                         <div>
@@ -564,6 +605,39 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
                           {!overdue && dueSoon && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">موعد الاستحقاق خلال 7 أيام</Badge>}
                         </div>
                       )}
+
+                      <div className="mt-4 border-t border-slate-100 pt-4">
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setExpandedHistoryKey(expandedHistoryKey === requirement.key ? '' : requirement.key)}>
+                          <History className="ml-1 h-4 w-4" />سجل المتابعة ({historyEvents.length.toLocaleString('ar-SA')})
+                        </Button>
+                        {expandedHistoryKey === requirement.key && (
+                          <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                              <Input
+                                value={historyNoteDrafts[requirement.key] || ''}
+                                onChange={(event) => setHistoryNoteDrafts((prev) => ({ ...prev, [requirement.key]: event.target.value }))}
+                                placeholder="إضافة متابعة جديدة، مثل: تمت مخاطبة الجهة واستلام إفادة أولية..."
+                              />
+                              <Button type="button" size="sm" onClick={() => addEvidenceHistoryNote(requirement.key)}>
+                                <PlusCircle className="ml-1 h-4 w-4" />إضافة للسجل
+                              </Button>
+                            </div>
+                            {!historyEvents.length ? (
+                              <p className="py-5 text-center text-xs text-slate-500">لا توجد أحداث متابعة مسجلة حتى الآن.</p>
+                            ) : (
+                              <div className="mt-3 space-y-2">
+                                {historyEvents.map((event) => (
+                                  <div key={event.id} className="relative rounded-xl border bg-white p-3 pr-5">
+                                    <span className="absolute right-2 top-4 h-2 w-2 rounded-full bg-slate-400" />
+                                    <p className="text-xs font-bold leading-6 text-slate-800">{event.summary}</p>
+                                    <p className="mt-1 text-[10px] text-slate-500">{new Date(event.at).toLocaleString('ar-SA')} · {event.actor || 'مستخدم المنصة'}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                   <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-6 text-slate-600">طريقة الاحتساب: «متوفر» = 100% من وزن المتطلب، «يحتاج تحديث» = 50%، «ناقص» = 0%. وتتحول حالة اكتمال المستندات في التحليل تلقائيًا إلى مكتملة أو جزئية أو مفقودة عند الحفظ.</p>

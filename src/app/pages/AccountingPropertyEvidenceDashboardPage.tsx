@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Printer,
   Siren,
+  History,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../components/ui/badge';
@@ -47,6 +48,7 @@ import {
   type EvidenceFollowUpPriority,
   type EvidenceFollowUpStatus,
 } from '../config/accountingPropertyEvidenceFollowUp';
+import { mergeEvidenceHistory, type EvidenceHistoryEvent } from '../config/accountingPropertyEvidenceHistory';
 import type {
   AccountingTransformationAttachment,
   AccountingTransformationRecord,
@@ -64,6 +66,7 @@ type EvidenceChecklistEntry = {
   followUpStatus?: EvidenceFollowUpStatus;
   lastAction?: string;
   lastActionAt?: string;
+  history?: EvidenceHistoryEvent[];
 };
 
 type SavedControlAnalysis = {
@@ -92,6 +95,8 @@ type DashboardTask = {
   daysPastDue: number;
   dueSoon: boolean;
   escalation: EvidenceEscalationLevel;
+  historyCount: number;
+  latestHistory?: EvidenceHistoryEvent;
 };
 
 type DashboardRow = {
@@ -187,6 +192,7 @@ const buildRow = (profile: PropertyControlMemoProfile, records: AccountingTransf
       const followUpStatus = savedEntry?.followUpStatus || defaultFollowUpStatus(status);
       const open = isEvidenceTaskOpen(status, followUpStatus);
       const overdue = isEvidenceTaskOverdue(status, savedEntry?.dueDate, followUpStatus);
+      const historyEvents = mergeEvidenceHistory({ ...(savedEntry || {}), status, followUpStatus });
       tasks.push({
         key: requirement.key,
         label: requirement.label,
@@ -202,6 +208,8 @@ const buildRow = (profile: PropertyControlMemoProfile, records: AccountingTransf
         daysPastDue: overdue ? evidenceDaysPastDue(savedEntry?.dueDate) : 0,
         dueSoon: evidenceDueSoon(status, savedEntry?.dueDate, followUpStatus),
         escalation: getEvidenceEscalationLevel(status, savedEntry?.dueDate, followUpStatus),
+        historyCount: historyEvents.length,
+        latestHistory: historyEvents[0],
       });
     }
   });
@@ -297,7 +305,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
         row.nextAction,
         row.representative?.assetDescription,
         row.representative?.city,
-        ...row.tasks.flatMap((task) => [task.label, task.responsible, task.lastAction]),
+        ...row.tasks.flatMap((task) => [task.label, task.responsible, task.lastAction, task.latestHistory?.summary]),
       ].filter(Boolean).join(' ')).includes(needle);
     });
   }, [rows, query, filter]);
@@ -321,7 +329,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
     if (filter === 'complete') return false;
     const needle = normalize(query);
     if (!needle) return true;
-    return normalize([row.profile.title, task.label, task.responsible, task.lastAction].filter(Boolean).join(' ')).includes(needle);
+    return normalize([row.profile.title, task.label, task.responsible, task.lastAction, task.latestHistory?.summary].filter(Boolean).join(' ')).includes(needle);
   });
   const overallPercentage = totalRequirements
     ? Math.round(((totalAvailable + totalNeedsUpdate * 0.5) / totalRequirements) * 100)
@@ -350,13 +358,14 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
         <td>${task.daysPastDue ? escapeHtml(`${task.daysPastDue} يوم`) : '-'}</td>
         <td>${escapeHtml(EVIDENCE_FOLLOW_UP_STATUS_LABELS[task.followUpStatus])}</td>
         <td>${escapeHtml(task.lastAction || '-')}</td>
+        <td>${escapeHtml(`${task.historyCount} حدث — ${task.latestHistory?.summary || 'لا يوجد سجل محفوظ'}`)}</td>
       </tr>`).join('');
     const generatedAt = new Date().toLocaleString('ar-SA');
     popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير متابعة مستندات الإثبات</title><style>
       @page{size:A4 landscape;margin:12mm} body{font-family:Arial,Tahoma,sans-serif;color:#111827;margin:0} h1{font-size:22px;margin:0 0 6px} .meta{font-size:11px;color:#475569;margin-bottom:14px}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 16px}.box{border:1px solid #cbd5e1;border-radius:8px;padding:8px;text-align:center}.box b{display:block;font-size:18px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:10px}th,td{border:1px solid #cbd5e1;padding:6px;vertical-align:top}th{background:#f1f5f9}.due_soon{background:#fffbeb}.overdue{background:#fef2f2}.critical{background:#fee2e2;font-weight:700}.legend{font-size:10px;margin-top:10px;color:#475569}@media print{button{display:none}}
     </style></head><body><h1>تقرير متابعة مستندات الإثبات</h1><div class="meta">جامعة الإمام عبدالرحمن بن فيصل — لجنة متابعة متطلبات التحول المحاسبي<br>تاريخ إعداد التقرير: ${escapeHtml(generatedAt)} — معيار الحالة الحرجة: ${EVIDENCE_ESCALATION_CONFIG.criticalAfterDays} يومًا بعد الاستحقاق</div>
     <div class="summary"><div class="box">المهام المفتوحة<b>${totalOpenTasks}</b></div><div class="box">المتأخرة<b>${totalOverdueTasks}</b></div><div class="box">الحرجة<b>${totalCriticalTasks}</b></div><div class="box">أولوية عالية<b>${totalHighPriorityOpen}</b></div></div>
-    <table><thead><tr><th>العقار</th><th>المستند</th><th>حالة المستند</th><th>التصعيد</th><th>المسؤول</th><th>الأولوية</th><th>الاستحقاق</th><th>مدة التأخير</th><th>حالة المتابعة</th><th>آخر إجراء</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+    <table><thead><tr><th>العقار</th><th>المستند</th><th>حالة المستند</th><th>التصعيد</th><th>المسؤول</th><th>الأولوية</th><th>الاستحقاق</th><th>مدة التأخير</th><th>حالة المتابعة</th><th>آخر إجراء</th><th>السجل الزمني</th></tr></thead><tbody>${rowsHtml}</tbody></table>
     <div class="legend">قريب الاستحقاق: خلال ${EVIDENCE_ESCALATION_CONFIG.dueSoonDays} أيام — متأخر: بعد تاريخ الاستحقاق — حرج: بعد ${EVIDENCE_ESCALATION_CONFIG.criticalAfterDays} يومًا من التأخير.</div></body></html>`);
     popup.document.close();
     popup.focus();
@@ -520,7 +529,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1500px] text-right text-sm">
                 <thead className="bg-slate-50 text-xs text-slate-600"><tr>
-                  <th className="px-4 py-3">العقار</th><th className="px-4 py-3">المستند</th><th className="px-4 py-3">حالة المستند</th><th className="px-4 py-3">التصعيد</th><th className="px-4 py-3">المسؤول</th><th className="px-4 py-3">الأولوية</th><th className="px-4 py-3">الاستحقاق</th><th className="px-4 py-3">حالة المتابعة</th><th className="px-4 py-3">آخر إجراء</th><th className="px-4 py-3">فتح</th>
+                  <th className="px-4 py-3">العقار</th><th className="px-4 py-3">المستند</th><th className="px-4 py-3">حالة المستند</th><th className="px-4 py-3">التصعيد</th><th className="px-4 py-3">المسؤول</th><th className="px-4 py-3">الأولوية</th><th className="px-4 py-3">الاستحقاق</th><th className="px-4 py-3">حالة المتابعة</th><th className="px-4 py-3">آخر إجراء</th><th className="px-4 py-3">السجل الزمني</th><th className="px-4 py-3">فتح</th>
                 </tr></thead>
                 <tbody className="divide-y">
                   {filteredTaskRows.map(({ row, task }) => (
@@ -534,6 +543,7 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
                       <td className="px-4 py-4 text-xs">{task.dueDate || '-'}{task.overdue && <p className="mt-1 font-black text-red-700">متأخر {task.daysPastDue.toLocaleString('ar-SA')} يوم</p>}{!task.overdue && task.dueSoon && <p className="mt-1 font-bold text-amber-700">خلال 7 أيام</p>}</td>
                       <td className="px-4 py-4 text-xs">{EVIDENCE_FOLLOW_UP_STATUS_LABELS[task.followUpStatus]}</td>
                       <td className="max-w-[320px] px-4 py-4 text-xs leading-6 text-slate-700">{task.lastAction || '-'}{task.lastActionAt && <p className="mt-1 text-[10px] text-slate-400">{task.lastActionAt}</p>}</td>
+                      <td className="max-w-[300px] px-4 py-4 text-xs leading-6 text-slate-700"><div className="flex items-center gap-1 font-black text-slate-800"><History className="h-3.5 w-3.5" />{task.historyCount.toLocaleString('ar-SA')} حدث</div><p className="mt-1 text-[10px] text-slate-500">{task.latestHistory?.summary || 'لا يوجد سجل محفوظ'}</p></td>
                       <td className="px-4 py-4">{row.representative ? <Button size="sm" variant="outline" onClick={() => navigate(`/accounting-transformation/control-indicators`)}>متابعة</Button> : <span className="text-[11px] text-red-600">غير مرتبط</span>}</td>
                     </tr>
                   ))}
