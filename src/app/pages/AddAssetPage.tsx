@@ -239,9 +239,14 @@ export const AddAssetPage: React.FC = () => {
   };
 
   const selectCentralBuilding = (buildingId: string) => {
-    if (buildingId === '__manual__') {
+    if (buildingId === '__independent__') {
       setForm((current) => ({
         ...current,
+        building: '',
+        buildingNumber: '',
+        floor: '',
+        room: '',
+        coordinates: '',
         excelPayload: withCentralBuildingId(current.excelPayload, null),
       }));
       return;
@@ -615,6 +620,18 @@ export const AddAssetPage: React.FC = () => {
       return;
     }
 
+    const centralBuildingId = getAssetCentralBuildingId(form);
+    const hasBuildingLocation = Boolean(
+      String(form.building || '').trim() ||
+      String(form.buildingNumber || '').trim() ||
+      String(form.floor || '').trim() ||
+      String(form.room || '').trim()
+    );
+    if (hasBuildingLocation && !centralBuildingId) {
+      setError('عند تسجيل الأصل داخل مبنى يجب اختيار المبنى من السجل المركزي للمباني. لا يعتمد الإدخال اليدوي لرقم أو اسم المبنى.');
+      return;
+    }
+
     try {
       setIsSaving(true);
 
@@ -936,16 +953,17 @@ export const AddAssetPage: React.FC = () => {
             <Input value={form.department || ''} onChange={(e) => setField('department', e.target.value)} placeholder="اسم الجهة" />
           </div>
           <div className="space-y-2">
-            <Label>المبنى — السجل المركزي</Label>
+            <Label>ارتباط الأصل بالمبنى — السجل المركزي *</Label>
             <Select
-              value={getAssetCentralBuildingId(form) || '__manual__'}
+              value={getAssetCentralBuildingId(form) || (String(form.building || form.buildingNumber || form.floor || form.room || '').trim() ? '__legacy__' : '__independent__')}
               onValueChange={selectCentralBuilding}
             >
               <SelectTrigger>
                 <SelectValue placeholder="اختر المبنى من السجل المركزي" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__manual__">بدون ربط مركزي / إدخال يدوي</SelectItem>
+                <SelectItem value="__legacy__" disabled>بيانات موقع غير مرتبطة — اختر المبنى لاعتمادها</SelectItem>
+                <SelectItem value="__independent__">موقع مستقل / غير مرتبط بمبنى جامعي</SelectItem>
                 {centralBuildings.map((building) => (
                   <SelectItem key={building.id} value={building.id}>
                     {building.buildingNumber} — {building.name || 'بدون مسمى'}
@@ -960,19 +978,20 @@ export const AddAssetPage: React.FC = () => {
                 onChange={(e) => setField('building', e.target.value)}
                 className="pr-9"
                 placeholder="الوصف التشغيلي للمبنى"
+                disabled={!getAssetCentralBuildingId(form)}
               />
             </div>
             <p className="text-[11px] leading-5 text-muted-foreground">
-              اختيار مبنى من السجل المركزي يحفظ معرفًا ثابتًا مع الأصل، ويبقى اسم/رقم المبنى للعرض والتوافق مع السجلات السابقة.
+              إذا كان الأصل داخل مبنى جامعي فاختيار المبنى من السجل المركزي إلزامي. استخدم «موقع مستقل» فقط للأصول غير المرتبطة بأي مبنى.
             </p>
           </div>
           <div className="space-y-2">
             <Label>الدور</Label>
-            <Input value={form.floor || ''} onChange={(e) => setField('floor', e.target.value)} placeholder="الدور" />
+            <Input value={form.floor || ''} onChange={(e) => setField('floor', e.target.value)} placeholder="الدور" disabled={!getAssetCentralBuildingId(form)} />
           </div>
           <div className="space-y-2">
             <Label>الغرفة / الموقع التفصيلي</Label>
-            <Input value={form.room || ''} onChange={(e) => setField('room', e.target.value)} placeholder="رقم الغرفة أو وصف الموقع" />
+            <Input value={form.room || ''} onChange={(e) => setField('room', e.target.value)} placeholder="رقم الغرفة أو وصف الموقع" disabled={!getAssetCentralBuildingId(form)} />
           </div>
         </CardContent>
       </Card>

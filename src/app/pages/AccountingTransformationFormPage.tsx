@@ -248,6 +248,9 @@ export const AccountingTransformationFormPage: React.FC = () => {
       if (!String(payload.B || '').trim() || !String(payload.C || '').trim()) return toast.error('اسم الجهة ورمز الجهة مطلوبان');
       if (!String(payload.G || '').trim()) return toast.error('وصف الأصل مطلوب');
     }
+    if (recordType === 'building' && !getCentralBuildingIdFromPayload(payload)) {
+      return toast.error('سجل المبنى يجب ربطه بمبنى معتمد من السجل المركزي للمباني قبل الحفظ.');
+    }
     setSaving(true);
     try {
       const input = { recordType, ownershipMode, committeeStatus, payload, attachments, notes: notes || null };
@@ -349,12 +352,12 @@ export const AccountingTransformationFormPage: React.FC = () => {
             <Card className="rounded-[24px] border-cyan-200/80 bg-cyan-50/30">
               <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-cyan-700" />الربط بالسجل المركزي للمباني</CardTitle></CardHeader>
               <CardContent className="space-y-2">
-                <Label>المبنى المركزي</Label>
-                <NativeSelect value={getCentralBuildingIdFromPayload(payload)} onChange={(e) => selectCentralBuilding(e.target.value)}>
-                  <option value="">غير مرتبط بعد</option>
+                <Label>المبنى المركزي *</Label>
+                <NativeSelect value={getCentralBuildingIdFromPayload(payload)} onChange={(e) => selectCentralBuilding(e.target.value)} required>
+                  <option value="" disabled>اختر المبنى من السجل المركزي</option>
                   {centralBuildings.map((building) => <option key={building.id} value={building.id}>{building.buildingNumber} — {building.name || 'بدون مسمى'}</option>)}
                 </NativeSelect>
-                <p className="text-[11px] leading-5 text-slate-500">يحفظ النظام معرف المبنى الثابت داخل السجل المحاسبي؛ لذلك لا ينقطع الارتباط عند تغيير اسم المبنى أو وصفه.</p>
+                <p className="text-[11px] leading-5 text-slate-500">الربط إلزامي لسجل المبنى المحاسبي. يحفظ النظام معرف المبنى الثابت؛ لذلك لا ينقطع الارتباط عند تغيير الاسم أو الوصف.</p>
               </CardContent>
             </Card>
           )}

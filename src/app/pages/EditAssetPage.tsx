@@ -88,8 +88,16 @@ export const EditAssetPage: React.FC = () => {
   const setField = <K extends keyof AssetInput>(key: K, value: AssetInput[K]) => setForm((current) => ({ ...current, [key]: value }));
 
   const selectCentralBuilding = (buildingId: string) => {
-    if (buildingId === '__manual__') {
-      setForm((current) => ({ ...current, excelPayload: withCentralBuildingId(current.excelPayload, null) }));
+    if (buildingId === '__independent__') {
+      setForm((current) => ({
+        ...current,
+        building: '',
+        buildingNumber: '',
+        floor: '',
+        room: '',
+        coordinates: '',
+        excelPayload: withCentralBuildingId(current.excelPayload, null),
+      }));
       return;
     }
     const building = centralBuildings.find((item) => item.id === buildingId);
@@ -111,6 +119,18 @@ export const EditAssetPage: React.FC = () => {
     if (!assetId) return;
     if (!String(form.itemNumber || '').trim() || !String(form.name || '').trim() || !String(form.category || '').trim()) {
       setError('اسم الأصل والتصنيف حقول مطلوبة.');
+      return;
+    }
+
+    const centralBuildingId = getAssetCentralBuildingId(form);
+    const hasBuildingLocation = Boolean(
+      String(form.building || '').trim() ||
+      String(form.buildingNumber || '').trim() ||
+      String(form.floor || '').trim() ||
+      String(form.room || '').trim()
+    );
+    if (hasBuildingLocation && !centralBuildingId) {
+      setError('هذا الأصل يحتوي بيانات موقع داخل مبنى، ويجب ربطه أولًا بمبنى معتمد من السجل المركزي قبل حفظ التعديلات.');
       return;
     }
 
@@ -181,9 +201,9 @@ export const EditAssetPage: React.FC = () => {
         <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />الموقع الإداري</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
           <div><Label>الجهة / الإدارة</Label><Input value={form.department || ''} onChange={(e) => setField('department', e.target.value)} /></div>
-          <div className="space-y-2"><Label>المبنى — السجل المركزي</Label><Select value={getAssetCentralBuildingId(form) || '__manual__'} onValueChange={selectCentralBuilding}><SelectTrigger><SelectValue placeholder="اختر المبنى من السجل المركزي" /></SelectTrigger><SelectContent><SelectItem value="__manual__">بدون ربط مركزي / إدخال يدوي</SelectItem>{centralBuildings.map((building) => <SelectItem key={building.id} value={building.id}>{building.buildingNumber} — {building.name || 'بدون مسمى'}</SelectItem>)}</SelectContent></Select><div className="relative"><Building2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pr-9" value={form.building || ''} onChange={(e) => setField('building', e.target.value)} placeholder="الوصف التشغيلي للمبنى" /></div><p className="text-[11px] leading-5 text-muted-foreground">الرابط المركزي ثابت حتى عند تعديل اسم المبنى لاحقًا.</p></div>
-          <div><Label>الدور</Label><Input value={form.floor || ''} onChange={(e) => setField('floor', e.target.value)} /></div>
-          <div><Label>الغرفة / الموقع التفصيلي</Label><Input value={form.room || ''} onChange={(e) => setField('room', e.target.value)} /></div>
+          <div className="space-y-2"><Label>ارتباط الأصل بالمبنى — السجل المركزي *</Label><Select value={getAssetCentralBuildingId(form) || (String(form.building || form.buildingNumber || form.floor || form.room || '').trim() ? '__legacy__' : '__independent__')} onValueChange={selectCentralBuilding}><SelectTrigger><SelectValue placeholder="اختر المبنى من السجل المركزي" /></SelectTrigger><SelectContent><SelectItem value="__legacy__" disabled>بيانات موقع غير مرتبطة — اختر المبنى لاعتمادها</SelectItem><SelectItem value="__independent__">موقع مستقل / غير مرتبط بمبنى جامعي</SelectItem>{centralBuildings.map((building) => <SelectItem key={building.id} value={building.id}>{building.buildingNumber} — {building.name || 'بدون مسمى'}</SelectItem>)}</SelectContent></Select><div className="relative"><Building2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pr-9" value={form.building || ''} onChange={(e) => setField('building', e.target.value)} placeholder="الوصف التشغيلي للمبنى" disabled={!getAssetCentralBuildingId(form)} /></div><p className="text-[11px] leading-5 text-muted-foreground">الأصل الموجود داخل مبنى يجب أن يرتبط بمعرف المبنى من السجل المركزي قبل الحفظ.</p></div>
+          <div><Label>الدور</Label><Input value={form.floor || ''} onChange={(e) => setField('floor', e.target.value)} disabled={!getAssetCentralBuildingId(form)} /></div>
+          <div><Label>الغرفة / الموقع التفصيلي</Label><Input value={form.room || ''} onChange={(e) => setField('room', e.target.value)} disabled={!getAssetCentralBuildingId(form)} /></div>
         </CardContent>
       </Card>
 
