@@ -12,6 +12,8 @@ import {
   Save,
   Scale,
   ShieldCheck,
+  Upload,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
@@ -23,15 +25,26 @@ import { Textarea } from '../components/ui/textarea';
 import {
   getAccountingTransformationRecords,
   updateAccountingTransformationRecord,
+  uploadAccountingTransformationFile,
 } from '../api/accountingTransformation';
-import type { AccountingTransformationRecord } from '../../types/accountingTransformation';
+import type { AccountingTransformationAttachment, AccountingTransformationRecord } from '../../types/accountingTransformation';
 import { findPropertyControlMemoProfile, memoProfileToAnalysisSeed } from '../config/accountingPropertyControlMemoProfiles';
+import {
+  findMatchingPropertyEvidenceAttachment,
+  getPropertyEvidenceRequirements,
+  type PropertyEvidenceStatus,
+} from '../config/accountingPropertyEvidenceRequirements';
 
 const CONTROL_KEY = '__propertyControlAnalysis';
 
 type IndicatorValue = 'yes' | 'partial' | 'no' | 'unknown';
 type DocumentCompleteness = 'complete' | 'partial' | 'missing';
 type AnalysisLevel = 'strong_needs_approval' | 'needs_more_study' | 'insufficient' | 'undetermined';
+type EvidenceChecklistEntry = {
+  status: PropertyEvidenceStatus;
+  attachmentKey?: string;
+  notes?: string;
+};
 
 type ControlAnalysis = {
   relationshipType: string;
@@ -57,6 +70,8 @@ type ControlAnalysis = {
   memoProfileId?: string;
   memoSourceLabel?: string;
   memoReferenceScore?: number;
+  evidenceChecklist?: Record<string, EvidenceChecklistEntry>;
+  evidenceCompletionPercent?: number;
 };
 
 const emptyAnalysis = (): ControlAnalysis => ({
@@ -171,6 +186,8 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState('');
+  const [attachments, setAttachments] = useState<AccountingTransformationAttachment[]>([]);
+  const [uploadingEvidenceKey, setUploadingEvidenceKey] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -214,7 +231,10 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
     if (!selectedId && candidates.length) setSelectedId(candidates[0].id);
   }, [candidates, selectedId]);
 
-  useEffect(() => { setAnalysis(readAnalysis(selected)); }, [selected?.id]);
+  useEffect(() => {
+    setAnalysis(readAnalysis(selected));
+    setAttachments(Array.isArray(selected?.attachments) ? selected.attachments : []);
+  }, [selected?.id]);
 
   const completedAnalyses = candidates.filter((record) => {
     const saved = readAnalysis(record);
@@ -225,22 +245,89 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
   const insufficientCount = candidates.filter((record) => readAnalysis(record).analysisLevel === 'insufficient').length;
   const score = scoreAnalysis(analysis);
   const memoReferenceScore = analysis.memoReferenceScore;
+  const evidenceRequirements = useMemo(
+    () => getPropertyEvidenceRequirements(selectedMemoProfile?.id),
+    [selectedMemoProfile?.id]
+  );
+  const evidenceRows = useMemo(() => evidenceRequirements.map((requirement) => {
+    const saved = analysis.evidenceChecklist?.[requirement.key];
+    const autoAttachment = findMatchingPropertyEvidenceAttachment(requirement, attachments);
+    const linkedAttachment = saved?.attachmentKey
+      ? attachments.find((attachment) => (attachment.driveFileId || attachment.driveUrl) === saved.attachmentKey) || autoAttachment
+      : autoAttachment;
+    const status: PropertyEvidenceStatus = saved?.status || (linkedAttachment ? 'available' : 'missing');
+    return { requirement, saved, attachment: linkedAttachment, status };
+  }), [analysis.evidenceChecklist, attachments, evidenceRequirements]);
+  const evidenceCompletionPercent = evidenceRows.length
+    ? Math.round(evidenceRows.reduce((sum, row) => sum + (row.status === 'available' ? 1 : row.status === 'needs_update' ? 0.5 : 0), 0) / evidenceRows.length * 100)
+    : 0;
 
   const update = <K extends keyof ControlAnalysis>(key: K, value: ControlAnalysis[K]) => {
     setAnalysis((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const setEvidenceStatus = (key: string, status: PropertyEvidenceStatus) => {
+    setAnalysis((prev) => ({
+      ...prev,
+      evidenceChecklist: {
+        ...(prev.evidenceChecklist || {}),
+        [key]: { ...(prev.evidenceChecklist?.[key] || {}), status },
+      },
+    }));
+  };
+
+  const handleEvidenceUpload = async (key: string, label: string, file?: File | null) => {
+    if (!file) return;
+    setUploadingEvidenceKey(key);
+    try {
+      const uploaded = await uploadAccountingTransformationFile(file);
+      const attachment: AccountingTransformationAttachment = {
+        ...uploaded,
+        title: uploaded.title || file.name,
+        documentPurpose: 'ownership_acquisition',
+        documentType: label,
+        notes: `مؤشرات السيطرة - ${label}`,
+      };
+      const attachmentKey = attachment.driveFileId || attachment.driveUrl;
+      setAttachments((current) => [...current, attachment]);
+      setAnalysis((prev) => ({
+        ...prev,
+        evidenceChecklist: {
+          ...(prev.evidenceChecklist || {}),
+          [key]: { ...(prev.evidenceChecklist?.[key] || {}), status: 'available', attachmentKey },
+        },
+      }));
+      toast.success(`تم رفع مستند: ${label}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر رفع مستند الإثبات');
+    } finally {
+      setUploadingEvidenceKey('');
+    }
   };
 
   const save = async () => {
     if (!selected) return;
     setSaving(true);
     try {
-      const nextAnalysis: ControlAnalysis = { ...analysis, updatedAt: new Date().toISOString() };
+      const computedDocumentCompleteness: DocumentCompleteness = evidenceRequirements.length
+        ? evidenceCompletionPercent >= 100
+          ? 'complete'
+          : evidenceCompletionPercent <= 0
+            ? 'missing'
+            : 'partial'
+        : analysis.documentCompleteness;
+      const nextAnalysis: ControlAnalysis = {
+        ...analysis,
+        documentCompleteness: computedDocumentCompleteness,
+        evidenceCompletionPercent,
+        updatedAt: new Date().toISOString(),
+      };
       const updated = await updateAccountingTransformationRecord(selected.id, {
         recordType: selected.recordType,
         ownershipMode: selected.ownershipMode,
         committeeStatus: selected.committeeStatus,
         payload: { ...selected.payload, [CONTROL_KEY]: nextAnalysis },
-        attachments: selected.attachments || [],
+        attachments,
         notes: selected.notes || null,
       });
       setRecords((prev) => prev.map((item) => item.id === updated.id ? updated : item));
@@ -325,6 +412,67 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
                   )}
                 </CardContent>
               </Card>
+
+            {selectedMemoProfile && (
+              <Card className="rounded-[26px] border-indigo-200 bg-indigo-50/35">
+                <CardHeader className="border-b border-indigo-100">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base">ملف مستندات الإثبات</CardTitle>
+                      <p className="mt-1 text-xs leading-6 text-slate-500">المتطلبات أدناه مستمدة من فجوات المستندات والإجراءات الواردة في مذكرة مؤشرات السيطرة. يمكن ربط مرفق موجود أو رفع مستند جديد ثم حفظ التحليل.</p>
+                    </div>
+                    <div className="min-w-[150px] rounded-2xl border border-indigo-200 bg-white px-4 py-3 text-center">
+                      <p className="text-[10px] font-bold text-slate-500">نسبة اكتمال ملف الإثبات</p>
+                      <p className="mt-1 text-2xl font-black text-indigo-800">{evidenceCompletionPercent}%</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-indigo-100">
+                    <div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: evidenceCompletionPercent + '%' }} />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 p-4">
+                  {evidenceRows.map(({ requirement, attachment, status }) => (
+                    <div key={requirement.key} className="rounded-2xl border bg-white p-4 shadow-sm">
+                      <div className="grid gap-3 lg:grid-cols-[1fr_180px_auto] lg:items-center">
+                        <div>
+                          <p className="font-black text-slate-900">{requirement.label}</p>
+                          <p className="mt-1 text-[11px] leading-5 text-slate-500">{requirement.description}</p>
+                          {attachment && <p className="mt-2 text-[11px] font-bold text-emerald-700">المرفق المرتبط: {attachment.title}</p>}
+                          {!attachment && status === 'available' && <p className="mt-2 text-[11px] font-bold text-amber-700">الحالة «متوفر» ولكن لا يوجد ملف مرفوع مرتبط بهذه الخانة.</p>}
+                        </div>
+                        <NativeSelect value={status} onChange={(event) => setEvidenceStatus(requirement.key, event.target.value as PropertyEvidenceStatus)}>
+                          <option value="available">متوفر</option>
+                          <option value="needs_update">يحتاج تحديث</option>
+                          <option value="missing">ناقص</option>
+                        </NativeSelect>
+                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                          {attachment?.driveUrl && (
+                            <Button type="button" size="sm" variant="outline" asChild>
+                              <a href={attachment.driveUrl} target="_blank" rel="noreferrer"><ExternalLink className="ml-1 h-4 w-4" />فتح</a>
+                            </Button>
+                          )}
+                          <label className="inline-flex cursor-pointer items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-100">
+                            <Upload className="ml-1 h-4 w-4" />
+                            {uploadingEvidenceKey === requirement.key ? 'جارٍ الرفع...' : attachment ? 'استبدال / إضافة' : 'رفع المستند'}
+                            <input
+                              type="file"
+                              className="hidden"
+                              disabled={Boolean(uploadingEvidenceKey)}
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                void handleEvidenceUpload(requirement.key, requirement.label, file);
+                                event.currentTarget.value = '';
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-6 text-slate-600">طريقة الاحتساب: «متوفر» = 100% من وزن المتطلب، «يحتاج تحديث» = 50%، «ناقص» = 0%. وتتحول حالة اكتمال المستندات في التحليل تلقائيًا إلى مكتملة أو جزئية أو مفقودة عند الحفظ.</p>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="rounded-[26px]">
               <CardHeader className="border-b"><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle>{selected.assetDescription || selected.entityAssetNumber || selected.recordNumber}</CardTitle><p className="mt-2 text-xs text-slate-500">المالك حسب سجل الأصول: {String(assetOwner(selected) || 'غير متوفر')} · رقم السجل: {selected.recordNumber}</p></div><Button variant="outline" onClick={() => navigate(`/accounting-transformation/${selected.id}`)}><Eye className="ml-2 h-4 w-4" />عرض السجل الأصلي</Button></div></CardHeader>
