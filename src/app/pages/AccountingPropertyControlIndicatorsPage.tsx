@@ -30,6 +30,8 @@ import {
   uploadAccountingTransformationFile,
 } from '../api/accountingTransformation';
 import type { AccountingTransformationAttachment, AccountingTransformationRecord } from '../../types/accountingTransformation';
+import { usePermissions } from '../../context/PermissionsContext';
+import { MODULE_LABELS } from '../../types/permissions';
 import { findPropertyControlMemoProfile, memoProfileToAnalysisSeed } from '../config/accountingPropertyControlMemoProfiles';
 import {
   findMatchingPropertyEvidenceAttachment,
@@ -49,9 +51,11 @@ import {
   type EvidenceFollowUpStatus,
 } from '../config/accountingPropertyEvidenceFollowUp';
 import {
+  appendEvidenceHistoryEvent,
   appendEvidenceHistoryFromChanges,
   createEvidenceHistoryEvent,
   mergeEvidenceHistory,
+  type EvidenceAuditActor,
   type EvidenceHistoryEvent,
 } from '../config/accountingPropertyEvidenceHistory';
 
@@ -207,6 +211,16 @@ const IndicatorField: React.FC<{
 
 export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { isAdmin, hasPermission, userProfile } = usePermissions();
+  const canEdit = isAdmin || hasPermission('accounting_transformation', 'canEdit');
+  const auditActor = useMemo<EvidenceAuditActor>(() => ({
+    userId: userProfile?.uid,
+    username: userProfile?.username || userProfile?.email || 'مستخدم المنصة',
+    email: userProfile?.email,
+    role: userProfile?.role,
+    roleLabel: userProfile?.role === 'admin' ? 'مدير النظام' : userProfile?.role === 'employee' ? 'موظف' : 'غير محدد',
+    contextLabel: MODULE_LABELS.accounting_transformation,
+  }), [userProfile]);
   const [records, setRecords] = useState<AccountingTransformationRecord[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [analysis, setAnalysis] = useState<ControlAnalysis>(emptyAnalysis());
@@ -298,10 +312,12 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
     : 0;
 
   const update = <K extends keyof ControlAnalysis>(key: K, value: ControlAnalysis[K]) => {
+    if (!canEdit) return;
     setAnalysis((prev) => ({ ...prev, [key]: value }));
   };
 
   const setEvidenceEntry = (key: string, patch: Partial<EvidenceChecklistEntry>) => {
+    if (!canEdit) return;
     setAnalysis((prev) => ({
       ...prev,
       evidenceChecklist: {
@@ -312,6 +328,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
   };
 
   const setEvidenceStatus = (key: string, status: PropertyEvidenceStatus) => {
+    if (!canEdit) return;
     setAnalysis((prev) => {
       const current = prev.evidenceChecklist?.[key];
       const followUpStatus: EvidenceFollowUpStatus = status === 'available'
@@ -330,6 +347,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
   };
 
   const addEvidenceHistoryNote = (key: string) => {
+    if (!canEdit) { toast.error('ليس لديك صلاحية تعديل سجل التحول المحاسبي'); return; }
     const summary = (historyNoteDrafts[key] || '').trim();
     if (!summary) { toast.error('اكتب تفاصيل المتابعة أولًا'); return; }
     setAnalysis((prev) => {
@@ -338,10 +356,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
         ...prev,
         evidenceChecklist: {
           ...(prev.evidenceChecklist || {}),
-          [key]: {
-            ...current,
-            history: [...(current.history || []), createEvidenceHistoryEvent('note', summary)],
-          },
+          [key]: appendEvidenceHistoryEvent(current, createEvidenceHistoryEvent('note', summary, { actor: auditActor })),
         },
       };
     });
@@ -350,6 +365,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
   };
 
   const handleEvidenceUpload = async (key: string, label: string, file?: File | null) => {
+    if (!canEdit) { toast.error('ليس لديك صلاحية تعديل سجل التحول المحاسبي'); return; }
     if (!file) return;
     setUploadingEvidenceKey(key);
     try {
@@ -386,6 +402,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
   };
 
   const save = async () => {
+    if (!canEdit) { toast.error('ليس لديك صلاحية تعديل سجل التحول المحاسبي'); return; }
     if (!selected) return;
     setSaving(true);
     try {
@@ -401,7 +418,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
       const nextEvidenceChecklist = Object.fromEntries(
         Object.entries(analysis.evidenceChecklist || {}).map(([key, entry]) => [
           key,
-          appendEvidenceHistoryFromChanges(savedAnalysis.evidenceChecklist?.[key], entry, historyAt),
+          appendEvidenceHistoryFromChanges(savedAnalysis.evidenceChecklist?.[key], entry, historyAt, auditActor),
         ])
       );
       const nextAnalysis: ControlAnalysis = {
@@ -437,6 +454,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
             <div className="mb-3 flex flex-wrap gap-2">
               <Badge variant="outline" className="border-cyan-200/30 bg-cyan-200/10 text-cyan-50">مذكرة مؤشرات السيطرة على العقارات</Badge>
               <Badge variant="outline" className="border-amber-200/30 bg-amber-200/10 text-amber-50">النتيجة استرشادية وليست اعتمادًا نهائيًا</Badge>
+              <Badge variant="outline" className="border-emerald-200/30 bg-emerald-200/10 text-emerald-50">سجل رقابي: {auditActor.username} · {auditActor.roleLabel}</Badge>
             </div>
             <h1 className="text-2xl font-black sm:text-3xl">العقارات التي يكون مالك الأصل فيها خلاف الجامعة</h1>
             <p className="mt-3 max-w-5xl text-sm leading-7 text-slate-300">مساحة عمل لحصر الحالات، جمع المستندات، تحليل مؤشرات الملكية والوصول والاستخدام وحق النفاذ، ثم توثيق المعالجة المقترحة قبل الاعتماد المالي والنظامي.</p>
@@ -529,7 +547,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
                           {attachment && <p className="mt-2 text-[11px] font-bold text-emerald-700">المرفق المرتبط: {attachment.title}</p>}
                           {!attachment && status === 'available' && <p className="mt-2 text-[11px] font-bold text-amber-700">الحالة «متوفر» ولكن لا يوجد ملف مرفوع مرتبط بهذه الخانة.</p>}
                         </div>
-                        <NativeSelect value={status} onChange={(event) => setEvidenceStatus(requirement.key, event.target.value as PropertyEvidenceStatus)}>
+                        <NativeSelect value={status} disabled={!canEdit} onChange={(event) => setEvidenceStatus(requirement.key, event.target.value as PropertyEvidenceStatus)}>
                           <option value="available">متوفر</option>
                           <option value="needs_update">يحتاج تحديث</option>
                           <option value="missing">ناقص</option>
@@ -546,7 +564,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
                             <input
                               type="file"
                               className="hidden"
-                              disabled={Boolean(uploadingEvidenceKey)}
+                              disabled={Boolean(uploadingEvidenceKey) || !canEdit}
                               onChange={(event) => {
                                 const file = event.target.files?.[0];
                                 void handleEvidenceUpload(requirement.key, requirement.label, file);
@@ -612,13 +630,18 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
                         </Button>
                         {expandedHistoryKey === requirement.key && (
                           <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-[11px] font-bold text-slate-600">سجل رقابي للقراءة فقط؛ الأحداث السابقة لا يمكن تعديلها أو حذفها من الواجهة.</p>
+                              <Badge variant="outline" className="border-slate-300 bg-white text-slate-700">{auditActor.username} · {auditActor.roleLabel}</Badge>
+                            </div>
                             <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                               <Input
                                 value={historyNoteDrafts[requirement.key] || ''}
+                                disabled={!canEdit}
                                 onChange={(event) => setHistoryNoteDrafts((prev) => ({ ...prev, [requirement.key]: event.target.value }))}
                                 placeholder="إضافة متابعة جديدة، مثل: تمت مخاطبة الجهة واستلام إفادة أولية..."
                               />
-                              <Button type="button" size="sm" onClick={() => addEvidenceHistoryNote(requirement.key)}>
+                              <Button type="button" size="sm" disabled={!canEdit} onClick={() => addEvidenceHistoryNote(requirement.key)}>
                                 <PlusCircle className="ml-1 h-4 w-4" />إضافة للسجل
                               </Button>
                             </div>
@@ -630,7 +653,8 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
                                   <div key={event.id} className="relative rounded-xl border bg-white p-3 pr-5">
                                     <span className="absolute right-2 top-4 h-2 w-2 rounded-full bg-slate-400" />
                                     <p className="text-xs font-bold leading-6 text-slate-800">{event.summary}</p>
-                                    <p className="mt-1 text-[10px] text-slate-500">{new Date(event.at).toLocaleString('ar-SA')} · {event.actor || 'مستخدم المنصة'}</p>
+                                    <p className="mt-1 text-[10px] text-slate-500">{new Date(event.at).toLocaleString('ar-SA')} · {event.actor || 'مستخدم المنصة'}{event.actorRoleLabel ? ` · ${event.actorRoleLabel}` : ''}</p>
+                                    {(event.actorEmail || event.actorContext) && <p className="mt-1 text-[10px] text-slate-400">{[event.actorEmail, event.actorContext].filter(Boolean).join(' · ')}</p>}
                                   </div>
                                 ))}
                               </div>
@@ -683,7 +707,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
             </Card>
 
             <Card className="rounded-[26px] border-amber-200 bg-amber-50/55">
-              <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div><p className="font-black text-amber-950">ضابط الاعتماد</p><p className="mt-1 text-xs leading-6 text-amber-900">حفظ هذه الصفحة يوثق التحليل والمستندات المطلوبة فقط. إدراج العقار في سجل الأصول أو إثبات التحسينات أو الاكتفاء بالإفصاح/السجل الرقابي يبقى خاضعًا لاستكمال المستندات والاعتماد المالي والنظامي.</p></div></div><Button className="shrink-0" onClick={save} disabled={saving}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}حفظ تحليل السيطرة</Button></CardContent>
+              <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div><p className="font-black text-amber-950">ضابط الاعتماد</p><p className="mt-1 text-xs leading-6 text-amber-900">حفظ هذه الصفحة يوثق التحليل والمستندات المطلوبة فقط. إدراج العقار في سجل الأصول أو إثبات التحسينات أو الاكتفاء بالإفصاح/السجل الرقابي يبقى خاضعًا لاستكمال المستندات والاعتماد المالي والنظامي.</p></div></div><Button className="shrink-0" onClick={save} disabled={saving || !canEdit}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}حفظ تحليل السيطرة</Button></CardContent>
             </Card>
           </>}
         </div>
