@@ -1,0 +1,36 @@
+name: Apply Accounting Evidence Escalation Report
+
+on:
+  push:
+    branches:
+      - feat/accounting-evidence-escalation-report
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/accounting-evidence-escalation-report
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: python3 scripts/apply-accounting-evidence-escalation-report.py
+      - run: npm run build
+      - name: Remove temporary automation files
+        run: |
+          rm -f scripts/apply-accounting-evidence-escalation-report.py
+          rm -f .github/workflows/apply-accounting-evidence-escalation-report.yml
+      - name: Commit integration changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "4189824+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Integrate evidence escalation and printable report"
+          git push origin HEAD:feat/accounting-evidence-escalation-report
