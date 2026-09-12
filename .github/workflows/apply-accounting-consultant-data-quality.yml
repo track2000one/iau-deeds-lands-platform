@@ -1,0 +1,36 @@
+name: Apply Accounting Consultant Data Quality
+
+on:
+  push:
+    branches:
+      - fix/accounting-consultant-data-quality
+    paths:
+      - 'scripts/apply-accounting-consultant-data-quality.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/accounting-consultant-data-quality
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-accounting-consultant-data-quality.mjs
+      - run: npm run build
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "4189824+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/AccountingTransformationScopedImportPage.tsx src/app/pages/AccountingTransformationBaselineResetPage.tsx
+          git commit -m "Surface consultant data quality checks in accounting imports"
+          git push origin HEAD:fix/accounting-consultant-data-quality

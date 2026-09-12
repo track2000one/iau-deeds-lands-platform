@@ -6,6 +6,10 @@ import {
   inspectAccountingWorkbookStructure,
   parseAccountingWorkbookStructure,
 } from '../utils/accountingWorkbookStructuralIntake';
+import {
+  applyConsultantDataQualityRules,
+  consultantReviewMessage,
+} from '../utils/accountingConsultantDataQuality';
 
 type AnalyzeRequest = {
   sourceBuffer: ArrayBuffer;
@@ -48,7 +52,11 @@ scope.onmessage = async (event: MessageEvent<AnalyzeRequest>) => {
       ...inspection,
       sheets: inspection.sheets.filter((sheet) => !modelBSheetNames.has(sheet.sheetName)),
     };
-    const legacyRows = parseAccountingWorkbookStructure(workbook, legacyInspection);
+    const parsedLegacyRows = parseAccountingWorkbookStructure(workbook, legacyInspection);
+
+    progress('جاري تطبيق قواعد ملاحظات الاستشاري على سجل المباني...');
+    const consultantResult = applyConsultantDataQualityRules(parsedLegacyRows);
+    progress(consultantReviewMessage(consultantResult.review));
 
     scope.postMessage({
       type: 'done',
@@ -56,7 +64,8 @@ scope.onmessage = async (event: MessageEvent<AnalyzeRequest>) => {
         inspection,
         modelBSheets,
         modelBRows,
-        legacyRows,
+        legacyRows: consultantResult.rows,
+        consultantReview: consultantResult.review,
       },
     });
   } catch (error) {

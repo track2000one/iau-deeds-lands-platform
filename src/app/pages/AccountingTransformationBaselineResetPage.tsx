@@ -161,6 +161,16 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       });
       if (controller.signal.aborted) return;
 
+      const consultantReview = analyzed.consultantReview;
+      if (consultantReview.errorCount > 0) {
+        const firstIssues = consultantReview.issues
+          .filter((issue) => issue.severity === 'error')
+          .slice(0, 3)
+          .map((issue) => `${issue.sourceSheet}!${issue.column}${issue.sourceRow}: ${issue.message}`)
+          .join(' | ');
+        throw new Error(`تعذر اعتماد ملف الأساس: يوجد ${consultantReview.errorCount.toLocaleString('ar-SA')} خطأ مانع وفق ملاحظات الاستشاري. ${firstIssues}`);
+      }
+
       const workbookSheetNames = analyzed.inspection.sheets.map((sheet) => sheet.sheetName);
       if (!hasRequiredAccountingBaselineSheets(workbookSheetNames)) {
         throw new Error(
@@ -190,7 +200,8 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       setSummary(nextSummary);
       setMessage(
         `تم اعتماد ورقتي الأساس فقط: ${items.length.toLocaleString('ar-SA')} سجلًا. `
-        + `تم تجاهل ${ignoredSheets.toLocaleString('ar-SA')} ورقة مرجعية/تصنيفية وعدم تحويلها إلى سجلات.`,
+        + `تم تجاهل ${ignoredSheets.toLocaleString('ar-SA')} ورقة مرجعية/تصنيفية وعدم تحويلها إلى سجلات. `
+        + `فحص ملاحظات الاستشاري: ${consultantReview.warningCount.toLocaleString('ar-SA')} تنبيه، وتم توحيد ${consultantReview.normalizedCells.toLocaleString('ar-SA')} خلية آليًا.`,
       );
       await requestServerPreview(nextSummary, file.name);
     } catch (error) {
