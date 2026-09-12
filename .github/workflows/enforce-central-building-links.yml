@@ -1,0 +1,36 @@
+name: Enforce Central Building Links
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/enforce-central-building-links.mjs'
+      - '.github/workflows/enforce-central-building-links.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/enforce-central-building-links.mjs
+      - run: npm run build
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/AddAssetPage.tsx src/app/pages/EditAssetPage.tsx src/app/pages/AccountingTransformationFormPage.tsx
+          git commit -m "Require central building links where applicable"
+          git push
