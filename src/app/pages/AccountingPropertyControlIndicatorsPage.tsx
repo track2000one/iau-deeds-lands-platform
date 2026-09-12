@@ -34,6 +34,16 @@ import {
   getPropertyEvidenceRequirements,
   type PropertyEvidenceStatus,
 } from '../config/accountingPropertyEvidenceRequirements';
+import {
+  EVIDENCE_FOLLOW_UP_STATUS_LABELS,
+  EVIDENCE_PRIORITY_LABELS,
+  defaultFollowUpStatus,
+  evidenceDaysPastDue,
+  evidenceDueSoon,
+  isEvidenceTaskOverdue,
+  type EvidenceFollowUpPriority,
+  type EvidenceFollowUpStatus,
+} from '../config/accountingPropertyEvidenceFollowUp';
 
 const CONTROL_KEY = '__propertyControlAnalysis';
 
@@ -44,6 +54,12 @@ type EvidenceChecklistEntry = {
   status: PropertyEvidenceStatus;
   attachmentKey?: string;
   notes?: string;
+  responsibleParty?: string;
+  dueDate?: string;
+  priority?: EvidenceFollowUpPriority;
+  followUpStatus?: EvidenceFollowUpStatus;
+  lastAction?: string;
+  lastActionAt?: string;
 };
 
 type ControlAnalysis = {
@@ -256,7 +272,11 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
       ? attachments.find((attachment) => (attachment.driveFileId || attachment.driveUrl) === saved.attachmentKey) || autoAttachment
       : autoAttachment;
     const status: PropertyEvidenceStatus = saved?.status || (linkedAttachment ? 'available' : 'missing');
-    return { requirement, saved, attachment: linkedAttachment, status };
+    const followUpStatus = saved?.followUpStatus || defaultFollowUpStatus(status);
+    const overdue = isEvidenceTaskOverdue(status, saved?.dueDate, followUpStatus);
+    const daysPastDue = overdue ? evidenceDaysPastDue(saved?.dueDate) : 0;
+    const dueSoon = evidenceDueSoon(status, saved?.dueDate, followUpStatus);
+    return { requirement, saved, attachment: linkedAttachment, status, followUpStatus, overdue, daysPastDue, dueSoon };
   }), [analysis.evidenceChecklist, attachments, evidenceRequirements]);
   const evidenceCompletionPercent = evidenceRows.length
     ? Math.round(evidenceRows.reduce((sum, row) => sum + (row.status === 'available' ? 1 : row.status === 'needs_update' ? 0.5 : 0), 0) / evidenceRows.length * 100)
@@ -266,14 +286,32 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
     setAnalysis((prev) => ({ ...prev, [key]: value }));
   };
 
-  const setEvidenceStatus = (key: string, status: PropertyEvidenceStatus) => {
+  const setEvidenceEntry = (key: string, patch: Partial<EvidenceChecklistEntry>) => {
     setAnalysis((prev) => ({
       ...prev,
       evidenceChecklist: {
         ...(prev.evidenceChecklist || {}),
-        [key]: { ...(prev.evidenceChecklist?.[key] || {}), status },
+        [key]: { ...(prev.evidenceChecklist?.[key] || { status: 'missing' as PropertyEvidenceStatus }), ...patch },
       },
     }));
+  };
+
+  const setEvidenceStatus = (key: string, status: PropertyEvidenceStatus) => {
+    setAnalysis((prev) => {
+      const current = prev.evidenceChecklist?.[key];
+      const followUpStatus: EvidenceFollowUpStatus = status === 'available'
+        ? 'completed'
+        : current?.followUpStatus === 'completed'
+          ? 'not_started'
+          : current?.followUpStatus || 'not_started';
+      return {
+        ...prev,
+        evidenceChecklist: {
+          ...(prev.evidenceChecklist || {}),
+          [key]: { ...(current || {}), status, followUpStatus },
+        },
+      };
+    });
   };
 
   const handleEvidenceUpload = async (key: string, label: string, file?: File | null) => {
@@ -294,7 +332,14 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
         ...prev,
         evidenceChecklist: {
           ...(prev.evidenceChecklist || {}),
-          [key]: { ...(prev.evidenceChecklist?.[key] || {}), status: 'available', attachmentKey },
+          [key]: {
+            ...(prev.evidenceChecklist?.[key] || {}),
+            status: 'available',
+            attachmentKey,
+            followUpStatus: 'completed',
+            lastAction: `تم رفع المستند: ${label}`,
+            lastActionAt: new Date().toISOString().slice(0, 10),
+          },
         },
       }));
       toast.success(`تم رفع مستند: ${label}`);
@@ -431,7 +476,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3 p-4">
-                  {evidenceRows.map(({ requirement, attachment, status }) => (
+                  {evidenceRows.map(({ requirement, attachment, status, saved, followUpStatus, overdue, daysPastDue, dueSoon }) => (
                     <div key={requirement.key} className="rounded-2xl border bg-white p-4 shadow-sm">
                       <div className="grid gap-3 lg:grid-cols-[1fr_180px_auto] lg:items-center">
                         <div>
@@ -467,6 +512,55 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
                           </label>
                         </div>
                       </div>
+
+                      <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-2 xl:grid-cols-4">
+                        <div>
+                          <p className="mb-2 text-[11px] font-bold text-slate-600">الجهة / المسؤول عن المتابعة</p>
+                          <Input
+                            value={saved?.responsibleParty ?? analysis.responsible}
+                            onChange={(event) => setEvidenceEntry(requirement.key, { responsibleParty: event.target.value })}
+                            placeholder="الجهة أو الموظف المسؤول"
+                          />
+                        </div>
+                        <div>
+                          <p className="mb-2 text-[11px] font-bold text-slate-600">تاريخ الاستحقاق</p>
+                          <Input type="date" value={saved?.dueDate || ''} onChange={(event) => setEvidenceEntry(requirement.key, { dueDate: event.target.value })} />
+                        </div>
+                        <div>
+                          <p className="mb-2 text-[11px] font-bold text-slate-600">الأولوية</p>
+                          <NativeSelect value={saved?.priority || 'medium'} onChange={(event) => setEvidenceEntry(requirement.key, { priority: event.target.value as EvidenceFollowUpPriority })}>
+                            {Object.entries(EVIDENCE_PRIORITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                          </NativeSelect>
+                        </div>
+                        <div>
+                          <p className="mb-2 text-[11px] font-bold text-slate-600">حالة المتابعة</p>
+                          <NativeSelect value={followUpStatus} onChange={(event) => setEvidenceEntry(requirement.key, { followUpStatus: event.target.value as EvidenceFollowUpStatus })}>
+                            {Object.entries(EVIDENCE_FOLLOW_UP_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                          </NativeSelect>
+                        </div>
+                        <div className="md:col-span-2 xl:col-span-3">
+                          <p className="mb-2 text-[11px] font-bold text-slate-600">آخر إجراء / متابعة</p>
+                          <Input
+                            value={saved?.lastAction || ''}
+                            onChange={(event) => setEvidenceEntry(requirement.key, {
+                              lastAction: event.target.value,
+                              lastActionAt: saved?.lastActionAt || new Date().toISOString().slice(0, 10),
+                            })}
+                            placeholder="مثال: تمت مخاطبة الجهة المالكة لطلب نسخة محدثة من المستند"
+                          />
+                        </div>
+                        <div>
+                          <p className="mb-2 text-[11px] font-bold text-slate-600">تاريخ آخر إجراء</p>
+                          <Input type="date" value={saved?.lastActionAt || ''} onChange={(event) => setEvidenceEntry(requirement.key, { lastActionAt: event.target.value })} />
+                        </div>
+                      </div>
+
+                      {(overdue || dueSoon) && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {overdue && <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800">متأخر {daysPastDue.toLocaleString('ar-SA')} يوم</Badge>}
+                          {!overdue && dueSoon && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">موعد الاستحقاق خلال 7 أيام</Badge>}
+                        </div>
+                      )}
                     </div>
                   ))}
                   <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-6 text-slate-600">طريقة الاحتساب: «متوفر» = 100% من وزن المتطلب، «يحتاج تحديث» = 50%، «ناقص» = 0%. وتتحول حالة اكتمال المستندات في التحليل تلقائيًا إلى مكتملة أو جزئية أو مفقودة عند الحفظ.</p>
