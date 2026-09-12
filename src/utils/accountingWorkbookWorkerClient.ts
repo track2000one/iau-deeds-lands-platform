@@ -3,12 +3,14 @@ import type {
   StructuralAccountingIntakeRow,
   StructuralAccountingWorkbookInspection,
 } from './accountingWorkbookStructuralIntake';
+import type { ConsultantDataQualityReview } from './accountingConsultantDataQuality';
 
 export type AccountingWorkbookWorkerResult = {
   inspection: StructuralAccountingWorkbookInspection;
   modelBSheets: ModelBSheetInspection[];
   modelBRows: ModelBWorkbookRow[];
   legacyRows: StructuralAccountingIntakeRow[];
+  consultantReview: ConsultantDataQualityReview;
 };
 
 type AnalyzeOptions = {
