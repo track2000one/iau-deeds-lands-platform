@@ -1,0 +1,40 @@
+name: Apply Accounting Property Control Memo Profiles
+
+on:
+  push:
+    branches:
+      - feat/accounting-property-control-indicators
+    paths:
+      - 'src/app/config/accountingPropertyControlMemoProfiles.ts'
+      - 'scripts/apply-accounting-property-control-memo-profiles.mjs'
+      - '.github/workflows/apply-accounting-property-control-memo-profiles.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/accounting-property-control-indicators
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-accounting-property-control-memo-profiles.mjs
+      - run: npm run build
+      - name: Commit integration changes
+        run: |
+          if git diff --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "4189824+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/AccountingPropertyControlIndicatorsPage.tsx
+          git commit -m "Prefill property control analysis from accounting memo"
+          git push origin HEAD:feat/accounting-property-control-indicators

@@ -25,6 +25,7 @@ import {
   updateAccountingTransformationRecord,
 } from '../api/accountingTransformation';
 import type { AccountingTransformationRecord } from '../../types/accountingTransformation';
+import { findPropertyControlMemoProfile, memoProfileToAnalysisSeed } from '../config/accountingPropertyControlMemoProfiles';
 
 const CONTROL_KEY = '__propertyControlAnalysis';
 
@@ -53,6 +54,9 @@ type ControlAnalysis = {
   responsible: string;
   notes: string;
   updatedAt?: string;
+  memoProfileId?: string;
+  memoSourceLabel?: string;
+  memoReferenceScore?: number;
 };
 
 const emptyAnalysis = (): ControlAnalysis => ({
@@ -104,9 +108,11 @@ const assetOwner = (record: AccountingTransformationRecord) => {
 
 const readAnalysis = (record?: AccountingTransformationRecord | null): ControlAnalysis => {
   if (!record) return emptyAnalysis();
+  const profile = findPropertyControlMemoProfile(record);
+  const seed = profile ? memoProfileToAnalysisSeed(profile) as Partial<ControlAnalysis> : {};
   const raw = record.payload?.[CONTROL_KEY];
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return emptyAnalysis();
-  return { ...emptyAnalysis(), ...(raw as Partial<ControlAnalysis>) };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...emptyAnalysis(), ...seed };
+  return { ...emptyAnalysis(), ...seed, ...(raw as Partial<ControlAnalysis>) };
 };
 
 const indicatorScore = (value: IndicatorValue) => value === 'yes' ? 2 : value === 'partial' ? 1 : 0;
@@ -202,6 +208,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
   }, [candidates, query]);
 
   const selected = candidates.find((record) => record.id === selectedId) || null;
+  const selectedMemoProfile = selected ? findPropertyControlMemoProfile(selected) : undefined;
 
   useEffect(() => {
     if (!selectedId && candidates.length) setSelectedId(candidates[0].id);
@@ -217,6 +224,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
   const studyCount = candidates.filter((record) => readAnalysis(record).analysisLevel === 'needs_more_study').length;
   const insufficientCount = candidates.filter((record) => readAnalysis(record).analysisLevel === 'insufficient').length;
   const score = scoreAnalysis(analysis);
+  const memoReferenceScore = analysis.memoReferenceScore;
 
   const update = <K extends keyof ControlAnalysis>(key: K, value: ControlAnalysis[K]) => {
     setAnalysis((prev) => ({ ...prev, [key]: value }));
@@ -256,6 +264,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
             </div>
             <h1 className="text-2xl font-black sm:text-3xl">العقارات التي يكون مالك الأصل فيها خلاف الجامعة</h1>
             <p className="mt-3 max-w-5xl text-sm leading-7 text-slate-300">مساحة عمل لحصر الحالات، جمع المستندات، تحليل مؤشرات الملكية والوصول والاستخدام وحق النفاذ، ثم توثيق المعالجة المقترحة قبل الاعتماد المالي والنظامي.</p>
+            <p className="mt-2 max-w-5xl text-xs leading-6 text-cyan-100">الحالات الأربع الواردة في مذكرة 27/08/2026 يتم التعرف عليها تلقائيًا وتعبئة بيانات البطاقة المرجعية مع بقاء التعديل والمراجعة متاحين للمستخدم.</p>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
             <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => void load()} disabled={loading}><RefreshCcw className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />تحديث</Button>
@@ -295,6 +304,28 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
         <div className="space-y-5">
           {!selected && <Card className="rounded-[26px]"><CardContent className="py-20 text-center text-slate-500">اختر عقارًا من القائمة لبدء التحليل.</CardContent></Card>}
           {selected && <>
+              <Card className="rounded-[26px] border-teal-200 bg-teal-50/55">
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold text-teal-700">الربط مع مذكرة مؤشرات السيطرة</p>
+                      <p className="mt-1 text-sm font-black text-slate-900">{selectedMemoProfile ? selectedMemoProfile.title : 'هذه الحالة غير مطابقة تلقائيًا لإحدى البطاقات الأربع'}</p>
+                      {analysis.memoSourceLabel && <p className="mt-1 text-[11px] text-slate-600">{analysis.memoSourceLabel}</p>}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {selectedMemoProfile && <Badge variant="outline" className="border-teal-300 bg-white text-teal-800">بيانات مرجعية معبأة تلقائيًا</Badge>}
+                      {typeof memoReferenceScore === 'number' && <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">درجة المذكرة: {memoReferenceScore}/10</Badge>}
+                      <Badge variant="outline" className="border-sky-300 bg-sky-50 text-sky-800">الدرجة الحسابية المساعدة: {score}/10</Badge>
+                    </div>
+                  </div>
+                  {selectedMemoProfile && typeof memoReferenceScore === 'number' && memoReferenceScore !== score && (
+                    <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] leading-6 text-amber-900">
+                      درجة المذكرة محفوظة كما وردت في المستند، وقد تختلف عن الدرجة الحسابية المساعدة للمنصة. لا يتم تعديل أي منهما آليًا لتطابق الأخرى.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
             <Card className="rounded-[26px]">
               <CardHeader className="border-b"><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle>{selected.assetDescription || selected.entityAssetNumber || selected.recordNumber}</CardTitle><p className="mt-2 text-xs text-slate-500">المالك حسب سجل الأصول: {String(assetOwner(selected) || 'غير متوفر')} · رقم السجل: {selected.recordNumber}</p></div><Button variant="outline" onClick={() => navigate(`/accounting-transformation/${selected.id}`)}><Eye className="ml-2 h-4 w-4" />عرض السجل الأصلي</Button></div></CardHeader>
               <CardContent className="grid gap-4 p-5 lg:grid-cols-2">
