@@ -117,7 +117,12 @@ export const appendEvidenceHistoryFromChanges = <T extends EvidenceHistoryCompat
   at: string = new Date().toISOString(),
   actor?: EvidenceAuditActor | string
 ): T => {
-  const history = previous?.history ? [...previous.history] : [...(next.history || [])];
+  const previousHistory = [...(previous?.history || [])];
+  const previousIds = new Set(previousHistory.map((event) => event.id));
+  const pendingEvents = previous
+    ? (next.history || []).filter((event) => !previousIds.has(event.id))
+    : [...(next.history || [])];
+  const history = [...previousHistory, ...pendingEvents];
   const add = (event: EvidenceHistoryEvent) => history.push(event);
 
   if (!previous) {
@@ -201,31 +206,31 @@ export const getEvidenceDerivedMilestones = (
   const dueSoonAt = new Date(due);
   dueSoonAt.setDate(dueSoonAt.getDate() - EVIDENCE_ESCALATION_CONFIG.dueSoonDays);
   if (dueSoonAt <= effectiveEnd) {
-    events.push(createEvidenceHistoryEvent('note', `دخلت المهمة نطاق الاستحقاق القريب (خلال ${EVIDENCE_ESCALATION_CONFIG.dueSoonDays} أيام).`, {
+    events.push({ ...createEvidenceHistoryEvent('note', `دخلت المهمة نطاق الاستحقاق القريب (خلال ${EVIDENCE_ESCALATION_CONFIG.dueSoonDays} أيام).`, {
       at: dueSoonAt.toISOString(),
       actor: 'النظام',
       source: 'system',
-    }));
+    }), id: `system-due-soon-${entry.dueDate}` });
   }
 
   const overdueAt = new Date(due);
   overdueAt.setDate(overdueAt.getDate() + 1);
   if (overdueAt <= effectiveEnd) {
-    events.push(createEvidenceHistoryEvent('note', 'انتقلت المهمة إلى حالة متأخرة بعد تجاوز تاريخ الاستحقاق.', {
+    events.push({ ...createEvidenceHistoryEvent('note', 'انتقلت المهمة إلى حالة متأخرة بعد تجاوز تاريخ الاستحقاق.', {
       at: overdueAt.toISOString(),
       actor: 'النظام',
       source: 'system',
-    }));
+    }), id: `system-overdue-${entry.dueDate}` });
   }
 
   const criticalAt = new Date(due);
   criticalAt.setDate(criticalAt.getDate() + EVIDENCE_ESCALATION_CONFIG.criticalAfterDays);
   if (criticalAt <= effectiveEnd) {
-    events.push(createEvidenceHistoryEvent('note', `انتقلت المهمة إلى مستوى التصعيد «${EVIDENCE_ESCALATION_LABELS.critical}».`, {
+    events.push({ ...createEvidenceHistoryEvent('note', `انتقلت المهمة إلى مستوى التصعيد «${EVIDENCE_ESCALATION_LABELS.critical}».`, {
       at: criticalAt.toISOString(),
       actor: 'النظام',
       source: 'system',
-    }));
+    }), id: `system-critical-${entry.dueDate}` });
   }
   return events;
 };
