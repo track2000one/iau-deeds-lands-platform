@@ -3,8 +3,7 @@ import fs from 'node:fs';
 const patch = (file, transform) => {
   const before = fs.readFileSync(file, 'utf8');
   const after = transform(before);
-  if (after === before) throw new Error(`No changes applied to ${file}`);
-  fs.writeFileSync(file, after);
+  if (after !== before) fs.writeFileSync(file, after);
 };
 
 patch('src/app/routes.tsx', (text) => {
@@ -43,4 +42,4 @@ patch('src/app/pages/AccountingTransformationDashboardPage.tsx', (text) => {
   return next;
 });
 
-console.log('Property control indicators integration applied.');
+console.log('Property control indicators integration checked.');
