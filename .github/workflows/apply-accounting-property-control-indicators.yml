@@ -1,0 +1,40 @@
+name: Apply Accounting Property Control Indicators
+
+on:
+  push:
+    branches:
+      - feat/accounting-property-control-indicators
+    paths:
+      - 'src/app/pages/AccountingPropertyControlIndicatorsPage.tsx'
+      - 'scripts/apply-accounting-property-control-indicators.mjs'
+      - '.github/workflows/apply-accounting-property-control-indicators.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/accounting-property-control-indicators
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-accounting-property-control-indicators.mjs
+      - run: npm run build
+      - name: Commit integration changes
+        run: |
+          if git diff --quiet; then
+            echo "No integration changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "4189824+github-actions[bot]@users.noreply.github.com"
+          git add src/app/routes.tsx src/app/pages/AccountingTransformationDashboardPage.tsx
+          git commit -m "Integrate property control indicators workspace"
+          git push
