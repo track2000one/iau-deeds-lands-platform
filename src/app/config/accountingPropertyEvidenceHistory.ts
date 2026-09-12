@@ -1,10 +1,9 @@
 import type { PropertyEvidenceStatus } from './accountingPropertyEvidenceRequirements';
 import {
+  EVIDENCE_ESCALATION_CONFIG,
   EVIDENCE_ESCALATION_LABELS,
   EVIDENCE_FOLLOW_UP_STATUS_LABELS,
   EVIDENCE_PRIORITY_LABELS,
-  getEvidenceEscalationLevel,
-  type EvidenceEscalationLevel,
   type EvidenceFollowUpPriority,
   type EvidenceFollowUpStatus,
 } from './accountingPropertyEvidenceFollowUp';
@@ -138,17 +137,19 @@ export const getEvidenceDerivedMilestones = (
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))[0];
   const effectiveEnd = closedEvent ? new Date(closedEvent.at) : now;
   const events: EvidenceHistoryEvent[] = [];
+
   const dueSoonAt = new Date(due);
-  dueSoonAt.setDate(dueSoonAt.getDate() - 7);
+  dueSoonAt.setDate(dueSoonAt.getDate() - EVIDENCE_ESCALATION_CONFIG.dueSoonDays);
   if (dueSoonAt <= effectiveEnd) {
     events.push({
       id: `system-due-soon-${entry.dueDate}`,
       type: 'note',
       at: dueSoonAt.toISOString(),
       actor: 'النظام',
-      summary: 'دخلت المهمة نطاق الاستحقاق القريب (خلال 7 أيام).',
+      summary: `دخلت المهمة نطاق الاستحقاق القريب (خلال ${EVIDENCE_ESCALATION_CONFIG.dueSoonDays} أيام).`,
     });
   }
+
   const overdueAt = new Date(due);
   overdueAt.setDate(overdueAt.getDate() + 1);
   if (overdueAt <= effectiveEnd) {
@@ -160,10 +161,10 @@ export const getEvidenceDerivedMilestones = (
       summary: 'انتقلت المهمة إلى حالة متأخرة بعد تجاوز تاريخ الاستحقاق.',
     });
   }
+
   const criticalAt = new Date(due);
-  criticalAt.setDate(criticalAt.getDate() + 14);
-  const escalation: EvidenceEscalationLevel = getEvidenceEscalationLevel(entry.status || 'missing', entry.dueDate, entry.followUpStatus, effectiveEnd);
-  if (criticalAt <= effectiveEnd && escalation === 'critical') {
+  criticalAt.setDate(criticalAt.getDate() + EVIDENCE_ESCALATION_CONFIG.criticalAfterDays);
+  if (criticalAt <= effectiveEnd) {
     events.push({
       id: `system-critical-${entry.dueDate}`,
       type: 'note',
