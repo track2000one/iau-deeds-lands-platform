@@ -58,6 +58,7 @@ const AccountingTransformationImportPage = lazy(() => import('./pages/Accounting
 const AccountingTransformationReportsPage = lazy(() => import('./pages/AccountingTransformationReportsPage').then((m) => ({ default: m.AccountingTransformationReportsPage })));
 const AccountingTransformationCyclesPage = lazy(() => import('./pages/AccountingTransformationCyclesPage').then((m) => ({ default: m.AccountingTransformationCyclesPage })));
 const AccountingAssetClassificationPage = lazy(() => import('./pages/AccountingAssetClassificationPage').then((m) => ({ default: m.AccountingAssetClassificationPage })));
+const AccountingPropertyControlIndicatorsPage = lazy(() => import('./pages/AccountingPropertyControlIndicatorsPage').then((m) => ({ default: m.AccountingPropertyControlIndicatorsPage })));
 
 const LoadingPage = () => (
   <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">جارٍ فتح الصفحة...</div>
@@ -173,6 +174,7 @@ export const router = createHashRouter([
           { path: 'reports', element: accountingTransformationPermission(<AccountingTransformationReportsPage />, 'canView') },
           { path: 'cycles', element: accountingTransformationPermission(<AccountingTransformationCyclesPage />, 'canView') },
           { path: 'asset-classification', element: accountingTransformationPermission(<AccountingAssetClassificationPage />, 'canView') },
+          { path: 'control-indicators', element: accountingTransformationPermission(<AccountingPropertyControlIndicatorsPage />, 'canView') },
           { path: ':recordId/edit', element: accountingTransformationPermission(<AccountingTransformationFormPage />, 'canEdit') },
           { path: ':recordId', element: accountingTransformationPermission(<AccountingTransformationViewPage />, 'canView') },
         ],

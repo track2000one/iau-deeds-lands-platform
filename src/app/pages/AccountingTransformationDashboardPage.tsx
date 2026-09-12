@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   BarChart3, Boxes, Building2, CheckCircle2, ClipboardCheck, FileSearch, FileSpreadsheet,
-  LandPlot, ListChecks, History, RefreshCcw, PlusCircle, Scale, Sparkles, Tags, TriangleAlert,
+  LandPlot, ListChecks, History, RefreshCcw, PlusCircle, Scale, ShieldCheck, Sparkles, Tags, TriangleAlert,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -19,6 +19,7 @@ const quickActions = [
   { label: 'جميع السجلات', description: 'استعراض سجل الأصول الثابتة الموحد ومصادر الأراضي والمباني التاريخية.', path: '/accounting-transformation/records', icon: FileSearch },
   { label: 'دورات تحديث البيانات', description: 'مصالحة ملفات الإدارات مع الإصدار السابق قبل المراجعة والاعتماد.', path: '/accounting-transformation/cycles', icon: History },
   { label: 'تصنيف وترميز الأصول', description: 'المرجع الرسمي للترميز والحسابات والأعمار الإنتاجية وحدود الرسملة.', path: '/accounting-transformation/asset-classification', icon: Tags },
+  { label: 'مؤشرات السيطرة على العقارات', description: 'تحليل العقارات التي يكون مالك الأصل فيها خلاف الجامعة وتوثيق المستندات والمعالجة قبل الاعتماد.', path: '/accounting-transformation/control-indicators', icon: ShieldCheck },
   { label: 'إضافة سجل', description: 'إدخال يدوي عند الحاجة؛ المسار المفضل للتحديثات الجماعية هو نموذج ب عبر دورة تحديث.', path: '/accounting-transformation/new', icon: PlusCircle },
   { label: 'استيراد Excel', description: 'قراءة جميع أوراق الملف وربط نموذج ب والملفات القديمة بالسجل الرسمي.', path: '/accounting-transformation/import', icon: FileSpreadsheet },
   { label: 'التقارير', description: 'تقارير الحصر والجرد والتقييم وجودة واكتمال البيانات.', path: '/accounting-transformation/reports', icon: BarChart3 },
