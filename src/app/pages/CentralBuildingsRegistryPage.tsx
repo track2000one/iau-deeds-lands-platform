@@ -1,14 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import {
   Boxes,
   Building2,
   ChevronDown,
   ChevronUp,
+  Crosshair,
   Database,
   Landmark,
   Link2,
   MapPin,
+  MapPinned,
   Pencil,
   Plus,
   RefreshCw,
@@ -104,6 +108,17 @@ const linkedPrayerSiteCount = (building: MosqueBuilding) =>
   building._count?.sites ?? building.sites?.length ?? 0;
 
 const GROUP_BATCH_SIZE = 12;
+const DEFAULT_MAP_CENTER: [number, number] = [26.4207, 50.0888];
+
+const parseCoordinate = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const isValidLatitude = (value: number) => value >= -90 && value <= 90;
+const isValidLongitude = (value: number) => value >= -180 && value <= 180;
 
 export const CentralBuildingsRegistryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -130,6 +145,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const [migrating, setMigrating] = useState(false);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [editingBuilding, setEditingBuilding] =
     useState<MosqueBuilding | null>(null);
   const [form, setForm] = useState<BuildingForm>(EMPTY_FORM);
@@ -303,6 +320,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const openCreate = () => {
     setEditingBuilding(null);
     setForm(EMPTY_FORM);
+    setMapPickerOpen(false);
     setFormOpen(true);
   };
 
@@ -317,7 +335,46 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       latitude: building.latitude == null ? '' : String(building.latitude),
       longitude: building.longitude == null ? '' : String(building.longitude),
     });
+    setMapPickerOpen(false);
     setFormOpen(true);
+  };
+
+  const mapPosition = useMemo<[number, number] | null>(() => {
+    const latitude = parseCoordinate(form.latitude);
+    const longitude = parseCoordinate(form.longitude);
+    if (latitude == null || longitude == null) return null;
+    if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) return null;
+    return [latitude, longitude];
+  }, [form.latitude, form.longitude]);
+
+  const selectMapPosition = (latitude: number, longitude: number) => {
+    setForm((prev) => ({
+      ...prev,
+      latitude: latitude.toFixed(6),
+      longitude: longitude.toFixed(6),
+    }));
+  };
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('المتصفح لا يدعم تحديد الموقع الحالي');
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        selectMapPosition(position.coords.latitude, position.coords.longitude);
+        setMapPickerOpen(true);
+        setLocating(false);
+        toast.success('تم تحديد موقعك الحالي على الخريطة');
+      },
+      () => {
+        setLocating(false);
+        toast.error('تعذر الحصول على الموقع الحالي. تحقق من سماح المتصفح بالوصول للموقع.');
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+    );
   };
 
   const saveBuilding = async () => {
@@ -325,6 +382,17 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     const name = form.name.trim();
     if (!buildingNumber || !name) {
       toast.error('رقم المبنى واسم المبنى حقول مطلوبة');
+      return;
+    }
+
+    const latitude = parseCoordinate(form.latitude);
+    const longitude = parseCoordinate(form.longitude);
+    if (form.latitude.trim() && (latitude == null || !isValidLatitude(latitude))) {
+      toast.error('خط العرض غير صحيح. يجب أن يكون بين -90 و 90.');
+      return;
+    }
+    if (form.longitude.trim() && (longitude == null || !isValidLongitude(longitude))) {
+      toast.error('خط الطول غير صحيح. يجب أن يكون بين -180 و 180.');
       return;
     }
 
@@ -344,8 +412,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       campusLocation: form.campusLocation.trim() || null,
       city: form.city.trim() || null,
       district: form.district.trim() || null,
-      latitude: safeNumber(form.latitude),
-      longitude: safeNumber(form.longitude),
+      latitude,
+      longitude,
     };
 
     try {
@@ -769,6 +837,85 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                 onChange={(event) => setForm((prev) => ({ ...prev, longitude: event.target.value }))}
               />
             </Field>
+
+            <div className="md:col-span-2 rounded-2xl border bg-muted/20 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 font-black">
+                    <MapPinned className="h-4 w-4 text-primary" />
+                    تحديد موقع المبنى من الخريطة
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    افتح الخريطة ثم انقر على موقع المبنى؛ يتم تعبئة خط العرض وخط الطول تلقائيًا.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={useCurrentLocation}
+                    disabled={locating}
+                  >
+                    <Crosshair className={`h-4 w-4 ${locating ? 'animate-pulse' : ''}`} />
+                    {locating ? 'جاري التحديد...' : 'موقعي الحالي'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={mapPickerOpen ? 'secondary' : 'outline'}
+                    onClick={() => setMapPickerOpen((value) => !value)}
+                  >
+                    <MapPinned className="h-4 w-4" />
+                    {mapPickerOpen ? 'إخفاء الخريطة' : 'تحديد من الخريطة'}
+                  </Button>
+                </div>
+              </div>
+
+              {mapPickerOpen && (
+                <div className="mt-3 overflow-hidden rounded-2xl border bg-background">
+                  <div className="border-b bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    انقر على الخريطة لتثبيت موقع المبنى. يمكنك التكبير والتحريك للوصول إلى الموقع بدقة.
+                  </div>
+                  <MapContainer
+                    center={mapPosition || DEFAULT_MAP_CENTER}
+                    zoom={mapPosition ? 17 : 12}
+                    scrollWheelZoom
+                    className="h-[340px] w-full"
+                    style={{ zIndex: 0 }}
+                  >
+                    <TileLayer
+                      attribution='&copy; OpenStreetMap contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <MapClickSelector onPick={selectMapPosition} />
+                    <MapCenterSync position={mapPosition} />
+                    {mapPosition && (
+                      <CircleMarker
+                        center={mapPosition}
+                        radius={9}
+                        pathOptions={{ color: '#0f766e', fillColor: '#14b8a6', fillOpacity: 0.9, weight: 3 }}
+                      />
+                    )}
+                  </MapContainer>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-xs">
+                    <span className="text-muted-foreground">
+                      {mapPosition
+                        ? `الموقع المحدد: ${mapPosition[0].toFixed(6)} ، ${mapPosition[1].toFixed(6)}`
+                        : 'لم يتم تحديد موقع بعد'}
+                    </span>
+                    {mapPosition && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setForm((prev) => ({ ...prev, latitude: '', longitude: '' }))}
+                      >
+                        مسح الموقع
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter className="gap-2 sm:justify-start">
@@ -800,6 +947,23 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       </AlertDialog>
     </div>
   );
+};
+
+const MapClickSelector = ({ onPick }: { onPick: (latitude: number, longitude: number) => void }) => {
+  useMapEvents({
+    click(event) {
+      onPick(event.latlng.lat, event.latlng.lng);
+    },
+  });
+  return null;
+};
+
+const MapCenterSync = ({ position }: { position: [number, number] | null }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (position) map.setView(position, Math.max(map.getZoom(), 16), { animate: true });
+  }, [map, position]);
+  return null;
 };
 
 const StatCard = ({
