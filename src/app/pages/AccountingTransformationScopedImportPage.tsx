@@ -367,9 +367,17 @@ export const AccountingTransformationScopedImportPage: React.FC = () => {
         ? ` تم التعرف على ${analyzed.modelBSheets.length.toLocaleString('ar-SA')} ورقة وفق نموذج ب ${MODEL_B_VERSION}.`
         : '';
       const intakeMessage = `اكتمل التحليل بالخلفية دون حجز واجهة المستخدم: ${analyzed.inspection.sheets.length.toLocaleString('ar-SA')} ورقة؛ ${mappedCount.toLocaleString('ar-SA')} مرتبطة بالمخطط الرسمي و${unmappedCount.toLocaleString('ar-SA')} ورقة إضافية/مرجعية.${modelBText}`;
+      const consultantReview = analyzed.consultantReview;
+      const consultantText = ` فحص ملاحظات الاستشاري: ${consultantReview.checkedBuildingRows.toLocaleString('ar-SA')} سجل مبنى، ${consultantReview.errorCount.toLocaleString('ar-SA')} خطأ مانع، ${consultantReview.warningCount.toLocaleString('ar-SA')} تنبيه، وتم توحيد ${consultantReview.normalizedCells.toLocaleString('ar-SA')} خلية آليًا.`;
+
+      if (consultantReview.errorCount > 0) {
+        setMessage(`${intakeMessage}${consultantText} تم إيقاف الاستيراد حتى معالجة الأخطاء المانعة.`);
+        toast.error(`يوجد ${consultantReview.errorCount.toLocaleString('ar-SA')} خطأ مانع وفق قواعد ملاحظات الاستشاري. راجع الملف قبل الاستيراد.`);
+        return;
+      }
 
       if (!parsed.length) {
-        setMessage(`${intakeMessage} لم تُكتب أي بيانات لأن النظام لم يجد سجلات يمكن ربطها آليًا.`);
+        setMessage(`${intakeMessage}${consultantText} لم تُكتب أي بيانات لأن النظام لم يجد سجلات يمكن ربطها آليًا.`);
         toast.warning('تمت قراءة الملف، ولكن لا توجد سجلات قابلة للربط الآلي');
         return;
       }
