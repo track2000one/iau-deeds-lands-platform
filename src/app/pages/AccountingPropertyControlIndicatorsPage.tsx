@@ -35,11 +35,13 @@ import {
   type PropertyEvidenceStatus,
 } from '../config/accountingPropertyEvidenceRequirements';
 import {
+  EVIDENCE_ESCALATION_LABELS,
   EVIDENCE_FOLLOW_UP_STATUS_LABELS,
   EVIDENCE_PRIORITY_LABELS,
   defaultFollowUpStatus,
   evidenceDaysPastDue,
   evidenceDueSoon,
+  getEvidenceEscalationLevel,
   isEvidenceTaskOverdue,
   type EvidenceFollowUpPriority,
   type EvidenceFollowUpStatus,
@@ -276,7 +278,8 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
     const overdue = isEvidenceTaskOverdue(status, saved?.dueDate, followUpStatus);
     const daysPastDue = overdue ? evidenceDaysPastDue(saved?.dueDate) : 0;
     const dueSoon = evidenceDueSoon(status, saved?.dueDate, followUpStatus);
-    return { requirement, saved, attachment: linkedAttachment, status, followUpStatus, overdue, daysPastDue, dueSoon };
+    const escalation = getEvidenceEscalationLevel(status, saved?.dueDate, followUpStatus);
+    return { requirement, saved, attachment: linkedAttachment, status, followUpStatus, overdue, daysPastDue, dueSoon, escalation };
   }), [analysis.evidenceChecklist, attachments, evidenceRequirements]);
   const evidenceCompletionPercent = evidenceRows.length
     ? Math.round(evidenceRows.reduce((sum, row) => sum + (row.status === 'available' ? 1 : row.status === 'needs_update' ? 0.5 : 0), 0) / evidenceRows.length * 100)
@@ -480,7 +483,7 @@ export const AccountingPropertyControlIndicatorsPage: React.FC = () => {
                     <div key={requirement.key} className="rounded-2xl border bg-white p-4 shadow-sm">
                       <div className="grid gap-3 lg:grid-cols-[1fr_180px_auto] lg:items-center">
                         <div>
-                          <p className="font-black text-slate-900">{requirement.label}</p>
+                          <div className="flex flex-wrap items-center gap-2"><p className="font-black text-slate-900">{requirement.label}</p>{status !== 'available' && <Badge variant="outline" className={escalation === 'critical' ? 'border-red-500 bg-red-100 text-red-950' : escalation === 'overdue' ? 'border-red-200 bg-red-50 text-red-800' : escalation === 'due_soon' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-slate-50 text-slate-700'}>{EVIDENCE_ESCALATION_LABELS[escalation]}</Badge>}</div>
                           <p className="mt-1 text-[11px] leading-5 text-slate-500">{requirement.description}</p>
                           {attachment && <p className="mt-2 text-[11px] font-bold text-emerald-700">المرفق المرتبط: {attachment.title}</p>}
                           {!attachment && status === 'available' && <p className="mt-2 text-[11px] font-bold text-amber-700">الحالة «متوفر» ولكن لا يوجد ملف مرفوع مرتبط بهذه الخانة.</p>}
