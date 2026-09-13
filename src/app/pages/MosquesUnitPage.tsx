@@ -1897,6 +1897,8 @@ ${quranStockMovementForm.notes}` : ''}`
     );
   }, [updateBuildingCoordinates]);
 
+  // MOSQUE_BUILDING_PUT_PAYLOAD_FIX_V1
+  // The buildings endpoint uses PUT and requires buildingNumber even when only coverage fields change.
   const saveBuilding = async () => {
     if (!editingBuilding) return toast.error('تعريف المبنى وتعديل بياناته الأساسية يتم من السجل المركزي للمباني');
     if (buildingForm.creationFeasibility === 'unavailable' && !String(buildingForm.unavailableReason || '').trim()) {
@@ -1905,6 +1907,7 @@ ${quranStockMovementForm.notes}` : ''}`
     setSaving(true);
     try {
       await mosqueApi.updateBuilding(editingBuilding.id, {
+        buildingNumber: editingBuilding.buildingNumber,
         expectedUsers: buildingForm.expectedUsers === '' ? null : Number(buildingForm.expectedUsers),
         coverageStatus: buildingForm.coverageStatus,
         creationFeasibility: buildingForm.creationFeasibility,
@@ -1955,7 +1958,10 @@ ${quranStockMovementForm.notes}` : ''}`
 
     setSaving(true);
     try {
-      await mosqueApi.updateBuilding(building.id, { coverageStatus: nextCoverageStatus });
+      await mosqueApi.updateBuilding(building.id, {
+        buildingNumber: building.buildingNumber,
+        coverageStatus: nextCoverageStatus,
+      });
       toast.success('تم إثبات عدم وجود مصلى في المبنى ضمن ملف خدمة الصلاة، دون إنشاء موقع وهمي');
       setSiteDialog(false);
       setBuildingDialog(false);
@@ -2094,7 +2100,12 @@ ${quranStockMovementForm.notes}` : ''}`
         ? await mosqueApi.updateSite(editingSite.id, payload)
         : await mosqueApi.createSite(payload);
       if (linkedBuilding && savedSite.status !== 'temporarily_closed' && linkedBuilding.coverageStatus !== 'covered') {
-        try { await mosqueApi.updateBuilding(linkedBuilding.id, { coverageStatus: 'covered' }); }
+        try {
+          await mosqueApi.updateBuilding(linkedBuilding.id, {
+            buildingNumber: linkedBuilding.buildingNumber,
+            coverageStatus: 'covered',
+          });
+        }
         catch { /* حفظ المصلى نجح؛ تحديث مؤشر التغطية يعاد احتسابه عند المراجعة التالية إن تعذر الطلب */ }
       }
       toast.success(editingSite ? 'تم تحديث بيانات الموقع والمرفقات' : 'تمت إضافة الموقع والمرفقات وإنشاء QR تلقائيًا');
