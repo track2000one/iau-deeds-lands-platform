@@ -1909,7 +1909,7 @@ ${quranStockMovementForm.notes}` : ''}`
   const selectedSiteBuilding = officialBuildings.find((building) => building.id === siteForm.buildingId) || null;
   const selectedBuildingHasMen = Boolean(selectedSiteBuilding?.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'men' && site.status !== 'temporarily_closed'));
   const selectedBuildingHasWomen = Boolean(selectedSiteBuilding?.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'women' && site.status !== 'temporarily_closed'));
-  const duplicatePrayerRoom = siteForm.spatialRelation === 'inside_building' && siteForm.siteType === 'prayer_room' && siteForm.buildingId && siteForm.prayerRoomGender
+  const duplicatePrayerRoom = siteForm.spatialRelation === 'inside_building' && siteForm.buildingId && siteForm.prayerRoomGender
     ? sites.find((site) => site.id !== editingSite?.id && site.buildingId === siteForm.buildingId && site.siteType === 'prayer_room' && site.prayerRoomGender === siteForm.prayerRoomGender) || null
     : null;
 
@@ -1973,13 +1973,14 @@ ${quranStockMovementForm.notes}` : ''}`
 
   const saveSite = async () => {
     if (!siteForm.name.trim()) return toast.error('اسم المسجد أو المصلى مطلوب');
-    if (siteForm.siteType === 'prayer_room' && !siteForm.prayerRoomGender) return toast.error('حدد فئة المصلى: رجال أو نساء');
+    const effectiveSiteType = siteForm.spatialRelation === 'inside_building' ? 'prayer_room' : siteForm.siteType;
+    if (effectiveSiteType === 'prayer_room' && !siteForm.prayerRoomGender) return toast.error('حدد فئة المصلى: رجال أو نساء');
     if (siteForm.spatialRelation === 'inside_building' && !siteForm.buildingId) return toast.error('اختر رقم المبنى للموقع الموجود داخل مبنى');
     const linkedBuilding = siteForm.spatialRelation === 'inside_building'
       ? officialBuildings.find((building) => building.id === siteForm.buildingId) || null
       : null;
     if (siteForm.spatialRelation === 'inside_building' && !linkedBuilding) return toast.error('المبنى المحدد غير موجود أو غير معتمد في السجل المركزي');
-    if (siteForm.spatialRelation === 'inside_building' && siteForm.siteType === 'prayer_room' && siteForm.prayerRoomGender) {
+    if (siteForm.spatialRelation === 'inside_building' && siteForm.prayerRoomGender) {
       const duplicate = sites.find((site) =>
         site.id !== editingSite?.id &&
         site.buildingId === siteForm.buildingId &&
@@ -2011,6 +2012,7 @@ ${quranStockMovementForm.notes}` : ''}`
       const effectiveLongitude = linkedBuilding ? linkedBuilding.longitude ?? null : (siteForm.longitude === '' ? null : Number(siteForm.longitude));
       const payload = {
         ...siteForm,
+        siteType: effectiveSiteType,
         spatialRelation: siteForm.spatialRelation || 'independent',
         buildingId: linkedBuilding?.id || null,
         floor: linkedBuilding ? (siteForm.floor || null) : null,
@@ -2022,7 +2024,7 @@ ${quranStockMovementForm.notes}` : ''}`
         imamName: null,
         muezzinName: null,
         khateebName: null,
-        prayerRoomGender: siteForm.siteType === 'prayer_room' ? siteForm.prayerRoomGender : null,
+        prayerRoomGender: effectiveSiteType === 'prayer_room' ? siteForm.prayerRoomGender : null,
         area: siteForm.area === '' ? null : Number(siteForm.area),
         capacity: siteForm.capacity === '' ? null : Number(siteForm.capacity),
         quranTargetCount: siteForm.quranTargetCount === '' ? null : Number(siteForm.quranTargetCount),
@@ -3182,15 +3184,30 @@ ${quranStockMovementForm.notes}` : ''}`
               <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><FileText className="h-5 w-5" />المعلومات الأساسية</CardTitle><CardDescription>تعريف المسجد أو الجامع أو المصلى وحالته وموقعه الإداري داخل الجامعة.</CardDescription></CardHeader>
               <CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2 lg:grid-cols-3">
                 <Field label="اسم المسجد / الجامع / المصلى *"><Input className="h-11" autoFocus value={siteForm.name} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} placeholder="مثال: مسجد الحرم الجامعي" /></Field>
-                <Field label="النوع"><NativeSelect className="h-11" value={siteForm.siteType} onChange={(e) => setSiteForm({ ...siteForm, siteType: e.target.value, prayerRoomGender: e.target.value === 'prayer_room' ? siteForm.prayerRoomGender : '' })}><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect></Field>
+                <Field label="النوع">
+                  {siteForm.spatialRelation === 'inside_building'
+                    ? <div className="space-y-1"><Input className="h-11 bg-emerald-50 font-bold text-emerald-800" readOnly value="مصلى" /><p className="text-[11px] leading-5 text-emerald-700">داخل المباني الجامعية يسمح بتسجيل المصليات فقط، ولا يمكن إنشاء مسجد أو جامع داخل المبنى.</p></div>
+                    : <NativeSelect className="h-11" value={siteForm.siteType} onChange={(e) => setSiteForm({ ...siteForm, siteType: e.target.value, prayerRoomGender: e.target.value === 'prayer_room' ? siteForm.prayerRoomGender : '' })}><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect>}
+                </Field>
                 {siteForm.siteType === 'prayer_room' && <Field label="فئة المصلى *"><NativeSelect className="h-11" value={siteForm.prayerRoomGender || ''} onChange={(e) => setSiteForm({ ...siteForm, prayerRoomGender: e.target.value })}><option value="">اختر الفئة</option><option value="men">رجال</option><option value="women">نساء</option></NativeSelect></Field>}
-                <Field label="الارتباط المكاني *"><NativeSelect className="h-11" value={siteForm.spatialRelation || 'independent'} onChange={(e) => setSiteForm({ ...siteForm, spatialRelation: e.target.value, buildingId: e.target.value === 'inside_building' ? siteForm.buildingId : '', floor: e.target.value === 'inside_building' ? siteForm.floor : '', roomNumber: e.target.value === 'inside_building' ? siteForm.roomNumber : '' })}><option value="independent">موقع مستقل</option><option value="inside_building">داخل مبنى جامعي</option></NativeSelect></Field>
+                <Field label="الارتباط المكاني *"><NativeSelect className="h-11" value={siteForm.spatialRelation || 'independent'} onChange={(e) => {
+                  const insideBuilding = e.target.value === 'inside_building';
+                  setSiteForm({
+                    ...siteForm,
+                    spatialRelation: e.target.value,
+                    siteType: insideBuilding ? 'prayer_room' : siteForm.siteType,
+                    prayerRoomGender: insideBuilding ? siteForm.prayerRoomGender : siteForm.prayerRoomGender,
+                    buildingId: insideBuilding ? siteForm.buildingId : '',
+                    floor: insideBuilding ? siteForm.floor : '',
+                    roomNumber: insideBuilding ? siteForm.roomNumber : '',
+                  });
+                }}><option value="independent">موقع مستقل</option><option value="inside_building">داخل مبنى جامعي — مصلى فقط</option></NativeSelect></Field>
                 {siteForm.spatialRelation === 'inside_building' && <>
                   <Field label="رقم المبنى * — من السجل المركزي"><NativeSelect className="h-11" value={siteForm.buildingId || ''} onChange={(e) => setSiteForm({ ...siteForm, buildingId: e.target.value })}><option value="">اختر المبنى المعتمد</option>{officialBuildings.map((building) => <option key={building.id} value={building.id}>{building.buildingNumber}{building.name ? (' — ' + building.name) : ''}</option>)}</NativeSelect></Field>
                   <Field label="الدور"><Input className="h-11" value={siteForm.floor || ''} onChange={(e) => setSiteForm({ ...siteForm, floor: e.target.value })} placeholder="مثال: الأرضي" /></Field>
                   <Field label="رقم الغرفة / الموقع الداخلي"><Input className="h-11" value={siteForm.roomNumber || ''} onChange={(e) => setSiteForm({ ...siteForm, roomNumber: e.target.value })} placeholder="مثال: 012 أو الجناح الشرقي" /></Field>
                 </>}
-                {siteForm.spatialRelation === 'inside_building' && selectedSiteBuilding && <div className="md:col-span-2 lg:col-span-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-3"><div className="flex flex-wrap items-center gap-2 text-sm"><b>المبنى {selectedSiteBuilding.buildingNumber}</b><Badge variant="outline" className={selectedBuildingHasMen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-50 text-amber-700'}>مصلى رجال: {selectedBuildingHasMen ? 'موجود' : 'غير موجود'}</Badge><Badge variant="outline" className={selectedBuildingHasWomen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-50 text-amber-700'}>مصلى نساء: {selectedBuildingHasWomen ? 'موجود' : 'غير موجود'}</Badge><Badge variant="outline">{buildingFeasibilityLabels[selectedSiteBuilding.creationFeasibility] || selectedSiteBuilding.creationFeasibility}</Badge></div><p className="mt-2 text-xs text-slate-600">يعرض النظام المواقع المرتبطة بهذا المبنى لتفادي التكرار. المدينة والحي والحرم والإحداثيات تورث تلقائيًا من السجل المركزي ولا تعدل من هنا.</p></div>}{duplicatePrayerRoom && <div className="md:col-span-2 lg:col-span-3 rounded-2xl border border-red-300 bg-red-50 p-3 text-sm leading-6 text-red-800"><strong>لا يمكن إنشاء سجل مكرر:</strong> يوجد بالفعل مصلى {siteForm.prayerRoomGender === 'men' ? 'رجال' : 'نساء'} في هذا المبنى باسم «{duplicatePrayerRoom.name}». استخدم تعديل السجل الموجود بدل إنشاء مصلى آخر من الفئة نفسها.</div>}
+                {siteForm.spatialRelation === 'inside_building' && selectedSiteBuilding && <div className="md:col-span-2 lg:col-span-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-3"><div className="mb-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">المبنى الجامعي يرتبط بمصلى رجال و/أو مصلى نساء فقط. المسجد والجامع يسجلان كموقع مستقل.</div><div className="flex flex-wrap items-center gap-2 text-sm"><b>المبنى {selectedSiteBuilding.buildingNumber}</b><Badge variant="outline" className={selectedBuildingHasMen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-50 text-amber-700'}>مصلى رجال: {selectedBuildingHasMen ? 'موجود' : 'غير موجود'}</Badge><Badge variant="outline" className={selectedBuildingHasWomen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-50 text-amber-700'}>مصلى نساء: {selectedBuildingHasWomen ? 'موجود' : 'غير موجود'}</Badge><Badge variant="outline">{buildingFeasibilityLabels[selectedSiteBuilding.creationFeasibility] || selectedSiteBuilding.creationFeasibility}</Badge></div><p className="mt-2 text-xs text-slate-600">يعرض النظام المواقع المرتبطة بهذا المبنى لتفادي التكرار. المدينة والحي والحرم والإحداثيات تورث تلقائيًا من السجل المركزي ولا تعدل من هنا.</p></div>}{duplicatePrayerRoom && <div className="md:col-span-2 lg:col-span-3 rounded-2xl border border-red-300 bg-red-50 p-3 text-sm leading-6 text-red-800"><strong>لا يمكن إنشاء سجل مكرر:</strong> يوجد بالفعل مصلى {siteForm.prayerRoomGender === 'men' ? 'رجال' : 'نساء'} في هذا المبنى باسم «{duplicatePrayerRoom.name}». استخدم تعديل السجل الموجود بدل إنشاء مصلى آخر من الفئة نفسها.</div>}
                 <Field label="الحالة"><NativeSelect className="h-11" value={siteForm.status} onChange={(e) => setSiteForm({ ...siteForm, status: e.target.value })}><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect></Field>
                 <Field label={siteForm.spatialRelation === 'inside_building' ? 'المدينة — موروثة من السجل المركزي' : 'المدينة'}><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} value={siteForm.city} onChange={(e) => setSiteForm({ ...siteForm, city: e.target.value })} /></Field>
                 <Field label={siteForm.spatialRelation === 'inside_building' ? 'الحي — موروث من السجل المركزي' : 'الحي'}><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} value={siteForm.district} onChange={(e) => setSiteForm({ ...siteForm, district: e.target.value })} /></Field>
