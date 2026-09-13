@@ -40,6 +40,7 @@ export type EvidenceHistoryEvent = {
   actorRoleLabel?: string;
   actorContext?: string;
   source?: 'user' | 'system';
+  serverRecordedAt?: string;
   summary: string;
   from?: string;
   to?: string;
