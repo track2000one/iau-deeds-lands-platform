@@ -80,6 +80,9 @@ const RecordCard: React.FC<{
   onDelete: () => void;
 }> = ({ item, canEdit, canDelete, onView, onEdit, onDelete }) => {
   const { Icon, tone } = typeVisual(item.recordType);
+  const isLand = item.recordType === 'land';
+  const landDeedNumber = isLand ? String(item.payload?.AJ ?? '').trim() : '';
+  const landDeedDate = isLand ? String(item.payload?.AG ?? '').trim() : '';
   return (
     <article className="flex min-h-[322px] flex-col overflow-hidden rounded-[22px] border-[1.5px] border-[#17395f]/75 bg-[linear-gradient(145deg,#fff_0%,#fbfdff_55%,#edf3f8_100%)] shadow-[0_10px_0_rgba(13,48,82,.09),0_17px_30px_rgba(15,42,70,.10)] transition duration-200 hover:-translate-y-1">
       <div className="flex items-start justify-between gap-3 border-b border-slate-200/80 bg-white/65 p-4">
@@ -89,8 +92,8 @@ const RecordCard: React.FC<{
       <div className="grid flex-1 gap-4 p-4">
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-xl border bg-white/70 p-3"><span className="text-slate-500">نوع السجل</span><p className="mt-1 font-bold text-slate-800">{getAccountingRecordTypeLabel(item.recordType)}</p></div>
-          <div className="rounded-xl border bg-white/70 p-3"><span className="text-slate-500">رقم الأصل بالجهة</span><p className="mt-1 truncate font-bold text-slate-800">{item.entityAssetNumber || '-'}</p></div>
-          <div className="rounded-xl border bg-white/70 p-3"><span className="text-slate-500">المدينة</span><p className="mt-1 truncate font-bold text-slate-800">{item.city || '-'}</p></div>
+          <div className="rounded-xl border bg-white/70 p-3"><span className="text-slate-500">{isLand ? 'رقم الصك — AJ' : 'رقم الأصل بالجهة'}</span><p className="mt-1 truncate font-bold text-slate-800">{isLand ? (landDeedNumber || '-') : (item.entityAssetNumber || '-')}</p></div>
+          <div className="rounded-xl border bg-white/70 p-3"><span className="text-slate-500">{isLand ? 'تاريخ الصك — AG' : 'المدينة'}</span><p className="mt-1 truncate font-bold text-slate-800">{isLand ? (landDeedDate || '-') : (item.city || '-')}</p></div>
           <div className="rounded-xl border bg-white/70 p-3"><span className="text-slate-500">رمز الأصل المحاسبي</span><p className="mt-1 truncate font-bold text-slate-800">{item.accountingAssetCode || '-'}</p></div>
         </div>
         <div className="space-y-2 rounded-2xl border bg-white/65 p-3"><ProgressMini label="الحصر" value={item.censusProgress} /><ProgressMini label="الجرد" value={item.inventoryProgress} /><ProgressMini label="التقييم" value={item.valuationProgress} /></div>
