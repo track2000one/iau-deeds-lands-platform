@@ -125,7 +125,9 @@ const comparisonMessage = (previewInput: AccountingTransformationImportPreview) 
 
 const sourceBadge = (item: PreviewItem) => item.recordType === 'fixed_asset'
   ? { label: `مخطط نموذج ب ${MODEL_B_VERSION}`, className: 'border-violet-300 bg-violet-50 text-violet-800' }
-  : { label: 'مصدر Legacy مرتبط بنيويًا', className: 'border-sky-300 bg-sky-50 text-sky-800' };
+  : item.recordType === 'land'
+    ? { label: 'هوية الأرض: رقم الصك AJ + تاريخ الصك AG', className: 'border-amber-300 bg-amber-50 text-amber-900' }
+    : { label: 'مصدر Legacy مرتبط بنيويًا', className: 'border-sky-300 bg-sky-50 text-sky-800' };
 
 export const AccountingTransformationResponsiveImportPage: React.FC = () => {
   const navigate = useNavigate();
@@ -480,13 +482,18 @@ export const AccountingTransformationResponsiveImportPage: React.FC = () => {
 
         <Card className="rounded-[24px]">
           <CardHeader><CardTitle>معاينة السجلات المرتبطة</CardTitle></CardHeader>
-          <CardContent><div className="overflow-x-auto rounded-xl border"><table className="w-full min-w-[1100px] text-xs"><thead className="bg-slate-50"><tr><th className="p-3 text-right">الحالة</th><th className="p-3 text-right">المصدر</th><th className="p-3 text-right">النوع</th><th className="p-3 text-right">صف Excel</th><th className="p-3 text-right">رقم الأصل</th><th className="p-3 text-right">وصف الأصل</th><th className="p-3 text-right">طريقة الربط</th></tr></thead><tbody>{currentRows.slice(0, 15).map((item, localIndex) => {
+          <CardContent><div className="overflow-x-auto rounded-xl border"><table className="w-full min-w-[1250px] text-xs"><thead className="bg-slate-50"><tr><th className="p-3 text-right">الحالة</th><th className="p-3 text-right">المصدر</th><th className="p-3 text-right">النوع</th><th className="p-3 text-right">صف Excel</th><th className="p-3 text-right">رقم الصك / الأصل</th><th className="p-3 text-right">تاريخ الصك</th><th className="p-3 text-right">وصف الأصل</th><th className="p-3 text-right">طريقة الربط</th></tr></thead><tbody>{currentRows.slice(0, 15).map((item, localIndex) => {
             const globalIndex = batchRange.start + localIndex;
             const status = statusForIndex(globalIndex);
             const source = sourceBadge(item);
-            const number = item.recordType === 'fixed_asset' ? String(item.payload.Y || item.payload.Z || item.payload.AB || '-') : String(item.payload.E || item.payload.D || '-');
+            const number = item.recordType === 'fixed_asset'
+              ? String(item.payload.Y || item.payload.Z || item.payload.AB || '-')
+              : item.recordType === 'land'
+                ? String(item.payload.AJ || '-')
+                : String(item.payload.E || item.payload.D || '-');
+            const deedDate = item.recordType === 'land' ? String(item.payload.AG || '-') : '-';
             const description = item.recordType === 'fixed_asset' ? String(item.payload.AA || '-') : String(item.payload.G || '-');
-            return <tr key={`${item.sourceSheet}-${item.sourceRow}-${globalIndex}`} className="border-t"><td className="p-3"><Badge variant="outline" className={status.className}>{status.label}</Badge></td><td className="p-3 font-bold">{item.sourceSheet}</td><td className="p-3">{recordTypeLabel(item.recordType)}</td><td className="p-3">{item.sourceRow}</td><td className="p-3">{number}</td><td className="max-w-[320px] truncate p-3">{description}</td><td className="p-3"><Badge variant="outline" className={source.className}>{source.label}</Badge></td></tr>;
+            return <tr key={`${item.sourceSheet}-${item.sourceRow}-${globalIndex}`} className="border-t"><td className="p-3"><Badge variant="outline" className={status.className}>{status.label}</Badge></td><td className="p-3 font-bold">{item.sourceSheet}</td><td className="p-3">{recordTypeLabel(item.recordType)}</td><td className="p-3">{item.sourceRow}</td><td className="p-3 font-bold">{number}</td><td className="p-3">{deedDate}</td><td className="max-w-[320px] truncate p-3">{description}</td><td className="p-3"><Badge variant="outline" className={source.className}>{source.label}</Badge></td></tr>;
           })}</tbody></table></div></CardContent>
         </Card>
 
