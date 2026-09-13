@@ -1,0 +1,43 @@
+name: Apply Accounting Evidence Audit Verification
+
+on:
+  push:
+    branches: [feat/accounting-evidence-audit-verification]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply verification integration
+        run: python3 scripts/apply-accounting-evidence-audit-verification.py
+      - name: Build frontend
+        run: npm run build
+      - name: Verify integration markers
+        run: |
+          grep -q "getAccountingEvidenceAuditMirror" src/app/api/accountingTransformation.ts
+          grep -q "verificationStatus" src/app/pages/AccountingPropertyEvidenceAuditPage.tsx
+          grep -q "serverRecordedAt" src/app/config/accountingPropertyEvidenceHistory.ts
+      - name: Remove temporary automation files
+        run: rm -f scripts/apply-accounting-evidence-audit-verification.py .github/workflows/apply-accounting-evidence-audit-verification.yml
+      - name: Commit integration changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Verify accounting evidence audit events against server mirror"
+            git push origin HEAD:feat/accounting-evidence-audit-verification
+          fi
