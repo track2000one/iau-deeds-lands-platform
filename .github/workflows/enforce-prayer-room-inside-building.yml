@@ -1,0 +1,41 @@
+name: Enforce Prayer Room Inside Building
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/enforce-prayer-room-inside-building.mjs'
+      - '.github/workflows/enforce-prayer-room-inside-building.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Sync latest main
+        run: git pull --rebase origin main
+      - run: node scripts/enforce-prayer-room-inside-building.mjs
+      - run: npm run build
+      - name: Commit and push changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/MosquesUnitPage.tsx
+          git commit -m "Restrict university buildings to prayer rooms"
+          git pull --rebase origin main
+          git push
