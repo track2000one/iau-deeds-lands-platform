@@ -51,6 +51,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { MosqueFieldVisitsPanel } from '../components/MosqueFieldVisitsPanel';
 import { MosqueReportsCenter } from '../components/MosqueReportsCenter';
+import { BuildingCoverageReportsDialog } from '../components/BuildingCoverageReportsDialog';
 import { isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
 import {
@@ -548,6 +549,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [leaveQuickFilter, setLeaveQuickFilter] = useState<'all' | 'pending'>('all');
 
   const [buildingDialog, setBuildingDialog] = useState(false);
+  const [buildingCoverageReportOpen, setBuildingCoverageReportOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<MosqueBuilding | null>(null);
   const [buildingForm, setBuildingForm] = useState<any>(emptyBuilding);
   const [showBuildingMap, setShowBuildingMap] = useState(false);
@@ -2780,7 +2782,10 @@ ${quranStockMovementForm.notes}` : ''}`
                 <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-sky-700" />تغطية المباني بخدمة الصلاة</CardTitle>
                 <CardDescription>ملف خدمة الصلاة للمباني المعرفة في السجل المركزي، مع توثيق وجود المصلى والاحتياج وإمكانية الإنشاء والبديل المعتمد.</CardDescription>
               </div>
-              <Button className={button3d} variant="outline" onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />السجل المركزي للمباني</Button>
+              <div className="flex flex-wrap gap-2">
+                {canPrint && <Button className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={() => setBuildingCoverageReportOpen(true)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />تقارير التغطية — PDF / Excel</Button>}
+                <Button className={button3d} variant="outline" onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />السجل المركزي للمباني</Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-7 text-sky-950 md:flex-row md:items-center md:justify-between">
@@ -3214,6 +3219,13 @@ ${quranStockMovementForm.notes}` : ''}`
           <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} disabled={mediaImportSaving} onClick={() => setMediaImportDialog(false)}>إلغاء</Button><Button className={'min-w-44 ' + button3d} disabled={mediaImportSaving || mediaImportStats.selected === 0} onClick={importSelectedMediaZip}>{mediaImportSaving ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}{mediaImportSaving ? 'جاري الاستيراد...' : `استيراد الملفات المحددة (${mediaImportStats.selected})`}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BuildingCoverageReportsDialog
+        open={buildingCoverageReportOpen}
+        onOpenChange={setBuildingCoverageReportOpen}
+        buildings={officialBuildings}
+        canPrint={canPrint}
+      />
 
       <Dialog open={buildingDialog} onOpenChange={setBuildingDialog}>
         <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[900px]" dir="rtl">
