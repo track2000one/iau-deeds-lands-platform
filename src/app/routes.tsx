@@ -61,6 +61,7 @@ const AccountingAssetClassificationPage = lazy(() => import('./pages/AccountingA
 const AccountingPropertyControlIndicatorsPage = lazy(() => import('./pages/AccountingPropertyControlIndicatorsPage').then((m) => ({ default: m.AccountingPropertyControlIndicatorsPage })));
 const AccountingPropertyEvidenceDashboardPage = lazy(() => import('./pages/AccountingPropertyEvidenceDashboardPage').then((m) => ({ default: m.AccountingPropertyEvidenceDashboardPage })));
 const AccountingPropertyEvidenceAuditPage = lazy(() => import('./pages/AccountingPropertyEvidenceAuditPage').then((m) => ({ default: m.AccountingPropertyEvidenceAuditPage })));
+const AccountingTransformationZeroResetPage = lazy(() => import('./pages/AccountingTransformationZeroResetPage').then((m) => ({ default: m.AccountingTransformationZeroResetPage })));
 
 const LoadingPage = () => (
   <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">جارٍ فتح الصفحة...</div>
@@ -179,6 +180,7 @@ export const router = createHashRouter([
           { path: 'control-indicators', element: accountingTransformationPermission(<AccountingPropertyControlIndicatorsPage />, 'canView') },
           { path: 'evidence-dashboard', element: accountingTransformationPermission(<AccountingPropertyEvidenceDashboardPage />, 'canView') },
           { path: 'evidence-audit', element: accountingTransformationPermission(<AccountingPropertyEvidenceAuditPage />, 'canView') },
+          { path: 'reset-data', element: adminOnly(<AccountingTransformationZeroResetPage />) },
           { path: ':recordId/edit', element: accountingTransformationPermission(<AccountingTransformationFormPage />, 'canEdit') },
           { path: ':recordId', element: accountingTransformationPermission(<AccountingTransformationViewPage />, 'canView') },
         ],
