@@ -47,6 +47,35 @@ export type AccountingTransformationHierarchyNode = AccountingTransformationGrou
   children: AccountingTransformationHierarchyLeaf[];
 };
 
+export type AccountingEvidenceAuditMirrorItem = {
+  id: string;
+  userId?: string | null;
+  username?: string | null;
+  userEmail?: string | null;
+  userRole?: string | null;
+  action: string;
+  module: string;
+  entity?: string | null;
+  entityId?: string | null;
+  entityLabel?: string | null;
+  status: string;
+  description?: string | null;
+  newData?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type AccountingEvidenceAuditMirrorPage = {
+  items: AccountingEvidenceAuditMirrorItem[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  truncated?: boolean;
+  readOnly?: boolean;
+  source?: string;
+};
+
 export type AccountingTransformationImportPreview = {
   total: number;
   fresh: number;
@@ -126,6 +155,8 @@ export const getAccountingTransformationRecords = (query: AccountingTransformati
   const suffix = params.toString();
   return apiJson<AccountingTransformationPage>(`/api/accounting-transformation${suffix ? `?${suffix}` : ''}`);
 };
+
+export const getAccountingEvidenceAuditMirror = () => apiJson<AccountingEvidenceAuditMirrorPage>('/api/accounting-transformation/evidence-audit-log?all=1');
 
 export const getAccountingTransformationRecord = (id: string) => apiJson<AccountingTransformationRecord>(`/api/accounting-transformation/${id}`);
 export const createAccountingTransformationRecord = (input: AccountingTransformationInput) => apiJson<AccountingTransformationRecord>('/api/accounting-transformation', { method: 'POST', body: JSON.stringify(input) });
