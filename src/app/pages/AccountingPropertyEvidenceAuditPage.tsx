@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useAuth } from '../../context/AuthContext';
 import {
   AlertTriangle,
   Bot,
@@ -27,6 +28,11 @@ import {
   getAccountingTransformationRecords,
   type AccountingEvidenceAuditMirrorItem,
 } from '../api/accountingTransformation';
+import {
+  backfillAccountingEvidenceAuditMissingMirrors,
+  getAccountingEvidenceAuditReconciliation,
+  type AccountingEvidenceAuditReconciliationResult,
+} from '../api/accountingEvidenceAuditReconciliation';
 import {
   findPropertyControlMemoProfile,
   PROPERTY_CONTROL_MEMO_PROFILES,
@@ -178,6 +184,8 @@ const csvCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}
 
 export const AccountingPropertyEvidenceAuditPage: React.FC = () => {
   const navigate = useNavigate();
+  const { userProfile } = useAuth();
+  const isAdmin = userProfile?.role === 'admin';
   const [records, setRecords] = useState<AccountingTransformationRecord[]>([]);
   const [auditMirror, setAuditMirror] = useState<AccountingEvidenceAuditMirrorItem[]>([]);
   const [mirrorConnected, setMirrorConnected] = useState(false);
@@ -192,6 +200,9 @@ export const AccountingPropertyEvidenceAuditPage: React.FC = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedKey, setSelectedKey] = useState('');
+  const [reconciliation, setReconciliation] = useState<AccountingEvidenceAuditReconciliationResult | null>(null);
+  const [reconciliationLoading, setReconciliationLoading] = useState(false);
+  const [backfillLoading, setBackfillLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -216,6 +227,47 @@ export const AccountingPropertyEvidenceAuditPage: React.FC = () => {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل السجل الرقابي لمستندات الإثبات');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const runDatabaseReconciliation = async () => {
+    if (!isAdmin) {
+      toast.error('فحص المطابقة الفعلية متاح لمسؤول النظام فقط');
+      return;
+    }
+    setReconciliationLoading(true);
+    try {
+      const result = await getAccountingEvidenceAuditReconciliation(500);
+      setReconciliation(result);
+      if (result.status === 'ok') toast.success('اكتملت المطابقة: لا توجد نسخ مفقودة أو اختلافات');
+      else toast.warning('اكتملت المطابقة وتوجد عناصر تحتاج مراجعة');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر فحص المطابقة مع قاعدة البيانات');
+    } finally {
+      setReconciliationLoading(false);
+    }
+  };
+
+  const backfillMissingMirrors = async () => {
+    if (!isAdmin || !reconciliation?.remainingMissing) return;
+    const approved = window.confirm(
+      'سيتم إنشاء النسخ المرآة المفقودة فقط (' + reconciliation.remainingMissing.toLocaleString('ar-SA') + ') دون تعديل أو حذف أي سجل AuditLog موجود. هل تريد المتابعة؟'
+    );
+    if (!approved) return;
+    setBackfillLoading(true);
+    try {
+      const result = await backfillAccountingEvidenceAuditMissingMirrors(500);
+      setReconciliation(result);
+      if (result.repaired > 0) {
+        toast.success('تم استكمال ' + result.repaired.toLocaleString('ar-SA') + ' نسخة مرآة مفقودة بأمان');
+      } else {
+        toast.success('لا توجد نسخ مرآة مفقودة تحتاج استكمالًا');
+      }
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر استكمال النسخ المرآة المفقودة');
+    } finally {
+      setBackfillLoading(false);
     }
   };
 
@@ -444,6 +496,109 @@ export const AccountingPropertyEvidenceAuditPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      <Card className="audit-print-card rounded-[26px] border-cyan-200 bg-cyan-50/35">
+        <CardHeader className="border-b border-cyan-100">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-5 w-5 text-cyan-700" />مطابقة قاعدة البيانات الفعلية</CardTitle>
+              <p className="mt-1 text-xs leading-6 text-slate-600">مقارنة أحداث مستندات الإثبات المحفوظة في سجلات التحول المحاسبي مع النسخ المرآة داخل AuditLog. لا يتم تعديل السجلات المختلفة تلقائيًا.</p>
+            </div>
+            {isAdmin ? (
+              <div className="audit-no-print flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => void runDatabaseReconciliation()} disabled={reconciliationLoading || backfillLoading}>
+                  {reconciliationLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="ml-2 h-4 w-4" />}
+                  فحص قاعدة البيانات
+                </Button>
+                {Boolean(reconciliation?.remainingMissing) && (
+                  <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => void backfillMissingMirrors()} disabled={reconciliationLoading || backfillLoading}>
+                    {backfillLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="ml-2 h-4 w-4" />}
+                    استكمال المفقود فقط
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Badge variant="outline" className="border-slate-200 bg-white text-slate-600">الفحص والإصلاح لمسؤول النظام فقط</Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 p-4">
+          {!reconciliation ? (
+            <div className="rounded-2xl border border-dashed bg-white p-5 text-center text-sm text-slate-500">
+              {isAdmin ? 'اضغط «فحص قاعدة البيانات» للحصول على نتيجة المطابقة الحية.' : 'يمكنك متابعة حالة التحقق لكل حدث في الجدول أدناه. نتيجة المطابقة الشاملة متاحة لمسؤول النظام.'}
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className={reconciliation.status === 'ok' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}>
+                    {reconciliation.status === 'ok' ? 'المطابقة سليمة' : 'تحتاج مراجعة'}
+                  </Badge>
+                  <span className="text-xs text-slate-500">آخر فحص: {new Date(reconciliation.checkedAt).toLocaleString('ar-SA')}</span>
+                </div>
+                <span className="text-xs font-bold text-slate-600">تم فحص {reconciliation.recordsScanned.toLocaleString('ar-SA')} سجل · {reconciliation.expectedEvents.toLocaleString('ar-SA')} حدث</span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ['موثّق', reconciliation.verified, 'border-emerald-200 bg-emerald-50 text-emerald-800'],
+                  ['نسخة مرآة مفقودة', reconciliation.remainingMissing, 'border-red-200 bg-red-50 text-red-800'],
+                  ['اختلاف يحتاج مراجعة', reconciliation.mismatched, 'border-amber-200 bg-amber-50 text-amber-800'],
+                  ['سجل تاريخي فقط', reconciliation.auditOnly, 'border-slate-200 bg-slate-50 text-slate-700'],
+                ].map(([label, value, tone]) => (
+                  <div key={String(label)} className="rounded-2xl border bg-white p-4">
+                    <p className="text-[11px] font-bold text-slate-500">{String(label)}</p>
+                    <div className="mt-2 flex items-end justify-between gap-2">
+                      <p className="text-2xl font-black text-slate-950">{Number(value).toLocaleString('ar-SA')}</p>
+                      <Badge variant="outline" className={String(tone)}>{Number(value) === 0 ? 'سليم' : 'موجود'}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {reconciliation.repaired > 0 && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800">
+                  تم في آخر عملية استكمال إضافة {reconciliation.repaired.toLocaleString('ar-SA')} نسخة مرآة مفقودة. لم يتم تعديل السجلات الموجودة مسبقًا.
+                </div>
+              )}
+
+              {(reconciliation.details.length > 0 || reconciliation.auditOnlyDetails.length > 0) && (
+                <div className="overflow-hidden rounded-2xl border bg-white">
+                  <div className="border-b bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-black text-slate-800">العناصر التي تحتاج انتباهًا</p>
+                    <p className="mt-1 text-[10px] text-slate-500">الاختلافات لا تُصحح تلقائيًا، والسجلات التاريخية في AuditLog لا تُحذف.</p>
+                  </div>
+                  <div className="max-h-[360px] overflow-auto">
+                    <table className="w-full min-w-[820px] text-right text-xs">
+                      <thead className="sticky top-0 bg-slate-100 text-slate-600"><tr><th className="p-3">الحالة</th><th className="p-3">رقم السجل</th><th className="p-3">متطلب الإثبات</th><th className="p-3">معرف الحدث/المرآة</th><th className="p-3">التفاصيل</th></tr></thead>
+                      <tbody className="divide-y">
+                        {reconciliation.details.map((item) => (
+                          <tr key={'detail-' + item.mirrorId} className="align-top">
+                            <td className="p-3"><Badge variant="outline" className={item.status === 'mismatch' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-200 bg-red-50 text-red-800'}>{item.status === 'mismatch' ? 'اختلاف' : 'مفقود'}</Badge></td>
+                            <td className="p-3 font-bold text-slate-800">{item.recordNumber || item.recordId || '-'}</td>
+                            <td className="p-3 text-slate-700">{item.requirementKey || '-'}</td>
+                            <td className="p-3 font-mono text-[10px] text-slate-600">{item.eventId || item.mirrorId}</td>
+                            <td className="p-3 text-[10px] leading-5 text-slate-500">{item.fields?.length ? 'حقول مختلفة: ' + item.fields.join('، ') : item.status === 'missing_mirror' ? 'لا توجد نسخة مرآة مقابلة في AuditLog.' : '-'}</td>
+                          </tr>
+                        ))}
+                        {reconciliation.auditOnlyDetails.map((item) => (
+                          <tr key={'audit-only-' + item.auditLogId} className="align-top">
+                            <td className="p-3"><Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">تاريخي فقط</Badge></td>
+                            <td className="p-3 text-slate-700">-</td>
+                            <td className="p-3 text-slate-700">{item.entityLabel || '-'}</td>
+                            <td className="p-3 font-mono text-[10px] text-slate-600">{item.mirrorId || item.auditLogId}</td>
+                            <td className="p-3 text-[10px] leading-5 text-slate-500">محفوظ في AuditLog دون حدث مقابل في السجل الحالي؛ يتم الاحتفاظ به كسجل تاريخي.</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {[
