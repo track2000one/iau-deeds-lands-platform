@@ -23,6 +23,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { NativeSelect } from '../components/ui/native-select';
+import { AccountingBackendDeploymentStatus } from '../components/accounting/AccountingBackendDeploymentStatus';
 import {
   getAccountingEvidenceAuditMirror,
   getAccountingTransformationRecords,
@@ -203,6 +204,7 @@ export const AccountingPropertyEvidenceAuditPage: React.FC = () => {
   const [reconciliation, setReconciliation] = useState<AccountingEvidenceAuditReconciliationResult | null>(null);
   const [reconciliationLoading, setReconciliationLoading] = useState(false);
   const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backendAuditReady, setBackendAuditReady] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -235,6 +237,10 @@ export const AccountingPropertyEvidenceAuditPage: React.FC = () => {
       toast.error('فحص المطابقة الفعلية متاح لمسؤول النظام فقط');
       return;
     }
+    if (!backendAuditReady) {
+      toast.error('النسخة المنشورة لا تدعم مسار المطابقة الرقابية بعد. تحقق من بطاقة جاهزية الخادم أولًا.');
+      return;
+    }
     setReconciliationLoading(true);
     try {
       const result = await getAccountingEvidenceAuditReconciliation(500);
@@ -249,7 +255,7 @@ export const AccountingPropertyEvidenceAuditPage: React.FC = () => {
   };
 
   const backfillMissingMirrors = async () => {
-    if (!isAdmin || !reconciliation?.remainingMissing) return;
+    if (!isAdmin || !backendAuditReady || !reconciliation?.remainingMissing) return;
     const approved = window.confirm(
       'سيتم إنشاء النسخ المرآة المفقودة فقط (' + reconciliation.remainingMissing.toLocaleString('ar-SA') + ') دون تعديل أو حذف أي سجل AuditLog موجود. هل تريد المتابعة؟'
     );
@@ -497,6 +503,8 @@ export const AccountingPropertyEvidenceAuditPage: React.FC = () => {
         </div>
       </section>
 
+      <AccountingBackendDeploymentStatus onReadinessChange={setBackendAuditReady} />
+
       <Card className="audit-print-card rounded-[26px] border-cyan-200 bg-cyan-50/35">
         <CardHeader className="border-b border-cyan-100">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -506,12 +514,12 @@ export const AccountingPropertyEvidenceAuditPage: React.FC = () => {
             </div>
             {isAdmin ? (
               <div className="audit-no-print flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={() => void runDatabaseReconciliation()} disabled={reconciliationLoading || backfillLoading}>
+                <Button type="button" variant="outline" onClick={() => void runDatabaseReconciliation()} disabled={reconciliationLoading || backfillLoading || !backendAuditReady}>
                   {reconciliationLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="ml-2 h-4 w-4" />}
                   فحص قاعدة البيانات
                 </Button>
                 {Boolean(reconciliation?.remainingMissing) && (
-                  <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => void backfillMissingMirrors()} disabled={reconciliationLoading || backfillLoading}>
+                  <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => void backfillMissingMirrors()} disabled={reconciliationLoading || backfillLoading || !backendAuditReady}>
                     {backfillLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="ml-2 h-4 w-4" />}
                     استكمال المفقود فقط
                   </Button>
