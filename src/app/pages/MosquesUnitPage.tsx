@@ -2621,6 +2621,47 @@ ${quranStockMovementForm.notes}` : ''}`
           <Badge variant="outline" className="h-10 justify-center border-sky-300 bg-white px-3 font-bold text-sky-800">تم جرد {quranSummary.countedSites} من {quranSummary.sites}</Badge>
         </div>}
 
+        {/* QURAN_LIVE_SEARCH_CARDS_V1: show matching mosque/prayer-room cards immediately while typing. */}
+        {activeTab === 'quran' && quranSearch.trim() && <div className="space-y-3 rounded-2xl border border-sky-200 bg-white/95 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-black text-slate-900">نتائج البحث الفوري</p>
+              <p className="mt-1 text-xs text-slate-500">تظهر بطاقة المسجد أو المصلى مباشرة أثناء الكتابة.</p>
+            </div>
+            <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-800">{filteredQuranInventoryItems.length} نتيجة</Badge>
+          </div>
+
+          {filteredQuranInventoryItems.length ? <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+            {filteredQuranInventoryItems.slice(0, 6).map((item) => {
+              const site = sites.find((row) => row.id === item.site.id) || item.site as MosqueSite;
+              const stockRow = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id);
+              const totalCount = stockRow?.systemStock?.totalCount ?? item.latest?.totalCount ?? 0;
+              const needCount = Number(stockRow?.needCount || 0);
+              return <Card key={'quick-' + item.site.id} className={card3d + ' overflow-hidden rounded-2xl border-sky-200'}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-black text-slate-900">{item.site.name}</p>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><MapPin className="h-3.5 w-3.5 shrink-0" />{siteTypeDisplayLabel(item.site as MosqueSite)} — {item.site.campusLocation || item.site.city || '-'}</p>
+                    </div>
+                    {needCount > 0 ? <Badge variant="outline" className="shrink-0 border-amber-300 bg-amber-50 text-amber-800">احتياج {needCount}</Badge> : <Badge variant="outline" className="shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700">مكتمل</Badge>}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-center"><p className="text-[11px] font-bold text-slate-500">إجمالي المصاحف</p><p className="mt-1 text-2xl font-black text-emerald-700">{totalCount}</p></div>
+                    <div className={'rounded-xl border p-3 text-center ' + (needCount > 0 ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-slate-50 text-slate-700')}><p className="text-[11px] font-bold opacity-80">الاحتياج</p><p className="mt-1 text-2xl font-black">{needCount}</p></div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                    {role === 'head' && <Button size="sm" className={button3d + ' bg-emerald-700 text-white hover:bg-emerald-600'} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-4 w-4" />إضافة مصحف</Button>}
+                    <Button size="sm" variant="outline" className={button3d} onClick={() => openQuranHistory(site)}><Clock3 className="ml-1 h-4 w-4" />السجل</Button>
+                  </div>
+                </CardContent>
+              </Card>;
+            })}
+          </div> : <div className="rounded-xl border border-dashed border-sky-200 bg-sky-50/50 p-5 text-center text-sm font-bold text-slate-600">لا توجد نتائج مطابقة لعبارة البحث.</div>}
+
+          {filteredQuranInventoryItems.length > 6 && <p className="text-center text-xs font-bold text-sky-700">يتم عرض أول 6 نتائج من أصل {filteredQuranInventoryItems.length}. استمر في الكتابة لتضييق النتائج.</p>}
+        </div>}
+
       {role === 'head' && <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-9">
         <Stat title="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} onClick={() => goToDashboardSection('sites')} />
         <Stat title="إجمالي المصاحف" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
