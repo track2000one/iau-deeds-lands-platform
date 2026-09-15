@@ -526,6 +526,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [quranWarehousePreview, setQuranWarehousePreview] = useState<MosqueQuranWarehouse | null>(null);
   const [quranStockMovementDialog, setQuranStockMovementDialog] = useState(false);
   const [quranStockMovementForm, setQuranStockMovementForm] = useState<any>(emptyQuranStockMovementForm());
+  const [quranStockContextSiteId, setQuranStockContextSiteId] = useState<string | null>(null);
   const [quranStockSaving, setQuranStockSaving] = useState(false);
   const [assignments, setAssignments] = useState<MosqueAssignment[]>([]);
   const [staffUsers, setStaffUsers] = useState<MosqueStaffUser[]>([]);
@@ -981,6 +982,7 @@ export const MosquesUnitPage: React.FC = () => {
 
   const openQuranStockMovement = (movementType: string) => {
     const activeWarehouse = quranStockDashboard?.warehouses.find((item) => item.active) || quranStockDashboard?.warehouses[0];
+    setQuranStockContextSiteId(null);
     setQuranStockMovementForm({
       ...emptyQuranStockMovementForm(),
       movementType,
@@ -1079,6 +1081,7 @@ ${phrase}`);
       return;
     }
 
+    setQuranStockContextSiteId(site.id);
     setQuranStockMovementForm({
       ...emptyQuranStockMovementForm(),
       movementType: 'distribution',
@@ -1101,6 +1104,7 @@ ${phrase}`);
       toast.info('لا يوجد رصيد مصاحف في هذا المسجد أو المصلى يمكن سحبه');
       return;
     }
+    setQuranStockContextSiteId(site.id);
     setQuranStockMovementForm({
       ...emptyQuranStockMovementForm(),
       movementType: 'site_withdrawal',
@@ -3420,11 +3424,11 @@ ${quranStockMovementForm.notes}` : ''}`
         </DialogContent>
       </Dialog>
 
-      <Dialog open={quranStockMovementDialog} onOpenChange={setQuranStockMovementDialog}>
+      <Dialog open={quranStockMovementDialog} onOpenChange={(open) => { setQuranStockMovementDialog(open); if (!open) setQuranStockContextSiteId(null); }}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-emerald-200/80 sm:max-w-[900px]" dir="rtl">
           <DialogHeader className="border-b border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-sky-50 p-5 text-right"><DialogTitle className="flex items-center gap-2 text-xl font-black"><BookOpen className="h-5 w-5 text-emerald-700" />{quranStockMovementForm.movementType === 'site_withdrawal' ? 'سحب مصاحف من المسجد / المصلى' : 'حركة مصاحف المكتبة'}</DialogTitle><DialogDescription>{quranStockMovementForm.movementType === 'site_withdrawal' ? 'السحب يخصم المصاحف من الرصيد النظامي للموقع ويسجل سبب السحب وتاريخه. المصاحف المسحوبة لا تعاد تلقائيًا إلى رصيد المكتبة المتاح.' : 'إضافة الرصيد تزيد رصيد المكتبة، وإضافة المصاحف للموقع تخصمها تلقائيًا من المكتبة، والإرجاع يعيد الكمية إلى المكتبة. لا يتم تعديل الرصيد يدويًا خارج سجل الحركات.'}</DialogDescription></DialogHeader>
           <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-5 md:p-6">
-            <div className="grid gap-4 md:grid-cols-2"><Field label="نوع الحركة *"><NativeSelect value={quranStockMovementForm.movementType} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, movementType: e.target.value, siteId: ['distribution', 'return', 'site_withdrawal'].includes(e.target.value) ? (quranStockMovementForm.siteId || sites[0]?.id || '') : '' })}>{Object.entries(quranStockMovementTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect></Field><Field label="المكتبة *"><NativeSelect value={quranStockMovementForm.warehouseId} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, warehouseId: e.target.value })}><option value="">اختر المكتبة</option>{quranStockDashboard?.warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} — رصيد {warehouse.balance.totalCount}</option>)}</NativeSelect></Field>{['distribution', 'return', 'site_withdrawal'].includes(quranStockMovementForm.movementType) && <div className="md:col-span-2"><Field label="المسجد / المصلى *"><NativeSelect value={quranStockMovementForm.siteId} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name} — {siteTypeDisplayLabel(site)}</option>)}</NativeSelect></Field></div>}</div>
+            <div className="grid gap-4 md:grid-cols-2"><Field label="نوع الحركة *"><NativeSelect disabled={Boolean(quranStockContextSiteId)} value={quranStockMovementForm.movementType} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, movementType: e.target.value, siteId: ['distribution', 'return', 'site_withdrawal'].includes(e.target.value) ? (quranStockMovementForm.siteId || sites[0]?.id || '') : '' })}>{Object.entries(quranStockMovementTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect>{quranStockContextSiteId && <p className="mt-1.5 text-[11px] text-slate-500">تم تحديد نوع الحركة تلقائيًا من الإجراء الذي اخترته.</p>}</Field><Field label="المكتبة *"><NativeSelect value={quranStockMovementForm.warehouseId} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, warehouseId: e.target.value })}><option value="">اختر المكتبة</option>{quranStockDashboard?.warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} — رصيد {warehouse.balance.totalCount}</option>)}</NativeSelect></Field>{['distribution', 'return', 'site_withdrawal'].includes(quranStockMovementForm.movementType) && <div className="md:col-span-2">{quranStockContextSiteId ? (() => { const selectedSite = sites.find((site) => site.id === quranStockMovementForm.siteId); return <Field label="المسجد / المصلى المستهدف"><div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-black text-emerald-950">{selectedSite?.name || 'الموقع المحدد'}</p><p className="mt-1 text-xs text-emerald-800">{selectedSite ? siteTypeDisplayLabel(selectedSite) : 'مسجد / مصلى'} — تم تحديده تلقائيًا من البطاقة</p></div><Badge variant="outline" className="border-emerald-300 bg-white text-emerald-800">محدد مسبقًا</Badge></div></div></Field>; })() : <Field label="المسجد / المصلى *"><NativeSelect value={quranStockMovementForm.siteId} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name} — {siteTypeDisplayLabel(site)}</option>)}</NativeSelect></Field>}</div>}</div>
             {quranStockDashboard?.warehouses.find((warehouse) => warehouse.id === quranStockMovementForm.warehouseId) && <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><p className="text-xs font-bold text-emerald-900">الرصيد الحالي للمكتبة</p>{(() => { const balance = quranStockDashboard.warehouses.find((warehouse) => warehouse.id === quranStockMovementForm.warehouseId)!.balance; return <div className="mt-2 grid grid-cols-4 gap-2 text-center"><Info label="الإجمالي" value={balance.totalCount} /><Info label="كبير" value={balance.largeCount} /><Info label="متوسط" value={balance.mediumCount} /><Info label="صغير" value={balance.smallCount} /></div>; })()}</div>}
             <Card className="border-emerald-200"><CardHeader className="pb-3"><CardTitle className="text-base">الكميات حسب الحجم</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-3"><Field label="المصاحف الكبيرة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranStockMovementForm.largeCount} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, largeCount: e.target.value })} /></Field><Field label="المصاحف المتوسطة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranStockMovementForm.mediumCount} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, mediumCount: e.target.value })} /></Field><Field label="المصاحف الصغيرة"><Input type="number" min="0" step="1" inputMode="numeric" value={quranStockMovementForm.smallCount} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, smallCount: e.target.value })} /></Field></CardContent></Card>
             {quranStockMovementForm.movementType === 'site_withdrawal' && <Field label="سبب السحب *"><NativeSelect value={quranStockMovementForm.withdrawalReason || ''} onChange={(e) => setQuranStockMovementForm({ ...quranStockMovementForm, withdrawalReason: e.target.value })}><option value="">اختر سبب السحب</option><option value="قدم المصحف">قدم المصحف</option><option value="تهالك أو تمزق">تهالك أو تمزق</option><option value="عدم ملاءمة النسخة للموقع">عدم ملاءمة النسخة للموقع</option><option value="فائض عن حاجة الموقع">فائض عن حاجة الموقع</option><option value="إعادة تنظيم وتوزيع">إعادة تنظيم وتوزيع</option><option value="أخرى">أخرى</option></NativeSelect></Field>}
