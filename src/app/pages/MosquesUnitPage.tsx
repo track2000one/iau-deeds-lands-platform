@@ -2596,7 +2596,9 @@ ${quranStockMovementForm.notes}` : ''}`
 
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <div className="relative overflow-hidden rounded-2xl border border-emerald-300/90 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-3 shadow-[0_10px_28px_rgba(5,150,105,0.10),0_0_0_1px_rgba(16,185,129,0.08),0_0_24px_rgba(45,212,191,0.12)] ring-1 ring-emerald-100/80 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:border before:border-emerald-300/60 before:opacity-35 before:content-[''] before:animate-pulse motion-reduce:before:animate-none sm:hidden">
+        {/* STICKY_UNIT_NAV_V1: keep unit navigation visible while scrolling on desktop and mobile. */}
+        <div className="sticky top-0 z-40 -mx-1 rounded-2xl border border-slate-200/80 bg-white/95 p-1.5 shadow-[0_10px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl supports-[backdrop-filter]:bg-white/85">
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-300/90 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-3 shadow-[0_10px_28px_rgba(5,150,105,0.10),0_0_0_1px_rgba(16,185,129,0.08),0_0_24px_rgba(45,212,191,0.12)] ring-1 ring-emerald-100/80 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:border before:border-emerald-300/60 before:opacity-35 before:content-[''] before:animate-pulse motion-reduce:before:animate-none sm:hidden">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold text-emerald-800">التنقل بين أقسام الوحدة</p>
@@ -2627,7 +2629,7 @@ ${quranStockMovementForm.notes}` : ''}`
           </NativeSelect>
         </div>
 
-        <TabsList className="hidden h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border bg-white/80 p-2 sm:flex [&>[data-slot=tabs-trigger]]:min-w-max [&>[data-slot=tabs-trigger]]:flex-none">
+        <TabsList className="hidden h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-sky-200/80 bg-white/95 p-2 shadow-sm sm:flex [&>[data-slot=tabs-trigger]]:min-w-max [&>[data-slot=tabs-trigger]]:flex-none">
           <TabsTrigger value="overview">الرئيسية</TabsTrigger>
           <TabsTrigger value="sites">المساجد والمصليات</TabsTrigger>
           {['head', 'supervisor'].includes(role) && <TabsTrigger value="buildings">تغطية المباني بخدمة الصلاة</TabsTrigger>}
@@ -2643,6 +2645,7 @@ ${quranStockMovementForm.notes}` : ''}`
           {isAdmin && <TabsTrigger value="roles">الأدوار التشغيلية</TabsTrigger>}
           {role !== 'university_member' && role !== 'viewer' && <TabsTrigger value="notifications" className="gap-1">الإشعارات {unreadNotifications > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{unreadNotifications}</span>}</TabsTrigger>}
         </TabsList>
+        </div>
 
         <TabsContent value="overview" className="space-y-4">
           {role === 'head' && <>
