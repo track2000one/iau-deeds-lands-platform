@@ -50,3 +50,5 @@ jobs:
           git add src/app/pages/MosquesUnitPage.tsx
           git commit -m "Move mosque navigation above statistics cards"
           git push origin HEAD:main
+
+# Triggered after workflow creation so the source reorder is applied and verified.
