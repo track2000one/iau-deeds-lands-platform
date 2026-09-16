@@ -18,6 +18,7 @@ import {
   CalendarDays,
   Tags,
   FileDown,
+  FileSpreadsheet,
   ShieldCheck,
   AlertTriangle,
   Copy,
@@ -45,6 +46,7 @@ import { authenticatedFetch } from '../../lib/http';
 import { usePermissions } from '../../context/PermissionsContext';
 import { AttachmentPreviewCard } from '../components/AttachmentPreview';
 import { ArchiveReportsDialog } from '../components/ArchiveReportsDialog';
+import { ArchiveExcelImportDialog, type ArchiveExcelImportPayload } from '../components/ArchiveExcelImportDialog';
 
 type ArchiveDocument = {
   id: string;
@@ -226,6 +228,7 @@ export const ArchivePage: React.FC = () => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
+  const [excelImportOpen, setExcelImportOpen] = useState(false);
 
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
@@ -730,6 +733,16 @@ export const ArchivePage: React.FC = () => {
             <Button variant="outline" onClick={() => setReportsOpen(true)} className="w-full lg:w-auto">
               <FileDown className="ml-2 h-4 w-4" />
               تقارير الأرشفة — طباعة / PDF / Excel
+            </Button>
+          )}
+          {canAdd && (
+            <Button
+              variant="outline"
+              onClick={() => setExcelImportOpen(true)}
+              className="w-full border-emerald-300 bg-emerald-50 font-bold text-emerald-800 hover:bg-emerald-100 lg:w-auto"
+            >
+              <FileSpreadsheet className="ml-2 h-4 w-4" />
+              استيراد Excel
             </Button>
           )}
           {canAdd && (
@@ -1339,6 +1352,21 @@ export const ArchivePage: React.FC = () => {
           )}
         </div>
       </section>
+
+      <ArchiveExcelImportDialog
+        open={excelImportOpen}
+        onOpenChange={setExcelImportOpen}
+        existingDocuments={documents}
+        createArchiveDocument={(payload: ArchiveExcelImportPayload) =>
+          archiveRequest<ArchiveDocument>('', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          })
+        }
+        onImported={async () => {
+          await loadDocumentsFromServer();
+        }}
+      />
 
       <ArchiveReportsDialog documents={documents} open={reportsOpen} onOpenChange={setReportsOpen} />
 
