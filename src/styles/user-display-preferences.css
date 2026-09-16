@@ -1,5 +1,31 @@
 /* Per-user reading comfort and accessibility controls */
 
+/*
+ * Platform-wide readability baseline.
+ * Tailwind typography utilities use rem units, so increasing the root size
+ * improves text readability consistently across pages without rewriting each
+ * component. Small screens keep a slightly smaller baseline to protect layout.
+ */
+:root {
+  --app-base-font-size: 18px;
+}
+
+html {
+  font-size: var(--app-base-font-size) !important;
+}
+
+@media (max-width: 767px) {
+  html {
+    --app-base-font-size: 17px;
+  }
+}
+
+@media (max-width: 390px) {
+  html {
+    --app-base-font-size: 16.5px;
+  }
+}
+
 body,
 button,
 input,
