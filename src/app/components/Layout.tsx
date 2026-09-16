@@ -369,7 +369,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     title={item.label}
                     aria-label={item.label}
                     className={`
-                      future-nav-item w-full ${isRTL ? 'justify-end' : 'justify-start'} gap-3 text-[13px] min-h-12 h-auto px-3 py-2.5 whitespace-normal
+                      future-nav-item w-full ${isRTL ? 'justify-end' : 'justify-start'} gap-3 text-base font-medium min-h-12 h-auto px-3 py-2.5 whitespace-normal
                       ${sidebarCollapsed ? 'lg:justify-center lg:px-2 lg:gap-0' : ''}
                       ${isActive ? 'is-active font-bold' : ''}
                     `}
@@ -379,7 +379,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     }}
                   >
                     <Icon className={`shrink-0 ${sidebarCollapsed ? 'lg:h-5 lg:w-5' : 'h-4.5 w-4.5'}`} />
-                    <span className={`min-w-0 flex-1 whitespace-normal break-words leading-5 ${isRTL ? 'text-right' : 'text-left'} ${sidebarCollapsed ? 'lg:hidden' : ''}`} title={item.label}>
+                    <span className={`min-w-0 flex-1 whitespace-normal break-words leading-6 ${isRTL ? 'text-right' : 'text-left'} ${sidebarCollapsed ? 'lg:hidden' : ''}`} title={item.label}>
                       {item.label}
                     </span>
                   </Button>
