@@ -48,6 +48,31 @@ jobs:
       - name: Apply Quran flexible movement reports
         run: node scripts/apply-quran-flexible-movement-reports.mjs
 
+      - name: Normalize generated patch boundaries
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          page_path = Path('src/app/pages/MosquesUnitPage.tsx')
+          page = page_path.read_text()
+          emerald = '            <Card className="overflow-hidden border-emerald-200/80 bg-white/95 shadow-sm">'
+          slate = '            <Card className="overflow-hidden border-slate-200 bg-white/95">'
+          page = page.replace(emerald + '\n' + emerald, emerald)
+          page = page.replace(slate + '\n' + slate, slate)
+          page = page.replace('            <DialogFooter          </div>\n            <DialogFooter', '          <DialogFooter')
+          page_path.write_text(page)
+
+          reports_path = Path('src/app/components/MosqueReportsCenter.tsx')
+          reports = reports_path.read_text()
+          building = '    buildings: buildings.map((building, index) => ({ data: {'
+          personnel = '    personnel: personnel.map((person, index) => { const site = siteById.get(person.siteId); return ({ data: {'
+          reports = reports.replace(building + building, building)
+          reports = reports.replace(building + '\n' + building, building)
+          reports = reports.replace(personnel + personnel, personnel)
+          reports = reports.replace(personnel + '\n' + personnel, personnel)
+          reports_path.write_text(reports)
+          PY
+
       - name: Verify build
         run: npm run build
 
