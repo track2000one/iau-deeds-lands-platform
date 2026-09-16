@@ -11,6 +11,7 @@ import {
   type MosquePersonnel,
   type MosqueQuranInventoryOverviewItem,
   type MosqueQuranStockDashboard,
+  type MosqueQuranStockMovement,
   type MosqueRequest,
   type MosqueSite,
   type MosqueTicket,
@@ -77,6 +78,8 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
   const [settings, setSettings] = React.useState<ReportSettings>({ reportType: 'comprehensive', from: '', to: '', city: '', campus: '', siteType: 'all', status: 'all', priority: 'all', search: '' });
   const [visits, setVisits] = React.useState<MosqueFieldVisit[]>([]);
   const [visitsLoading, setVisitsLoading] = React.useState(false);
+  const [quranMovements, setQuranMovements] = React.useState<MosqueQuranStockMovement[]>([]);
+  const [quranMovementsLoading, setQuranMovementsLoading] = React.useState(false);
   const [templates, setTemplates] = React.useState<SavedTemplate[]>(loadTemplates);
   const [templateName, setTemplateName] = React.useState('');
 
@@ -87,17 +90,56 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
     return () => { active = false; };
   }, []);
 
+  React.useEffect(() => {
+    let active = true;
+    setQuranMovementsLoading(true);
+    mosqueApi.quranStockMovements()
+      .then((rows) => { if (active) setQuranMovements(rows || []); })
+      .catch(() => { if (active) setQuranMovements([]); })
+      .finally(() => { if (active) setQuranMovementsLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const quranPeriodMovements = React.useMemo(() => quranMovements.filter((movement) => {
+    if (!movement.siteId) return false;
+    const movementDate = String(movement.movementAt || movement.createdAt || '').slice(0, 10);
+    if (settings.from && movementDate && movementDate < settings.from) return false;
+    if (settings.to && movementDate && movementDate > settings.to) return false;
+    return true;
+  }), [quranMovements, settings.from, settings.to]);
+
+  const quranMovementTotalsBySite = React.useMemo(() => {
+    const result = new Map<string, { added: number; withdrawn: number; returned: number; net: number }>();
+    for (const movement of quranPeriodMovements) {
+      if (!movement.siteId) continue;
+      const current = result.get(movement.siteId) || { added: 0, withdrawn: 0, returned: 0, net: 0 };
+      const quantity = Number(movement.totalCount || 0);
+      if (movement.movementType === 'distribution') current.added += quantity;
+      if (movement.movementType === 'site_withdrawal') current.withdrawn += quantity;
+      if (movement.movementType === 'return') current.returned += quantity;
+      current.net = current.added - current.withdrawn - current.returned;
+      result.set(movement.siteId, current);
+    }
+    return result;
+  }, [quranPeriodMovements]);
+
   const siteById = React.useMemo(() => new Map(sites.map((site) => [site.id, site])), [sites]);
   const cities = React.useMemo(() => Array.from(new Set([...sites.map((x) => x.city), ...buildings.map((x) => x.city)].filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'ar')), [sites, buildings]);
   const campuses = React.useMemo(() => Array.from(new Set([...sites.map((x) => x.campusLocation), ...buildings.map((x) => x.campusLocation)].filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'ar')), [sites, buildings]);
 
   const datasets = React.useMemo<Record<Exclude<ReportType, 'comprehensive'>, ReportRow[]>>(() => ({
-    sites: sites.map((site, index) => ({ data: {
-      'م': index + 1, 'المسجد / المصلى': site.name, 'النوع': siteTypeLabel(site), 'رقم المبنى': site.building?.buildingNumber || '-',
-      'الحرم / الموقع': site.campusLocation || '-', 'المدينة': site.city || '-', 'الحي': site.district || '-', 'المساحة م²': site.area || '-', 'السعة': site.capacity || '-',
-      'الإمام': site.imamName || '-', 'المؤذن': site.muezzinName || '-', 'الخطيب': site.khateebName || '-', 'الحالة': siteStatusLabels[site.status] || site.status,
-      'الإحداثيات': site.latitude != null && site.longitude != null ? `${site.latitude}, ${site.longitude}` : '-',
-    }, meta: { search: [site.name, site.building?.buildingNumber, site.city, site.district, site.campusLocation, site.imamName].filter(Boolean).join(' '), city: site.city || '', campus: site.campusLocation || '', type: site.siteType, status: site.status } })),
+    sites: sites.map((site, index) => {
+      const quranStock = quranStockDashboard?.sites.find((row) => row.site.id === site.id);
+      const movement = quranMovementTotalsBySite.get(site.id) || { added: 0, withdrawn: 0, returned: 0, net: 0 };
+      return ({ data: {
+        'م': index + 1, 'المسجد / المصلى': site.name, 'النوع': siteTypeLabel(site), 'رقم المبنى': site.building?.buildingNumber || '-',
+        'الحرم / الموقع': site.campusLocation || '-', 'المدينة': site.city || '-', 'الحي': site.district || '-', 'المساحة م²': site.area || '-', 'السعة': site.capacity || '-',
+        'الإمام': site.imamName || '-', 'المؤذن': site.muezzinName || '-', 'الخطيب': site.khateebName || '-', 'الحالة': siteStatusLabels[site.status] || site.status,
+        'رصيد المصاحف الحالي': quranStock?.systemStock?.totalCount || 0, 'المضاف خلال الفترة': movement.added, 'المسحوب خلال الفترة': movement.withdrawn,
+        'المرتجع خلال الفترة': movement.returned, 'صافي حركة المصاحف': movement.net, 'احتياج المصاحف الحالي': quranStock?.needCount || 0,
+        'الإحداثيات': site.latitude != null && site.longitude != null ? `${site.latitude}, ${site.longitude}` : '-',
+      }, meta: { search: [site.name, site.building?.buildingNumber, site.city, site.district, site.campusLocation, site.imamName].filter(Boolean).join(' '), city: site.city || '', campus: site.campusLocation || '', type: site.siteType, status: site.status } });
+    }),
     buildings: buildings.map((building, index) => ({ data: {
       'م': index + 1, 'رقم المبنى': building.buildingNumber, 'اسم المبنى': building.name || '-', 'الحرم / الموقع': building.campusLocation || '-', 'المدينة': building.city || '-', 'الحي': building.district || '-',
       'حالة التغطية': buildingCoverageLabels[building.coverageStatus] || building.coverageStatus, 'عدد المواقع المرتبطة': building._count?.sites ?? building.sites?.length ?? 0,
@@ -118,11 +160,18 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
       'م': index + 1, 'رقم البلاغ': ticket.ticketNumber, 'الموقع': ticket.site?.name || site?.name || '-', 'النوع': ticket.ticketType, 'الحالة': statusLabels[ticket.status] || ticket.status,
       'الوصف': ticket.description, 'المبلّغ': ticket.reporterName || '-', 'وسيلة التواصل': ticket.reporterPhone || ticket.reporterEmail || '-', 'طلب صيانة مرتبط': ticket.convertedRequestId ? 'نعم' : 'لا', 'تاريخ الإنشاء': displayDate(ticket.createdAt),
     }, meta: { search: [ticket.ticketNumber, ticket.site?.name, site?.name, ticket.description, ticket.reporterName].filter(Boolean).join(' '), date: dateOnly(ticket.createdAt), city: site?.city || '', campus: site?.campusLocation || '', type: ticket.ticketType, status: ticket.status } }); }),
-    quran: quranInventoryItems.map((item, index) => { const stock = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id); return ({ data: {
-      'م': index + 1, 'الموقع': item.site.name, 'النوع': siteTypeLabel(item.site as MosqueSite), 'إجمالي المصاحف': item.latest?.totalCount || 0, 'كبير': item.latest?.largeCount || 0,
-      'متوسط': item.latest?.mediumCount || 0, 'صغير': item.latest?.smallCount || 0, 'المسحوبة': stock?.withdrawnStock?.totalCount || 0, 'المستهدف': stock?.targetCount || 0,
-      'التغطية %': stock?.coveragePercent ?? '-', 'الاحتياج': stock?.needCount || 0, 'آخر جرد': item.latest?.countedAt ? displayDate(item.latest.countedAt) : 'لم يجرد',
-    }, meta: { search: [item.site.name, item.site.city, item.site.district, item.site.campusLocation].filter(Boolean).join(' '), date: dateOnly(item.latest?.countedAt), city: item.site.city || '', campus: item.site.campusLocation || '', type: item.site.siteType, status: (stock?.needCount || 0) > 0 ? 'needs_supply' : 'covered' } }); }),
+    quran: quranInventoryItems.map((item, index) => {
+      const stock = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id);
+      const movement = quranMovementTotalsBySite.get(item.site.id) || { added: 0, withdrawn: 0, returned: 0, net: 0 };
+      const currentStock = stock?.systemStock?.totalCount ?? item.latest?.totalCount ?? 0;
+      return ({ data: {
+        'م': index + 1, 'الموقع': item.site.name, 'النوع': siteTypeLabel(item.site as MosqueSite), 'الرصيد الحالي': currentStock,
+        'كبير': stock?.systemStock?.largeCount ?? item.latest?.largeCount ?? 0, 'متوسط': stock?.systemStock?.mediumCount ?? item.latest?.mediumCount ?? 0, 'صغير': stock?.systemStock?.smallCount ?? item.latest?.smallCount ?? 0,
+        'المضاف خلال الفترة': movement.added, 'المسحوب خلال الفترة': movement.withdrawn, 'المرتجع خلال الفترة': movement.returned, 'صافي الحركة': movement.net,
+        'المسحوب التراكمي': stock?.withdrawnStock?.totalCount || 0, 'المستهدف': stock?.targetCount || 0, 'التغطية %': stock?.coveragePercent ?? '-',
+        'الاحتياج': stock?.needCount || 0, 'آخر جرد': item.latest?.countedAt ? displayDate(item.latest.countedAt) : 'لم يجرد',
+      }, meta: { search: [item.site.name, item.site.city, item.site.district, item.site.campusLocation].filter(Boolean).join(' '), city: item.site.city || '', campus: item.site.campusLocation || '', type: item.site.siteType, status: (stock?.needCount || 0) > 0 ? 'needs_supply' : 'covered' } });
+    }),
     personnel: personnel.map((person, index) => { const site = siteById.get(person.siteId); return ({ data: {
       'م': index + 1, 'الاسم': person.name, 'الصفة': person.role, 'المسجد / المصلى': person.site?.name || site?.name || '-', 'الجوال': person.mobile || '-', 'البريد': person.email || '-', 'الحالة': person.active ? 'نشط' : 'غير نشط',
     }, meta: { search: [person.name, person.role, person.site?.name, site?.name, person.mobile, person.email].filter(Boolean).join(' '), city: site?.city || '', campus: site?.campusLocation || '', type: person.role, status: person.active ? 'active' : 'inactive' } }); }),
@@ -134,7 +183,7 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
       'م': index + 1, 'رقم الطلب': job.applicationNumber, 'الاسم': job.fullName, 'الوظيفة': job.jobType, 'المؤهل': job.qualification, 'الموقع المفضل': job.preferredLocation || '-',
       'الحالة': statusLabels[job.status] || job.status, 'الجوال': job.phone, 'البريد': job.email, 'تاريخ التقديم': displayDate(job.createdAt),
     }, meta: { search: [job.applicationNumber, job.fullName, job.jobType, job.qualification, job.preferredLocation].filter(Boolean).join(' '), date: dateOnly(job.createdAt), campus: job.preferredLocation || '', type: job.jobType, status: job.status } })),
-  }), [sites, buildings, visits, requests, tickets, quranInventoryItems, quranStockDashboard, personnel, leaves, jobs, siteById]);
+  }), [sites, buildings, visits, requests, tickets, quranInventoryItems, quranStockDashboard, quranMovementTotalsBySite, personnel, leaves, jobs, siteById]);
 
   const filterRows = React.useCallback((rows: ReportRow[]) => rows.filter((row) => {
     const query = settings.search.trim().toLowerCase();
@@ -160,6 +209,9 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
   const buildingsNeedPrayerRoom = buildings.filter((item) => item.coverageStatus === 'needs_prayer_room').length;
   const openVisitItems = visits.reduce((sum, visit) => sum + (visit.items?.filter((item) => !['resolved', 'closed'].includes(item.resolutionStatus)).length || 0), 0);
   const quranNeed = quranStockDashboard?.summary.siteNeedTotal || 0;
+  const quranAddedInPeriod = quranPeriodMovements.filter((movement) => movement.movementType === 'distribution').reduce((sum, movement) => sum + Number(movement.totalCount || 0), 0);
+  const quranWithdrawnInPeriod = quranPeriodMovements.filter((movement) => movement.movementType === 'site_withdrawal').reduce((sum, movement) => sum + Number(movement.totalCount || 0), 0);
+  const quranReturnedInPeriod = quranPeriodMovements.filter((movement) => movement.movementType === 'return').reduce((sum, movement) => sum + Number(movement.totalCount || 0), 0);
 
   const dynamicStatusOptions = React.useMemo(() => {
     const rows = settings.reportType === 'comprehensive' ? Object.values(datasets).flat() : datasets[settings.reportType];
@@ -186,12 +238,14 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
     appendExcelReportSheet(workbook, 'الملخص التنفيذي', [{
       'نوع التقرير': reportLabels[settings.reportType], 'النتائج المطابقة': activeRows, 'المساجد والمصليات': sites.length, 'المباني التي تحتاج مصلى': buildingsNeedPrayerRoom,
       'الطلبات المفتوحة': openRequests, 'البلاغات المفتوحة': openTickets, 'ملاحظات الزيارات المفتوحة': openVisitItems, 'احتياج المصاحف': quranNeed,
+      'المصاحف المضافة خلال الفترة': quranAddedInPeriod, 'المصاحف المسحوبة خلال الفترة': quranWithdrawnInPeriod, 'المصاحف المرتجعة خلال الفترة': quranReturnedInPeriod,
       'معايير التقرير': filterSummary(), 'تاريخ الاستخراج': new Date().toLocaleString('ar-SA-u-ca-gregory'),
     }]);
     await writeProfessionalExcel(workbook, `mosques-${settings.reportType}-${excelReportDateStamp()}.xlsx`, {
       title: reportLabels[settings.reportType], subtitle: filterSummary(), orientation: 'landscape', metrics: [
         { label: 'النتائج', value: activeRows, tone: 'blue' }, { label: 'طلبات مفتوحة', value: openRequests, tone: 'amber' },
         { label: 'بلاغات مفتوحة', value: openTickets, tone: 'red' }, { label: 'احتياج المصاحف', value: quranNeed, tone: 'green' },
+        { label: 'مصاحف مضافة', value: quranAddedInPeriod, tone: 'green' }, { label: 'مصاحف مسحوبة', value: quranWithdrawnInPeriod, tone: 'red' },
       ],
     });
     toast.success('تم تجهيز تقرير Excel الاحترافي');
@@ -210,8 +264,8 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
     }).join('');
     const generatedAt = new Date().toLocaleString('ar-SA-u-ca-gregory');
     win.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(reportLabels[settings.reportType])}</title><style>
-      @page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0;font-size:9px;direction:rtl}.header{border:1.5px solid #94a3b8;border-radius:14px;padding:14px;background:linear-gradient(110deg,#eff6ff,#fff,#ecfdf5)}.kicker{font-size:8px;color:#64748b}.head-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}.head-row h1{margin:4px 0;font-size:21px}.badge{border:1px solid #93c5fd;background:#eff6ff;border-radius:999px;padding:5px 10px;font-weight:800}.meta{color:#64748b}.filters{margin-top:8px;border-top:1px solid #dbeafe;padding-top:7px}.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:10px 0}.metric{border:1px solid #cbd5e1;border-radius:9px;padding:7px;text-align:center;background:#f8fafc}.metric span{display:block;color:#64748b;font-size:7px}.metric b{display:block;font-size:15px;margin-top:2px}.section-title{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px}.section-title h2{font-size:14px;margin:0}.section-title span{color:#64748b}.table-wrap{overflow:hidden;border-radius:8px}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:4px 3px;text-align:center;vertical-align:middle;line-height:1.45;word-break:break-word}th{background:#e0f2fe;font-weight:900;font-size:7.5px}td{font-size:7.2px}.footer{margin-top:10px;border-top:1px solid #e2e8f0;padding-top:6px;color:#64748b;display:flex;justify-content:space-between}section{break-inside:auto}thead{display:table-header-group}@media print{.no-print{display:none!important}}
-    </style></head><body><header class="header"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><div class="head-row"><div><h1>${escapeHtml(reportLabels[settings.reportType])}</h1><div class="meta">تاريخ الاستخراج: ${escapeHtml(generatedAt)}</div></div><span class="badge">${activeRows} نتيجة</span></div><div class="filters"><b>معايير التقرير:</b> ${escapeHtml(filterSummary())}</div></header><div class="metrics"><div class="metric"><span>المساجد والمصليات</span><b>${sites.length}</b></div><div class="metric"><span>مبانٍ تحتاج مصلى</span><b>${buildingsNeedPrayerRoom}</b></div><div class="metric"><span>طلبات مفتوحة</span><b>${openRequests}</b></div><div class="metric"><span>بلاغات مفتوحة</span><b>${openTickets}</b></div><div class="metric"><span>ملاحظات زيارة مفتوحة</span><b>${openVisitItems}</b></div><div class="metric"><span>احتياج المصاحف</span><b>${quranNeed}</b></div></div>${sectionsHtml}<div class="footer"><span>منصة إدارة الأملاك والأراضي — وحدة العناية بالمساجد والمصليات الجامعية</span><span>${escapeHtml(generatedAt)}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+      @page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0;font-size:9px;direction:rtl}.header{border:1.5px solid #94a3b8;border-radius:14px;padding:14px;background:linear-gradient(110deg,#eff6ff,#fff,#ecfdf5)}.kicker{font-size:8px;color:#64748b}.head-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}.head-row h1{margin:4px 0;font-size:21px}.badge{border:1px solid #93c5fd;background:#eff6ff;border-radius:999px;padding:5px 10px;font-weight:800}.meta{color:#64748b}.filters{margin-top:8px;border-top:1px solid #dbeafe;padding-top:7px}.metrics{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:10px 0}.metric{border:1px solid #cbd5e1;border-radius:9px;padding:7px;text-align:center;background:#f8fafc}.metric span{display:block;color:#64748b;font-size:7px}.metric b{display:block;font-size:15px;margin-top:2px}.section-title{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px}.section-title h2{font-size:14px;margin:0}.section-title span{color:#64748b}.table-wrap{overflow:hidden;border-radius:8px}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:4px 3px;text-align:center;vertical-align:middle;line-height:1.45;word-break:break-word}th{background:#e0f2fe;font-weight:900;font-size:7.5px}td{font-size:7.2px}.footer{margin-top:10px;border-top:1px solid #e2e8f0;padding-top:6px;color:#64748b;display:flex;justify-content:space-between}section{break-inside:auto}thead{display:table-header-group}@media print{.no-print{display:none!important}}
+    </style></head><body><header class="header"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><div class="head-row"><div><h1>${escapeHtml(reportLabels[settings.reportType])}</h1><div class="meta">تاريخ الاستخراج: ${escapeHtml(generatedAt)}</div></div><span class="badge">${activeRows} نتيجة</span></div><div class="filters"><b>معايير التقرير:</b> ${escapeHtml(filterSummary())}</div></header><div class="metrics"><div class="metric"><span>المساجد والمصليات</span><b>${sites.length}</b></div><div class="metric"><span>مبانٍ تحتاج مصلى</span><b>${buildingsNeedPrayerRoom}</b></div><div class="metric"><span>طلبات مفتوحة</span><b>${openRequests}</b></div><div class="metric"><span>بلاغات مفتوحة</span><b>${openTickets}</b></div><div class="metric"><span>ملاحظات زيارة مفتوحة</span><b>${openVisitItems}</b></div><div class="metric"><span>احتياج المصاحف</span><b>${quranNeed}</b></div><div class="metric"><span>مصاحف مضافة</span><b>${quranAddedInPeriod}</b></div><div class="metric"><span>مصاحف مسحوبة</span><b>${quranWithdrawnInPeriod}</b></div></div>${sectionsHtml}<div class="footer"><span>منصة إدارة الأملاك والأراضي — وحدة العناية بالمساجد والمصليات الجامعية</span><span>${escapeHtml(generatedAt)}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
     win.document.close();
   };
 
@@ -253,7 +307,7 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
           <div className="flex items-end"><Button type="button" variant="outline" className="w-full" onClick={resetFilters}>مسح الفلاتر</Button></div>
         </CardContent></Card>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/60 p-4"><div><div className="font-black text-sky-950">النتائج المطابقة: {activeRows.toLocaleString('ar-SA')}</div><div className="mt-1 text-xs text-slate-600">{filterSummary()}{visitsLoading ? ' — جاري استكمال بيانات الزيارات...' : ''}</div></div><div className="flex flex-wrap gap-2">{canPrint && <Button variant="outline" onClick={printPdf}><Printer className="ml-2 h-4 w-4" />PDF / طباعة</Button>}<Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={exportExcel}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel احترافي</Button></div></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/60 p-4"><div><div className="font-black text-sky-950">النتائج المطابقة: {activeRows.toLocaleString('ar-SA')}</div><div className="mt-1 text-xs text-slate-600">{filterSummary()}{visitsLoading ? ' — جاري استكمال بيانات الزيارات...' : ''}{quranMovementsLoading ? ' — جاري تحميل حركات المصاحف...' : ''}</div>{['sites', 'quran', 'comprehensive'].includes(settings.reportType) && <div className="mt-1 text-[11px] font-semibold text-emerald-800">المضاف والمسحوب والمرتجع للمصاحف يحتسب حسب الفترة المحددة أعلاه، بينما الرصيد الحالي قيمة لحظية.</div>}</div><div className="flex flex-wrap gap-2">{canPrint && <Button variant="outline" onClick={printPdf}><Printer className="ml-2 h-4 w-4" />PDF / طباعة</Button>}<Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={exportExcel}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel احترافي</Button></div></div>
 
         <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4" />معاينة أقسام التقرير</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{activeSections.map((section) => <div key={section.key} className="rounded-2xl border bg-white p-4 shadow-sm"><div className="flex items-center justify-between gap-2"><strong>{section.title}</strong><Badge variant="outline">{section.rows.length} سجل</Badge></div><p className="mt-2 text-xs text-muted-foreground">{section.rows.length ? `جاهز للتصدير — ${Object.keys(section.rows[0].data).length} أعمدة` : 'لا توجد نتائج مطابقة للفلاتر الحالية'}</p></div>)}</CardContent></Card>
 

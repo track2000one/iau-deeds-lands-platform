@@ -263,7 +263,8 @@ const emptyQuranOpeningBaselineForm = () => ({
 
 type QuranPrintSiteFilter = 'all' | 'mosque' | 'jami' | 'prayer_room_men' | 'prayer_room_women';
 type QuranPrintStateFilter = 'all' | 'with_stock' | 'without_stock' | 'need' | 'damaged' | 'not_counted';
-type QuranPrintSortKey = 'name' | 'total' | 'large' | 'medium' | 'small' | 'damaged' | 'needed' | 'last_count';
+type QuranPrintActivityFilter = 'all' | 'with_activity' | 'added' | 'withdrawn' | 'returned' | 'without_activity';
+type QuranPrintSortKey = 'name' | 'total' | 'large' | 'medium' | 'small' | 'damaged' | 'needed' | 'added' | 'withdrawn' | 'returned' | 'netMovement' | 'last_count';
 type QuranPrintSortDirection = 'asc' | 'desc';
 
 const quranStockMovementTypeLabels: Record<string, string> = {
@@ -507,6 +508,9 @@ export const MosquesUnitPage: React.FC = () => {
   const [quranPrintSearch, setQuranPrintSearch] = useState('');
   const [quranPrintSiteFilter, setQuranPrintSiteFilter] = useState<QuranPrintSiteFilter>('all');
   const [quranPrintStateFilter, setQuranPrintStateFilter] = useState<QuranPrintStateFilter>('all');
+  const [quranPrintActivityFilter, setQuranPrintActivityFilter] = useState<QuranPrintActivityFilter>('all');
+  const [quranPrintFrom, setQuranPrintFrom] = useState('');
+  const [quranPrintTo, setQuranPrintTo] = useState('');
   const [quranPrintSortKey, setQuranPrintSortKey] = useState<QuranPrintSortKey>('name');
   const [quranPrintSortDirection, setQuranPrintSortDirection] = useState<QuranPrintSortDirection>('asc');
   const [quranDialog, setQuranDialog] = useState(false);
@@ -516,6 +520,8 @@ export const MosquesUnitPage: React.FC = () => {
   const [quranHistoryRows, setQuranHistoryRows] = useState<MosqueQuranInventory[]>([]);
   const [quranHistoryLoading, setQuranHistoryLoading] = useState(false);
   const [quranStockDashboard, setQuranStockDashboard] = useState<MosqueQuranStockDashboard | null>(null);
+  const [quranStockMovements, setQuranStockMovements] = useState<MosqueQuranStockMovement[]>([]);
+  const [quranMovementsLoading, setQuranMovementsLoading] = useState(false);
   const [quranOpeningBaselineStatus, setQuranOpeningBaselineStatus] = useState<MosqueQuranOpeningBaselineStatus | null>(null);
   const [quranOpeningBaselineDialog, setQuranOpeningBaselineDialog] = useState(false);
   const [quranOpeningBaselineSite, setQuranOpeningBaselineSite] = useState<MosqueSite | null>(null);
@@ -1222,6 +1228,32 @@ ${quranStockMovementForm.notes}` : ''}`
     finally { setQuranHistoryLoading(false); }
   };
 
+  const quranPeriodMovements = useMemo(() => {
+    return quranStockMovements.filter((movement) => {
+      if (!movement.siteId) return false;
+      const movementDate = String(movement.movementAt || movement.createdAt || '').slice(0, 10);
+      if (quranPrintFrom && movementDate && movementDate < quranPrintFrom) return false;
+      if (quranPrintTo && movementDate && movementDate > quranPrintTo) return false;
+      return true;
+    });
+  }, [quranStockMovements, quranPrintFrom, quranPrintTo]);
+
+  const quranMovementStatsBySite = useMemo(() => {
+    const stats = new Map<string, { added: number; withdrawn: number; returned: number; netMovement: number; movements: number }>();
+    for (const movement of quranPeriodMovements) {
+      if (!movement.siteId) continue;
+      const current = stats.get(movement.siteId) || { added: 0, withdrawn: 0, returned: 0, netMovement: 0, movements: 0 };
+      const quantity = Number(movement.totalCount || 0);
+      if (movement.movementType === 'distribution') current.added += quantity;
+      if (movement.movementType === 'site_withdrawal') current.withdrawn += quantity;
+      if (movement.movementType === 'return') current.returned += quantity;
+      current.netMovement = current.added - current.withdrawn - current.returned;
+      current.movements += 1;
+      stats.set(movement.siteId, current);
+    }
+    return stats;
+  }, [quranPeriodMovements]);
+
   const quranPrintRows = useMemo(() => {
     const q = quranPrintSearch.trim().toLowerCase();
     const rows = quranInventoryItems.map((item) => {
@@ -1238,7 +1270,8 @@ ${quranStockMovementForm.notes}` : ''}`
       const needed = Number(stockRow?.needCount ?? 0);
       const coverage = stockRow?.coveragePercent ?? (target > 0 ? Math.min(100, Math.round((total / target) * 100)) : null);
       const lastCountAt = latest?.countedAt ? new Date(latest.countedAt).getTime() : 0;
-      return { item, site, latest, large, medium, small, total, damaged, target, needed, coverage, lastCountAt };
+      const movement = quranMovementStatsBySite.get(site.id) || { added: 0, withdrawn: 0, returned: 0, netMovement: 0, movements: 0 };
+      return { item, site, latest, large, medium, small, total, damaged, target, needed, coverage, lastCountAt, ...movement };
     }).filter((row) => {
       const matchesSearch = !q || [row.site.name, row.site.city, row.site.district, row.site.campusLocation]
         .filter(Boolean)
@@ -1254,7 +1287,14 @@ ${quranStockMovementForm.notes}` : ''}`
         || (quranPrintStateFilter === 'need' && row.needed > 0)
         || (quranPrintStateFilter === 'damaged' && row.damaged > 0)
         || (quranPrintStateFilter === 'not_counted' && !row.latest);
-      return matchesSearch && matchesSite && matchesState;
+      const activityTotal = row.added + row.withdrawn + row.returned;
+      const matchesActivity = quranPrintActivityFilter === 'all'
+        || (quranPrintActivityFilter === 'with_activity' && activityTotal > 0)
+        || (quranPrintActivityFilter === 'without_activity' && activityTotal === 0)
+        || (quranPrintActivityFilter === 'added' && row.added > 0)
+        || (quranPrintActivityFilter === 'withdrawn' && row.withdrawn > 0)
+        || (quranPrintActivityFilter === 'returned' && row.returned > 0);
+      return matchesSearch && matchesSite && matchesState && matchesActivity;
     });
 
     rows.sort((a, b) => {
@@ -1266,7 +1306,7 @@ ${quranStockMovementForm.notes}` : ''}`
       return quranPrintSortDirection === 'desc' ? compared * -1 : compared;
     });
     return rows;
-  }, [quranInventoryItems, sites, quranStockDashboard, quranPrintSearch, quranPrintSiteFilter, quranPrintStateFilter, quranPrintSortKey, quranPrintSortDirection]);
+  }, [quranInventoryItems, sites, quranStockDashboard, quranPrintSearch, quranPrintSiteFilter, quranPrintStateFilter, quranPrintActivityFilter, quranPrintSortKey, quranPrintSortDirection, quranMovementStatsBySite]);
 
   const quranPrintStats = useMemo(() => quranPrintRows.reduce((stats, row) => ({
     sites: stats.sites + 1,
@@ -1276,29 +1316,63 @@ ${quranStockMovementForm.notes}` : ''}`
     small: stats.small + row.small,
     damaged: stats.damaged + row.damaged,
     needed: stats.needed + row.needed,
-  }), { sites: 0, total: 0, large: 0, medium: 0, small: 0, damaged: 0, needed: 0 }), [quranPrintRows]);
+    added: stats.added + row.added,
+    withdrawn: stats.withdrawn + row.withdrawn,
+    returned: stats.returned + row.returned,
+    netMovement: stats.netMovement + row.netMovement,
+  }), { sites: 0, total: 0, large: 0, medium: 0, small: 0, damaged: 0, needed: 0, added: 0, withdrawn: 0, returned: 0, netMovement: 0 }), [quranPrintRows]);
 
-  const openQuranPrintDialog = () => {
+  const quranPrintMovementRows = useMemo(() => {
+    const allowedSiteIds = new Set(quranPrintRows.map((row) => row.site.id));
+    return quranPeriodMovements
+      .filter((movement) => {
+        if (!movement.siteId || !allowedSiteIds.has(movement.siteId)) return false;
+        if (quranPrintActivityFilter === 'added') return movement.movementType === 'distribution';
+        if (quranPrintActivityFilter === 'withdrawn') return movement.movementType === 'site_withdrawal';
+        if (quranPrintActivityFilter === 'returned') return movement.movementType === 'return';
+        if (quranPrintActivityFilter === 'without_activity') return false;
+        return ['distribution', 'site_withdrawal', 'return'].includes(movement.movementType);
+      })
+      .sort((a, b) => new Date(b.movementAt).getTime() - new Date(a.movementAt).getTime());
+  }, [quranPeriodMovements, quranPrintRows, quranPrintActivityFilter]);
+
+  const openQuranPrintDialog = async () => {
     setQuranPrintSearch(quranSearch);
     setQuranPrintSiteFilter('all');
     setQuranPrintStateFilter(quranNeedOnly ? 'need' : 'all');
+    setQuranPrintActivityFilter('all');
+    setQuranPrintFrom('');
+    setQuranPrintTo('');
     setQuranPrintSortKey('name');
     setQuranPrintSortDirection('asc');
     setQuranPrintDialog(true);
+    setQuranMovementsLoading(true);
+    try {
+      setQuranStockMovements(await mosqueApi.quranStockMovements());
+    } catch (error) {
+      setQuranStockMovements([]);
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل سجل حركات المصاحف للتقرير');
+    } finally {
+      setQuranMovementsLoading(false);
+    }
   };
 
   const resetQuranPrintFilters = () => {
     setQuranPrintSearch('');
     setQuranPrintSiteFilter('all');
     setQuranPrintStateFilter('all');
+    setQuranPrintActivityFilter('all');
+    setQuranPrintFrom('');
+    setQuranPrintTo('');
     setQuranPrintSortKey('name');
     setQuranPrintSortDirection('asc');
   };
 
   const exportQuranInventoryExcel = async () => {
     if (!quranPrintRows.length) return toast.info('لا توجد بيانات مصاحف مطابقة لمعايير التقرير');
+    if (quranMovementsLoading) return toast.info('جاري تحميل حركات المصاحف، انتظر لحظة ثم أعد التصدير');
     const workbook = XLSX.utils.book_new();
-    appendExcelReportSheet(workbook, 'حصر المصاحف', quranPrintRows.map((row, index) => ({
+    appendExcelReportSheet(workbook, 'ملخص المواقع', quranPrintRows.map((row, index) => ({
       'م': index + 1,
       'المسجد / المصلى': row.site.name,
       'النوع': siteTypeDisplayLabel(row.site),
@@ -1306,49 +1380,88 @@ ${quranStockMovementForm.notes}` : ''}`
       'كبيرة': row.large,
       'متوسطة': row.medium,
       'صغيرة': row.small,
-      'الإجمالي': row.total,
-      'المسحوبة': row.damaged,
+      'الرصيد الحالي': row.total,
+      'المضاف خلال الفترة': row.added,
+      'المسحوب خلال الفترة': row.withdrawn,
+      'المرتجع خلال الفترة': row.returned,
+      'صافي الحركة': row.netMovement,
+      'المسحوب التراكمي': row.damaged,
       'المستهدف': row.target || 0,
       'التغطية %': row.coverage ?? '-',
       'الاحتياج': row.needed,
       'آخر جرد': row.latest ? new Date(row.latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لم يجرد',
     })));
+    appendExcelReportSheet(workbook, 'حركات الفترة', quranPrintMovementRows.map((movement, index) => ({
+      'م': index + 1,
+      'رقم الحركة': movement.movementNumber,
+      'التاريخ': new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory'),
+      'المسجد / المصلى': movement.site?.name || sites.find((site) => site.id === movement.siteId)?.name || '-',
+      'نوع الحركة': quranStockMovementDisplayLabel(movement),
+      'كبير': movement.largeCount,
+      'متوسط': movement.mediumCount,
+      'صغير': movement.smallCount,
+      'الإجمالي': movement.totalCount,
+      'المرجع': movement.referenceNumber || '-',
+      'نفذت بواسطة': movement.createdByName || '-',
+      'الملاحظات': movement.notes || '-',
+    })), 'لا توجد حركات مصاحف مطابقة للفترة والمعايير المحددة');
     appendExcelReportSheet(workbook, 'ملخص التقرير', [{
       'عدد المواقع': quranPrintStats.sites,
-      'إجمالي المصاحف': quranPrintStats.total,
-      'الكبيرة': quranPrintStats.large,
-      'المتوسطة': quranPrintStats.medium,
-      'الصغيرة': quranPrintStats.small,
-      'المسحوبة': quranPrintStats.damaged,
+      'الرصيد الحالي': quranPrintStats.total,
+      'المضاف خلال الفترة': quranPrintStats.added,
+      'المسحوب خلال الفترة': quranPrintStats.withdrawn,
+      'المرتجع خلال الفترة': quranPrintStats.returned,
+      'صافي الحركة': quranPrintStats.netMovement,
       'الاحتياج': quranPrintStats.needed,
+      'من تاريخ': quranPrintFrom || 'بداية السجل',
+      'إلى تاريخ': quranPrintTo || 'حتى الآن',
+      'عدد الحركات': quranPrintMovementRows.length,
       'تاريخ التصدير': new Date().toLocaleString('ar-SA-u-ca-gregory'),
     }]);
     appendExcelReportSheet(workbook, 'الصور والمرفقات', siteMediaExcelRows(quranPrintRows.map((row) => row.site)), 'لا توجد صور أو مرفقات للمواقع الظاهرة في التقرير');
-    await writeProfessionalExcel(workbook, `quran-inventory-report-${excelReportDateStamp()}.xlsx`, { title: 'تقرير إدارة وحصر المصاحف', subtitle: `عدد المواقع: ${quranPrintRows.length}`, orientation: 'landscape', metrics: [{ label: 'المواقع', value: quranPrintStats.sites, tone: 'blue' }, { label: 'إجمالي المصاحف', value: quranPrintStats.total, tone: 'green' }, { label: 'الكبيرة', value: quranPrintStats.large }, { label: 'المتوسطة', value: quranPrintStats.medium }, { label: 'الصغيرة', value: quranPrintStats.small }, { label: 'المسحوبة', value: quranPrintStats.damaged, tone: 'red' }, { label: 'الاحتياج', value: quranPrintStats.needed, tone: 'amber' }], imageLoader: async (fileId, url) => fileId ? mosqueApi.mediaBlob(fileId) : (url ? fetch(url).then((response) => response.ok ? response.blob() : null) : null) });
-    toast.success('تم تجهيز تقرير المصاحف بصيغة Excel مع ورقة الصور والمرفقات');
+    await writeProfessionalExcel(workbook, `quran-movement-report-${excelReportDateStamp()}.xlsx`, {
+      title: 'تقرير المصاحف والحركات',
+      subtitle: `المواقع: ${quranPrintRows.length} — الفترة: ${quranPrintFrom || 'بداية السجل'} إلى ${quranPrintTo || 'الآن'}`,
+      orientation: 'landscape',
+      metrics: [
+        { label: 'المواقع', value: quranPrintStats.sites, tone: 'blue' },
+        { label: 'الرصيد الحالي', value: quranPrintStats.total, tone: 'green' },
+        { label: 'المضاف', value: quranPrintStats.added, tone: 'green' },
+        { label: 'المسحوب', value: quranPrintStats.withdrawn, tone: 'red' },
+        { label: 'المرتجع', value: quranPrintStats.returned, tone: 'amber' },
+        { label: 'الاحتياج', value: quranPrintStats.needed, tone: 'amber' },
+      ],
+      imageLoader: async (fileId, url) => fileId ? mosqueApi.mediaBlob(fileId) : (url ? fetch(url).then((response) => response.ok ? response.blob() : null) : null),
+    });
+    toast.success('تم تجهيز تقرير المصاحف والحركات بصيغة Excel');
   };
 
   const printQuranInventory = () => {
     if (!quranPrintRows.length) return toast.info('لا توجد بيانات مصاحف مطابقة لمعايير الطباعة');
-    const printWindow = window.open('', '_blank', 'width=1400,height=950');
+    if (quranMovementsLoading) return toast.info('جاري تحميل حركات المصاحف، انتظر لحظة ثم أعد الطباعة');
+    const printWindow = window.open('', '_blank', 'width=1450,height=950');
     if (!printWindow) return toast.error('تعذر فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة ثم أعد المحاولة.');
-    const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char] || char));
-    const siteFilterLabels: Record<QuranPrintSiteFilter, string> = { all: 'جميع المواقع', mosque: 'المساجد', jami: 'الجوامع', prayer_room_men: 'مصليات الرجال', prayer_room_women: 'مصليات النساء' };
-    const stateFilterLabels: Record<QuranPrintStateFilter, string> = { all: 'جميع الحالات', with_stock: 'لديه رصيد', without_stock: 'بدون رصيد', need: 'لديه احتياج', damaged: 'لديه مصاحف مسحوبة', not_counted: 'لم يسبق جرده' };
-    const sortLabels: Record<QuranPrintSortKey, string> = { name: 'اسم الموقع', total: 'الإجمالي', large: 'الكبيرة', medium: 'المتوسطة', small: 'الصغيرة', damaged: 'المسحوبة', needed: 'الاحتياج', last_count: 'آخر جرد' };
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char] || char));
+    const siteFilterLabels = { all: 'جميع المواقع', mosque: 'المساجد', jami: 'الجوامع', prayer_room_men: 'مصليات الرجال', prayer_room_women: 'مصليات النساء' };
+    const stateFilterLabels = { all: 'جميع الحالات', with_stock: 'لديه رصيد', without_stock: 'بدون رصيد', need: 'لديه احتياج', damaged: 'لديه مصاحف مسحوبة', not_counted: 'لم يسبق جرده' };
+    const activityFilterLabels = { all: 'جميع المواقع', with_activity: 'لديها حركة خلال الفترة', added: 'تمت إضافة مصاحف', withdrawn: 'تم سحب مصاحف', returned: 'تم إرجاع مصاحف', without_activity: 'بدون حركة خلال الفترة' };
+    const sortLabels = { name: 'اسم الموقع', total: 'الرصيد الحالي', large: 'الكبيرة', medium: 'المتوسطة', small: 'الصغيرة', damaged: 'المسحوب التراكمي', needed: 'الاحتياج', added: 'المضاف', withdrawn: 'المسحوب', returned: 'المرتجع', netMovement: 'صافي الحركة', last_count: 'آخر جرد' };
     const rows = quranPrintRows.map((row, index) => {
       const location = [row.site.campusLocation, row.site.city, row.site.district].filter(Boolean).join(' — ') || '-';
-      return `<tr><td>${index + 1}</td><td class="name">${esc(row.site.name)}</td><td>${esc(siteTypeDisplayLabel(row.site))}</td><td class="location">${esc(location)}</td><td>${row.large}</td><td>${row.medium}</td><td>${row.small}</td><td class="total">${row.total}</td><td class="damaged">${row.damaged}</td><td>${row.target || '-'}</td><td>${row.coverage == null ? '-' : `${row.coverage}%`}</td><td class="needed">${row.needed}</td><td>${row.latest ? esc(new Date(row.latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory')) : 'لم يجرد'}</td></tr>`;
+      return `<tr><td>${index + 1}</td><td class="name">${esc(row.site.name)}</td><td>${esc(siteTypeDisplayLabel(row.site))}</td><td class="location">${esc(location)}</td><td>${row.total}</td><td class="added">${row.added}</td><td class="withdrawn">${row.withdrawn}</td><td class="returned">${row.returned}</td><td class="net">${row.netMovement}</td><td>${row.target || '-'}</td><td>${row.coverage == null ? '-' : `${row.coverage}%`}</td><td class="needed">${row.needed}</td><td>${row.latest ? esc(new Date(row.latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory')) : 'لم يجرد'}</td></tr>`;
     }).join('');
+    const movementRows = quranPrintMovementRows.map((movement, index) => `<tr><td>${index + 1}</td><td>${esc(movement.movementNumber)}</td><td>${esc(new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory'))}</td><td class="name">${esc(movement.site?.name || sites.find((site) => site.id === movement.siteId)?.name || '-')}</td><td>${esc(quranStockMovementDisplayLabel(movement))}</td><td>${movement.largeCount}</td><td>${movement.mediumCount}</td><td>${movement.smallCount}</td><td class="total">${movement.totalCount}</td><td>${esc(movement.referenceNumber || '-')}</td></tr>`).join('');
     const filterSummary = [
       quranPrintSearch.trim() ? `بحث: ${quranPrintSearch.trim()}` : '',
       siteFilterLabels[quranPrintSiteFilter],
       stateFilterLabels[quranPrintStateFilter],
+      activityFilterLabels[quranPrintActivityFilter],
+      `الفترة: ${quranPrintFrom || 'بداية السجل'} إلى ${quranPrintTo || 'الآن'}`,
       `الترتيب: ${sortLabels[quranPrintSortKey]} (${quranPrintSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'})`,
     ].filter(Boolean).join(' — ');
-    const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير حصر المصاحف</title><style>
-      @page{size:A4 landscape;margin:6mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;margin:0;color:#172033;font-size:8.5px;direction:rtl}.head{border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;background:linear-gradient(90deg,#f0fdfa,#fff,#eff6ff)}.kicker{font-size:8px;color:#64748b;margin-bottom:3px}.title-row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}h1{font-size:18px;margin:0;color:#123047}.count{border:1px solid #93c5fd;background:#eff6ff;border-radius:999px;padding:4px 10px;font-weight:800}.meta{color:#64748b;margin-top:4px}.filters{margin-top:7px;border-top:1px solid #dbeafe;padding-top:6px;color:#334155;font-size:8px}.metrics{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:8px 0}.metric{border:1px solid #cbd5e1;border-radius:7px;padding:6px;background:#f8fafc;text-align:center}.metric span{display:block;color:#64748b;font-size:7px}.metric b{display:block;font-size:13px;margin-top:2px}.metric.emerald{border-color:#a7f3d0;background:#ecfdf5}.metric.red{border-color:#fecaca;background:#fef2f2}.metric.amber{border-color:#fde68a;background:#fffbeb}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #cbd5e1;padding:4px 3px;text-align:center;vertical-align:middle;line-height:1.45}th{background:#e0f2fe;font-weight:900;font-size:7.5px}.name{text-align:right;font-weight:800;width:15%}.location{text-align:right;font-size:7.5px;width:20%}.total{font-weight:900;background:#ecfdf5}.damaged{color:#b91c1c;font-weight:800}.needed{color:#b45309;font-weight:800}.footer{margin-top:7px;padding-top:5px;border-top:1px solid #e2e8f0;color:#64748b;font-size:7px;display:flex;justify-content:space-between;gap:10px}@media print{body{print-color-adjust:exact}}
-    </style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><div class="title-row"><h1>تقرير إدارة وحصر المصاحف</h1><span class="count">${quranPrintRows.length} موقع</span></div><div class="meta">تاريخ الاستخراج: ${esc(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</div><div class="filters"><strong>معايير التقرير:</strong> ${esc(filterSummary)}</div></div><div class="metrics"><div class="metric"><span>المواقع</span><b>${quranPrintStats.sites}</b></div><div class="metric emerald"><span>إجمالي المصاحف</span><b>${quranPrintStats.total}</b></div><div class="metric"><span>الكبيرة</span><b>${quranPrintStats.large}</b></div><div class="metric"><span>المتوسطة</span><b>${quranPrintStats.medium}</b></div><div class="metric"><span>الصغيرة</span><b>${quranPrintStats.small}</b></div><div class="metric red"><span>المسحوبة</span><b>${quranPrintStats.damaged}</b></div><div class="metric amber"><span>الاحتياج</span><b>${quranPrintStats.needed}</b></div></div><table><thead><tr><th style="width:3%">م</th><th style="width:15%">المسجد / المصلى</th><th style="width:8%">النوع</th><th style="width:20%">الموقع</th><th>كبيرة</th><th>متوسطة</th><th>صغيرة</th><th>الإجمالي</th><th>المسحوبة</th><th>المستهدف</th><th>التغطية</th><th>الاحتياج</th><th style="width:8%">آخر جرد</th></tr></thead><tbody>${rows}</tbody></table><div class="footer"><span>منصة إدارة الأملاك والأراضي — IAU Deeds</span><span>تم تطبيق الفرز والتصفية قبل إنشاء التقرير. المصاحف المسحوبة لا تضاف إلى إجمالي الأحجام.</span></div></body></html>`;
+    const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير المصاحف والحركات</title><style>
+      @page{size:A4 landscape;margin:6mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;margin:0;color:#172033;font-size:8px;direction:rtl}.head{border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;background:linear-gradient(90deg,#f0fdfa,#fff,#eff6ff)}.kicker{font-size:8px;color:#64748b;margin-bottom:3px}.title-row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}h1{font-size:18px;margin:0;color:#123047}.count{border:1px solid #93c5fd;background:#eff6ff;border-radius:999px;padding:4px 10px;font-weight:800}.meta{color:#64748b;margin-top:4px}.filters{margin-top:7px;border-top:1px solid #dbeafe;padding-top:6px;color:#334155;font-size:8px}.metrics{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:8px 0}.metric{border:1px solid #cbd5e1;border-radius:7px;padding:6px;background:#f8fafc;text-align:center}.metric span{display:block;color:#64748b;font-size:7px}.metric b{display:block;font-size:13px;margin-top:2px}.metric.emerald{border-color:#a7f3d0;background:#ecfdf5}.metric.red{border-color:#fecaca;background:#fef2f2}.metric.amber{border-color:#fde68a;background:#fffbeb}.section-title{margin:12px 0 5px;font-size:13px;font-weight:900;color:#123047}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:4px 3px;text-align:center;vertical-align:middle;line-height:1.4}th{background:#e0f2fe;font-weight:900;font-size:7.2px}.name{text-align:right;font-weight:800}.location{text-align:right;font-size:7px}.total,.added{font-weight:900;color:#047857}.withdrawn{font-weight:900;color:#b91c1c}.returned{font-weight:900;color:#b45309}.net{font-weight:900;color:#0369a1}.needed{color:#b45309;font-weight:800}.footer{margin-top:7px;padding-top:5px;border-top:1px solid #e2e8f0;color:#64748b;font-size:7px;display:flex;justify-content:space-between;gap:10px}.movements{margin-top:12px;break-before:auto}@media print{body{print-color-adjust:exact}}
+    </style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><div class="title-row"><h1>تقرير المصاحف والحركات</h1><span class="count">${quranPrintRows.length} موقع</span></div><div class="meta">تاريخ الاستخراج: ${esc(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</div><div class="filters"><strong>معايير التقرير:</strong> ${esc(filterSummary)}</div></div><div class="metrics"><div class="metric"><span>المواقع</span><b>${quranPrintStats.sites}</b></div><div class="metric emerald"><span>الرصيد الحالي</span><b>${quranPrintStats.total}</b></div><div class="metric emerald"><span>المضاف</span><b>${quranPrintStats.added}</b></div><div class="metric red"><span>المسحوب</span><b>${quranPrintStats.withdrawn}</b></div><div class="metric amber"><span>المرتجع</span><b>${quranPrintStats.returned}</b></div><div class="metric"><span>صافي الحركة</span><b>${quranPrintStats.netMovement}</b></div><div class="metric amber"><span>الاحتياج</span><b>${quranPrintStats.needed}</b></div></div><div class="section-title">ملخص المساجد والمصليات</div><table><thead><tr><th>م</th><th>المسجد / المصلى</th><th>النوع</th><th>الموقع</th><th>الرصيد الحالي</th><th>المضاف</th><th>المسحوب</th><th>المرتجع</th><th>صافي الحركة</th><th>المستهدف</th><th>التغطية</th><th>الاحتياج</th><th>آخر جرد</th></tr></thead><tbody>${rows}</tbody></table>${movementRows ? `<div class="movements"><div class="section-title">تفاصيل الحركات خلال الفترة (${quranPrintMovementRows.length})</div><table><thead><tr><th>م</th><th>رقم الحركة</th><th>التاريخ</th><th>المسجد / المصلى</th><th>نوع الحركة</th><th>كبير</th><th>متوسط</th><th>صغير</th><th>الإجمالي</th><th>المرجع</th></tr></thead><tbody>${movementRows}</tbody></table></div>` : ''}<div class="footer"><span>منصة إدارة الأملاك والأراضي — وحدة العناية بالمساجد والمصليات الجامعية</span><span>الرصيد الحالي قيمة لحظية، بينما المضاف والمسحوب والمرتجع تحسب حسب الفترة المحددة.</span></div></body></html>`;
     printWindow.document.open();
     printWindow.document.write(html);
     printWindow.document.close();
@@ -3586,45 +3699,61 @@ ${quranStockMovementForm.notes}` : ''}`
           </DialogHeader>
           <div className="min-h-0 space-y-5 overflow-y-auto overscroll-contain p-4 pb-6 md:p-6">
             <Card className="overflow-hidden border-sky-200/80 bg-white/95 shadow-sm">
-              <CardHeader className="border-b border-sky-100 bg-sky-50/60 pb-3"><CardTitle className="flex items-center gap-2 text-base"><Filter className="h-4 w-4 text-sky-700" />التصفية</CardTitle></CardHeader>
+              <CardHeader className="border-b border-sky-100 bg-sky-50/60 pb-3"><CardTitle className="flex items-center gap-2 text-base"><Filter className="h-4 w-4 text-sky-700" />التصفية والفترة الزمنية</CardTitle><CardDescription>الرصيد الحالي لحظي، بينما المضاف والمسحوب والمرتجع تحسب حسب الفترة المحددة.</CardDescription></CardHeader>
               <CardContent className="grid gap-4 pt-5 md:grid-cols-2 xl:grid-cols-4">
                 <div className="md:col-span-2"><Field label="بحث داخل التقرير"><div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input className="h-11 pr-10" value={quranPrintSearch} onChange={(e) => setQuranPrintSearch(e.target.value)} placeholder="اسم المسجد أو المصلى، المدينة، الحي، الموقع..." /></div></Field></div>
                 <Field label="نوع الموقع"><NativeSelect className="h-11" value={quranPrintSiteFilter} onChange={(e) => setQuranPrintSiteFilter(e.target.value as QuranPrintSiteFilter)}><option value="all">جميع المواقع</option><option value="mosque">المساجد فقط</option><option value="jami">الجوامع فقط</option><option value="prayer_room_men">مصليات الرجال</option><option value="prayer_room_women">مصليات النساء</option></NativeSelect></Field>
                 <Field label="حالة الرصيد"><NativeSelect className="h-11" value={quranPrintStateFilter} onChange={(e) => setQuranPrintStateFilter(e.target.value as QuranPrintStateFilter)}><option value="all">جميع الحالات</option><option value="with_stock">لديه رصيد</option><option value="without_stock">بدون رصيد</option><option value="need">لديه احتياج</option><option value="damaged">لديه مصاحف مسحوبة</option><option value="not_counted">لم يسبق جرده</option></NativeSelect></Field>
+                <Field label="من تاريخ"><Input className="h-11" type="date" value={quranPrintFrom} onChange={(e) => setQuranPrintFrom(e.target.value)} /></Field>
+                <Field label="إلى تاريخ"><Input className="h-11" type="date" value={quranPrintTo} onChange={(e) => setQuranPrintTo(e.target.value)} /></Field>
+                <Field label="حركة المصاحف"><NativeSelect className="h-11" value={quranPrintActivityFilter} onChange={(e) => setQuranPrintActivityFilter(e.target.value as QuranPrintActivityFilter)}><option value="all">جميع المواقع</option><option value="with_activity">لديها حركة خلال الفترة</option><option value="added">تمت إضافة مصاحف</option><option value="withdrawn">تم سحب مصاحف</option><option value="returned">تم إرجاع مصاحف</option><option value="without_activity">بدون حركة خلال الفترة</option></NativeSelect></Field>
+                <div className="flex items-end"><Badge variant="outline" className={`h-11 w-full justify-center px-3 font-bold ${quranMovementsLoading ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-emerald-300 bg-emerald-50 text-emerald-800'}`}>{quranMovementsLoading ? 'جاري تحميل سجل الحركات...' : `حركات الفترة: ${quranPrintMovementRows.length}`}</Badge></div>
               </CardContent>
             </Card>
 
             <Card className="overflow-hidden border-emerald-200/80 bg-white/95 shadow-sm">
               <CardHeader className="border-b border-emerald-100 bg-emerald-50/50 pb-3"><CardTitle className="text-base">الفرز وترتيب التقرير</CardTitle></CardHeader>
               <CardContent className="grid gap-4 pt-5 md:grid-cols-[1fr_1fr_auto] md:items-end">
-                <Field label="الفرز حسب"><NativeSelect className="h-11" value={quranPrintSortKey} onChange={(e) => setQuranPrintSortKey(e.target.value as QuranPrintSortKey)}><option value="name">اسم الموقع</option><option value="total">إجمالي المصاحف</option><option value="large">المصاحف الكبيرة</option><option value="medium">المصاحف المتوسطة</option><option value="small">المصاحف الصغيرة</option><option value="damaged">المسحوبة</option><option value="needed">الاحتياج</option><option value="last_count">آخر جرد</option></NativeSelect></Field>
+                <Field label="الفرز حسب"><NativeSelect className="h-11" value={quranPrintSortKey} onChange={(e) => setQuranPrintSortKey(e.target.value as QuranPrintSortKey)}><option value="name">اسم الموقع</option><option value="total">الرصيد الحالي</option><option value="added">المضاف خلال الفترة</option><option value="withdrawn">المسحوب خلال الفترة</option><option value="returned">المرتجع خلال الفترة</option><option value="netMovement">صافي الحركة</option><option value="large">المصاحف الكبيرة</option><option value="medium">المصاحف المتوسطة</option><option value="small">المصاحف الصغيرة</option><option value="damaged">المسحوب التراكمي</option><option value="needed">الاحتياج</option><option value="last_count">آخر جرد</option></NativeSelect></Field>
                 <Field label="اتجاه الفرز"><NativeSelect className="h-11" value={quranPrintSortDirection} onChange={(e) => setQuranPrintSortDirection(e.target.value as QuranPrintSortDirection)}><option value="asc">تصاعدي</option><option value="desc">تنازلي</option></NativeSelect></Field>
                 <Button type="button" variant="outline" className={`${button3d} h-11`} onClick={resetQuranPrintFilters}><RefreshCw className="ml-2 h-4 w-4" />إعادة الضبط</Button>
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
               <ReportMetric label="المواقع" value={quranPrintStats.sites} />
-              <ReportMetric label="إجمالي المصاحف" value={quranPrintStats.total} />
+              <ReportMetric label="الرصيد الحالي" value={quranPrintStats.total} />
+              <ReportMetric label="المضاف خلال الفترة" value={quranPrintStats.added} />
+              <ReportMetric label="المسحوب خلال الفترة" value={quranPrintStats.withdrawn} />
+              <ReportMetric label="المرتجع خلال الفترة" value={quranPrintStats.returned} />
+              <ReportMetric label="صافي الحركة" value={quranPrintStats.netMovement} />
               <ReportMetric label="الكبيرة" value={quranPrintStats.large} />
               <ReportMetric label="المتوسطة" value={quranPrintStats.medium} />
               <ReportMetric label="الصغيرة" value={quranPrintStats.small} />
-              <ReportMetric label="المسحوبة" value={quranPrintStats.damaged} />
+              <ReportMetric label="المسحوب التراكمي" value={quranPrintStats.damaged} />
               <ReportMetric label="الاحتياج" value={quranPrintStats.needed} />
+              <ReportMetric label="عدد الحركات" value={quranPrintMovementRows.length} />
             </div>
 
             <Card className="overflow-hidden border-slate-200 bg-white/95">
-              <CardHeader className="gap-2 border-b bg-slate-50/80 pb-3 md:flex-row md:items-center md:justify-between"><div><CardTitle className="text-base">معاينة النتائج</CardTitle><CardDescription>تظهر أول 12 نتيجة فقط هنا، بينما يشمل التقرير جميع النتائج المطابقة.</CardDescription></div><Badge variant="outline" className="w-fit border-sky-200 bg-white">{quranPrintRows.length} موقع مطابق</Badge></CardHeader>
+              <CardHeader className="gap-2 border-b bg-slate-50/80 pb-3 md:flex-row md:items-center md:justify-between"><div><CardTitle className="text-base">ملخص المواقع</CardTitle><CardDescription>الرصيد الحالي مع إجماليات الإضافة والسحب والإرجاع حسب الفترة.</CardDescription></div><Badge variant="outline" className="w-fit border-sky-200 bg-white">{quranPrintRows.length} موقع مطابق</Badge></CardHeader>
               <CardContent className="p-0">
-                {quranPrintRows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-sm"><thead className="bg-sky-50 text-slate-700"><tr><th className="p-3 text-right">المسجد / المصلى</th><th className="p-3">النوع</th><th className="p-3">الإجمالي</th><th className="p-3">كبيرة</th><th className="p-3">متوسطة</th><th className="p-3">صغيرة</th><th className="p-3">المسحوبة</th><th className="p-3">الاحتياج</th><th className="p-3">آخر جرد</th></tr></thead><tbody>{quranPrintRows.slice(0, 12).map((row) => <tr key={row.site.id} className="border-t"><td className="p-3 font-bold text-slate-800">{row.site.name}</td><td className="p-3 text-center">{siteTypeDisplayLabel(row.site)}</td><td className="p-3 text-center text-lg font-black text-emerald-700">{row.total}</td><td className="p-3 text-center">{row.large}</td><td className="p-3 text-center">{row.medium}</td><td className="p-3 text-center">{row.small}</td><td className="p-3 text-center font-bold text-red-600">{row.damaged}</td><td className="p-3 text-center font-bold text-amber-700">{row.needed}</td><td className="p-3 text-center text-xs">{row.latest ? new Date(row.latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لم يجرد'}</td></tr>)}</tbody></table></div> : <div className="p-10"><Empty text="لا توجد نتائج مطابقة لمعايير الطباعة الحالية" /></div>}
+                {quranPrintRows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[1180px] text-sm"><thead className="bg-sky-50 text-slate-700"><tr><th className="p-3 text-right">المسجد / المصلى</th><th className="p-3">النوع</th><th className="p-3">الرصيد الحالي</th><th className="p-3">المضاف</th><th className="p-3">المسحوب</th><th className="p-3">المرتجع</th><th className="p-3">صافي الحركة</th><th className="p-3">المستهدف</th><th className="p-3">التغطية</th><th className="p-3">الاحتياج</th><th className="p-3">آخر جرد</th></tr></thead><tbody>{quranPrintRows.slice(0, 12).map((row) => <tr key={row.site.id} className="border-t"><td className="p-3 font-bold text-slate-800">{row.site.name}</td><td className="p-3 text-center">{siteTypeDisplayLabel(row.site)}</td><td className="p-3 text-center text-lg font-black text-emerald-700">{row.total}</td><td className="p-3 text-center font-black text-emerald-700">{row.added}</td><td className="p-3 text-center font-black text-red-600">{row.withdrawn}</td><td className="p-3 text-center font-black text-amber-700">{row.returned}</td><td className="p-3 text-center font-black text-sky-700">{row.netMovement}</td><td className="p-3 text-center">{row.target || '-'}</td><td className="p-3 text-center">{row.coverage == null ? '-' : `${row.coverage}%`}</td><td className="p-3 text-center font-bold text-amber-700">{row.needed}</td><td className="p-3 text-center text-xs">{row.latest ? new Date(row.latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لم يجرد'}</td></tr>)}</tbody></table></div> : <div className="p-10"><Empty text="لا توجد نتائج مطابقة لمعايير التقرير الحالية" /></div>}
+              </CardContent>
+            </Card>
+
+            <Card className="overflow-hidden border-violet-200 bg-white/95">
+              <CardHeader className="gap-2 border-b bg-violet-50/60 pb-3 md:flex-row md:items-center md:justify-between"><div><CardTitle className="text-base">تفاصيل حركات المصاحف</CardTitle><CardDescription>سجل رقابي للحركات المطابقة للفترة والمواقع الحالية.</CardDescription></div><Badge variant="outline" className="w-fit border-violet-200 bg-white">{quranPrintMovementRows.length} حركة</Badge></CardHeader>
+              <CardContent className="p-0">
+                {quranPrintMovementRows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-sm"><thead className="bg-violet-50 text-slate-700"><tr><th className="p-3">رقم الحركة</th><th className="p-3">التاريخ</th><th className="p-3 text-right">المسجد / المصلى</th><th className="p-3">نوع الحركة</th><th className="p-3">كبير</th><th className="p-3">متوسط</th><th className="p-3">صغير</th><th className="p-3">الإجمالي</th><th className="p-3">المرجع</th></tr></thead><tbody>{quranPrintMovementRows.slice(0, 20).map((movement) => <tr key={movement.id} className="border-t"><td className="p-3 text-center font-mono text-xs">{movement.movementNumber}</td><td className="p-3 text-center text-xs">{new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td><td className="p-3 font-bold">{movement.site?.name || sites.find((site) => site.id === movement.siteId)?.name || '-'}</td><td className="p-3 text-center"><Badge variant="outline">{quranStockMovementDisplayLabel(movement)}</Badge></td><td className="p-3 text-center">{movement.largeCount}</td><td className="p-3 text-center">{movement.mediumCount}</td><td className="p-3 text-center">{movement.smallCount}</td><td className="p-3 text-center font-black">{movement.totalCount}</td><td className="p-3 text-center">{movement.referenceNumber || '-'}</td></tr>)}</tbody></table></div> : <div className="p-8"><Empty text="لا توجد حركات مصاحف مطابقة للفترة الحالية" /></div>}
               </CardContent>
             </Card>
           </div>
-          <DialogFooter className="relative z-20 shrink-0 border-t border-sky-100 bg-white p-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] md:px-6">
+<DialogFooter className="relative z-20 shrink-0 border-t border-sky-100 bg-white p-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] md:px-6">
             <Button variant="outline" className={button3d} onClick={() => setQuranPrintDialog(false)}>إلغاء</Button>
             <Button variant="outline" className={button3d} onClick={resetQuranPrintFilters}><RefreshCw className="ml-2 h-4 w-4" />مسح التصفية</Button>
-            <Button className={`min-w-36 ${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={exportQuranInventoryExcel} disabled={!quranPrintRows.length}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button>
-            <Button className={`min-w-44 ${button3d} bg-sky-700 hover:bg-sky-600`} onClick={printQuranInventory} disabled={!quranPrintRows.length}><Printer className="ml-2 h-4 w-4" />طباعة / حفظ PDF</Button>
+            <Button className={`min-w-36 ${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={exportQuranInventoryExcel} disabled={!quranPrintRows.length || quranMovementsLoading}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button>
+            <Button className={`min-w-44 ${button3d} bg-sky-700 hover:bg-sky-600`} onClick={printQuranInventory} disabled={!quranPrintRows.length || quranMovementsLoading}><Printer className="ml-2 h-4 w-4" />طباعة / حفظ PDF</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
