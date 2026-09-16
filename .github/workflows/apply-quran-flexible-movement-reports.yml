@@ -34,6 +34,17 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
+      - name: Repair report patch literals
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/apply-quran-flexible-movement-reports.mjs')
+          text = path.read_text()
+          for token in ('quranNeed', 'sectionsHtml', 'quranAddedInPeriod', 'quranWithdrawnInPeriod'):
+              text = text.replace('${' + token + '}', '\\${' + token + '}')
+          path.write_text(text)
+          PY
+
       - name: Apply Quran flexible movement reports
         run: node scripts/apply-quran-flexible-movement-reports.mjs
 
@@ -42,7 +53,7 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          if git diff --quiet; then
+          if git diff --quiet -- src/app/pages/MosquesUnitPage.tsx src/app/components/MosqueReportsCenter.tsx; then
             echo "No source changes to commit."
             exit 0
           fi
