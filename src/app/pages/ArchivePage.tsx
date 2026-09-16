@@ -17,6 +17,10 @@ import {
   Paperclip,
   CalendarDays,
   Tags,
+  FileDown,
+  ShieldCheck,
+  AlertTriangle,
+  Copy,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -40,6 +44,7 @@ import { toast } from 'sonner';
 import { authenticatedFetch } from '../../lib/http';
 import { usePermissions } from '../../context/PermissionsContext';
 import { AttachmentPreviewCard } from '../components/AttachmentPreview';
+import { ArchiveReportsDialog } from '../components/ArchiveReportsDialog';
 
 type ArchiveDocument = {
   id: string;
@@ -171,6 +176,20 @@ const getArchiveConfidentialityClassName = (value: ArchiveDocument['confidential
   return 'border-sky-300/90 bg-gradient-to-b from-sky-50 to-sky-100 text-sky-700 shadow-[0_3px_0_rgba(2,132,199,0.16),0_7px_14px_rgba(14,165,233,0.10),inset_0_1px_0_rgba(255,255,255,0.95)]';
 };
 
+const getArchiveReference = (doc: ArchiveDocument) =>
+  `ARC-${String(doc.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || '00000000'}`;
+
+const getArchiveMissingMetadata = (doc: ArchiveDocument) => {
+  const missing: string[] = [];
+  if (!String(doc.documentNumber || '').trim()) missing.push('رقم المستند');
+  if (!String(doc.documentDate || '').trim()) missing.push('تاريخ المستند');
+  if (!String(doc.issuingAuthority || '').trim()) missing.push('الجهة / المصدر');
+  if (!String(doc.tags || '').trim()) missing.push('الكلمات المفتاحية');
+  if (!String(doc.description || '').trim()) missing.push('الوصف');
+  if (!String(doc.driveUrl || '').trim()) missing.push('رابط الملف');
+  return missing;
+};
+
 const getArchiveFileTypeLabel = (doc: ArchiveDocument) => {
   const extension = String(doc.originalName || doc.fileName || '')
     .split('.')
@@ -192,7 +211,11 @@ const getArchiveFileTypeLabel = (doc: ArchiveDocument) => {
 
 export const ArchivePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { isAdmin } = usePermissions();
+  const { isAdmin, hasPermission } = usePermissions();
+  const canAdd = isAdmin || hasPermission('archive', 'canAdd');
+  const canEdit = isAdmin || hasPermission('archive', 'canEdit');
+  const canDelete = isAdmin || hasPermission('archive', 'canDelete');
+  const canPrint = isAdmin || hasPermission('archive', 'canPrint');
 
   const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -202,6 +225,7 @@ export const ArchivePage: React.FC = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
 
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
@@ -356,14 +380,29 @@ export const ArchivePage: React.FC = () => {
 
   const totalSize = useMemo(() => documents.reduce((sum, doc) => sum + Number(doc.fileSize || 0), 0), [documents]);
   const availableCategories = useMemo(() => Array.from(new Set([...categories, ...documents.map((doc) => doc.category).filter(Boolean)])), [documents]);
+  const archiveQuality = useMemo(() => {
+    const numberCounts = new Map<string, number>();
+    documents.forEach((doc) => {
+      const value = String(doc.documentNumber || '').trim().toLowerCase();
+      if (value) numberCounts.set(value, (numberCounts.get(value) || 0) + 1);
+    });
+    const duplicateNumbers = new Set(
+      Array.from(numberCounts.entries()).filter(([, count]) => count > 1).map(([value]) => value),
+    );
+    const incomplete = documents.filter((doc) => getArchiveMissingMetadata(doc).length > 0).length;
+    const duplicateRecords = documents.filter((doc) => duplicateNumbers.has(String(doc.documentNumber || '').trim().toLowerCase())).length;
+    const missingLinks = documents.filter((doc) => !String(doc.driveUrl || '').trim()).length;
+    const complete = Math.max(0, documents.length - incomplete - duplicateRecords);
+    return { incomplete, duplicateRecords, missingLinks, complete, duplicateNumbers };
+  }, [documents]);
 
   const updateFormField = (field: keyof ArchiveFormState, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const openAddForm = () => {
-    if (!isAdmin) {
-      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+    if (!canAdd) {
+      toast.error('لا تملك صلاحية إضافة ملفات إلى الأرشفة');
       return;
     }
 
@@ -376,8 +415,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const openEditForm = (doc: ArchiveDocument) => {
-    if (!isAdmin) {
-      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+    if (!canEdit) {
+      toast.error('لا تملك صلاحية تعديل بيانات الأرشفة');
       return;
     }
 
@@ -408,8 +447,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const requestDelete = (doc: ArchiveDocument) => {
-    if (!isAdmin) {
-      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+    if (!canDelete) {
+      toast.error('لا تملك صلاحية حذف سجلات الأرشفة');
       return;
     }
 
@@ -418,8 +457,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const confirmDelete = async () => {
-    if (!isAdmin) {
-      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+    if (!canDelete) {
+      toast.error('لا تملك صلاحية حذف سجلات الأرشفة');
       return;
     }
 
@@ -490,8 +529,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!isAdmin) {
-      toast.error('المستخدم العادي يملك صلاحية العرض فقط');
+    if ((formMode === 'add' && !canAdd) || (formMode === 'edit' && !canEdit)) {
+      toast.error('لا تملك الصلاحية المطلوبة لتنفيذ عملية الأرشفة');
       return;
     }
 
@@ -686,12 +725,20 @@ export const ArchivePage: React.FC = () => {
           </p>
         </div>
 
-        {isAdmin && (
-          <Button onClick={openAddForm} className="w-full lg:w-auto">
-            <Plus className="ml-2 h-4 w-4" />
-            إضافة ملف للأرشفة
-          </Button>
-        )}
+        <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+          {canPrint && (
+            <Button variant="outline" onClick={() => setReportsOpen(true)} className="w-full lg:w-auto">
+              <FileDown className="ml-2 h-4 w-4" />
+              تقارير الأرشفة — طباعة / PDF / Excel
+            </Button>
+          )}
+          {canAdd && (
+            <Button onClick={openAddForm} className="w-full lg:w-auto">
+              <Plus className="ml-2 h-4 w-4" />
+              إضافة ملف للأرشفة
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -735,6 +782,39 @@ export const ArchivePage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="overflow-hidden border-sky-200/80 bg-gradient-to-l from-sky-50/70 via-white to-slate-50/80">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <ShieldCheck className="h-5 w-5 text-emerald-700" />
+            جودة وسلامة الأرشفة
+          </CardTitle>
+          <CardDescription>مراجعة آلية لجودة الفهرسة قبل الاعتماد على الأرشيف في التقارير والبحث.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3">
+              <p className="text-xs text-muted-foreground">سجلات مكتملة مبدئيًا</p>
+              <p className="mt-1 text-2xl font-black text-emerald-700">{archiveQuality.complete}</p>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-3">
+              <p className="flex items-center gap-1 text-xs text-muted-foreground"><AlertTriangle className="h-3.5 w-3.5" /> بيانات وصفية ناقصة</p>
+              <p className="mt-1 text-2xl font-black text-amber-700">{archiveQuality.incomplete}</p>
+            </div>
+            <div className="rounded-2xl border border-violet-200 bg-violet-50/80 p-3">
+              <p className="flex items-center gap-1 text-xs text-muted-foreground"><Copy className="h-3.5 w-3.5" /> أرقام مستندات مكررة</p>
+              <p className="mt-1 text-2xl font-black text-violet-700">{archiveQuality.duplicateRecords}</p>
+            </div>
+            <div className="rounded-2xl border border-red-200 bg-red-50/80 p-3">
+              <p className="text-xs text-muted-foreground">سجلات دون رابط ملف</p>
+              <p className="mt-1 text-2xl font-black text-red-700">{archiveQuality.missingLinks}</p>
+            </div>
+          </div>
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-950">
+            <b>ملاحظة إجرائية:</b> حذف سجل الأرشفة حاليًا يحذف الفهرسة من المنصة فقط؛ ملف Google Drive لا يُحذف تلقائيًا. لذلك يعرض النظام هذه المعلومة بوضوح قبل الحذف لمنع فقدان التتبع.
+          </div>
+        </CardContent>
+      </Card>
 
       {formOpen && (
         <div id="archive-form" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
@@ -979,6 +1059,7 @@ export const ArchivePage: React.FC = () => {
             <Separator />
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <InfoItem label="المرجع الأرشيفي" value={getArchiveReference(selectedDocument)} />
               <InfoItem label="العنوان" value={selectedDocument.title} />
               <InfoItem label="التصنيف" value={selectedDocument.category} />
               <InfoItem label="رقم المستند" value={selectedDocument.documentNumber || '-'} />
@@ -1028,16 +1109,20 @@ export const ArchivePage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {isAdmin && (
+            {(canEdit || canDelete) && (
               <div className="flex flex-col md:flex-row justify-end gap-2">
-                <Button variant="outline" onClick={() => openEditForm(selectedDocument)}>
-                  <Edit className="ml-2 h-4 w-4" />
-                  تعديل البيانات
-                </Button>
-                <Button variant="destructive" onClick={() => requestDelete(selectedDocument)}>
-                  <Trash2 className="ml-2 h-4 w-4" />
-                  حذف
-                </Button>
+                {canEdit && (
+                  <Button variant="outline" onClick={() => openEditForm(selectedDocument)}>
+                    <Edit className="ml-2 h-4 w-4" />
+                    تعديل البيانات
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button variant="destructive" onClick={() => requestDelete(selectedDocument)}>
+                    <Trash2 className="ml-2 h-4 w-4" />
+                    حذف
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -1126,6 +1211,14 @@ export const ArchivePage: React.FC = () => {
                           >
                             {getConfidentialityLabel(doc.confidentiality)}
                           </Badge>
+                          {getArchiveMissingMetadata(doc).length > 0 && (
+                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                              بيانات ناقصة: {getArchiveMissingMetadata(doc).length}
+                            </Badge>
+                          )}
+                          {archiveQuality.duplicateNumbers.has(String(doc.documentNumber || '').trim().toLowerCase()) && (
+                            <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">رقم مكرر</Badge>
+                          )}
                         </div>
 
                         <h3 className="line-clamp-2 text-base font-black leading-7 text-slate-800 sm:text-lg">
@@ -1214,25 +1307,28 @@ export const ArchivePage: React.FC = () => {
                         تنزيل
                       </Button>
 
-                      {isAdmin && (
+                      {(canEdit || canDelete) && (
                         <>
-                          <Button
-                            variant="outline"
-                            onClick={() => openEditForm(doc)}
-                            className="border-amber-300 bg-gradient-to-b from-white to-amber-50 font-bold text-amber-800 shadow-[0_4px_0_rgba(180,83,9,0.15),0_7px_12px_rgba(245,158,11,0.08),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-0.5 hover:bg-amber-50 active:translate-y-[2px] active:shadow-[0_2px_0_rgba(180,83,9,0.14)]"
-                          >
-                            <Edit className="ml-2 h-4 w-4" />
-                            تعديل
-                          </Button>
-
-                          <Button
-                            variant="outline"
-                            onClick={() => requestDelete(doc)}
-                            className="border-red-400/90 bg-gradient-to-b from-red-50 to-red-100 font-bold text-red-600 shadow-[0_4px_0_rgba(185,28,28,0.20),0_8px_14px_rgba(220,38,38,0.10),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-0.5 hover:border-red-500 hover:text-red-700 active:translate-y-[2px] active:shadow-[0_2px_0_rgba(185,28,28,0.18)]"
-                          >
-                            <Trash2 className="ml-2 h-4 w-4" />
-                            حذف
-                          </Button>
+                          {canEdit && (
+                            <Button
+                              variant="outline"
+                              onClick={() => openEditForm(doc)}
+                              className="border-amber-300 bg-gradient-to-b from-white to-amber-50 font-bold text-amber-800 shadow-[0_4px_0_rgba(180,83,9,0.15),0_7px_12px_rgba(245,158,11,0.08),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-0.5 hover:bg-amber-50 active:translate-y-[2px] active:shadow-[0_2px_0_rgba(180,83,9,0.14)]"
+                            >
+                              <Edit className="ml-2 h-4 w-4" />
+                              تعديل
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="outline"
+                              onClick={() => requestDelete(doc)}
+                              className="border-red-400/90 bg-gradient-to-b from-red-50 to-red-100 font-bold text-red-600 shadow-[0_4px_0_rgba(185,28,28,0.20),0_8px_14px_rgba(220,38,38,0.10),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-0.5 hover:border-red-500 hover:text-red-700 active:translate-y-[2px] active:shadow-[0_2px_0_rgba(185,28,28,0.18)]"
+                            >
+                              <Trash2 className="ml-2 h-4 w-4" />
+                              حذف
+                            </Button>
+                          )}
                         </>
                       )}
                     </div>
@@ -1243,6 +1339,8 @@ export const ArchivePage: React.FC = () => {
           )}
         </div>
       </section>
+
+      <ArchiveReportsDialog documents={documents} open={reportsOpen} onOpenChange={setReportsOpen} />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
