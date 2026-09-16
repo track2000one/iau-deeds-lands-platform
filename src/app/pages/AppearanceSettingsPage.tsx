@@ -24,6 +24,7 @@ import {
 import {
   DEFAULT_USER_DISPLAY_PREFERENCES,
   DISPLAY_FONT_OPTIONS,
+  DISPLAY_FONT_SIZE_DEFAULT,
   DISPLAY_FONT_SIZE_MAX,
   DISPLAY_FONT_SIZE_MIN,
   DISPLAY_MUTED_COLOR_PRESETS,
@@ -476,7 +477,7 @@ export const AppearanceSettingsPage: React.FC = () => {
   };
 
   const selected = getThemeById(selectedTheme);
-  const fontSize = Number.parseInt(displayPreferences.baseFontSize, 10) || 15;
+  const fontSize = Number.parseInt(displayPreferences.baseFontSize, 10) || DISPLAY_FONT_SIZE_DEFAULT;
   const hasUnsavedChanges =
     selectedTheme !== savedTheme ||
     !userDisplayPreferencesEqual(
@@ -575,7 +576,7 @@ export const AppearanceSettingsPage: React.FC = () => {
               />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>أصغر</span>
-                <span>افتراضي 15px</span>
+                <span>افتراضي 18px — كبير</span>
                 <span>أكبر</span>
               </div>
             </div>

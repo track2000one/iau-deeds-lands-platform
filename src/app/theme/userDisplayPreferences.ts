@@ -71,10 +71,11 @@ export const DISPLAY_MUTED_COLOR_PRESETS = [
 
 export const DISPLAY_FONT_SIZE_MIN = 13;
 export const DISPLAY_FONT_SIZE_MAX = 22;
+export const DISPLAY_FONT_SIZE_DEFAULT = 18;
 
 export const DEFAULT_USER_DISPLAY_PREFERENCES: UserDisplayPreferences = {
   fontFamily: 'Tajawal, Cairo, Arial, sans-serif',
-  baseFontSize: '15px',
+  baseFontSize: `${DISPLAY_FONT_SIZE_DEFAULT}px`,
   headingFontWeight: '800',
   foreground: '',
   mutedForeground: '',
@@ -103,7 +104,7 @@ const normalizeFontSize = (value: unknown) => {
   const numeric = Number.parseInt(String(value ?? ''), 10);
   const safe = Number.isFinite(numeric)
     ? Math.min(DISPLAY_FONT_SIZE_MAX, Math.max(DISPLAY_FONT_SIZE_MIN, numeric))
-    : 15;
+    : DISPLAY_FONT_SIZE_DEFAULT;
   return `${safe}px`;
 };
 
@@ -164,6 +165,9 @@ export const getUserDisplayPreferencesStorageKey = (
   username?: string | null
 ) => `iau-appearance-font-controls:${username?.trim() || 'guest'}`;
 
+const getLargeDefaultFontMigrationKey = (username?: string | null) =>
+  `${getUserDisplayPreferencesStorageKey(username)}:large-default-v1`;
+
 export const loadUserDisplayPreferences = (
   username?: string | null
 ): UserDisplayPreferences => {
@@ -176,7 +180,31 @@ export const loadUserDisplayPreferences = (
       getUserDisplayPreferencesStorageKey(username)
     );
     if (!stored) return { ...DEFAULT_USER_DISPLAY_PREFERENCES };
-    return normalizeUserDisplayPreferences(JSON.parse(stored));
+
+    const normalized = normalizeUserDisplayPreferences(JSON.parse(stored));
+    const migrationKey = getLargeDefaultFontMigrationKey(username);
+    const alreadyMigrated = window.localStorage.getItem(migrationKey) === '1';
+
+    // Upgrade the former 15px default once for existing accounts. After this
+    // migration, users can still deliberately choose 15px and it will persist.
+    if (!alreadyMigrated && normalized.baseFontSize === '15px') {
+      const upgraded = {
+        ...normalized,
+        baseFontSize: `${DISPLAY_FONT_SIZE_DEFAULT}px`,
+      };
+      window.localStorage.setItem(
+        getUserDisplayPreferencesStorageKey(username),
+        JSON.stringify(upgraded)
+      );
+      window.localStorage.setItem(migrationKey, '1');
+      return upgraded;
+    }
+
+    if (!alreadyMigrated) {
+      window.localStorage.setItem(migrationKey, '1');
+    }
+
+    return normalized;
   } catch {
     return { ...DEFAULT_USER_DISPLAY_PREFERENCES };
   }
