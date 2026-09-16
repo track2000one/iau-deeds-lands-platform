@@ -1,0 +1,53 @@
+name: Apply Quran Flexible Movement Reports
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-quran-flexible-movement-reports.mjs'
+      - '.github/workflows/apply-quran-flexible-movement-reports.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Apply Quran flexible movement reports
+        run: node scripts/apply-quran-flexible-movement-reports.mjs
+
+      - name: Verify build
+        run: npm run build
+
+      - name: Commit and push changes
+        run: |
+          if git diff --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/pages/MosquesUnitPage.tsx src/app/components/MosqueReportsCenter.tsx
+          git commit -m "Add Quran movement metrics to reports"
+          git push origin main
