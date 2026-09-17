@@ -69,6 +69,13 @@ import {
   savePendingFieldVisitMedia,
   type PendingFieldVisitMedia,
 } from '../utils/fieldVisitOffline';
+import {
+  clearFieldVisitEmergencyDraft,
+  loadFieldVisitEmergencyDraft,
+  makeFieldVisitEmergencyKey,
+  newestFieldVisitRecoveryDraft,
+  saveFieldVisitEmergencyDraft,
+} from '../utils/fieldVisitDraftRecovery';
 
 type Props = {
   sites: MosqueSite[];
@@ -1521,6 +1528,15 @@ const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentIt
   const [fieldVisitAutosaveAt, setFieldVisitAutosaveAt] = React.useState<string | null>(null);
   const [pendingMediaCount, setPendingMediaCount] = React.useState(0);
   const restoringDraftRef = React.useRef(false);
+  // IAU_FIELD_VISIT_DRAFT_RESUME_V2
+  const fieldVisitEmergencyKey = React.useMemo(
+    () => makeFieldVisitEmergencyKey(currentUsername || 'anonymous'),
+    [currentUsername],
+  );
+  const latestVisitFormRef = React.useRef(visitForm);
+  React.useEffect(() => {
+    latestVisitFormRef.current = visitForm;
+  }, [visitForm]);
 
   const refreshPendingMediaCount = React.useCallback(async () => {
     try {
@@ -1563,42 +1579,82 @@ const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentIt
   }, [refreshPendingMediaCount]);
 
   React.useEffect(() => {
-    if (!visitDialog || editingVisit || restoringDraftRef.current) return;
+    if (!visitDialog || restoringDraftRef.current) return;
     restoringDraftRef.current = true;
     void (async () => {
       try {
-        const [draft, rows] = await Promise.all([
+        const [indexedDraft, rows] = await Promise.all([
           loadFieldVisitDraft<VisitForm>(fieldVisitDraftKey),
           listPendingFieldVisitMedia(currentUsername || 'anonymous'),
         ]);
+        const emergencyDraft = loadFieldVisitEmergencyDraft<VisitForm>(fieldVisitEmergencyKey);
+        const expectedEditingVisitId = editingVisit?.id || null;
+        const draft = newestFieldVisitRecoveryDraft<VisitForm>(
+          [indexedDraft, emergencyDraft],
+          expectedEditingVisitId,
+        );
         setPendingMediaCount(rows.length);
-        if (draft?.form?.siteId) {
+        if (draft?.form) {
           setVisitForm(hydrateOfflinePlaceholders(draft.form, rows));
           setFieldVisitAutosaveAt(draft.savedAt);
-          toast.success('تم استعادة آخر مسودة محفوظة تلقائيًا للزيارة الميدانية');
+          toast.success('تم استعادة آخر مسودة محفوظة تلقائيًا ويمكنك متابعة التعبئة من حيث توقفت');
         }
       } catch {
-        // The visit can continue normally if local recovery storage is unavailable.
+        // Local recovery must never block opening or completing a visit.
       } finally {
         restoringDraftRef.current = false;
       }
     })();
-  }, [visitDialog, editingVisit, fieldVisitDraftKey, currentUsername, hydrateOfflinePlaceholders]);
+  }, [visitDialog, editingVisit?.id, fieldVisitDraftKey, fieldVisitEmergencyKey, currentUsername, hydrateOfflinePlaceholders]);
+
+  React.useEffect(() => {
+    if (!visitDialog || restoringDraftRef.current) return;
+    latestVisitFormRef.current = visitForm;
+    const savedAt = new Date().toISOString();
+    const snapshot = {
+      username: currentUsername || 'anonymous',
+      form: visitForm,
+      editingVisitId: editingVisit?.id || null,
+      savedAt,
+    };
+
+    // Synchronous browser storage protects the latest keystroke/select change.
+    saveFieldVisitEmergencyDraft(fieldVisitEmergencyKey, snapshot);
+    setFieldVisitAutosaveAt(savedAt);
+
+    // IndexedDB remains the durable offline layer, including queued media references.
+    const timer = window.setTimeout(() => {
+      void saveFieldVisitDraft({
+        id: fieldVisitDraftKey,
+        ...snapshot,
+      }).catch(() => undefined);
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [visitDialog, visitForm, editingVisit?.id, fieldVisitDraftKey, fieldVisitEmergencyKey, currentUsername]);
 
   React.useEffect(() => {
     if (!visitDialog) return;
-    const timer = window.setTimeout(() => {
-      const savedAt = new Date().toISOString();
-      void saveFieldVisitDraft({
-        id: fieldVisitDraftKey,
+    const flushEmergencySnapshot = () => {
+      saveFieldVisitEmergencyDraft(fieldVisitEmergencyKey, {
         username: currentUsername || 'anonymous',
-        form: visitForm,
+        form: latestVisitFormRef.current,
         editingVisitId: editingVisit?.id || null,
-        savedAt,
-      }).then(() => setFieldVisitAutosaveAt(savedAt)).catch(() => undefined);
-    }, 650);
-    return () => window.clearTimeout(timer);
-  }, [visitDialog, visitForm, editingVisit?.id, fieldVisitDraftKey, currentUsername]);
+        savedAt: new Date().toISOString(),
+      });
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushEmergencySnapshot();
+    };
+
+    window.addEventListener('pagehide', flushEmergencySnapshot);
+    window.addEventListener('beforeunload', flushEmergencySnapshot);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', flushEmergencySnapshot);
+      window.removeEventListener('beforeunload', flushEmergencySnapshot);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [visitDialog, editingVisit?.id, fieldVisitEmergencyKey, currentUsername]);
 
   const queueFieldVisitMedia = React.useCallback(async (file: File, target: { kind: 'item' | 'visit'; itemIndex?: number; phase: 'beforeImages' | 'afterImages' | 'attachments'; description?: string }) => {
     const id = makeOfflineMediaId();
@@ -1920,6 +1976,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
         : await mosqueApi.createFieldVisit(payload);
       toast.success(editingVisit ? 'تم تحديث الزيارة وحفظ نتائجها' : 'تم إنشاء الزيارة الميدانية');
       await clearFieldVisitDraft(fieldVisitDraftKey).catch(() => undefined);
+      clearFieldVisitEmergencyDraft(fieldVisitEmergencyKey);
       setFieldVisitAutosaveAt(null);
       let quranSyncResult: { synced: boolean; needsCorrection: boolean; message: string | null } | null = null;
       try {
