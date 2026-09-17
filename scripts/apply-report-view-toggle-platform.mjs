@@ -26,7 +26,11 @@ patchFile('src/app/pages/ReportsPage.tsx', (input) => {
     s = s.replace(cardAnchor, '<Card id={`reports-section-${type}`} key={type} className="group relative overflow-hidden');
     const buttonAnchor = `            <Button\n              variant="ghost"\n              size="sm"\n              onClick={() => toggleSection(type)}`;
     ensure(s.includes(buttonAnchor), 'ReportsPage collapse button anchor not found');
-    s = s.replace(buttonAnchor, `            {/* IAU_REPORT_VIEW_TOGGLE_PLATFORM_V1 */}\n            <div className="flex items-center gap-2">\n              <ReportViewToggle storageKey={\`iau-report-view-${type}\`} scopeId={\`reports-section-${type}\`} />\n${buttonAnchor}`);
+    const insertedToggle = '            {/* IAU_REPORT_VIEW_TOGGLE_PLATFORM_V1 */}\n' +
+      '            <div className="flex items-center gap-2">\n' +
+      '              <ReportViewToggle storageKey={`iau-report-view-${type}`} scopeId={`reports-section-${type}`} />\n' +
+      buttonAnchor;
+    s = s.replace(buttonAnchor, insertedToggle);
     const closeButton = `            </Button>\n          </div>\n        </CardHeader>`;
     ensure(s.includes(closeButton), 'ReportsPage header close anchor not found');
     s = s.replace(closeButton, `            </Button>\n            </div>\n          </div>\n        </CardHeader>`);
