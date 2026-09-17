@@ -58,6 +58,17 @@ import { NativeSelect } from './ui/native-select';
 import { Progress } from './ui/progress';
 import { Textarea } from './ui/textarea';
 import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
+import {
+  clearFieldVisitDraft,
+  compressFieldVisitImage,
+  deletePendingFieldVisitMedia,
+  listPendingFieldVisitMedia,
+  loadFieldVisitDraft,
+  makeOfflineMediaId,
+  saveFieldVisitDraft,
+  savePendingFieldVisitMedia,
+  type PendingFieldVisitMedia,
+} from '../utils/fieldVisitOffline';
 
 type Props = {
   sites: MosqueSite[];
@@ -1504,25 +1515,185 @@ const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentIt
     }
   };
 
+  // IAU_FIELD_VISIT_OFFLINE_FIRST_V1
+  const fieldVisitDraftKey = React.useMemo(() => `field-visit-draft:${currentUsername || 'anonymous'}`, [currentUsername]);
+  const [fieldVisitOnline, setFieldVisitOnline] = React.useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
+  const [fieldVisitAutosaveAt, setFieldVisitAutosaveAt] = React.useState<string | null>(null);
+  const [pendingMediaCount, setPendingMediaCount] = React.useState(0);
+  const restoringDraftRef = React.useRef(false);
+
+  const refreshPendingMediaCount = React.useCallback(async () => {
+    try {
+      const rows = await listPendingFieldVisitMedia(currentUsername || 'anonymous');
+      setPendingMediaCount(rows.length);
+      return rows;
+    } catch {
+      return [] as PendingFieldVisitMedia[];
+    }
+  }, [currentUsername]);
+
+  const hydrateOfflinePlaceholders = React.useCallback((form: VisitForm, rows: PendingFieldVisitMedia[]) => {
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const hydrate = (image: any) => {
+      const id = image?.offlineId as string | undefined;
+      const row = id ? byId.get(id) : null;
+      return row ? { ...image, url: URL.createObjectURL(row.blob), uploadState: 'pending' } : image;
+    };
+    return {
+      ...form,
+      attachments: (form.attachments || []).map(hydrate),
+      items: (form.items || []).map((item) => ({
+        ...item,
+        beforeImages: (item.beforeImages || []).map(hydrate),
+        afterImages: (item.afterImages || []).map(hydrate),
+      })),
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const onOnline = () => setFieldVisitOnline(true);
+    const onOffline = () => setFieldVisitOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    void refreshPendingMediaCount();
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, [refreshPendingMediaCount]);
+
+  React.useEffect(() => {
+    if (!visitDialog || editingVisit || restoringDraftRef.current) return;
+    restoringDraftRef.current = true;
+    void (async () => {
+      try {
+        const [draft, rows] = await Promise.all([
+          loadFieldVisitDraft<VisitForm>(fieldVisitDraftKey),
+          listPendingFieldVisitMedia(currentUsername || 'anonymous'),
+        ]);
+        setPendingMediaCount(rows.length);
+        if (draft?.form?.siteId) {
+          setVisitForm(hydrateOfflinePlaceholders(draft.form, rows));
+          setFieldVisitAutosaveAt(draft.savedAt);
+          toast.success('تم استعادة آخر مسودة محفوظة تلقائيًا للزيارة الميدانية');
+        }
+      } catch {
+        // The visit can continue normally if local recovery storage is unavailable.
+      } finally {
+        restoringDraftRef.current = false;
+      }
+    })();
+  }, [visitDialog, editingVisit, fieldVisitDraftKey, currentUsername, hydrateOfflinePlaceholders]);
+
+  React.useEffect(() => {
+    if (!visitDialog) return;
+    const timer = window.setTimeout(() => {
+      const savedAt = new Date().toISOString();
+      void saveFieldVisitDraft({
+        id: fieldVisitDraftKey,
+        username: currentUsername || 'anonymous',
+        form: visitForm,
+        editingVisitId: editingVisit?.id || null,
+        savedAt,
+      }).then(() => setFieldVisitAutosaveAt(savedAt)).catch(() => undefined);
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [visitDialog, visitForm, editingVisit?.id, fieldVisitDraftKey, currentUsername]);
+
+  const queueFieldVisitMedia = React.useCallback(async (file: File, target: { kind: 'item' | 'visit'; itemIndex?: number; phase: 'beforeImages' | 'afterImages' | 'attachments'; description?: string }) => {
+    const id = makeOfflineMediaId();
+    const capturedAt = new Date().toISOString();
+    await savePendingFieldVisitMedia({
+      id, username: currentUsername || 'anonymous', kind: target.kind, itemIndex: target.itemIndex ?? null, phase: target.phase,
+      fileName: file.name, mimeType: file.type, capturedAt, description: target.description || '', blob: file, createdAt: capturedAt,
+    });
+    const placeholder: any = {
+      url: URL.createObjectURL(file), fileId: null, fileName: file.name, mimeType: file.type, fileSize: file.size, capturedAt,
+      description: target.description || '', offlineId: id, uploadState: 'pending',
+    };
+    setVisitForm((current) => {
+      if (target.kind === 'visit') return { ...current, attachments: [...current.attachments, placeholder] };
+      return {
+        ...current,
+        items: current.items.map((item, idx) => idx === target.itemIndex
+          ? { ...item, [target.phase]: [...((item as any)[target.phase] || []), placeholder] }
+          : item),
+      };
+    });
+    await refreshPendingMediaCount();
+    return id;
+  }, [currentUsername, refreshPendingMediaCount]);
+
+  const replaceQueuedMedia = React.useCallback((row: PendingFieldVisitMedia, uploaded: any) => {
+    setVisitForm((current) => {
+      const replace = (entry: any) => entry?.offlineId === row.id
+        ? { ...entry, url: uploaded.driveUrl, fileId: uploaded.driveFileId || null, fileName: uploaded.fileName || row.fileName, mimeType: uploaded.mimeType || row.mimeType, uploadState: 'uploaded', offlineId: undefined }
+        : entry;
+      if (row.kind === 'visit') return { ...current, attachments: current.attachments.map(replace) };
+      return {
+        ...current,
+        items: current.items.map((item, idx) => idx === row.itemIndex
+          ? { ...item, [row.phase]: ((item as any)[row.phase] || []).map(replace) }
+          : item),
+      };
+    });
+  }, []);
+
+  const flushPendingFieldVisitMedia = React.useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    const rows = await listPendingFieldVisitMedia(currentUsername || 'anonymous').catch(() => [] as PendingFieldVisitMedia[]);
+    if (!rows.length) { setPendingMediaCount(0); return; }
+    for (const row of rows) {
+      try {
+        const file = new File([row.blob], row.fileName, { type: row.mimeType, lastModified: Date.now() });
+        const uploaded = await mosqueApi.upload(file);
+        replaceQueuedMedia(row, uploaded);
+        await deletePendingFieldVisitMedia(row.id);
+      } catch {
+        break;
+      }
+    }
+    await refreshPendingMediaCount();
+  }, [currentUsername, replaceQueuedMedia, refreshPendingMediaCount]);
+
+  React.useEffect(() => {
+    if (!fieldVisitOnline || !visitDialog) return;
+    void flushPendingFieldVisitMedia();
+  }, [fieldVisitOnline, visitDialog, flushPendingFieldVisitMedia]);
+
   const uploadItemImages = async (index: number, phase: 'beforeImages' | 'afterImages', files: FileList | null) => {
     const selected = Array.from(files || []);
     if (!selected.length) return;
     const key = `${index}-${phase}`;
     try {
       setUploadingKey(key);
-      const uploaded: MosqueFieldVisitImage[] = [];
-      for (const file of selected) {
-        if (!file.type.startsWith('image/')) throw new Error(`الملف ${file.name} ليس صورة مدعومة`);
-        const result = await mosqueApi.upload(file);
-        uploaded.push({
-          url: result.driveUrl, fileId: result.driveFileId || null, fileName: result.fileName || file.name,
-          mimeType: result.mimeType || file.type, capturedAt: new Date().toISOString(),
-        });
+      let uploadedCount = 0;
+      let queuedCount = 0;
+      for (const source of selected) {
+        if (!source.type.startsWith('image/')) throw new Error(`الملف ${source.name} ليس صورة مدعومة`);
+        const file = await compressFieldVisitImage(source);
+        if (!navigator.onLine) {
+          await queueFieldVisitMedia(file, { kind: 'item', itemIndex: index, phase });
+          queuedCount += 1;
+          continue;
+        }
+        try {
+          const result = await mosqueApi.upload(file);
+          const image: any = { url: result.driveUrl, fileId: result.driveFileId || null, fileName: result.fileName || file.name, mimeType: result.mimeType || file.type, fileSize: file.size, capturedAt: new Date().toISOString() };
+          setVisitForm((current) => ({ ...current, items: current.items.map((item, idx) => idx === index ? { ...item, [phase]: [...((item as any)[phase] || []), image] } : item) }));
+          uploadedCount += 1;
+        } catch {
+          await queueFieldVisitMedia(file, { kind: 'item', itemIndex: index, phase });
+          queuedCount += 1;
+        }
       }
-      setVisitItem(index, { [phase]: [...(visitForm.items[index][phase] || []), ...uploaded] });
-      toast.success(`تم رفع ${uploaded.length} صورة`);
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر رفع الصور'); }
-    finally { setUploadingKey(''); }
+      if (uploadedCount) toast.success(`تم رفع ${uploadedCount} صورة بعد تحسين حجمها`);
+      if (queuedCount) toast.info(`تم حفظ ${queuedCount} صورة على الجهاز وستُرفع تلقائيًا عند تحسن الاتصال`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تجهيز الصور');
+    } finally {
+      setUploadingKey('');
+    }
   };
 
   const uploadActivityApprovalEvidence = async (index: number, files: FileList | null) => {
@@ -1530,39 +1701,31 @@ const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentIt
     if (!selected.length) return;
     const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
     const invalid = selected.find((file) => !allowedTypes.has(file.type));
-    if (invalid) {
-      toast.error(`الملف ${invalid.name} غير مدعوم. المسموح صور JPG وPNG وWEBP وGIF أو ملفات PDF`);
-      return;
-    }
+    if (invalid) return toast.error(`الملف ${invalid.name} غير مدعوم. المسموح صور JPG وPNG وWEBP وGIF أو ملفات PDF`);
     const oversized = selected.find((file) => file.size > 20 * 1024 * 1024);
-    if (oversized) {
-      toast.error(`حجم الملف ${oversized.name} يتجاوز الحد الأعلى 20 ميجابايت`);
-      return;
-    }
-    if ((visitForm.items[index].beforeImages?.length || 0) + selected.length > 20) {
-      toast.error('الحد الأعلى لمرفقات اعتماد النشاط هو 20 ملفًا');
-      return;
-    }
-
+    if (oversized) return toast.error(`حجم الملف ${oversized.name} يتجاوز الحد الأعلى 20 ميجابايت`);
+    if ((visitForm.items[index].beforeImages?.length || 0) + selected.length > 20) return toast.error('الحد الأعلى لمرفقات اعتماد النشاط هو 20 ملفًا');
     const key = `${index}-activityApprovalEvidence`;
     try {
       setUploadingKey(key);
-      const uploaded: MosqueFieldVisitImage[] = [];
-      for (const file of selected) {
-        const result = await mosqueApi.upload(file);
-        uploaded.push({
-          url: result.driveUrl,
-          fileId: result.driveFileId || null,
-          fileName: result.fileName || file.name,
-          mimeType: result.mimeType || file.type,
-          fileSize: file.size,
-          capturedAt: new Date().toISOString(),
-        });
+      for (const source of selected) {
+        const file = source.type.startsWith('image/') ? await compressFieldVisitImage(source) : source;
+        if (!navigator.onLine) {
+          await queueFieldVisitMedia(file, { kind: 'item', itemIndex: index, phase: 'beforeImages' });
+          continue;
+        }
+        try {
+          const result = await mosqueApi.upload(file);
+          const image: any = { url: result.driveUrl, fileId: result.driveFileId || null, fileName: result.fileName || file.name, mimeType: result.mimeType || file.type, fileSize: file.size, capturedAt: new Date().toISOString() };
+          setVisitForm((current) => ({ ...current, items: current.items.map((item, idx) => idx === index ? { ...item, beforeImages: [...(item.beforeImages || []), image] } : item) }));
+        } catch {
+          await queueFieldVisitMedia(file, { kind: 'item', itemIndex: index, phase: 'beforeImages' });
+        }
       }
-      setVisitItem(index, { beforeImages: [...(visitForm.items[index].beforeImages || []), ...uploaded] });
-      toast.success(`تم رفع ${uploaded.length} مرفق لاعتماد النشاط`);
+      await refreshPendingMediaCount();
+      toast.success(navigator.onLine ? 'تم تجهيز مرفقات الاعتماد؛ المتعذر منها سيُرفع تلقائيًا' : 'تم حفظ المرفقات على الجهاز حتى عودة الاتصال');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر رفع مرفقات اعتماد النشاط');
+      toast.error(error instanceof Error ? error.message : 'تعذر تجهيز مرفقات اعتماد النشاط');
     } finally {
       setUploadingKey('');
     }
@@ -1577,40 +1740,30 @@ const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentIt
     if (!selected.length) return;
     const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
     const invalid = selected.find((file) => !allowedTypes.has(file.type));
-    if (invalid) {
-      toast.error(`الملف ${invalid.name} غير مدعوم. المسموح صور JPG وPNG وWEBP وGIF أو ملفات PDF`);
-      return;
-    }
+    if (invalid) return toast.error(`الملف ${invalid.name} غير مدعوم. المسموح صور JPG وPNG وWEBP وGIF أو ملفات PDF`);
     const oversized = selected.find((file) => file.size > 20 * 1024 * 1024);
-    if (oversized) {
-      toast.error(`حجم الملف ${oversized.name} يتجاوز الحد الأعلى 20 ميجابايت`);
-      return;
-    }
-    if (visitForm.attachments.length + selected.length > 100) {
-      toast.error('الحد الأعلى لمرفقات الزيارة هو 100 ملف');
-      return;
-    }
-
+    if (oversized) return toast.error(`حجم الملف ${oversized.name} يتجاوز الحد الأعلى 20 ميجابايت`);
+    if (visitForm.attachments.length + selected.length > 100) return toast.error('الحد الأعلى لمرفقات الزيارة هو 100 ملف');
     try {
       setUploadingKey('visit-attachments');
-      const uploaded: MosqueFieldVisitAttachment[] = [];
-      for (const file of selected) {
-        const result = await mosqueApi.upload(file);
-        const attachment: MosqueFieldVisitAttachment = {
-          url: result.driveUrl,
-          fileId: result.driveFileId || null,
-          fileName: result.fileName || file.name,
-          description: '',
-          mimeType: result.mimeType || file.type,
-          fileSize: file.size,
-          capturedAt: new Date().toISOString(),
-        };
-        uploaded.push(attachment);
-        setVisitForm((current) => ({ ...current, attachments: [...current.attachments, attachment] }));
+      for (const source of selected) {
+        const file = source.type.startsWith('image/') ? await compressFieldVisitImage(source) : source;
+        if (!navigator.onLine) {
+          await queueFieldVisitMedia(file, { kind: 'visit', phase: 'attachments' });
+          continue;
+        }
+        try {
+          const result = await mosqueApi.upload(file);
+          const attachment: any = { url: result.driveUrl, fileId: result.driveFileId || null, fileName: result.fileName || file.name, description: '', mimeType: result.mimeType || file.type, fileSize: file.size, capturedAt: new Date().toISOString() };
+          setVisitForm((current) => ({ ...current, attachments: [...current.attachments, attachment] }));
+        } catch {
+          await queueFieldVisitMedia(file, { kind: 'visit', phase: 'attachments' });
+        }
       }
-      toast.success(`تم رفع ${uploaded.length} ${uploaded.length === 1 ? 'مرفق' : 'مرفقات'}`);
+      await refreshPendingMediaCount();
+      toast.success(navigator.onLine ? 'تم تجهيز المرفقات؛ وسيعاد رفع أي ملف متعذر تلقائيًا' : 'تم حفظ المرفقات محليًا حتى عودة الاتصال');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر رفع مرفقات الزيارة');
+      toast.error(error instanceof Error ? error.message : 'تعذر تجهيز مرفقات الزيارة');
     } finally {
       setUploadingKey('');
     }
@@ -1721,6 +1874,13 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
       return;
     }
 
+    if (pendingMediaCount > 0) {
+      if (!navigator.onLine) toast.warning('الزيارة محفوظة تلقائيًا على هذا الجهاز. أعد المحاولة بعد عودة الاتصال ليتم رفع الصور واعتماد الزيارة.');
+      else toast.info(`يوجد ${pendingMediaCount} صورة أو مرفق قيد المزامنة. انتظر اكتمال الرفع التلقائي ثم احفظ الزيارة.`);
+      void flushPendingFieldVisitMedia();
+      return;
+    }
+
     let quranReconciliationError: string | null = null;
     const preparedVisitItems = visitForm.items.map((item) => {
       if (!isQuranFieldVisitItem(item)) return item;
@@ -1759,6 +1919,8 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
         ? await mosqueApi.updateFieldVisit(editingVisit.id, payload)
         : await mosqueApi.createFieldVisit(payload);
       toast.success(editingVisit ? 'تم تحديث الزيارة وحفظ نتائجها' : 'تم إنشاء الزيارة الميدانية');
+      await clearFieldVisitDraft(fieldVisitDraftKey).catch(() => undefined);
+      setFieldVisitAutosaveAt(null);
       let quranSyncResult: { synced: boolean; needsCorrection: boolean; message: string | null } | null = null;
       try {
         quranSyncResult = await syncQuranVisitInventory(savedVisit);
@@ -2614,6 +2776,13 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
     <Dialog open={visitDialog} onOpenChange={setVisitDialog}>
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-[1120px]" dir="rtl">
         <DialogHeader className="text-right"><DialogTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-sky-700" />{editingVisit ? `توثيق الزيارة ${editingVisit.visitNumber}` : 'إنشاء زيارة ميدانية'}</DialogTitle><DialogDescription>تُحفظ الزيارة في السجل التاريخي للمسجد أو المصلى المحدد، وتنتقل الملاحظات المفتوحة إلى المتابعة.</DialogDescription></DialogHeader>
+            <div className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs ${fieldVisitOnline ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
+              <div className="flex flex-wrap items-center gap-2 font-bold">
+                <span>{fieldVisitOnline ? '● متصل — الحفظ التلقائي يعمل' : '● بدون اتصال — البيانات محفوظة على الجهاز'}</span>
+                {pendingMediaCount > 0 && <Badge variant="outline" className="bg-white">{pendingMediaCount} ملف بانتظار المزامنة</Badge>}
+              </div>
+              <div className="text-[11px] font-medium">{fieldVisitAutosaveAt ? `آخر حفظ تلقائي: ${new Date(fieldVisitAutosaveAt).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}` : 'سيتم الحفظ تلقائيًا أثناء التعبئة'}</div>
+            </div>
         <div className="grid gap-4 rounded-2xl border bg-slate-50/70 p-4 md:grid-cols-3"><Field label="المسجد أو المصلى *"><NativeSelect value={visitForm.siteId} onChange={(event) => setVisitForm({ ...visitForm, siteId: event.target.value })} disabled={Boolean(editingVisit?.tourId)}><option value="">اختر الموقع</option>{sites.map((site) => { const activeVisit = activeVisitBySite.get(site.id); const blocked = !editingVisit && Boolean(activeVisit); return <option key={site.id} value={site.id} disabled={blocked}>{site.name} — {site.campusLocation || site.city || ''}{blocked ? ` — زيارة قائمة ${activeVisit!.visitNumber}` : ''}</option>; })}</NativeSelect></Field><Field label="نوع الزيارة"><NativeSelect value={visitForm.visitType} onChange={(event) => setVisitForm({ ...visitForm, visitType: event.target.value as MosqueFieldVisit['visitType'] })}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field><Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field><Field label="ممثل الموقع"><Input value={visitForm.representativeName} onChange={(event) => setVisitForm({ ...visitForm, representativeName: event.target.value })} /></Field><Field label="حالة سجل الزيارة"><NativeSelect value={visitForm.workflowStatus} onChange={(event) => setVisitForm({ ...visitForm, workflowStatus: event.target.value as MosqueFieldVisit['workflowStatus'] })}>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><div className="md:col-span-3"><Field label="منفذ الزيارة"><Input value={visitForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field><p className="mt-1 text-[11px] text-slate-500">يُسجل اسم المستخدم الحالي تلقائيًا. السجلات السابقة تحتفظ بأسماء الفريق المحفوظة تاريخيًا.</p></div><Field label="الحالة العامة"><NativeSelect value={visitForm.overallStatus} onChange={(event) => setVisitForm({ ...visitForm, overallStatus: event.target.value as MosqueFieldVisit['overallStatus'] })}>{Object.entries(overallLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label="الأولوية العامة"><NativeSelect value={visitForm.priority} onChange={(event) => setVisitForm({ ...visitForm, priority: event.target.value as MosqueFieldVisit['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field></div>
         {visitForm.siteId && <QuranVisitStockLink dashboard={quranStockDashboard} siteId={visitForm.siteId} linkedRequest={selectedQuranSupplyRequest} onApplyQuantity={applyQuranQuantityAssessment} />}
         <div className="space-y-3"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">تتغير خيارات النتيجة تلقائيًا حسب نوع بند الفحص، ويمكن إضافة بنود ميدانية غير موجودة في القائمة الأساسية لتدخل في نفس مسار الاعتماد والمتابعة.</p></div><div className="flex flex-wrap items-center gap-2"><Button type="button" size="sm" variant="outline" className="border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100" onClick={addManualVisitItem}><Plus className="ml-1 h-4 w-4" />إضافة بند ميداني</Button><Badge variant="outline">{visitForm.items.filter((item) => item.status !== 'not_checked').length} / {visitForm.items.length}</Badge></div></div>{visitForm.items.map((item, index) => <Card id={isManualFieldVisitItem(item) && index === visitForm.items.length - 1 ? 'manual-field-visit-item-last' : undefined} key={item.id || `visit-item-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center">{isManualFieldVisitItem(item) ? <div className="min-w-0 flex-1 rounded-xl border border-sky-200 bg-sky-50/60 p-3"><div className="mb-2 flex items-center justify-between gap-2"><Badge variant="outline" className="border-sky-300 bg-white text-sky-800">بند مضاف يدويًا</Badge><Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => removeManualVisitItem(index)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button></div><div className="grid gap-2 md:grid-cols-[180px_1fr]"><Input value={item.category || ''} onChange={(event) => setVisitItem(index, { category: event.target.value })} maxLength={120} placeholder="التصنيف — مثال: السلامة" /><Input value={item.title || ''} onChange={(event) => setVisitItem(index, { title: event.target.value })} maxLength={300} placeholder="اكتب البند الذي تريد فحصه *" /></div></div> : <div className="min-w-0 flex-1"><span className={getFieldVisitCategoryBadgeClass(item.category)}><span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-current opacity-70 shadow-[0_0_8px_currentColor]" /><span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 h-px bg-white/95" /><span className="relative">{item.category}</span></span><p className="font-bold text-slate-800">{item.title}</p></div>}{isAutomaticAdhanItem(item) ? <div className="flex shrink-0 items-center gap-2 lg:w-[26rem] lg:justify-end"><Badge variant="outline" className="border-indigo-300 bg-indigo-50 px-3 py-2 text-indigo-800">النتيجة والأولوية تلقائية</Badge></div> : <><NativeSelect className="lg:w-64" value={item.status} onChange={(event) => setVisitItem(index, { status: event.target.value as MosqueFieldVisitItem['status'] })}>{getItemStatusOptions(item).map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></>}</div>{isAutomaticAdhanItem(item) && <AutomaticAdhanEditor item={item} onChange={(patch) => updateAutomaticAdhanDetails(index, patch)} />}{isQuranFieldVisitItem(item) && <QuranFieldInventoryEditor item={item} stock={selectedQuranStock} baselineClosed={quranOpeningBaselineStatus?.closed ?? null} onChange={(patch) => updateQuranInventoryDetails(index, patch)} />}{isQuranRackFieldVisitItem(item) && item.status !== 'not_applicable' && <QuranRackInventoryEditor item={item} dashboard={quranRackDashboard} siteRow={getSelectedQuranRackStock(quranEquipmentItemType(item))} onChange={(patch) => updateQuranRackDetails(index, patch)} />}{isActivityApprovalItem(item) && !['not_available', 'not_applicable', 'not_checked'].includes(item.status) && <ActivityApprovalEvidenceField files={item.beforeImages || []} loading={uploadingKey === `${index}-activityApprovalEvidence`} onFiles={(files) => void uploadActivityApprovalEvidence(index, files)} onRemove={(fileIndex) => removeItemImage(index, 'beforeImages', fileIndex)} />}{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2"><div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label={['resolved', 'closed'].includes(item.resolutionStatus) ? 'وصف الإجراء / المعالجة المنفذة *' : 'وصف الإجراء / المعالجة المنفذة'}><Textarea rows={2} value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} placeholder="اكتب ما تم تنفيذه لمعالجة الملاحظة" /></Field><div className={(isActivityApprovalItem(item) || isQuranFieldVisitItem(item)) ? 'hidden' : 'md:col-span-2 rounded-2xl border border-emerald-200 bg-white p-3'}><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><b className="text-sm text-emerald-900">سجل المعالجة المصور — قبل / بعد</b><p className="mt-1 text-[11px] text-slate-500">وثّق الحالة قبل المعالجة، ثم أضف صورة بعد التنفيذ لإغلاق الملاحظة والتحقق منها.</p></div><div className="flex gap-2"><Badge variant="outline">قبل: {(item.beforeImages || []).length}</Badge><Badge variant="outline">بعد: {(item.afterImages || []).length}</Badge></div></div><div className="grid gap-3 md:grid-cols-2"><ImageField label="صور قبل المعالجة *" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label={item.resolutionStatus === 'closed' ? 'صور بعد المعالجة *' : 'صور بعد المعالجة'} images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div></div></div>}</CardContent></Card>)}</div>
