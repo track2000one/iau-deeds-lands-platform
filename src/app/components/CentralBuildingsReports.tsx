@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
+import { ReportViewToggle } from './ReportViewToggle';
 
 type UsageEntry = {
   mosqueSites: number;
@@ -171,11 +172,13 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
         التقارير
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[92vh] max-w-[96vw] overflow-y-auto sm:max-w-6xl" dir="rtl">
+        <DialogContent id="central-buildings-reports-view" className="max-h-[92vh] max-w-[96vw] overflow-y-auto sm:max-w-6xl" dir="rtl">
           <DialogHeader className="text-right sm:text-right">
             <DialogTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" />تقارير السجل المركزي للمباني</DialogTitle>
             <DialogDescription>تقارير مرنة مع فلترة النتائج، اختيار الأعمدة، التصدير إلى Excel والطباعة أو الحفظ PDF.</DialogDescription>
           </DialogHeader>
+          {/* IAU_REPORT_VIEW_TOGGLE_PLATFORM_V1 */}
+          <div className="flex justify-end"><ReportViewToggle storageKey="iau-central-buildings-reports-view" scopeId="central-buildings-reports-view" /></div>
 
           <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4 md:grid-cols-2 xl:grid-cols-6">
             <div className="space-y-1.5 xl:col-span-2"><Label>بحث</Label><div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(e) => setSearch(e.target.value)} className="pr-9" placeholder="رقم أو اسم المبنى..." /></div></div>

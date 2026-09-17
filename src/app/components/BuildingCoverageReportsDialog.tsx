@@ -17,6 +17,7 @@ import {
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
+import { ReportViewToggle } from './ReportViewToggle';
 
 const coverageLabels: Record<string, string> = {
   unassessed: 'لم يتم التقييم',
@@ -280,11 +281,13 @@ export const BuildingCoverageReportsDialog: React.FC<Props> = ({ open, onOpenCha
   };
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="max-h-[94dvh] overflow-y-auto sm:max-w-[1180px]" dir="rtl">
+    <DialogContent id="building-coverage-reports-view" className="max-h-[94dvh] overflow-y-auto sm:max-w-[1180px]" dir="rtl">
       <DialogHeader className="text-right">
         <DialogTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-emerald-700" />تقارير تغطية المباني بخدمة الصلاة</DialogTitle>
         <DialogDescription>أنشئ تقريرًا مرنًا من المباني الظاهرة في ملف التغطية، ثم عاينه أو اطبعه/احفظه PDF أو صدّره إلى Excel احترافي.</DialogDescription>
       </DialogHeader>
+          {/* IAU_REPORT_VIEW_TOGGLE_PLATFORM_V1 */}
+          <div className="flex justify-end"><ReportViewToggle storageKey="iau-building-coverage-reports-view" scopeId="building-coverage-reports-view" /></div>
 
       <div className="space-y-5 py-2">
         <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">

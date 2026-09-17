@@ -19,6 +19,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
+import { ReportViewToggle } from '../components/ReportViewToggle';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { NativeSelect } from '../components/ui/native-select';
@@ -351,7 +352,7 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   const cycleTemplate = selectedCycle?.officialTemplate || officialTemplate;
 
   return (
-    <div className="accounting-report mx-auto w-full max-w-[1780px] space-y-5 p-1 sm:p-3 md:p-5" dir="rtl">
+    <div id="accounting-reports-view" className="accounting-report mx-auto w-full max-w-[1780px] space-y-5 p-1 sm:p-3 md:p-5" dir="rtl">
       <section className="rounded-[28px] border bg-white/90 p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -360,6 +361,8 @@ export const AccountingTransformationReportsPage: React.FC = () => {
             <p className="mt-1 text-sm text-slate-500">اختر الدورة، راجع نطاق البيانات، ثم أنشئ المخرج المطلوب من مكان واحد.</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {/* IAU_REPORT_VIEW_TOGGLE_PLATFORM_V1 */}
+            <ReportViewToggle storageKey="iau-accounting-reports-view" scopeId="accounting-reports-view" />
             <Button variant="outline" onClick={() => navigate('/accounting-transformation')}><ArrowRight className="ml-2 h-4 w-4" />لوحة اللجنة</Button>
             {canAdd && <Button variant="outline" onClick={() => navigate('/accounting-transformation/import')}><FileSpreadsheet className="ml-2 h-4 w-4" />استيراد Excel</Button>}
             <Button variant="outline" onClick={() => navigate('/accounting-transformation/cycles')}><LayoutGrid className="ml-2 h-4 w-4" />مركز الدورات</Button>

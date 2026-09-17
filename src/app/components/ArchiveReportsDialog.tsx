@@ -14,6 +14,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
+import { ReportViewToggle } from './ReportViewToggle';
 import {
   Dialog,
   DialogContent,
@@ -447,7 +448,7 @@ export const ArchiveReportsDialog: React.FC<ArchiveReportsDialogProps> = ({ docu
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] w-[96vw] max-w-[1180px] overflow-y-auto" dir="rtl">
+      <DialogContent id="archive-reports-dialog-view" className="max-h-[92vh] w-[96vw] max-w-[1180px] overflow-y-auto" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <FileDown className="h-5 w-5 text-sky-700" />
@@ -457,6 +458,8 @@ export const ArchiveReportsDialog: React.FC<ArchiveReportsDialogProps> = ({ docu
             تقرير مرن يطبق الفلاتر فورًا ثم يتيح الطباعة أو الحفظ PDF أو التصدير إلى Excel.
           </DialogDescription>
         </DialogHeader>
+          {/* IAU_REPORT_VIEW_TOGGLE_PLATFORM_V1 */}
+          <div className="flex justify-end"><ReportViewToggle storageKey="iau-archive-reports-dialog-view" scopeId="archive-reports-dialog-view" /></div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-2xl border bg-sky-50 p-3"><p className="text-xs text-muted-foreground">النتائج</p><p className="text-2xl font-black text-sky-800">{metrics.count}</p></div>

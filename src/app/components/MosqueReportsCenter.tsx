@@ -19,6 +19,7 @@ import {
 import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { ReportViewToggle } from './ReportViewToggle';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -279,7 +280,7 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
   const deleteTemplate = (id: string) => { const next = templates.filter((item) => item.id !== id); setTemplates(next); saveTemplates(next); };
   const resetFilters = () => setSettings((current) => ({ ...current, from: '', to: '', city: '', campus: '', siteType: 'all', status: 'all', priority: 'all', search: '' }));
 
-  return <div className="space-y-4" dir="rtl">
+  return <div id="mosque-reports-view" className="space-y-4" dir="rtl">
     <Card className="overflow-hidden border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-emerald-50/30 shadow-[0_8px_0_rgba(15,23,42,0.07),0_16px_34px_rgba(15,23,42,0.08)]">
       <CardHeader className="border-b border-sky-100 bg-white/80">
         <CardTitle className="flex items-center gap-2 text-xl"><BarChart3 className="h-5 w-5 text-sky-700" />مركز التقارير والتحليل</CardTitle>
@@ -307,7 +308,7 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
           <div className="flex items-end"><Button type="button" variant="outline" className="w-full" onClick={resetFilters}>مسح الفلاتر</Button></div>
         </CardContent></Card>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/60 p-4"><div><div className="font-black text-sky-950">النتائج المطابقة: {activeRows.toLocaleString('ar-SA')}</div><div className="mt-1 text-xs text-slate-600">{filterSummary()}{visitsLoading ? ' — جاري استكمال بيانات الزيارات...' : ''}{quranMovementsLoading ? ' — جاري تحميل حركات المصاحف...' : ''}</div>{['sites', 'quran', 'comprehensive'].includes(settings.reportType) && <div className="mt-1 text-[11px] font-semibold text-emerald-800">المضاف والمسحوب والمرتجع للمصاحف يحتسب حسب الفترة المحددة أعلاه، بينما الرصيد الحالي قيمة لحظية.</div>}</div><div className="flex flex-wrap gap-2">{canPrint && <Button variant="outline" onClick={printPdf}><Printer className="ml-2 h-4 w-4" />PDF / طباعة</Button>}<Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={exportExcel}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel احترافي</Button></div></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/60 p-4"><div><div className="font-black text-sky-950">النتائج المطابقة: {activeRows.toLocaleString('ar-SA')}</div><div className="mt-1 text-xs text-slate-600">{filterSummary()}{visitsLoading ? ' — جاري استكمال بيانات الزيارات...' : ''}{quranMovementsLoading ? ' — جاري تحميل حركات المصاحف...' : ''}</div>{['sites', 'quran', 'comprehensive'].includes(settings.reportType) && <div className="mt-1 text-[11px] font-semibold text-emerald-800">المضاف والمسحوب والمرتجع للمصاحف يحتسب حسب الفترة المحددة أعلاه، بينما الرصيد الحالي قيمة لحظية.</div>}</div><div className="flex flex-wrap gap-2">{/* IAU_REPORT_VIEW_TOGGLE_PLATFORM_V1 */}<ReportViewToggle storageKey="iau-mosque-reports-view" scopeId="mosque-reports-view" />{canPrint && <Button variant="outline" onClick={printPdf}><Printer className="ml-2 h-4 w-4" />PDF / طباعة</Button>}<Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={exportExcel}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel احترافي</Button></div></div>
 
         <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4" />معاينة أقسام التقرير</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{activeSections.map((section) => <div key={section.key} className="rounded-2xl border bg-white p-4 shadow-sm"><div className="flex items-center justify-between gap-2"><strong>{section.title}</strong><Badge variant="outline">{section.rows.length} سجل</Badge></div><p className="mt-2 text-xs text-muted-foreground">{section.rows.length ? `جاهز للتصدير — ${Object.keys(section.rows[0].data).length} أعمدة` : 'لا توجد نتائج مطابقة للفلاتر الحالية'}</p></div>)}</CardContent></Card>
 

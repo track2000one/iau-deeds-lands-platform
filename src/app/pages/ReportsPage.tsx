@@ -55,6 +55,7 @@ import { getSiteInspection, getSiteInspections } from '../api/siteInspections';
 import { openSiteInspectionReport, openSiteInspectionReports } from '../utils/siteInspectionReport';
 import * as XLSX from 'xlsx';
 import { Badge } from '../components/ui/badge';
+import { ReportViewToggle } from '../components/ReportViewToggle';
 import {
   BarChart,
   Bar,
@@ -2144,7 +2145,7 @@ export const ReportsPage: React.FC = () => {
     const distribution = getDistributionData(type);
 
     return (
-      <Card key={type} className="group relative overflow-hidden rounded-[30px] border border-white/45 bg-white/55 shadow-[0_20px_60px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_26px_80px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.92)]">
+      <Card id={`reports-section-${type}`} key={type} className="group relative overflow-hidden rounded-[30px] border border-white/45 bg-white/55 shadow-[0_20px_60px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_26px_80px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.92)]">
         <CardHeader className="border-b border-white/50 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,239,231,0.72),rgba(236,231,223,0.56))]">
           <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-start">
             <div>
@@ -2165,6 +2166,9 @@ export const ReportsPage: React.FC = () => {
               </CardDescription>
             </div>
 
+            {/* IAU_REPORT_VIEW_TOGGLE_PLATFORM_V1 */}
+            <div className="flex items-center gap-2">
+              <ReportViewToggle storageKey={`iau-report-view-${type}`} scopeId={`reports-section-${type}`} />
             <Button
               variant="ghost"
               size="sm"
@@ -2173,6 +2177,7 @@ export const ReportsPage: React.FC = () => {
             >
               {expandedSection === type ? <ChevronUp /> : <ChevronDown />}
             </Button>
+            </div>
           </div>
         </CardHeader>
 
