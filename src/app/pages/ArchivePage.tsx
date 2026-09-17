@@ -19,6 +19,8 @@ import {
   Tags,
   FileDown,
   FileSpreadsheet,
+  LayoutGrid,
+  Table2,
   ShieldCheck,
   AlertTriangle,
   Copy,
@@ -223,6 +225,14 @@ export const ArchivePage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterConfidentiality, setFilterConfidentiality] = useState('');
+  // IAU_ARCHIVE_VIEW_TOGGLE_V1
+  const [archiveViewMode, setArchiveViewMode] = useState<'cards' | 'table'>(() => {
+    try {
+      return localStorage.getItem('iau_archive_view_mode') === 'table' ? 'table' : 'cards';
+    } catch {
+      return 'cards';
+    }
+  });
 
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -701,6 +711,15 @@ export const ArchivePage: React.FC = () => {
     link.rel = 'noreferrer';
     link.download = doc.originalName || doc.fileName;
     link.click();
+  };
+
+  const changeArchiveViewMode = (mode: 'cards' | 'table') => {
+    setArchiveViewMode(mode);
+    try {
+      localStorage.setItem('iau_archive_view_mode', mode);
+    } catch {
+      // Ignore storage restrictions; the selected view still works for the current session.
+    }
   };
 
   const clearFilters = () => {
@@ -1188,12 +1207,38 @@ export const ArchivePage: React.FC = () => {
               ملفات الأرشفة ({filteredDocuments.length})
             </h2>
             <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              عرض الملفات كبطاقات واضحة مع بياناتها وإجراءاتها الرئيسية.
+              اختر طريقة العرض المناسبة: بطاقات مرئية أو جدول تفصيلي مضغوط.
             </p>
           </div>
-          <Badge variant="outline" className="w-fit border-slate-300 bg-white/90 px-3 py-1 font-bold text-slate-700 shadow-sm">
-            {filteredDocuments.length} ملف
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-xl border border-slate-300 bg-white/95 p-1 shadow-sm" role="group" aria-label="طريقة عرض ملفات الأرشفة">
+              <Button
+                type="button"
+                size="sm"
+                variant={archiveViewMode === 'cards' ? 'default' : 'ghost'}
+                onClick={() => changeArchiveViewMode('cards')}
+                className="h-9 rounded-lg px-3 font-bold"
+                aria-pressed={archiveViewMode === 'cards'}
+              >
+                <LayoutGrid className="ml-2 h-4 w-4" />
+                بطاقات
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={archiveViewMode === 'table' ? 'default' : 'ghost'}
+                onClick={() => changeArchiveViewMode('table')}
+                className="h-9 rounded-lg px-3 font-bold"
+                aria-pressed={archiveViewMode === 'table'}
+              >
+                <Table2 className="ml-2 h-4 w-4" />
+                جدول
+              </Button>
+            </div>
+            <Badge variant="outline" className="w-fit border-slate-300 bg-white/90 px-3 py-1 font-bold text-slate-700 shadow-sm">
+              {filteredDocuments.length} ملف
+            </Badge>
+          </div>
         </div>
 
         <div className="p-4 sm:p-5">
@@ -1202,7 +1247,7 @@ export const ArchivePage: React.FC = () => {
               <Archive className="mx-auto mb-3 h-12 w-12 opacity-30" />
               لا توجد ملفات مؤرشفة مطابقة للبحث.
             </div>
-          ) : (
+          ) : archiveViewMode === 'cards' ? (
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
               {filteredDocuments.map((doc) => (
                 <article
@@ -1348,6 +1393,88 @@ export const ArchivePage: React.FC = () => {
                   </div>
                 </article>
               ))}
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1180px] border-collapse text-right text-sm">
+                  <thead className="bg-gradient-to-l from-slate-100 via-sky-50 to-slate-50 text-slate-700">
+                    <tr className="border-b border-slate-200">
+                      <th className="px-4 py-3 font-black">العنوان / الملف</th>
+                      <th className="px-4 py-3 font-black">التصنيف</th>
+                      <th className="px-4 py-3 font-black">رقم المستند</th>
+                      <th className="px-4 py-3 font-black">تاريخ المستند</th>
+                      <th className="px-4 py-3 font-black">الجهة / المصدر</th>
+                      <th className="px-4 py-3 font-black">السرية</th>
+                      <th className="px-4 py-3 font-black">النوع</th>
+                      <th className="px-4 py-3 font-black">الحجم</th>
+                      <th className="px-4 py-3 text-center font-black">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDocuments.map((doc, index) => (
+                      <tr
+                        key={doc.id}
+                        className={`border-b border-slate-100 transition-colors hover:bg-sky-50/70 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/55'}`}
+                      >
+                        <td className="max-w-[280px] px-4 py-3 align-top">
+                          <button type="button" onClick={() => openDetails(doc)} className="block w-full text-right">
+                            <span className="line-clamp-2 font-black text-slate-800 hover:text-sky-700">{doc.title}</span>
+                            <span className="mt-1 block truncate text-xs text-slate-500" dir="auto">{doc.originalName || doc.fileName}</span>
+                          </button>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {getArchiveMissingMetadata(doc).length > 0 && (
+                              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[10px] text-amber-800">
+                                ناقص {getArchiveMissingMetadata(doc).length}
+                              </Badge>
+                            )}
+                            {archiveQuality.duplicateNumbers.has(String(doc.documentNumber || '').trim().toLowerCase()) && (
+                              <Badge variant="outline" className="border-violet-300 bg-violet-50 text-[10px] text-violet-800">مكرر</Badge>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 align-top font-semibold text-slate-700">{doc.category || 'غير مصنف'}</td>
+                        <td className="px-4 py-3 align-top font-bold text-slate-700">{doc.documentNumber || '-'}</td>
+                        <td className="whitespace-nowrap px-4 py-3 align-top text-slate-700">{formatArchiveDocumentDate(doc.documentDate, doc.documentDateType)}</td>
+                        <td className="max-w-[220px] px-4 py-3 align-top text-slate-700"><span className="line-clamp-2">{doc.issuingAuthority || '-'}</span></td>
+                        <td className="px-4 py-3 align-top">
+                          <Badge variant="outline" className={`text-[10px] font-black ${getArchiveConfidentialityClassName(doc.confidentiality)}`}>
+                            {getConfidentialityLabel(doc.confidentiality)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 align-top font-black text-slate-700">{getArchiveFileTypeLabel(doc)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 align-top font-semibold text-slate-700">{formatFileSize(doc.fileSize)}</td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="flex min-w-max items-center justify-center gap-1.5">
+                            <Button type="button" variant="outline" size="sm" onClick={() => openDetails(doc)} title="عرض التفاصيل" className="h-8 px-2.5">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => openFile(doc)} title="فتح الملف" className="h-8 px-2.5 text-sky-700">
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => downloadFile(doc)} title="تنزيل الملف" className="h-8 px-2.5 text-indigo-700">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            {canEdit && (
+                              <Button type="button" variant="outline" size="sm" onClick={() => openEditForm(doc)} title="تعديل" className="h-8 px-2.5 text-amber-700">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button type="button" variant="outline" size="sm" onClick={() => requestDelete(doc)} title="حذف" className="h-8 px-2.5 text-red-600">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-2 text-xs text-slate-500">
+                يعرض الجدول {filteredDocuments.length} ملفًا. استخدم البحث والتصفية لتقليل النتائج، ويمكن التمرير أفقيًا على الشاشات الصغيرة.
+              </div>
             </div>
           )}
         </div>
