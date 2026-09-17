@@ -1,0 +1,53 @@
+name: Apply Archive View Toggle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-archive-view-toggle.mjs'
+      - '.github/workflows/apply-archive-view-toggle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync latest main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Apply archive view toggle patch
+        run: node scripts/apply-archive-view-toggle.mjs
+
+      - name: Verify build
+        run: npm run build
+
+      - name: Commit and push changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git add src/app/pages/ArchivePage.tsx
+          git commit -m "Add cards and table views to archive"
+          git push origin HEAD:main
