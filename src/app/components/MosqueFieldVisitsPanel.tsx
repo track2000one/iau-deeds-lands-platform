@@ -1523,17 +1523,35 @@ const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentIt
   };
 
   // IAU_FIELD_VISIT_OFFLINE_FIRST_V1
-  const fieldVisitDraftKey = React.useMemo(() => `field-visit-draft:${currentUsername || 'anonymous'}`, [currentUsername]);
+  // IAU_FIELD_VISIT_DRAFT_PER_SITE_V3
+  const legacyFieldVisitDraftKey = React.useMemo(
+    () => `field-visit-draft:${currentUsername || 'anonymous'}`,
+    [currentUsername],
+  );
+  const fieldVisitDraftScope = React.useMemo(() => {
+    if (editingVisit?.id) return `visit:${editingVisit.id}`;
+    const siteId = String(visitForm.siteId || '').trim();
+    return siteId ? `site:${siteId}` : 'new';
+  }, [editingVisit?.id, visitForm.siteId]);
+  const fieldVisitDraftKey = React.useMemo(
+    () => `${legacyFieldVisitDraftKey}:${fieldVisitDraftScope}`,
+    [legacyFieldVisitDraftKey, fieldVisitDraftScope],
+  );
   const [fieldVisitOnline, setFieldVisitOnline] = React.useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
   const [fieldVisitAutosaveAt, setFieldVisitAutosaveAt] = React.useState<string | null>(null);
   const [pendingMediaCount, setPendingMediaCount] = React.useState(0);
   const restoringDraftRef = React.useRef(false);
   // IAU_FIELD_VISIT_DRAFT_RESUME_V2
-  const fieldVisitEmergencyKey = React.useMemo(
+  const legacyFieldVisitEmergencyKey = React.useMemo(
     () => makeFieldVisitEmergencyKey(currentUsername || 'anonymous'),
     [currentUsername],
   );
+  const fieldVisitEmergencyKey = React.useMemo(
+    () => `${legacyFieldVisitEmergencyKey}:${fieldVisitDraftScope}`,
+    [legacyFieldVisitEmergencyKey, fieldVisitDraftScope],
+  );
   const latestVisitFormRef = React.useRef(visitForm);
+  const lastRestoredDraftScopeRef = React.useRef('');
   React.useEffect(() => {
     latestVisitFormRef.current = visitForm;
   }, [visitForm]);
@@ -1580,24 +1598,39 @@ const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentIt
 
   React.useEffect(() => {
     if (!visitDialog || restoringDraftRef.current) return;
+    const restoreToken = `${fieldVisitDraftKey}|${editingVisit?.id || 'new'}`;
+    if (lastRestoredDraftScopeRef.current === restoreToken) return;
+    lastRestoredDraftScopeRef.current = restoreToken;
     restoringDraftRef.current = true;
     void (async () => {
       try {
-        const [indexedDraft, rows] = await Promise.all([
+        const shouldReadLegacyDraft = fieldVisitDraftKey !== legacyFieldVisitDraftKey;
+        const [indexedDraft, legacyIndexedDraft, rows] = await Promise.all([
           loadFieldVisitDraft<VisitForm>(fieldVisitDraftKey),
+          shouldReadLegacyDraft ? loadFieldVisitDraft<VisitForm>(legacyFieldVisitDraftKey) : Promise.resolve(null),
           listPendingFieldVisitMedia(currentUsername || 'anonymous'),
         ]);
         const emergencyDraft = loadFieldVisitEmergencyDraft<VisitForm>(fieldVisitEmergencyKey);
+        const legacyEmergencyDraft = fieldVisitEmergencyKey !== legacyFieldVisitEmergencyKey
+          ? loadFieldVisitEmergencyDraft<VisitForm>(legacyFieldVisitEmergencyKey)
+          : null;
         const expectedEditingVisitId = editingVisit?.id || null;
+        const expectedSiteId = String(editingVisit?.siteId || visitForm.siteId || '').trim();
+        const candidates = [indexedDraft, emergencyDraft, legacyIndexedDraft, legacyEmergencyDraft].filter((draft) => {
+          if (!draft?.form) return false;
+          const draftSiteId = String((draft.form as VisitForm).siteId || '').trim();
+          if (expectedSiteId && draftSiteId !== expectedSiteId) return false;
+          return true;
+        });
         const draft = newestFieldVisitRecoveryDraft<VisitForm>(
-          [indexedDraft, emergencyDraft],
+          candidates,
           expectedEditingVisitId,
         );
         setPendingMediaCount(rows.length);
         if (draft?.form) {
           setVisitForm(hydrateOfflinePlaceholders(draft.form, rows));
           setFieldVisitAutosaveAt(draft.savedAt);
-          toast.success('تم استعادة آخر مسودة محفوظة تلقائيًا ويمكنك متابعة التعبئة من حيث توقفت');
+          toast.success('تم استعادة آخر مسودة محفوظة تلقائيًا لهذا المسجد / المصلى ويمكنك متابعة التعبئة من حيث توقفت');
         }
       } catch {
         // Local recovery must never block opening or completing a visit.
@@ -1605,7 +1638,11 @@ const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentIt
         restoringDraftRef.current = false;
       }
     })();
-  }, [visitDialog, editingVisit?.id, fieldVisitDraftKey, fieldVisitEmergencyKey, currentUsername, hydrateOfflinePlaceholders]);
+  }, [visitDialog, editingVisit?.id, editingVisit?.siteId, visitForm.siteId, fieldVisitDraftKey, legacyFieldVisitDraftKey, fieldVisitEmergencyKey, legacyFieldVisitEmergencyKey, currentUsername, hydrateOfflinePlaceholders]);
+
+  React.useEffect(() => {
+    if (!visitDialog) lastRestoredDraftScopeRef.current = '';
+  }, [visitDialog]);
 
   React.useEffect(() => {
     if (!visitDialog || restoringDraftRef.current) return;
@@ -1976,7 +2013,13 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
         : await mosqueApi.createFieldVisit(payload);
       toast.success(editingVisit ? 'تم تحديث الزيارة وحفظ نتائجها' : 'تم إنشاء الزيارة الميدانية');
       await clearFieldVisitDraft(fieldVisitDraftKey).catch(() => undefined);
+      if (legacyFieldVisitDraftKey !== fieldVisitDraftKey) {
+        await clearFieldVisitDraft(legacyFieldVisitDraftKey).catch(() => undefined);
+      }
       clearFieldVisitEmergencyDraft(fieldVisitEmergencyKey);
+      if (legacyFieldVisitEmergencyKey !== fieldVisitEmergencyKey) {
+        clearFieldVisitEmergencyDraft(legacyFieldVisitEmergencyKey);
+      }
       setFieldVisitAutosaveAt(null);
       let quranSyncResult: { synced: boolean; needsCorrection: boolean; message: string | null } | null = null;
       try {
