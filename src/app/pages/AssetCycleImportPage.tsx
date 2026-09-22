@@ -315,24 +315,24 @@ export const AssetCycleImportPage: React.FC = () => {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-5 pb-8" dir="rtl">
-      <Card className="overflow-hidden rounded-[30px] border-sky-200/70 bg-gradient-to-l from-slate-950 via-slate-900 to-sky-950 text-white shadow-[0_24px_70px_rgba(15,23,42,.22)]">
+      <Card className="overflow-hidden rounded-[30px] border-sky-200 bg-gradient-to-l from-sky-50 via-white to-slate-50 text-slate-900 shadow-[0_16px_45px_rgba(15,23,42,.10)]">
         <CardContent className="p-6 sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-bold">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-100 px-3 py-1 text-xs font-bold text-sky-950">
                 <ShieldCheck className="h-4 w-4" />
                 استيراد آمن بنظام الإصدارات والمطابقة التلقائية
               </div>
               <h1 className="text-3xl font-black">استيراد دورة تحديث جديدة للأصول</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-300">
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-700">
                 يحلل النظام ملف Excel أولًا، ويطابق السجلات بالرقم الفريد، ثم يصنفها إلى جديد أو معدل أو مطابق أو يحتاج مراجعة. لا تصبح البيانات الحالية إلا بعد المراجعة والاعتماد.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/assets/cycles')}>
+              <Button variant="outline" className="border-slate-300 bg-white text-slate-900 shadow-sm hover:border-sky-400 hover:bg-sky-50 hover:text-slate-950" onClick={() => navigate('/assets/cycles')}>
                 <History className="ml-2 h-4 w-4" />سجل الدورات
               </Button>
-              <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => navigate('/assets')}>
+              <Button variant="outline" className="border-slate-300 bg-white text-slate-900 shadow-sm hover:border-sky-400 hover:bg-sky-50 hover:text-slate-950" onClick={() => navigate('/assets')}>
                 <ArrowRight className="ml-2 h-4 w-4" />لوحة الأصول
               </Button>
             </div>
