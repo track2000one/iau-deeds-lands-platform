@@ -2694,7 +2694,7 @@ ${quranStockMovementForm.notes}` : ''}`
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         {/* STICKY_UNIT_NAV_V2: navigation stays above KPI cards and remains visible while scrolling on desktop and mobile. */}
         <div className="sticky top-0 z-40 -mx-1 rounded-2xl border border-[#d6b46a]/55 bg-[#fffdf8]/95 p-1.5 shadow-[0_10px_30px_rgba(6,60,51,0.13)] backdrop-blur-xl supports-[backdrop-filter]:bg-[#fffdf8]/90">
-          <div className="relative overflow-hidden rounded-2xl border border-[#d6b46a]/70 bg-gradient-to-br from-[#fff8e8] via-white to-emerald-50 p-3 shadow-[0_10px_28px_rgba(6,60,51,0.10),0_0_0_1px_rgba(214,180,106,0.10)] ring-1 ring-[#e8d7ad]/80 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:border before:border-[#d6b46a]/35 before:opacity-40 before:content-[''] before:content-[''] sm:hidden">
+          <div className="relative overflow-hidden rounded-2xl border border-[#d6b46a]/70 bg-gradient-to-br from-[#fff8e8] via-white to-emerald-50 p-3 shadow-[0_10px_28px_rgba(6,60,51,0.10),0_0_0_1px_rgba(214,180,106,0.10)] ring-1 ring-[#e8d7ad]/80 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:border before:border-[#d6b46a]/35 before:opacity-40 before:content-[''] sm:hidden">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold text-emerald-800">التنقل بين أقسام الوحدة</p>
