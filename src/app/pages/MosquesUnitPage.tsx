@@ -2883,7 +2883,7 @@ ${quranStockMovementForm.notes}` : ''}`
           {filteredQuranInventoryItems.length > 6 && <div className="border-t border-sky-100 bg-sky-50/50 px-4 py-2.5 text-center text-xs font-bold text-sky-800">يتم عرض أول 6 نتائج من أصل {filteredQuranInventoryItems.length} — استمر في الكتابة لتضييق النتائج.</div>}
         </section>}
 
-      {role === 'head' && <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-9">
+      {activeTab !== 'overview' && role === 'head' && <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-9">
         <Stat title="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} onClick={() => goToDashboardSection('sites')} />
         <Stat title="إجمالي المصاحف" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
         <Stat title="طلبات جديدة" value={dashboard?.stats.newRequests || 0} icon={ClipboardList} onClick={() => goToDashboardSection('requests', { request: 'new' })} />
@@ -2895,7 +2895,7 @@ ${quranStockMovementForm.notes}` : ''}`
         <Stat title="طلبات توظيف" value={dashboard?.stats.jobs || 0} icon={Briefcase} onClick={() => goToDashboardSection('jobs')} />
       </div>}
 
-      {role === 'supervisor' && <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
+      {activeTab !== 'overview' && role === 'supervisor' && <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
         <Stat title="المساجد التابعة لي" value={dashboard?.stats.managedSites || 0} icon={Building2} />
         <Stat title="إجمالي المصاحف" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
         <Stat title="طلبات تحتاج متابعة" value={dashboard?.stats.assignedRequests || 0} icon={ClipboardList} />
@@ -2905,7 +2905,7 @@ ${quranStockMovementForm.notes}` : ''}`
         <Stat title="التنبيهات" value={unreadNotifications} icon={Bell} />
       </div>}
 
-      {role === 'personnel' && <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+      {activeTab !== 'overview' && role === 'personnel' && <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         <Stat title="الموقع المرتبط" value={linkedSite ? 1 : 0} icon={Building2} />
         <Stat title="مصاحف الموقع" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
         <Stat title="طلباتي الحالية" value={dashboard?.stats.myRequests || activeMyRequests.length} icon={ClipboardList} />
@@ -2918,11 +2918,88 @@ ${quranStockMovementForm.notes}` : ''}`
 
         <TabsContent value="overview" className="space-y-4">
           {role === 'head' && <>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card className={card3d}><CardHeader><CardTitle>آخر طلبات الصيانة والاحتياج</CardTitle><CardDescription>أحدث العمليات داخل منظومة الوحدة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد طلبات حتى الآن" />}</CardContent></Card>
-              <Card className={card3d}><CardHeader><CardTitle>آخر البلاغات</CardTitle><CardDescription>بلاغات الزوار ومنسوبي الجامعة التي تحتاج متابعة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد بلاغات حتى الآن" />}</CardContent></Card>
-            </div>
-            <Card className={card3d}><CardHeader><CardTitle>إدارة المنظومة</CardTitle><CardDescription>رئيس الوحدة يملك الرؤية الشاملة والتقارير والإعدادات واعتماد الإجراءات.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="الإشراف الشامل" text="متابعة جميع المساجد والمصليات والطلبات والبلاغات." /><Rule title="الاعتماد" text="اعتماد الطلبات والإجازات والقرارات النهائية." /><Rule title="المؤشرات" text="متابعة الأداء والطلبات المتأخرة والحالات العاجلة." /><Rule title="منسوبو المساجد" text="إدارة ومتابعة الإمام والمؤذن والخطيب والخطيب المتعاون فقط." /></CardContent></Card>
+            <section className="grid gap-5 xl:grid-cols-[1.55fr_0.95fr]">
+              <Card className={`${card3d} overflow-hidden rounded-[26px]`}>
+                <CardHeader className="border-b border-[#e7d9b8] bg-white/85 pb-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-[#fff8e8] text-[#8a6a1f]">لوحة المتابعة التشغيلية</Badge>
+                      <CardTitle className="text-xl font-black text-[#0b4a3f] md:text-2xl">صورة موحدة لأعمال الوحدة</CardTitle>
+                      <CardDescription className="mt-1 leading-6">متابعة المواقع والطلبات والبلاغات والمصاحف من شاشة واحدة، مع انتقال مباشر لكل قسم.</CardDescription>
+                    </div>
+                    <Button className={`${button3d} border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]`} onClick={() => goToDashboardSection('reports')}><BarChart3 className="ml-2 h-4 w-4" />التقارير</Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-5 p-4 sm:p-5">
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <OverviewMetric label="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} onClick={() => goToDashboardSection('sites')} />
+                    <OverviewMetric label="إجمالي المصاحف" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
+                    <OverviewMetric label="طلبات تحتاج متابعة" value={(dashboard?.stats.newRequests || 0) + (dashboard?.stats.reviewRequests || 0)} icon={ClipboardList} onClick={() => goToDashboardSection('requests')} />
+                    <OverviewMetric label="بلاغات مفتوحة" value={dashboard?.stats.openTickets || 0} icon={MessageSquare} onClick={() => goToDashboardSection('tickets')} />
+                  </div>
+
+                  <div className="rounded-[22px] border border-[#e3d7bb] bg-[#fbf8f1] p-3 sm:p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-black text-[#0b4a3f]">آخر الحركة التشغيلية</p>
+                        <p className="mt-0.5 text-xs text-slate-500">أحدث الطلبات والبلاغات التي تتطلب المتابعة.</p>
+                      </div>
+                      <Badge variant="outline" className="border-[#d6b46a]/50 bg-white text-[#0b4a3f]">محدث من بيانات المنصة</Badge>
+                    </div>
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1"><span className="text-sm font-black text-slate-700">طلبات الصيانة والاحتياج</span><Button variant="ghost" size="sm" className="h-8 text-xs text-[#0b5a49]" onClick={() => goToDashboardSection('requests')}>عرض الكل</Button></div>
+                        {(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.slice(0, 3).map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <EmptyCompact text="لا توجد طلبات حتى الآن" />}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1"><span className="text-sm font-black text-slate-700">البلاغات</span><Button variant="ghost" size="sm" className="h-8 text-xs text-[#0b5a49]" onClick={() => goToDashboardSection('tickets')}>عرض الكل</Button></div>
+                        {(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.slice(0, 3).map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <EmptyCompact text="لا توجد بلاغات حتى الآن" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('field-visits')}><ClipboardList className="ml-2 h-4 w-4" />جولة ميدانية</Button>
+                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('quran')}><BookOpen className="ml-2 h-4 w-4" />المصاحف</Button>
+                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('team')}><Users className="ml-2 h-4 w-4" />منسوبو المساجد</Button>
+                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('map')}><MapPin className="ml-2 h-4 w-4" />الخريطة</Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid content-start gap-3">
+                <OverviewSectionCard
+                  title="المساجد والمصليات"
+                  description="السجل التشغيلي للمواقع، البيانات الأساسية، الخرائط، QR والمرفقات."
+                  value={dashboard?.stats.sites || 0}
+                  icon={Building2}
+                  onClick={() => goToDashboardSection('sites')}
+                />
+                <OverviewSectionCard
+                  title="الجولات والزيارات الميدانية"
+                  description="توثيق الزيارة، قوائم الفحص، الصور والملاحظات ومتابعة المعالجة."
+                  value={officialBuildings.length}
+                  icon={ClipboardList}
+                  onClick={() => goToDashboardSection('field-visits')}
+                />
+                <OverviewSectionCard
+                  title="الطلبات والصيانة"
+                  description="إدارة الطلبات من التسجيل والمراجعة حتى التنفيذ والإغلاق."
+                  value={(dashboard?.stats.newRequests || 0) + (dashboard?.stats.reviewRequests || 0) + (dashboard?.stats.approvedRequests || 0)}
+                  icon={Wrench}
+                  onClick={() => goToDashboardSection('requests')}
+                />
+                <OverviewSectionCard
+                  title="المصاحف والتقارير"
+                  description="متابعة الأرصدة والجرد والاحتياج، مع تقارير تشغيلية قابلة للطباعة والتصدير."
+                  value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0}
+                  icon={BookOpen}
+                  onClick={() => goToDashboardSection('quran')}
+                />
+              </div>
+            </section>
+
+            <Card className={card3d}><CardHeader><CardTitle className="text-[#0b4a3f]">إدارة المنظومة</CardTitle><CardDescription>صلاحيات رئيس الوحدة موزعة إلى مسارات عمل واضحة بدل عرضها كنصوص متفرقة.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="الإشراف الشامل" text="متابعة جميع المساجد والمصليات والطلبات والبلاغات." /><Rule title="الاعتماد" text="اعتماد الطلبات والإجازات والقرارات النهائية." /><Rule title="المؤشرات" text="متابعة الأداء والطلبات المتأخرة والحالات العاجلة." /><Rule title="منسوبو المساجد" text="إدارة ومتابعة الإمام والمؤذن والخطيب والخطيب المتعاون فقط." /></CardContent></Card>
           </>}
 
           {role === 'supervisor' && <>
@@ -3945,6 +4022,28 @@ ${quranStockMovementForm.notes}` : ''}`
           </div>
   );
 };
+
+const OverviewMetric = ({ label, value, icon: Icon, onClick }: { label: string; value: number; icon: React.ElementType; onClick?: () => void }) => {
+  const content = <div className="group flex min-h-[106px] items-center justify-between gap-3 rounded-2xl border border-[#e1d4b7] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#d6b46a] hover:shadow-[0_10px_24px_rgba(6,60,51,0.10)]"><div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{value}</p></div><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#0b4a3f] text-[#f0d18b]"><Icon className="h-5 w-5" /></div></div>;
+  return onClick ? <button type="button" className="w-full text-right" onClick={onClick}>{content}</button> : content;
+};
+
+const OverviewSectionCard = ({ title, description, value, icon: Icon, onClick }: { title: string; description: string; value: number; icon: React.ElementType; onClick: () => void }) => (
+  <button type="button" className="group w-full text-right" onClick={onClick}>
+    <div className="relative overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white p-4 shadow-[0_8px_24px_rgba(6,60,51,0.07)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_14px_28px_rgba(6,60,51,0.12)]">
+      <div className="absolute bottom-3 right-0 top-3 w-1 rounded-l-full bg-[#0b5a49] transition-all group-hover:bg-[#d6b46a]" />
+      <div className="flex items-start gap-3 pr-2">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#fdf7e9] text-[#0b5a49]"><Icon className="h-5 w-5" /></div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3"><h3 className="font-black text-[#0b4a3f]">{title}</h3><span className="rounded-full border border-[#dfcfaa] bg-[#fffaf0] px-2.5 py-1 text-xs font-black text-[#8a6a1f]">{value}</span></div>
+          <p className="mt-1 text-xs leading-6 text-slate-500">{description}</p>
+        </div>
+      </div>
+    </div>
+  </button>
+);
+
+const EmptyCompact = ({ text }: { text: string }) => <div className="rounded-2xl border border-dashed border-[#d9c9a5] bg-white/75 px-4 py-6 text-center text-xs text-slate-500">{text}</div>;
 
 const Stat = ({ title, value, icon: Icon, onClick }: { title: string; value: number; icon: React.ElementType; onClick?: () => void }) => {
   const card = <Card className={`${card3d} group h-full overflow-hidden ${onClick ? 'transition-all duration-200 hover:-translate-y-1 hover:border-[#c6a052] hover:shadow-[0_16px_34px_rgba(6,60,51,0.14)]' : ''}`}><div className="h-1 bg-gradient-to-l from-[#0b5a49] via-[#d6b46a] to-[#0b5a49]" /><CardContent className="flex h-full items-center justify-between gap-3 p-4"><div><p className="text-xs font-bold text-slate-500">{title}</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{value}</p></div><div className="rounded-2xl border border-[#d6b46a]/55 bg-[#0b4a3f] p-2.5 text-[#f2d48d] shadow-[0_7px_18px_rgba(6,60,51,0.18)] transition-transform duration-200 group-hover:scale-105"><Icon className="h-5 w-5" /></div></CardContent></Card>;
