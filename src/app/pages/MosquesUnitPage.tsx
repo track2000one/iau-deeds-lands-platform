@@ -3097,87 +3097,140 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>
 
         <TabsContent value="quran" className="space-y-4">
-          <Card className={`${card3d} overflow-hidden border-amber-200/80`}>
-            <CardHeader className="gap-4 border-b border-amber-100 bg-gradient-to-l from-amber-50 via-white to-emerald-50 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <span className="group relative inline-flex h-12 w-12 shrink-0 items-center justify-center">
-                    <span className="absolute -inset-1 rounded-[18px] bg-gradient-to-br from-amber-300/55 via-emerald-400/40 to-cyan-300/30 blur-md transition duration-300 group-hover:blur-lg" />
-                    <span className="absolute inset-0 rounded-2xl bg-white/45 shadow-[0_10px_24px_rgba(15,118,110,0.24),0_0_18px_rgba(245,158,11,0.2)]" />
-                    <img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="relative h-11 w-11 rounded-2xl object-cover shadow-[0_7px_14px_rgba(15,23,42,0.25),0_0_20px_rgba(245,158,11,0.24)] ring-1 ring-amber-200/90 transition duration-300 group-hover:-translate-y-0.5 group-hover:scale-105" />
+          <section className="grid gap-5 xl:grid-cols-[1.6fr_0.85fr]">
+            <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+              <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+                <div className="flex items-center gap-3">
+                  <span className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-white shadow-sm">
+                    <img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="h-10 w-10 rounded-xl object-cover" />
                   </span>
-                  مكتبة المصاحف
-                </CardTitle>
-                <CardDescription className="mt-2">رصيد داخلي لوحدة العناية بالمساجد والمصليات. عند إضافة مصاحف لأي مسجد أو مصلى تُخصم الكمية تلقائيًا من مكتبة المصاحف مع حفظ سجل الحركة.</CardDescription>
-              </div>
-              {role === 'head' && <div className="flex flex-wrap gap-2">
-                {!quranStockDashboard?.warehouses.length && <Button variant="outline" className={button3d} onClick={openQuranWarehouse}><Plus className="ml-1 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}
-                <Button className="bg-emerald-700 hover:bg-emerald-600" onClick={() => openQuranStockMovement('receipt')} disabled={!quranStockDashboard?.warehouses.length}><Plus className="ml-1 h-4 w-4" />إضافة رصيد للمكتبة</Button>
-                <Button variant="outline" className="border-amber-300 text-amber-800" onClick={() => openQuranStockMovement('return')} disabled={!quranStockDashboard?.warehouses.length}><RefreshCw className="ml-1 h-4 w-4" />إرجاع للمكتبة</Button>
-                <Button variant="outline" className={`${button3d} border-red-300 bg-red-50/60 text-red-700 hover:bg-red-100 hover:text-red-800`} onClick={() => void resetQuranLibrary()} disabled={quranStockSaving || (!quranStockDashboard?.warehouses.length && !quranStockDashboard?.summary.siteSystemTotal && quranSummary.countedSites === 0)}><RefreshCw className="ml-1 h-4 w-4" />تصفير المكتبة</Button>
-              </div>}
-            </CardHeader>
-            <CardContent className="space-y-5 pt-5">
-              <div className="space-y-4">
-                <div>
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-black text-slate-800">الرصيد الحالي</p><p className="mt-1 text-[11px] text-slate-500">يعرض الكميات الموجودة فعليًا الآن في المكتبة والمواقع، وليس مجموع الحركات التاريخية.</p></div><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">رصيد لحظي</Badge></div>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-                    <ReportMetric label="رصيد المكتبة الحالي" value={quranStockDashboard?.summary.warehouseTotal || 0} />
-                    <ReportMetric label="الكبيرة بالمكتبة" value={quranStockDashboard?.summary.warehouseLarge || 0} />
-                    <ReportMetric label="المتوسطة بالمكتبة" value={quranStockDashboard?.summary.warehouseMedium || 0} />
-                    <ReportMetric label="الصغيرة بالمكتبة" value={quranStockDashboard?.summary.warehouseSmall || 0} />
-                    <ReportMetric label="الرصيد الحالي بالمواقع" value={quranStockDashboard?.summary.siteSystemTotal || 0} />
-                    <ReportMetric label="إجمالي الرصيد بالنظام" value={quranStockDashboard?.summary.systemTotal || 0} />
-                    <ReportMetric label="احتياج المواقع" value={quranStockDashboard?.summary.siteNeedTotal || 0} />
-                    <ReportMetric label="تنبيهات الرصيد" value={quranStockDashboard?.summary.lowStockWarehouses || 0} />
+                  <div>
+                    <Badge variant="outline" className="mb-1 border-[#d6b46a]/55 bg-white text-[#8a6a1f]">المخزون المركزي</Badge>
+                    <CardTitle className="text-xl font-black text-[#0b4a3f] md:text-2xl">مكتبة المصاحف</CardTitle>
+                    <CardDescription className="mt-1 max-w-3xl leading-6">إدارة الرصيد المركزي وتوزيعه على المساجد والمصليات مع حفظ كل حركة ومتابعة الاحتياج الفعلي للمواقع.</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-5 p-4 sm:p-5">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <div className="rounded-2xl border border-[#e2d4b4] bg-white p-4 shadow-sm"><p className="text-[11px] font-bold text-slate-500">رصيد المكتبة</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.warehouseTotal || 0}</p><p className="mt-1 text-[10px] text-slate-400">الرصيد المتاح للتوزيع</p></div>
+                  <div className="rounded-2xl border border-[#e2d4b4] bg-white p-4 shadow-sm"><p className="text-[11px] font-bold text-slate-500">الرصيد بالمواقع</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.siteSystemTotal || 0}</p><p className="mt-1 text-[10px] text-slate-400">الموجود حاليًا في المساجد والمصليات</p></div>
+                  <div className="rounded-2xl border border-[#e2d4b4] bg-white p-4 shadow-sm"><p className="text-[11px] font-bold text-slate-500">إجمالي النظام</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.systemTotal || 0}</p><p className="mt-1 text-[10px] text-slate-400">المكتبة + المواقع</p></div>
+                  <div className={`rounded-2xl border p-4 shadow-sm ${(quranStockDashboard?.summary.siteNeedTotal || 0) > 0 ? 'border-amber-200 bg-amber-50/70' : 'border-emerald-200 bg-emerald-50/60'}`}><p className="text-[11px] font-bold text-slate-500">احتياج المواقع</p><p className={`mt-1 text-3xl font-black ${(quranStockDashboard?.summary.siteNeedTotal || 0) > 0 ? 'text-amber-800' : 'text-emerald-700'}`}>{quranStockDashboard?.summary.siteNeedTotal || 0}</p><p className="mt-1 text-[10px] text-slate-500">وفق المستهدفات المسجلة</p></div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
+                  <div className="rounded-2xl border border-[#e5d9bd] bg-[#fbf8f1] p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div><p className="font-black text-[#0b4a3f]">تكوين رصيد المكتبة</p><p className="mt-1 text-xs text-slate-500">توزيع الرصيد الحالي حسب حجم المصحف.</p></div>
+                      <Badge variant="outline" className="border-[#d6b46a]/50 bg-white text-[#8a6a1f]">رصيد لحظي</Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">كبير</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.warehouseLarge || 0}</p></div>
+                      <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">متوسط</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.warehouseMedium || 0}</p></div>
+                      <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">صغير</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.warehouseSmall || 0}</p></div>
+                    </div>
+                  </div>
+
+                  <div className={`flex min-w-[210px] flex-col justify-center rounded-2xl border p-4 text-center ${(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50/70'}`}>
+                    <div className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl ${(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 ? <AlertTriangle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}</div>
+                    <p className="mt-2 text-xs font-bold text-slate-500">حالة المخزون</p>
+                    <p className={`mt-1 font-black ${(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 ? 'text-red-700' : 'text-emerald-700'}`}>{(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 ? 'يحتاج تزويد' : 'الرصيد ضمن الحد الآمن'}</p>
+                    {(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 && <p className="mt-1 text-[10px] leading-5 text-red-600">الناقص حتى حد الأمان: {quranStockDashboard?.summary.shortageTotal || 0}</p>}
                   </div>
                 </div>
 
-                {quranStockDashboard && <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
-                  <div className="mb-3"><p className="text-sm font-black text-slate-800">ملخص حركة المكتبة</p><p className="mt-1 text-[11px] leading-5 text-slate-500">هذه أرقام تراكمية للحركات المسجلة، لذلك قد تختلف عن الرصيد الحالي. المعادلة أدناه توضح سبب الفرق بصورة مباشرة.</p></div>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-                    <ReportMetric label="إجمالي الوارد للمكتبة" value={quranStockDashboard.summary.warehouseInflowTotal || 0} />
-                    <ReportMetric label="إجمالي الخارج من المكتبة" value={quranStockDashboard.summary.warehouseOutflowTotal || 0} />
-                    <ReportMetric label="المضاف للمواقع" value={quranStockDashboard.summary.distributedTotal || 0} />
-                    <ReportMetric label="المرتجع للمكتبة" value={quranStockDashboard.summary.returnedTotal || 0} />
-                    <ReportMetric label="المستبعد / تسويات النقص" value={(quranStockDashboard.summary.damagedTotal || 0) + (quranStockDashboard.summary.adjustmentOutTotal || 0)} />
-                  </div>
-                  <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-bold ${quranStockDashboard.summary.warehouseNetMovement === quranStockDashboard.summary.warehouseTotal ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
-                    معادلة الرصيد: {quranStockDashboard.summary.warehouseInflowTotal || 0} وارد − {quranStockDashboard.summary.warehouseOutflowTotal || 0} خارج = {quranStockDashboard.summary.warehouseNetMovement || 0}، والرصيد الحالي للمكتبة = {quranStockDashboard.summary.warehouseTotal || 0}.
-                  </div>
-                </div>}
-              </div>
-
-              {(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 && <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">تنبيه رصيد منخفض</p><p className="mt-1">رصيد مكتبة المصاحف تحت الحد الأدنى، وإجمالي الكمية المطلوب توفيرها للوصول إلى حدود الأمان هو {quranStockDashboard?.summary.shortageTotal || 0} مصحف.</p></div></div>}
-
-              {!quranStockDashboard?.warehouses.length ? <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/50 p-8 text-center"><span className="relative mx-auto flex h-16 w-16 items-center justify-center">
-                  <span className="absolute -inset-1 rounded-[22px] bg-gradient-to-br from-amber-300/45 via-emerald-400/35 to-cyan-300/25 blur-md" />
-                  <img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="relative h-14 w-14 rounded-[20px] object-cover shadow-[0_8px_18px_rgba(15,23,42,0.24),0_0_18px_rgba(245,158,11,0.22)] ring-1 ring-amber-200/80" />
-                </span><p className="mt-3 font-black text-slate-800">لم يتم إنشاء مكتبة المصاحف بعد</p><p className="mt-1 text-sm text-muted-foreground">ابدأ بإنشاء مكتبة المصاحف ثم أضف رصيدها. بعد ذلك تتم إضافة المصاحف من داخل بطاقة المسجد أو المصلى مع الخصم التلقائي من المكتبة.</p>{role === 'head' && <Button className="mt-4 bg-emerald-700 hover:bg-emerald-600" onClick={openQuranWarehouse}><Plus className="ml-2 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}</div> : <div className="grid gap-4 xl:grid-cols-2">{quranStockDashboard.warehouses.map((warehouse) => (
-                <Card key={warehouse.id} className={`border-2 ${warehouse.lowStock ? 'border-red-200 bg-red-50/20' : 'border-emerald-200 bg-emerald-50/20'}`}>
-                  <CardContent className="p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div><div className="flex items-center gap-2"><h3 className="font-black text-slate-900">{warehouse.name}</h3><Badge variant="outline">{warehouse.code}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{warehouse.location || 'لم يحدد موقع المكتبة'}</p></div>
-                      {warehouse.lowStock ? <Badge className="bg-red-600">رصيد منخفض</Badge> : <Badge className="bg-emerald-600">الرصيد آمن</Badge>}
+                <div>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="font-black text-[#0b4a3f]">المكتبات المسجلة</p><p className="mt-1 text-xs text-slate-500">الرصيد الفعلي لكل مكتبة مع الحدود الدنيا والتنبيهات.</p></div><Badge variant="outline" className="border-[#d6b46a]/50 bg-[#fffdf8] text-[#0b4a3f]">{quranStockDashboard?.warehouses.length || 0} مكتبة</Badge></div>
+                  {!quranStockDashboard?.warehouses.length ? <div className="rounded-2xl border border-dashed border-[#d6b46a] bg-[#fffaf0] p-7 text-center">
+                    <img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="mx-auto h-14 w-14 rounded-2xl object-cover shadow-sm" />
+                    <p className="mt-3 font-black text-[#0b4a3f]">لم يتم إنشاء مكتبة المصاحف بعد</p>
+                    <p className="mt-1 text-sm text-slate-500">أنشئ المكتبة أولًا، ثم أضف الرصيد ليصبح متاحًا للتوزيع على المواقع.</p>
+                    {role === 'head' && <Button className="mt-4 border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={openQuranWarehouse}><Plus className="ml-2 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}
+                  </div> : <div className="grid gap-3 lg:grid-cols-2">{quranStockDashboard.warehouses.map((warehouse) => (
+                    <div key={warehouse.id} className={`rounded-2xl border bg-white p-4 shadow-[0_6px_18px_rgba(6,60,51,0.05)] ${warehouse.lowStock ? 'border-red-200' : 'border-[#e2d4b4]'}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div><div className="flex items-center gap-2"><h3 className="font-black text-[#0b4a3f]">{warehouse.name}</h3><Badge variant="outline" className="border-[#d6b46a]/45">{warehouse.code}</Badge></div><p className="mt-1 text-xs text-slate-500">{warehouse.location || 'لم يحدد موقع المكتبة'}</p></div>
+                        {warehouse.lowStock ? <Badge className="bg-red-600">رصيد منخفض</Badge> : <Badge className="bg-emerald-600">الرصيد آمن</Badge>}
+                      </div>
+                      <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] text-slate-500">الإجمالي</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{warehouse.balance.totalCount}</p></div>
+                        <div className="rounded-xl border bg-white p-2.5"><p className="text-[10px] text-slate-500">كبير</p><p className="mt-1 font-black">{warehouse.balance.largeCount}</p><p className="text-[9px] text-slate-400">حد {warehouse.minLargeCount}</p></div>
+                        <div className="rounded-xl border bg-white p-2.5"><p className="text-[10px] text-slate-500">متوسط</p><p className="mt-1 font-black">{warehouse.balance.mediumCount}</p><p className="text-[9px] text-slate-400">حد {warehouse.minMediumCount}</p></div>
+                        <div className="rounded-xl border bg-white p-2.5"><p className="text-[10px] text-slate-500">صغير</p><p className="mt-1 font-black">{warehouse.balance.smallCount}</p><p className="text-[9px] text-slate-400">حد {warehouse.minSmallCount}</p></div>
+                      </div>
+                      {warehouse.lowStock && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">الناقص حتى حد الأمان: كبير {warehouse.shortage.largeCount} — متوسط {warehouse.shortage.mediumCount} — صغير {warehouse.shortage.smallCount}</p>}
+                      <div className="mt-3 flex flex-wrap gap-2 border-t border-[#eee5d2] pt-3">
+                        <Button size="sm" variant="outline" className="border-[#d9c9a5] text-[#0b4a3f]" onClick={() => setQuranWarehousePreview(warehouse)}><Eye className="ml-1 h-4 w-4" />معاينة</Button>
+                        <Button size="sm" variant="ghost" className="text-slate-600" onClick={() => exportQuranWarehouseExcel(warehouse)}><FileSpreadsheet className="ml-1 h-4 w-4" />Excel</Button>
+                        <Button size="sm" variant="ghost" className="text-slate-600" onClick={() => printQuranWarehouse(warehouse)}><Printer className="ml-1 h-4 w-4" />طباعة</Button>
+                        {role === 'head' && <><Button size="sm" variant="ghost" className="text-[#0b5a49]" onClick={() => openEditQuranWarehouse(warehouse)}><Pencil className="ml-1 h-4 w-4" />تعديل</Button><Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" disabled={quranStockSaving} onClick={() => deleteQuranWarehouse(warehouse)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button></>}
+                      </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                      <Button size="sm" variant="outline" className={button3d} onClick={() => setQuranWarehousePreview(warehouse)}><Eye className="ml-1 h-4 w-4" />معاينة</Button>
-                      <Button size="sm" className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={() => exportQuranWarehouseExcel(warehouse)}><FileSpreadsheet className="ml-1 h-4 w-4 text-white" />Excel</Button>
-                      <Button size="sm" variant="outline" className={button3d} onClick={() => printQuranWarehouse(warehouse)}><Printer className="ml-1 h-4 w-4" />طباعة</Button>
-                      {role === 'head' && <><Button size="sm" variant="outline" className={`${button3d} border-sky-200 text-sky-700`} onClick={() => openEditQuranWarehouse(warehouse)}><Pencil className="ml-1 h-4 w-4" />تعديل</Button><Button size="sm" variant="outline" className={`${button3d} border-red-200 text-red-700 hover:bg-red-50`} disabled={quranStockSaving} onClick={() => deleteQuranWarehouse(warehouse)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button></>}
-                    </div>
-                    <div className="mt-4 grid grid-cols-4 gap-2 text-center"><div className="rounded-xl border bg-white p-3"><p className="text-xs text-muted-foreground">الإجمالي</p><p className="mt-1 text-2xl font-black text-emerald-700">{warehouse.balance.totalCount}</p></div><div className="rounded-xl border bg-white p-3"><p className="text-xs text-muted-foreground">كبير</p><p className="mt-1 text-xl font-black">{warehouse.balance.largeCount}</p><p className="text-[10px] text-muted-foreground">حد أدنى {warehouse.minLargeCount}</p></div><div className="rounded-xl border bg-white p-3"><p className="text-xs text-muted-foreground">متوسط</p><p className="mt-1 text-xl font-black">{warehouse.balance.mediumCount}</p><p className="text-[10px] text-muted-foreground">حد أدنى {warehouse.minMediumCount}</p></div><div className="rounded-xl border bg-white p-3"><p className="text-xs text-muted-foreground">صغير</p><p className="mt-1 text-xl font-black">{warehouse.balance.smallCount}</p><p className="text-[10px] text-muted-foreground">حد أدنى {warehouse.minSmallCount}</p></div></div>
-                    {warehouse.lowStock && <p className="mt-3 rounded-xl bg-red-100/70 px-3 py-2 text-xs font-bold text-red-800">الناقص حتى حد الأمان: كبير {warehouse.shortage.largeCount} — متوسط {warehouse.shortage.mediumCount} — صغير {warehouse.shortage.smallCount}</p>}
-                  </CardContent>
-                </Card>
-              ))}</div>}
+                  ))}</div>}
+                </div>
 
-              <div>
-                <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-black text-slate-800">آخر حركات المصاحف</p><p className="text-xs text-muted-foreground">سجل حركات غير قابل للمحو. التراجع عن إضافة المصاحف ينشئ حركة إرجاع عكسية ويحافظ على الحركة الأصلية للتدقيق.</p></div><Badge variant="outline">{quranStockDashboard?.recentMovements.length || 0} حركة ظاهرة</Badge></div>
-                {quranStockDashboard?.recentMovements.length ? <div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[1120px] text-sm"><thead className="bg-slate-50"><tr><th className="p-3">رقم الحركة</th><th className="p-3">النوع</th><th className="p-3">المكتبة</th><th className="p-3">المسجد / المصلى</th><th className="p-3">كبير</th><th className="p-3">متوسط</th><th className="p-3">صغير</th><th className="p-3">الإجمالي</th><th className="p-3">التاريخ</th><th className="p-3">الإجراء</th></tr></thead><tbody>{quranStockDashboard.recentMovements.slice(0, 20).map((movement) => { const reversed = movement.movementType === 'distribution' && isQuranDistributionReversed(movement.movementNumber); return <tr key={movement.id} className="border-t"><td className="p-3 text-center font-mono text-xs">{movement.movementNumber}</td><td className="p-3 text-center"><Badge variant="outline" className={movement.notes?.startsWith('تراجع عن حركة الصرف') ? 'border-amber-300 bg-amber-50 text-amber-800' : ''}>{quranStockMovementDisplayLabel(movement)}</Badge></td><td className="p-3 text-center">{movement.warehouse?.name || '-'}</td><td className="p-3 text-center">{movement.site?.name || '-'}</td><td className="p-3 text-center">{movement.largeCount}</td><td className="p-3 text-center">{movement.mediumCount}</td><td className="p-3 text-center">{movement.smallCount}</td><td className="p-3 text-center font-black text-emerald-700">{movement.totalCount}</td><td className="p-3 text-center text-xs">{new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td><td className="p-3 text-center">{movement.movementType === 'distribution' ? reversed ? <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">تم التراجع</Badge> : role === 'head' ? <Button size="sm" variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" disabled={quranStockSaving} onClick={() => void reverseQuranStockMovement(movement)}><RefreshCw className="ml-1 h-3.5 w-3.5" />تراجع</Button> : '-' : movement.notes?.startsWith('تراجع عن حركة الصرف') ? <span className="text-xs text-muted-foreground">حركة عكسية</span> : '-'}</td></tr>; })}</tbody></table></div> : <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">لا توجد حركات مصاحف مسجلة حتى الآن.</div>}
-              </div>
-            </CardContent>
-          </Card>
+                {quranStockDashboard && <details className="group overflow-hidden rounded-2xl border border-[#e2d4b4] bg-white">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[#fffdf8] px-4 py-3">
+                    <div><p className="font-black text-[#0b4a3f]">ملخص حركة المكتبة</p><p className="mt-1 text-xs text-slate-500">الوارد والخارج والتوزيع والمرتجع والتسويات المسجلة.</p></div>
+                    <span className="rounded-full border border-[#d6b46a]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6a1f] group-open:hidden">عرض</span>
+                    <span className="hidden rounded-full border border-[#d6b46a]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6a1f] group-open:inline">إخفاء</span>
+                  </summary>
+                  <div className="space-y-3 border-t border-[#eee5d2] p-4">
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                      <ReportMetric label="الوارد للمكتبة" value={quranStockDashboard.summary.warehouseInflowTotal || 0} />
+                      <ReportMetric label="الخارج من المكتبة" value={quranStockDashboard.summary.warehouseOutflowTotal || 0} />
+                      <ReportMetric label="المضاف للمواقع" value={quranStockDashboard.summary.distributedTotal || 0} />
+                      <ReportMetric label="المرتجع للمكتبة" value={quranStockDashboard.summary.returnedTotal || 0} />
+                      <ReportMetric label="المستبعد / التسويات" value={(quranStockDashboard.summary.damagedTotal || 0) + (quranStockDashboard.summary.adjustmentOutTotal || 0)} />
+                    </div>
+                    <div className={`rounded-xl border px-3 py-2 text-xs font-bold ${quranStockDashboard.summary.warehouseNetMovement === quranStockDashboard.summary.warehouseTotal ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
+                      معادلة الرصيد: {quranStockDashboard.summary.warehouseInflowTotal || 0} وارد − {quranStockDashboard.summary.warehouseOutflowTotal || 0} خارج = {quranStockDashboard.summary.warehouseNetMovement || 0}، والرصيد الحالي للمكتبة = {quranStockDashboard.summary.warehouseTotal || 0}.
+                    </div>
+                  </div>
+                </details>}
+
+                <details className="group overflow-hidden rounded-2xl border border-[#e2d4b4] bg-white">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[#fffdf8] px-4 py-3">
+                    <div><p className="font-black text-[#0b4a3f]">سجل حركات المصاحف</p><p className="mt-1 text-xs text-slate-500">آخر الحركات المسجلة؛ السجل غير قابل للمحو حفاظًا على التدقيق.</p></div>
+                    <Badge variant="outline" className="border-[#d6b46a]/50 bg-white text-[#0b4a3f]">{quranStockDashboard?.recentMovements.length || 0} حركة</Badge>
+                  </summary>
+                  <div className="border-t border-[#eee5d2] p-3">
+                    {quranStockDashboard?.recentMovements.length ? <div className="overflow-x-auto rounded-xl border"><table className="w-full min-w-[1120px] text-sm"><thead className="bg-[#fbf8f1]"><tr><th className="p-3">رقم الحركة</th><th className="p-3">النوع</th><th className="p-3">المكتبة</th><th className="p-3">المسجد / المصلى</th><th className="p-3">كبير</th><th className="p-3">متوسط</th><th className="p-3">صغير</th><th className="p-3">الإجمالي</th><th className="p-3">التاريخ</th><th className="p-3">الإجراء</th></tr></thead><tbody>{quranStockDashboard.recentMovements.slice(0, 20).map((movement) => { const reversed = movement.movementType === 'distribution' && isQuranDistributionReversed(movement.movementNumber); return <tr key={movement.id} className="border-t"><td className="p-3 text-center font-mono text-xs">{movement.movementNumber}</td><td className="p-3 text-center"><Badge variant="outline" className={movement.notes?.startsWith('تراجع عن حركة الصرف') ? 'border-amber-300 bg-amber-50 text-amber-800' : ''}>{quranStockMovementDisplayLabel(movement)}</Badge></td><td className="p-3 text-center">{movement.warehouse?.name || '-'}</td><td className="p-3 text-center">{movement.site?.name || '-'}</td><td className="p-3 text-center">{movement.largeCount}</td><td className="p-3 text-center">{movement.mediumCount}</td><td className="p-3 text-center">{movement.smallCount}</td><td className="p-3 text-center font-black text-[#0b4a3f]">{movement.totalCount}</td><td className="p-3 text-center text-xs">{new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td><td className="p-3 text-center">{movement.movementType === 'distribution' ? reversed ? <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">تم التراجع</Badge> : role === 'head' ? <Button size="sm" variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" disabled={quranStockSaving} onClick={() => void reverseQuranStockMovement(movement)}><RefreshCw className="ml-1 h-3.5 w-3.5" />تراجع</Button> : '-' : movement.notes?.startsWith('تراجع عن حركة الصرف') ? <span className="text-xs text-slate-500">حركة عكسية</span> : '-'}</td></tr>; })}</tbody></table></div> : <div className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500">لا توجد حركات مصاحف مسجلة حتى الآن.</div>}
+                  </div>
+                </details>
+              </CardContent>
+            </Card>
+
+            <aside className="grid content-start gap-4">
+              <Card className="overflow-hidden rounded-[24px] border border-[#ded3b8] bg-white shadow-[0_8px_24px_rgba(6,60,51,0.07)]">
+                <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">إجراءات المخزون</CardTitle><CardDescription>الإجراءات الرئيسية لمكتبة المصاحف.</CardDescription></CardHeader>
+                <CardContent className="grid gap-2">
+                  {role === 'head' && !quranStockDashboard?.warehouses.length && <Button className="h-11 justify-start border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={openQuranWarehouse}><Plus className="ml-2 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}
+                  {role === 'head' && <Button className="h-11 justify-start border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => openQuranStockMovement('receipt')} disabled={!quranStockDashboard?.warehouses.length}><Plus className="ml-2 h-4 w-4" />إضافة رصيد للمكتبة</Button>}
+                  {role === 'head' && <Button variant="outline" className="h-11 justify-start border-[#d9c9a5] bg-[#fffdf8] font-bold text-[#0b4a3f]" onClick={() => openQuranStockMovement('return')} disabled={!quranStockDashboard?.warehouses.length}><RefreshCw className="ml-2 h-4 w-4" />إرجاع للمكتبة</Button>}
+                  {canPrint && <Button variant="outline" className="h-11 justify-start border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]" onClick={openQuranPrintDialog}><Printer className="ml-2 h-4 w-4" />تقرير المصاحف / PDF</Button>}
+                </CardContent>
+              </Card>
+
+              <Card className="overflow-hidden rounded-[24px] border border-[#ded3b8] bg-[#fffdf8] shadow-sm">
+                <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">الجرد التأسيسي</CardTitle><CardDescription>حالة حصر المصاحف الموجودة قبل تشغيل حركة المكتبة.</CardDescription></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">تم الحصر</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{quranOpeningBaselineStatus?.countedSites ?? quranSummary.countedSites}</p></div>
+                    <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">إجمالي المواقع</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{quranOpeningBaselineStatus?.totalSites ?? quranSummary.sites}</p></div>
+                  </div>
+                  {quranOpeningBaselineStatus && <div className={`rounded-xl border px-3 py-2 text-xs font-bold ${quranOpeningBaselineStatus.closed ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{quranOpeningBaselineStatus.closed ? 'الجرد التأسيسي معتمد ومقفل' : `متبقي ${quranOpeningBaselineStatus.remainingSites} موقع قبل الاعتماد`}</div>}
+                </CardContent>
+              </Card>
+
+              {role === 'head' && <details className="group overflow-hidden rounded-[24px] border border-red-200 bg-white">
+                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-red-700">إجراءات إدارية حساسة</summary>
+                <div className="border-t border-red-100 p-3"><Button variant="outline" className="w-full border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800" onClick={() => void resetQuranLibrary()} disabled={quranStockSaving || (!quranStockDashboard?.warehouses.length && !quranStockDashboard?.summary.siteSystemTotal && quranSummary.countedSites === 0)}><RefreshCw className="ml-2 h-4 w-4" />تصفير المكتبة</Button></div>
+              </details>}
+            </aside>
+          </section>
 
           <Card className={`${card3d} overflow-hidden`}>
             <CardHeader className="gap-3 border-b border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-sky-50 md:flex-row md:items-center md:justify-between">
