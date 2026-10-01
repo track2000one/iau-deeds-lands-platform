@@ -3023,22 +3023,35 @@ ${quranStockMovementForm.notes}` : ''}`
 
         <TabsContent value="sites" className="space-y-4">
           <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-            <CardHeader className="border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75 pb-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2 text-lg"><Filter className="h-5 w-5 text-sky-700" />التصفية والفرز للطباعة</CardTitle>
-                  <CardDescription className="mt-1">حدد السجلات ورتبها كما تريد؛ نفس النتائج الظاهرة هي التي ستُطبع أو تحفظ PDF.</CardDescription>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">سجل المواقع</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]"><Building2 className="h-5 w-5" />المساجد والمصليات الجامعية</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">استعرض كل مسجد ومصلى كبطاقة تشغيلية تجمع الموقع والمنسوبين والطلبات والبلاغات والمصاحف، مع أدوات البحث والتقرير في نفس الصفحة.</CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" className={button3d} onClick={resetSiteFilters}><X className="ml-2 h-4 w-4" />مسح التصفية</Button>
-                  {canPrint && visibleSites.length > 0 && <Button variant="outline" className={button3d} onClick={() => printSitesTable(visibleSites, 'preview')}><Eye className="ml-2 h-4 w-4" />معاينة التقرير</Button>}
-                  {canPrint && visibleSites.length > 0 && <Button className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={() => exportSitesExcel(visibleSites)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel ({visibleSites.length})</Button>}
-                  {canPrint && visibleSites.length > 0 && <Button className={`${button3d} bg-sky-700 hover:bg-sky-800`} onClick={() => printSitesTable(visibleSites, 'print')}><Printer className="ml-2 h-4 w-4" />طباعة / PDF كجدول ({visibleSites.length})</Button>}
+                  {canAdd && ['head', 'supervisor'].includes(role) && <Button className={`${button3d} border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]`} onClick={() => openSiteDialog()}><Plus className="ml-2 h-4 w-4" />إضافة مسجد / مصلى</Button>}
+                  <Button variant="outline" className={`${button3d} border-[#d9c9a5] bg-white text-[#0b4a3f]`} onClick={resetSiteFilters}><X className="ml-2 h-4 w-4" />مسح التصفية</Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <SiteRegistryMetric label="السجلات الظاهرة" value={siteFilterStats.total} />
+                <SiteRegistryMetric label="المساجد والجوامع" value={siteFilterStats.mosques} />
+                <SiteRegistryMetric label="المصليات" value={siteFilterStats.prayerRooms} />
+                <SiteRegistryMetric label="إجمالي المساحة" value={siteFilterStats.totalArea} suffix="م²" />
+              </div>
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">تتحدث البطاقات والنتائج والتقارير مباشرة وفق المعايير المختارة.</p></div>
+                  <div className="flex items-center gap-2 rounded-xl border border-[#dfcfaa] bg-white p-2">
+                    <span className="whitespace-nowrap text-xs font-semibold text-slate-600">اتجاه الفرز</span>
+                    <NativeSelect className="h-9 min-w-[120px]" value={siteSortDirection} onChange={(e) => setSiteSortDirection(e.target.value as 'asc' | 'desc')}><option value="asc">تصاعدي ↑</option><option value="desc">تنازلي ↓</option></NativeSelect>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
                 <div className="relative md:col-span-2 xl:col-span-2">
                   <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input className="h-11 rounded-xl pr-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالاسم أو المدينة أو الحي أو الموقع أو الإمام..." />
@@ -3049,6 +3062,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 {siteFilterType === 'prayer_room' && <NativeSelect className="h-11 rounded-xl border-emerald-200 bg-emerald-50/40" value={siteFilterPrayerRoomGender} onChange={(e) => setSiteFilterPrayerRoomGender(e.target.value as 'all' | 'men' | 'women')}><option value="all">كل المصليات</option><option value="men">مصلى رجال</option><option value="women">مصلى نساء</option></NativeSelect>}
                 <NativeSelect className="h-11 rounded-xl" value={siteFilterStatus} onChange={(e) => setSiteFilterStatus(e.target.value)}><option value="all">جميع الحالات</option><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect>
                 <NativeSelect className="h-11 rounded-xl" value={siteSortBy} onChange={(e) => setSiteSortBy(e.target.value)}><option value="name">فرز حسب الاسم</option><option value="building">فرز حسب رقم المبنى</option><option value="city">فرز حسب المدينة</option><option value="type">فرز حسب النوع</option><option value="status">فرز حسب الحالة</option><option value="area">فرز حسب المساحة</option></NativeSelect>
+                </div>
               </div>
 
               <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-l from-sky-50/80 via-white to-emerald-50/60 p-3 sm:p-4">
@@ -3101,16 +3115,12 @@ ${quranStockMovementForm.notes}` : ''}`
                 <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[11px] leading-6 text-sky-900"><strong>التنسيق الحالي:</strong><span>الخط: {sitePrintFontAuto ? 'تلقائي' : `${sitePrintFontSize} px`}</span><span>•</span><span>الأعمدة: {sitePrintWidthMode === 'smart' ? 'ذكية حسب المحتوى' : sitePrintWidthMode === 'compact' ? 'مضغوطة' : 'متساوية'}</span><span>•</span><span>النص: {sitePrintWrapMode === 'wrap' ? 'التفاف' : 'سطر واحد'}</span><span>•</span><span>الصفحة: {sitePrintOrientation === 'auto' ? 'تلقائية' : sitePrintOrientation === 'portrait' ? 'عمودية' : 'أفقية'}</span></div>
               </div>
 
-              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
-                  <div className="rounded-xl border bg-white px-3 py-2"><p className="text-[11px] text-muted-foreground">السجلات الظاهرة</p><p className="mt-1 text-lg font-black text-slate-800">{siteFilterStats.total.toLocaleString('ar-SA')}</p></div>
-                  <div className="rounded-xl border bg-white px-3 py-2"><p className="text-[11px] text-muted-foreground">المساجد والجوامع</p><p className="mt-1 text-lg font-black text-slate-800">{siteFilterStats.mosques.toLocaleString('ar-SA')}</p></div>
-                  <div className="rounded-xl border bg-white px-3 py-2"><p className="text-[11px] text-muted-foreground">المصليات</p><p className="mt-1 text-lg font-black text-slate-800">{siteFilterStats.prayerRooms.toLocaleString('ar-SA')}</p></div>
-                  <div className="rounded-xl border bg-white px-3 py-2"><p className="text-[11px] text-muted-foreground">إجمالي المساحة</p><p className="mt-1 text-lg font-black text-slate-800">{siteFilterStats.totalArea.toLocaleString('ar-SA', { maximumFractionDigits: 2 })} م²</p></div>
-                </div>
-                <div className="flex min-w-[190px] items-center gap-2 rounded-xl border bg-white p-2">
-                  <span className="whitespace-nowrap text-xs font-semibold text-slate-600">اتجاه الفرز</span>
-                  <NativeSelect className="h-9 flex-1" value={siteSortDirection} onChange={(e) => setSiteSortDirection(e.target.value as 'asc' | 'desc')}><option value="asc">تصاعدي ↑</option><option value="desc">تنازلي ↓</option></NativeSelect>
+              <div className="flex flex-col gap-3 rounded-2xl border border-[#e3d6b9] bg-[#fffdf8] p-3 lg:flex-row lg:items-center lg:justify-between">
+                <div><p className="font-black text-[#0b4a3f]">التقرير الحالي</p><p className="mt-1 text-xs text-slate-500">سيستخدم نفس السجلات الظاهرة ونفس ترتيبها الحالي.</p></div>
+                <div className="flex flex-wrap gap-2">
+                  {canPrint && visibleSites.length > 0 && <Button variant="outline" className={`${button3d} border-[#d9c9a5] bg-white text-[#0b4a3f]`} onClick={() => printSitesTable(visibleSites, 'preview')}><Eye className="ml-2 h-4 w-4" />معاينة التقرير</Button>}
+                  {canPrint && visibleSites.length > 0 && <Button variant="outline" className={`${button3d} border-[#d9c9a5] bg-white text-[#0b4a3f]`} onClick={() => exportSitesExcel(visibleSites)}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel ({visibleSites.length})</Button>}
+                  {canPrint && visibleSites.length > 0 && <Button className={`${button3d} border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]`} onClick={() => printSitesTable(visibleSites, 'print')}><Printer className="ml-2 h-4 w-4" />طباعة / PDF ({visibleSites.length})</Button>}
                 </div>
               </div>
 
@@ -3125,7 +3135,7 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>}
             </CardContent>
           </Card>
-          {visibleSites.length === 0 ? <Empty text="لا توجد مساجد أو مصليات مسجلة" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{visibleSites.map((site) => <SiteCard key={site.id} site={site} canEdit={canEdit && ['head', 'supervisor'].includes(role)} canDelete={canDelete && role === 'head'} canPrint={canPrint} onPreview={() => setPreviewSite(site)} onPrint={() => void printSiteCard(site)} onExcel={() => exportSitesExcel([site], `mosque-${site.publicToken || site.id}`)} onEdit={() => openSiteDialog(site)} onDelete={() => deleteSite(site)} onQr={() => setQrSite(site)} quranInventory={quranLatestBySite[site.id] as MosqueQuranInventory | null | undefined} />)}</div>}
+          {visibleSites.length === 0 ? <Empty text="لا توجد مساجد أو مصليات مسجلة" /> : <div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">{visibleSites.map((site) => <SiteCard key={site.id} site={site} canEdit={canEdit && ['head', 'supervisor'].includes(role)} canDelete={canDelete && role === 'head'} canPrint={canPrint} onPreview={() => setPreviewSite(site)} onPrint={() => void printSiteCard(site)} onExcel={() => exportSitesExcel([site], `mosque-${site.publicToken || site.id}`)} onEdit={() => openSiteDialog(site)} onDelete={() => deleteSite(site)} onQr={() => setQrSite(site)} quranInventory={quranLatestBySite[site.id] as MosqueQuranInventory | null | undefined} />)}</div>}
         </TabsContent>
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="buildings" className="space-y-4">
@@ -4056,7 +4066,80 @@ const Rule = ({ title, text }: { title: string; text: string }) => <div classNam
 const ReportMetric = ({ label, value }: { label: string; value: number }) => <div className="rounded-2xl border border-[#dfcfaa] bg-gradient-to-b from-white to-[#f9f3e7] p-5 text-center shadow-sm"><p className="text-sm font-bold text-slate-500">{label}</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{value}</p></div>;
 const MiniRow = ({ title, subtitle, status }: { title: string; subtitle: string; status: string }) => <div className="flex items-start justify-between gap-3 rounded-2xl border border-[#e3d5b4] bg-[#fffdf8] p-3 shadow-[0_4px_12px_rgba(6,60,51,0.05)]"><div className="min-w-0"><p className="truncate font-black text-[#0b4a3f]">{title}</p><p className="mt-1 line-clamp-1 text-xs text-slate-500">{subtitle}</p></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>;
 
-const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onExcel, onEdit, onDelete, onQr, quranInventory }: { site: MosqueSite; canEdit: boolean; canDelete: boolean; canPrint: boolean; onPreview: () => void; onPrint: () => void; onExcel: () => void; onEdit: () => void; onDelete: () => void; onQr: () => void; quranInventory?: MosqueQuranInventory | null }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-[#0b5a49] via-[#d6b46a] to-[#0b5a49]" /><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2">{siteTypeDisplayLabel(site)}</Badge><h3 className="text-lg font-black text-slate-800">{site.name}</h3><p className="mt-1 text-sm text-muted-foreground">{site.city || '-'} — {site.district || '-'}</p></div><Badge variant="outline" className={site.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : site.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-50'}>{siteStatusLabels[site.status]}</Badge></div><div className="my-4 grid grid-cols-2 gap-3 rounded-2xl border bg-slate-50/70 p-3 text-sm"><Info label="الموقع داخل الجامعة" value={site.campusLocation || '-'} /><Info label="المساحة" value={site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'} /><Info label="الإمام" value={site.imamName || '-'} /><Info label="المؤذن" value={site.muezzinName || '-'} /><Info label="الطلبات" value={site._count?.requests || 0} /><Info label="البلاغات" value={site._count?.tickets || 0} /></div><div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/55 p-3"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-sm font-black text-emerald-900"><BookOpen className="h-4 w-4" />آخر جرد فعلي للمصاحف</div><Badge variant="outline" className="border-emerald-200 bg-white text-emerald-800">{quranInventory ? `${quranInventory.totalCount} مصحف` : 'لم يتم الجرد'}</Badge></div>{quranInventory && <div className="mt-2 grid grid-cols-4 gap-2 text-center text-xs"><div><span className="text-muted-foreground">كبير</span><b className="mr-1">{quranInventory.largeCount}</b></div><div><span className="text-muted-foreground">متوسط</span><b className="mr-1">{quranInventory.mediumCount}</b></div><div><span className="text-muted-foreground">صغير</span><b className="mr-1">{quranInventory.smallCount}</b></div><div><span className="text-muted-foreground">احتياج</span><b className="mr-1 text-amber-700">{quranInventory.neededCount}</b></div></div>}</div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Button variant="outline" className={siteActionButton} onClick={onQr}><QrCode className="h-4 w-4 shrink-0" />رمز QR</Button>{site.latitude != null && site.longitude != null && <Button variant="outline" className={siteActionButton} onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')}><MapPin className="h-4 w-4 shrink-0" />الخريطة</Button>}<Button variant="outline" className={siteActionButton} onClick={onPreview}><Eye className="h-4 w-4 shrink-0" />معاينة</Button>{canPrint && <Button className={`${siteActionButton} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={onExcel}><FileSpreadsheet className="h-4 w-4 shrink-0 text-white" />Excel</Button>}{canPrint && <Button variant="outline" className={siteActionButton} onClick={onPrint}><Printer className="h-4 w-4 shrink-0" />طباعة / PDF</Button>}{canEdit && <Button variant="outline" className={siteActionButton} onClick={onEdit}><Pencil className="h-4 w-4 shrink-0" />تعديل</Button>}{canDelete && <Button variant="outline" className={`${siteActionButton} border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700`} onClick={onDelete}><Trash2 className="h-4 w-4 shrink-0" />حذف</Button>}</div></CardContent></Card>;
+const SiteRegistryMetric = ({ label, value, suffix }: { label: string; value: number; suffix?: string }) => (
+  <div className="rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
+    <p className="text-[11px] font-bold text-slate-500">{label}</p>
+    <div className="mt-1 flex items-end gap-1"><span className="text-2xl font-black text-[#0b4a3f]">{value.toLocaleString('ar-SA', { maximumFractionDigits: 2 })}</span>{suffix && <span className="pb-0.5 text-[11px] font-bold text-slate-500">{suffix}</span>}</div>
+  </div>
+);
+
+const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onExcel, onEdit, onDelete, onQr, quranInventory }: { site: MosqueSite; canEdit: boolean; canDelete: boolean; canPrint: boolean; onPreview: () => void; onPrint: () => void; onExcel: () => void; onEdit: () => void; onDelete: () => void; onQr: () => void; quranInventory?: MosqueQuranInventory | null }) => {
+  const media = normalizeSiteMedia(site.images || null);
+  const cover = media.photos.find((item) => item.category === 'mosque_image') || media.photos[0];
+  const requests = site._count?.requests || 0;
+  const tickets = site._count?.tickets || 0;
+  const personnel = site._count?.personnel || 0;
+
+  return <Card className="group overflow-hidden rounded-[24px] border border-[#ded3b8] bg-white shadow-[0_10px_28px_rgba(6,60,51,0.07)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_16px_34px_rgba(6,60,51,0.12)]">
+    <div className="grid min-h-[190px] sm:grid-cols-[180px_1fr]">
+      <button type="button" onClick={onPreview} className="relative min-h-[165px] overflow-hidden bg-[#f4efe4] text-right sm:min-h-full">
+        {cover ? <MosqueMediaImage item={cover} alt={cover.fileName || site.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" /> : <div className="flex h-full min-h-[165px] flex-col items-center justify-center bg-[radial-gradient(circle_at_top,#fff8e8,#eee6d7)] text-[#0b4a3f]"><Building2 className="h-12 w-12 opacity-60" /><span className="mt-2 text-xs font-bold text-slate-500">لا توجد صورة مسجلة</span></div>}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent px-3 pb-3 pt-9 text-white">
+          <span className="rounded-full border border-white/25 bg-black/25 px-2 py-1 text-[10px] font-bold backdrop-blur-sm">{siteTypeDisplayLabel(site)}</span>
+        </div>
+      </button>
+
+      <div className="flex min-w-0 flex-col p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-lg font-black text-[#0b4a3f]">{site.name}</h3>
+            <p className="mt-1 flex items-start gap-1 text-xs leading-5 text-slate-500"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span>{site.campusLocation || site.city || '-'}{site.building?.buildingNumber ? ` — مبنى ${site.building.buildingNumber}` : ''}</span></p>
+          </div>
+          <Badge variant="outline" className={site.status === 'active' ? 'shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700' : site.status === 'maintenance' ? 'shrink-0 border-amber-300 bg-amber-50 text-amber-700' : 'shrink-0 border-slate-300 bg-slate-50 text-slate-700'}>{siteStatusLabels[site.status]}</Badge>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-xl border border-[#e8ddc4] bg-[#fffdf8] p-2"><p className="text-[10px] font-bold text-slate-500">المساحة</p><p className="mt-1 text-sm font-black text-[#0b4a3f]">{site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'}</p></div>
+          <div className="rounded-xl border border-[#e8ddc4] bg-[#fffdf8] p-2"><p className="text-[10px] font-bold text-slate-500">السعة</p><p className="mt-1 text-sm font-black text-[#0b4a3f]">{site.capacity ? site.capacity.toLocaleString('ar-SA') : '-'}</p></div>
+          <div className="rounded-xl border border-[#e8ddc4] bg-[#fffdf8] p-2"><p className="text-[10px] font-bold text-slate-500">المنسوبون</p><p className="mt-1 text-sm font-black text-[#0b4a3f]">{personnel}</p></div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <div><span className="text-slate-500">الإمام</span><p className="mt-0.5 truncate font-bold text-slate-800">{site.imamName || '-'}</p></div>
+          <div><span className="text-slate-500">المؤذن</span><p className="mt-0.5 truncate font-bold text-slate-800">{site.muezzinName || '-'}</p></div>
+          <div><span className="text-slate-500">الخطيب</span><p className="mt-0.5 truncate font-bold text-slate-800">{site.khateebName || '-'}</p></div>
+          <div><span className="text-slate-500">المنسق</span><p className="mt-0.5 truncate font-bold text-slate-800">{site.coordinatorName || '-'}</p></div>
+        </div>
+      </div>
+    </div>
+
+    <CardContent className="space-y-3 border-t border-[#eee5d2] p-4">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-[#e4d8bd] bg-white p-2.5 text-center"><p className="text-[10px] font-bold text-slate-500">الطلبات</p><p className="mt-1 text-lg font-black text-[#0b4a3f]">{requests}</p></div>
+        <div className="rounded-xl border border-[#e4d8bd] bg-white p-2.5 text-center"><p className="text-[10px] font-bold text-slate-500">البلاغات</p><p className="mt-1 text-lg font-black text-[#0b4a3f]">{tickets}</p></div>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/55 p-2.5 text-center"><p className="text-[10px] font-bold text-emerald-700">المصاحف</p><p className="mt-1 text-lg font-black text-emerald-800">{quranInventory ? quranInventory.totalCount : '-'}</p></div>
+      </div>
+
+      {quranInventory && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/55 px-3 py-2 text-xs">
+        <div className="flex items-center gap-2 font-black text-emerald-900"><BookOpen className="h-4 w-4" />آخر جرد فعلي</div>
+        <div className="flex flex-wrap gap-2 text-emerald-800"><span>كبير {quranInventory.largeCount}</span><span>متوسط {quranInventory.mediumCount}</span><span>صغير {quranInventory.smallCount}</span>{quranInventory.neededCount > 0 && <span className="font-black text-amber-700">احتياج {quranInventory.neededCount}</span>}</div>
+      </div>}
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Button className={`${siteActionButton} border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152] hover:text-white`} onClick={onPreview}><Eye className="h-4 w-4 shrink-0" />فتح السجل</Button>
+        <Button variant="outline" className={`${siteActionButton} border-[#d9c9a5] text-[#0b4a3f]`} onClick={onQr}><QrCode className="h-4 w-4 shrink-0" />QR</Button>
+        {site.latitude != null && site.longitude != null ? <Button variant="outline" className={`${siteActionButton} border-[#d9c9a5] text-[#0b4a3f]`} onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')}><MapPin className="h-4 w-4 shrink-0" />الخريطة</Button> : <Button variant="outline" disabled className={siteActionButton}><MapPin className="h-4 w-4 shrink-0" />الخريطة</Button>}
+        {canEdit ? <Button variant="outline" className={`${siteActionButton} border-[#d6b46a] bg-[#fff8e8] text-[#7b5b16]`} onClick={onEdit}><Pencil className="h-4 w-4 shrink-0" />تعديل</Button> : <Button variant="outline" disabled className={siteActionButton}><Pencil className="h-4 w-4 shrink-0" />تعديل</Button>}
+      </div>
+
+      {(canPrint || canDelete) && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[#eee5d2] pt-3">
+        {canPrint && <Button size="sm" variant="ghost" className="text-slate-600" onClick={onExcel}><FileSpreadsheet className="ml-1 h-3.5 w-3.5" />Excel</Button>}
+        {canPrint && <Button size="sm" variant="ghost" className="text-slate-600" onClick={onPrint}><Printer className="ml-1 h-3.5 w-3.5" />طباعة / PDF</Button>}
+        {canDelete && <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={onDelete}><Trash2 className="ml-1 h-3.5 w-3.5" />حذف</Button>}
+      </div>}
+    </CardContent>
+  </Card>;
+};
 
 const QuickFilterBar = ({ label, onClear }: { label: string; onClear: () => void }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm"><span>العرض الحالي: <strong>{label}</strong></span><Button variant="outline" size="sm" className={button3d} onClick={onClear}>عرض الكل</Button></div>;
 
