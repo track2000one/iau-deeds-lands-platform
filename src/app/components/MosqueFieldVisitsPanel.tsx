@@ -2534,30 +2534,66 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
   if (loading) return <div className="flex min-h-[320px] items-center justify-center gap-3"><Loader2 className="h-7 w-7 animate-spin text-sky-700" /><span className="font-semibold">جاري تحميل البرنامج الميداني...</span></div>;
 
   return <div className="space-y-5" dir="rtl">
-    <Card className="overflow-hidden border-emerald-200/80 bg-gradient-to-l from-emerald-50 via-white to-sky-50">
-      <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-        <div><CardTitle className="flex items-center gap-2 text-xl"><Route className="h-5 w-5 text-emerald-700" />البرنامج الميداني للمساجد والمصليات</CardTitle><CardDescription className="mt-2">الجولات والزيارات مرتبطة مباشرة بالسجلات الحالية للمساجد والمصليات، مع متابعة الملاحظات والصور قبل المعالجة وبعدها.</CardDescription></div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void load()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button>
-          {canPrint && <Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={exportProgramExcel}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel</Button>}
-          {canPrint && <Button variant="outline" onClick={openProgramPrintDialog}><Printer className="ml-2 h-4 w-4" />تقرير البرنامج</Button>}
-          {canAdd && <Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white focus-visible:ring-emerald-500" onClick={openTour}><CalendarDays className="ml-2 h-4 w-4 text-white" />إنشاء جولة</Button>}
-          {canAdd && <Button className="bg-sky-700 hover:bg-sky-800" onClick={() => openNewVisit()}><Plus className="ml-2 h-4 w-4" />زيارة مستقلة</Button>}
-        </div>
-      </CardHeader>
-    </Card>
+    <section className="grid gap-5 xl:grid-cols-[1.55fr_0.9fr]">
+      <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+        <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-[#fff8e8] text-[#8a6a1f]">البرنامج الميداني</Badge>
+              <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Route className="h-5 w-5" />متابعة الجولات والزيارات</CardTitle>
+              <CardDescription className="mt-2 max-w-3xl leading-6">لوحة تشغيل موحدة لمتابعة التغطية الميدانية، الزيارات المنفذة، الملاحظات المفتوحة، والصور قبل المعالجة وبعدها.</CardDescription>
+            </div>
+            <div className="rounded-2xl border border-[#d6b46a]/45 bg-[#0b4a3f] px-4 py-3 text-center text-white">
+              <div className="text-[11px] font-bold text-[#efd18a]">نسبة التغطية</div>
+              <div className="mt-1 text-3xl font-black">{summary.coveragePercent}%</div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5 p-4 sm:p-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <FieldVisitOverviewMetric label="إجمالي المواقع" value={summary.totalSites} icon={MapPin} />
+            <FieldVisitOverviewMetric label="تمت زيارتها" value={summary.visitedSites} icon={CheckCircle2} />
+            <FieldVisitOverviewMetric label="المتبقية" value={summary.remainingSites} icon={CalendarDays} />
+            <FieldVisitOverviewMetric label="إجمالي الزيارات" value={summary.visits} icon={ClipboardList} />
+          </div>
 
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
-      <Metric label="إجمالي المواقع" value={summary.totalSites} icon={MapPin} />
-      <Metric label="تمت زيارتها" value={summary.visitedSites} icon={CheckCircle2} tone="green" />
-      <Metric label="المتبقية" value={summary.remainingSites} icon={CalendarDays} tone="blue" />
-      <Metric label="نسبة التغطية" value={`${summary.coveragePercent}%`} icon={Route} tone="green" />
-      <Metric label="إجمالي الزيارات" value={summary.visits} icon={ClipboardList} />
-      <Metric label="ملاحظات مفتوحة" value={summary.openItems} icon={FileText} tone="amber" />
-      <Metric label="عاجلة" value={summary.urgentItems} icon={AlertTriangle} tone="red" />
-      <Metric label="متأخرة" value={summary.overdueItems} icon={AlertTriangle} tone="amber" />
-    </div>
+          <div className="rounded-2xl border border-[#e2d4b4] bg-[#fbf8f1] p-4">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div><p className="font-black text-[#0b4a3f]">تقدم البرنامج الميداني</p><p className="mt-1 text-xs text-slate-500">تتحدث النسبة تلقائيًا وفق المواقع التي تم تنفيذ زيارات عليها.</p></div>
+              <span className="rounded-full border border-[#d6b46a]/45 bg-white px-3 py-1 text-xs font-black text-[#8a6a1f]">{summary.visitedSites} من {summary.totalSites}</span>
+            </div>
+            <Progress value={summary.coveragePercent} className="h-3" />
+          </div>
 
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-[#ead9b2] bg-white p-4"><div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-slate-500">ملاحظات مفتوحة</span><FileText className="h-4 w-4 text-[#0b5a49]" /></div><div className="mt-2 text-2xl font-black text-[#0b4a3f]">{summary.openItems}</div></div>
+            <div className="rounded-2xl border border-red-200 bg-red-50/50 p-4"><div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-red-700">عاجلة</span><AlertTriangle className="h-4 w-4 text-red-600" /></div><div className="mt-2 text-2xl font-black text-red-700">{summary.urgentItems}</div></div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4"><div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-amber-700">متأخرة</span><AlertTriangle className="h-4 w-4 text-amber-600" /></div><div className="mt-2 text-2xl font-black text-amber-800">{summary.overdueItems}</div></div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid content-start gap-3">
+        <Card className="overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_8px_24px_rgba(6,60,51,0.07)]">
+          <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">إجراءات سريعة</CardTitle><CardDescription>ابدأ الإجراء من هنا دون البحث داخل الصفحة.</CardDescription></CardHeader>
+          <CardContent className="grid gap-2">
+            {canAdd && <Button className="h-11 justify-start border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={openTour}><CalendarDays className="ml-2 h-4 w-4" />إنشاء جولة ميدانية</Button>}
+            {canAdd && <Button variant="outline" className="h-11 justify-start border-[#d9c9a5] bg-[#fffdf8] font-bold text-[#0b4a3f]" onClick={() => openNewVisit()}><Plus className="ml-2 h-4 w-4" />زيارة مستقلة</Button>}
+            {canPrint && <Button variant="outline" className="h-11 justify-start border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]" onClick={openProgramPrintDialog}><Printer className="ml-2 h-4 w-4" />تقرير البرنامج</Button>}
+            {canPrint && <Button variant="outline" className="h-11 justify-start border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]" onClick={exportProgramExcel}><FileSpreadsheet className="ml-2 h-4 w-4" />تصدير Excel</Button>}
+            <Button variant="ghost" className="h-10 justify-start text-slate-600" onClick={() => void load()}><RefreshCw className="ml-2 h-4 w-4" />تحديث البيانات</Button>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden rounded-[22px] border border-[#ded3b8] bg-[#fffdf8] shadow-sm">
+          <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">وضع العرض</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-2 gap-2">
+            <Button size="sm" className={view === 'visits' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]' : 'border border-[#d9c9a5] bg-white text-[#0b4a3f] hover:bg-[#fff8e8]'} onClick={() => setView('visits')}>الزيارات</Button>
+            <Button size="sm" className={view === 'tours' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]' : 'border border-[#d9c9a5] bg-white text-[#0b4a3f] hover:bg-[#fff8e8]'} onClick={() => { setView('tours'); setTourCardsVisible(false); }}>الجولات</Button>
+          </CardContent>
+        </Card>
+      </div>
+    </section>
 
 {quranRackDashboard && <Card className="border-teal-200 bg-gradient-to-l from-teal-50/80 via-white to-emerald-50/50">
   <CardHeader className="pb-3">
@@ -2585,10 +2621,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
     <Card>
       <CardContent className="pt-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex rounded-xl border bg-slate-50 p-1">
-            <Button size="sm" variant={view === 'visits' ? 'default' : 'ghost'} onClick={() => setView('visits')}>الزيارات</Button>
-            <Button size="sm" variant={view === 'tours' ? 'default' : 'ghost'} onClick={() => { setView('tours'); setTourCardsVisible(false); }}>الجولات</Button>
-          </div>
+          <div><p className="font-black text-[#0b4a3f]">{view === 'visits' ? 'سجل الزيارات الميدانية' : 'الجولات الميدانية'}</p><p className="mt-1 text-xs text-slate-500">{view === 'visits' ? 'ابحث وصفِّ الزيارات المسجلة ثم افتح بطاقة الزيارة أو تقريرها.' : 'استعرض الجولات المنظمة والمواقع المرتبطة بكل جولة.'}</p></div>
           {view === 'tours' && <Button type="button" size="sm" variant="outline" className={tourCardsVisible ? 'border-slate-300 text-slate-700' : 'border-emerald-300 bg-emerald-50 text-emerald-800'} onClick={() => setTourCardsVisible((current) => !current)}>{tourCardsVisible ? <EyeOff className="ml-2 h-4 w-4" /> : <Eye className="ml-2 h-4 w-4" />}{tourCardsVisible ? 'إخفاء بطاقات الجولات' : 'إظهار بطاقات الجولات'}</Button>}
           {view === 'visits' && <div className="flex-1 space-y-2 md:max-w-5xl">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -2612,7 +2645,6 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
             </div>}
           </div>}
         </div>
-        <div className="mt-4"><Progress value={summary.coveragePercent} className="h-2.5" /></div>
       </CardContent>
     </Card>
 
@@ -2980,6 +3012,13 @@ const VisitAttachmentField: React.FC<{
   </div>
   <VisitAttachmentGallery label="المرفقات المضافة" attachments={attachments} onRemove={onRemove} onDescriptionChange={onDescriptionChange} />
 </div>;
+const FieldVisitOverviewMetric = ({ label, value, icon: Icon }: { label: string; value: number; icon: React.ElementType }) => (
+  <div className="flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
+    <div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{value}</p></div>
+    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#fff8e8] text-[#0b5a49]"><Icon className="h-5 w-5" /></div>
+  </div>
+);
+
 const Metric: React.FC<{ label: string; value: React.ReactNode; icon: React.ElementType; tone?: 'green' | 'blue' | 'amber' | 'red' }> = ({ label, value, icon: Icon, tone = 'blue' }) => {
   const tones = { green: 'border-emerald-200 bg-emerald-50 text-emerald-700', blue: 'border-sky-200 bg-sky-50 text-sky-700', amber: 'border-amber-200 bg-amber-50 text-amber-700', red: 'border-red-200 bg-red-50 text-red-700' };
   return <Card className={`${tones[tone]} shadow-sm`}><CardContent className="p-3 sm:p-4"><Icon className="h-4 w-4 opacity-80" /><p className="mt-2 text-[11px] font-semibold">{label}</p><p className="mt-1 text-xl font-black sm:text-2xl">{value}</p></CardContent></Card>;
