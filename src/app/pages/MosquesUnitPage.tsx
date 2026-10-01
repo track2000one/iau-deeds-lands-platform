@@ -3232,13 +3232,22 @@ ${quranStockMovementForm.notes}` : ''}`
             </aside>
           </section>
 
-          <Card className={`${card3d} overflow-hidden`}>
-            <CardHeader className="gap-3 border-b border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-sky-50 md:flex-row md:items-center md:justify-between">
-              <div><CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-emerald-700" />إدارة وحصر المصاحف</CardTitle><CardDescription>متابعة رصيد المصاحف في المساجد والمصليات. تتم إضافة المصاحف من مكتبة المصاحف مباشرة مع الخصم التلقائي من رصيد المكتبة.</CardDescription></div>
-              {canPrint && <Button variant="outline" className={button3d} onClick={openQuranPrintDialog}><Filter className="ml-2 h-4 w-4" />إعداد الطباعة / PDF</Button>}
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_12px_32px_rgba(6,60,51,0.07)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/55 bg-white text-[#8a6a1f]">رصيد المواقع والجرد</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]"><BookOpen className="h-5 w-5" />المصاحف في المساجد والمصليات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">متابعة الرصيد والمستهدف ونسبة التغطية والاحتياج لكل موقع، مع الجرد والحركات من بطاقة واحدة.</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="h-9 border-[#d6b46a]/50 bg-white px-3 font-black text-[#0b4a3f]">{filteredQuranInventoryItems.length} موقع ظاهر</Badge>
+                  {canPrint && <Button variant="outline" className={`${button3d} border-[#d9c9a5] bg-white text-[#0b4a3f]`} onClick={openQuranPrintDialog}><Printer className="ml-2 h-4 w-4" />تقرير / PDF</Button>}
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-5">
-              {role === 'head' && quranOpeningBaselineStatus && <div className={`rounded-2xl border p-4 ${quranOpeningBaselineStatus.closed ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70'}`}>
+              {role === 'head' && quranOpeningBaselineStatus && <div className={`rounded-2xl border p-4 shadow-sm ${quranOpeningBaselineStatus.closed ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70'}`}>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2"><p className="font-black text-slate-900">الجرد التأسيسي للمصاحف</p><Badge className={quranOpeningBaselineStatus.closed ? 'bg-emerald-600' : 'bg-amber-500'}>{quranOpeningBaselineStatus.closed ? 'معتمد ومقفل' : 'مرحلة الحصر الميداني'}</Badge></div>
@@ -3261,6 +3270,8 @@ ${quranStockMovementForm.notes}` : ''}`
                 {filteredQuranInventoryItems.map((item) => {
                   const site = sites.find((row) => row.id === item.site.id) || item.site as MosqueSite;
                   const latest = item.latest;
+                  const media = normalizeSiteMedia(site.images || null);
+                  const cover = media.photos.find((photo) => photo.category === 'mosque_image') || media.photos[0];
                   const stockRow = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id);
                   const systemStock = stockRow?.systemStock;
                   const withdrawnStock = stockRow?.withdrawnStock;
@@ -3280,13 +3291,11 @@ ${quranStockMovementForm.notes}` : ''}`
                         ? 'border-orange-200 bg-orange-50 text-orange-800'
                         : 'border-red-200 bg-red-50 text-red-700';
 
-                  return <Card key={item.site.id} className={`${card3d} overflow-hidden rounded-2xl`}>
+                  return <Card key={item.site.id} className="group overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_8px_24px_rgba(6,60,51,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_14px_28px_rgba(6,60,51,0.10)]">
                     <CardContent className="p-4 sm:p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-700">
-                            <Building2 className="h-5 w-5" />
-                          </div>
+                          {cover ? <MosqueMediaImage item={cover} alt={cover.fileName || site.name} className="h-12 w-14 shrink-0 rounded-xl object-cover shadow-sm" /> : <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-xl border border-[#e2d4b4] bg-[#fff8e8] text-[#0b5a49]"><Building2 className="h-5 w-5" /></div>}
                           <div className="min-w-0">
                             <p className="truncate text-base font-black text-slate-900 sm:text-lg">{item.site.name}</p>
                             <p className="mt-1 flex items-start gap-1 text-xs leading-5 text-slate-500">
@@ -3344,10 +3353,10 @@ ${quranStockMovementForm.notes}` : ''}`
 
                       <div className="mt-4 border-t border-slate-100 pt-4">
                         {(canManageTarget || canManageBaseline) && <div className={`grid gap-2 ${canManageTarget && canManageBaseline ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                          {canManageTarget && <Button size="sm" variant="outline" className={`${button3d} h-11 border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100`} onClick={() => openSiteDialog(site)}><Pencil className="ml-1 h-4 w-4" />ضبط المستهدف</Button>}
+                          {canManageTarget && <Button size="sm" variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-[#fffdf8] text-[#0b4a3f] hover:bg-[#fff4da]`} onClick={() => openSiteDialog(site)}><Pencil className="ml-1 h-4 w-4" />ضبط المستهدف</Button>}
                           {canManageBaseline && <Button size="sm" className={`${button3d} h-11 border border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200 hover:text-slate-900`} onClick={() => openQuranOpeningBaselineForSite(site)}><ClipboardList className="ml-1 h-4 w-4" />{baselineCounted ? 'تحديث الجرد التأسيسي' : 'الجرد التأسيسي'}</Button>}
                         </div>}
-                        {role === 'head' && <Button size="sm" className={`${button3d} mt-2 h-12 w-full border border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-600`} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-4 w-4" />إضافة مصحف من المكتبة</Button>}
+                        {role === 'head' && <Button size="sm" className={`${button3d} mt-2 h-12 w-full border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]`} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-4 w-4" />إضافة مصاحف من المكتبة</Button>}
                         <div className={`mt-2 grid gap-2 ${role === 'head' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                           {role === 'head' && <Button size="sm" className={`${button3d} h-11 border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:text-amber-900`} onClick={() => openQuranWithdrawalForSite(site)}><RefreshCw className="ml-1 h-4 w-4" />سحب مصاحف</Button>}
                           <Button size="sm" variant="outline" className={`${button3d} h-11`} onClick={() => openQuranHistory(site)}><Clock3 className="ml-1 h-4 w-4" />السجل</Button>
