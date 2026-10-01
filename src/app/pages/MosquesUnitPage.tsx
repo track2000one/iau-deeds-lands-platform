@@ -3065,6 +3065,13 @@ ${quranStockMovementForm.notes}` : ''}`
                 </div>
               </div>
 
+              <details className="group overflow-hidden rounded-2xl border border-[#e3d6b9] bg-white">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[#fffdf8] px-4 py-3">
+                  <div><p className="font-black text-[#0b4a3f]">إعدادات التقرير والطباعة</p><p className="mt-1 text-xs text-slate-500">اختياري — افتح هذا القسم فقط عند الحاجة لتخصيص الأعمدة والخط واتجاه الصفحة.</p></div>
+                  <span className="rounded-full border border-[#d6b46a]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6a1f] group-open:hidden">إظهار الإعدادات</span>
+                  <span className="hidden rounded-full border border-[#d6b46a]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6a1f] group-open:inline">إخفاء الإعدادات</span>
+                </summary>
+                <div className="space-y-4 border-t border-[#eee4ce] p-3 sm:p-4">
               <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-l from-sky-50/80 via-white to-emerald-50/60 p-3 sm:p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
@@ -3114,6 +3121,8 @@ ${quranStockMovementForm.notes}` : ''}`
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[11px] leading-6 text-sky-900"><strong>التنسيق الحالي:</strong><span>الخط: {sitePrintFontAuto ? 'تلقائي' : `${sitePrintFontSize} px`}</span><span>•</span><span>الأعمدة: {sitePrintWidthMode === 'smart' ? 'ذكية حسب المحتوى' : sitePrintWidthMode === 'compact' ? 'مضغوطة' : 'متساوية'}</span><span>•</span><span>النص: {sitePrintWrapMode === 'wrap' ? 'التفاف' : 'سطر واحد'}</span><span>•</span><span>الصفحة: {sitePrintOrientation === 'auto' ? 'تلقائية' : sitePrintOrientation === 'portrait' ? 'عمودية' : 'أفقية'}</span></div>
               </div>
+                </div>
+              </details>
 
               <div className="flex flex-col gap-3 rounded-2xl border border-[#e3d6b9] bg-[#fffdf8] p-3 lg:flex-row lg:items-center lg:justify-between">
                 <div><p className="font-black text-[#0b4a3f]">التقرير الحالي</p><p className="mt-1 text-xs text-slate-500">سيستخدم نفس السجلات الظاهرة ونفس ترتيبها الحالي.</p></div>
