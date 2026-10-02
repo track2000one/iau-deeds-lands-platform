@@ -3009,7 +3009,7 @@ ${quranStockMovementForm.notes}` : ''}`
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-5 p-4 sm:p-5">
-                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <OverviewMetric label="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} onClick={() => goToDashboardSection('sites')} />
                     <OverviewMetric label="إجمالي المصاحف" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
                     <OverviewMetric label="طلبات تحتاج متابعة" value={(dashboard?.stats.newRequests || 0) + (dashboard?.stats.reviewRequests || 0)} icon={ClipboardList} onClick={() => goToDashboardSection('requests')} />
@@ -3115,7 +3115,7 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>
             </CardHeader>
             <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <SiteRegistryMetric label="السجلات الظاهرة" value={siteFilterStats.total} />
                 <SiteRegistryMetric label="المساجد والجوامع" value={siteFilterStats.mosques} />
                 <SiteRegistryMetric label="المصليات" value={siteFilterStats.prayerRooms} />
@@ -3257,7 +3257,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <SpatialMetric label="إجمالي المباني" value={officialBuildings.length} icon={Building2} />
                 <SpatialMetric label="مغطاة بالخدمة" value={officialBuildings.filter((x) => x.coverageStatus === 'covered').length} icon={CheckCircle2} />
                 <SpatialMetric label="تحتاج مصلى" value={officialBuildings.filter((x) => x.coverageStatus === 'needs_prayer_room').length} icon={AlertTriangle} tone="warning" />
@@ -3336,7 +3336,7 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>
             </CardHeader>
             <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <TransactionMetric label="إجمالي الطلبات" value={requests.filter((item) => item.status !== 'archived').length} icon={ClipboardList} />
                 <TransactionMetric label="قيد المتابعة" value={requests.filter((item) => !['closed', 'rejected', 'archived'].includes(item.status)).length} icon={Clock3} />
                 <TransactionMetric label="عاجلة" value={requests.filter((item) => item.priority === 'urgent' && !['closed', 'rejected', 'archived'].includes(item.status)).length} icon={AlertTriangle} tone="urgent" />
@@ -3386,7 +3386,7 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>
             </CardHeader>
             <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <TransactionMetric label="إجمالي البلاغات" value={tickets.filter((item) => item.status !== 'archived').length} icon={MessageSquare} />
                 <TransactionMetric label="مفتوحة" value={tickets.filter((item) => !['closed', 'rejected', 'archived'].includes(item.status)).length} icon={Clock3} />
                 <TransactionMetric label="قيد المعالجة" value={tickets.filter((item) => ['assigned', 'in_progress'].includes(item.status)).length} icon={Wrench} />
@@ -3416,16 +3416,62 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>
 
         <TabsContent value="leaves" className="space-y-4">
-          {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button></div>}
-          {leaveQuickFilter !== 'all' && <QuickFilterBar label="الإجازات والاعتذارات المعلقة" onClear={() => setLeaveQuickFilter('all')} />}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredLeaves.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} kind="leave" title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} createdAt={item.createdAt} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} submitterName={item.applicant?.name || item.personnel?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || (item.personnel?.role ? personnelRoleLabels[item.personnel.role] || item.personnel.role : 'مقدم الطلب')} onView={() => setViewingWorkflow({ kind: 'leave', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedLeaveEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('leave', item)} />)}</div>
-          {!filteredLeaves.length && <Empty text="لا توجد طلبات إجازة أو اعتذار مطابقة" />}
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">المناوبات والتغطية</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><CalendarDays className="h-5 w-5" />الإجازات والاعتذارات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">متابعة إجازات واعتذارات منسوبي المساجد والمصليات، البديل المقترح، وحالة الاعتماد لضمان استمرار التغطية التشغيلية.</CardDescription>
+                </div>
+                {role === 'personnel' && <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button>}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <TransactionMetric label="إجمالي الطلبات" value={leaves.filter((item) => item.status !== 'archived').length} icon={CalendarDays} />
+                <TransactionMetric label="قيد المراجعة" value={leaves.filter((item) => ['pending', 'under_review'].includes(item.status)).length} icon={Clock3} tone="warning" />
+                <TransactionMetric label="المعتمدة" value={leaves.filter((item) => item.status === 'approved').length} icon={CheckCircle2} />
+                <TransactionMetric label="معادة للتعديل" value={leaves.filter((item) => item.status === 'returned_for_edit').length} icon={RefreshCw} />
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3 lg:flex-row lg:items-center lg:justify-between">
+                <div><p className="font-black text-[#0b4a3f]">عرض طلبات التغطية</p><p className="mt-1 text-xs text-slate-500">ركّز على المعلّق فقط أو اعرض جميع الإجازات والاعتذارات.</p></div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant={leaveQuickFilter === 'all' ? 'default' : 'outline'} className={leaveQuickFilter === 'all' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setLeaveQuickFilter('all')}>الكل</Button>
+                  <Button size="sm" variant={leaveQuickFilter === 'pending' ? 'default' : 'outline'} className={leaveQuickFilter === 'pending' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setLeaveQuickFilter('pending')}>قيد المراجعة</Button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">{filteredLeaves.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} kind="leave" title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} createdAt={item.createdAt} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} submitterName={item.applicant?.name || item.personnel?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || (item.personnel?.role ? personnelRoleLabels[item.personnel.role] || item.personnel.role : 'مقدم الطلب')} onView={() => setViewingWorkflow({ kind: 'leave', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedLeaveEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('leave', item)} />)}</div>
+              {!filteredLeaves.filter((item) => item.status !== 'archived').length && <Empty text="لا توجد طلبات إجازة أو اعتذار مطابقة" />}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="jobs" className="space-y-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">بيانات الهوية والجوال والبريد والسيرة الذاتية تظهر فقط للمخولين داخل الوحدة، ولا تظهر في البوابة العامة.</div>
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{jobs.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} kind="job" title={item.applicationNumber} subtitle={`${item.fullName} — ${item.jobType}`} description={`${item.qualification}${item.preferredLocation ? ` — ${item.preferredLocation}` : ''}`} status={item.status} createdAt={item.createdAt} meta={[item.email, item.phone]} onStatus={canEdit && role === 'head' ? () => openStatusDialog('job', item) : undefined} extraAction={<>{workflowAdminActions('job', item)}{item.cvUrl ? <Button variant="outline" size="sm" className={button3d} onClick={() => window.open(item.cvUrl!, '_blank')}><Eye className="ml-1 h-3.5 w-3.5" />السيرة الذاتية</Button> : null}</>} />)}</div>
-          {!jobs.length && <Empty text="لا توجد طلبات توظيف" />}
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div>
+                <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">طلبات التعاون</Badge>
+                <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Briefcase className="h-5 w-5" />طلبات الوظائف والتعاون</CardTitle>
+                <CardDescription className="mt-1 max-w-3xl leading-6">متابعة المتقدمين لمهام الإمام والمؤذن والخطيب والخطيب المتعاون، من التسجيل والمراجعة حتى المقابلة والقبول.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <TransactionMetric label="إجمالي الطلبات" value={jobs.filter((item) => item.status !== 'archived').length} icon={Briefcase} />
+                <TransactionMetric label="طلبات جديدة" value={jobs.filter((item) => item.status === 'new').length} icon={Plus} />
+                <TransactionMetric label="تحت المراجعة" value={jobs.filter((item) => item.status === 'under_review').length} icon={Clock3} />
+                <TransactionMetric label="المرشحون / المقابلات" value={jobs.filter((item) => ['shortlisted', 'interview'].includes(item.status)).length} icon={Users} />
+              </div>
+
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-7 text-amber-900"><div className="flex items-start gap-3"><Shield className="mt-1 h-5 w-5 shrink-0" /><div><strong>خصوصية البيانات:</strong> بيانات الهوية والجوال والبريد والسيرة الذاتية تظهر فقط للمخولين داخل الوحدة، ولا تظهر في البوابة العامة.</div></div></div>
+
+              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">{jobs.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} kind="job" title={item.applicationNumber} subtitle={`${item.fullName} — ${item.jobType}`} description={`${item.qualification}${item.preferredLocation ? ` — ${item.preferredLocation}` : ''}`} status={item.status} createdAt={item.createdAt} meta={[item.email, item.phone]} onStatus={canEdit && role === 'head' ? () => openStatusDialog('job', item) : undefined} extraAction={<>{workflowAdminActions('job', item)}{item.cvUrl ? <Button variant="outline" size="sm" className="border-[#d9c9a5] text-[#0b4a3f]" onClick={() => window.open(item.cvUrl!, '_blank')}><Eye className="ml-1 h-3.5 w-3.5" />السيرة الذاتية</Button> : null}</>} />)}</div>
+              {!jobs.filter((item) => item.status !== 'archived').length && <Empty text="لا توجد طلبات توظيف" />}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="quran" className="space-y-4">
@@ -3445,7 +3491,7 @@ ${quranStockMovementForm.notes}` : ''}`
               </CardHeader>
 
               <CardContent className="space-y-5 p-4 sm:p-5">
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="rounded-2xl border border-[#e2d4b4] bg-white p-4 shadow-sm"><p className="text-[11px] font-bold text-slate-500">رصيد المكتبة</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.warehouseTotal || 0}</p><p className="mt-1 text-[10px] text-slate-400">الرصيد المتاح للتوزيع</p></div>
                   <div className="rounded-2xl border border-[#e2d4b4] bg-white p-4 shadow-sm"><p className="text-[11px] font-bold text-slate-500">الرصيد بالمواقع</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.siteSystemTotal || 0}</p><p className="mt-1 text-[10px] text-slate-400">الموجود حاليًا في المساجد والمصليات</p></div>
                   <div className="rounded-2xl border border-[#e2d4b4] bg-white p-4 shadow-sm"><p className="text-[11px] font-bold text-slate-500">إجمالي النظام</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.systemTotal || 0}</p><p className="mt-1 text-[10px] text-slate-400">المكتبة + المواقع</p></div>
@@ -3718,7 +3764,7 @@ ${quranStockMovementForm.notes}` : ''}`
             </CardHeader>
 
             <CardContent className="space-y-5 p-4 sm:p-5">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <SpatialMetric label="مواقع بإحداثيات" value={spatialMapSites.length} icon={MapPin} />
                 <SpatialMetric label="المباني على الخريطة" value={['head', 'supervisor'].includes(role) ? spatialMapBuildings.length : 0} icon={Building2} />
                 <SpatialMetric label="مبانٍ تحتاج مصلى" value={['head', 'supervisor'].includes(role) ? officialBuildings.filter((x) => x.coverageStatus === 'needs_prayer_room').length : 0} icon={AlertTriangle} tone="warning" />
@@ -3829,7 +3875,7 @@ ${quranStockMovementForm.notes}` : ''}`
             </CardHeader>
 
             <CardContent className="space-y-5 p-4 sm:p-5">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <PersonnelMetric label="إجمالي المنسوبين" value={personnel.length} icon={Users} />
                 <PersonnelMetric label="السجلات النشطة" value={personnel.filter((item) => item.active).length} icon={CheckCircle2} />
                 <PersonnelMetric label="حسابات دخول مرتبطة" value={personnel.filter((item) => Boolean(item.userId)).length} icon={Shield} />
@@ -3920,7 +3966,7 @@ ${quranStockMovementForm.notes}` : ''}`
             </CardHeader>
 
             <CardContent className="space-y-5 p-4 sm:p-5">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <RoleMetric label="الحسابات المتاحة" value={staffUsers.length} icon={Users} />
                 <RoleMetric label="الحسابات النشطة" value={staffUsers.filter((user) => user.isActive).length} icon={CheckCircle2} />
                 <RoleMetric label="روابط تشغيلية محفوظة" value={assignments.length} icon={Shield} />
@@ -4032,7 +4078,7 @@ ${quranStockMovementForm.notes}` : ''}`
             </CardHeader>
 
             <CardContent className="space-y-5 p-4 sm:p-5">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <NotificationMetric label="إجمالي الإشعارات" value={notifications.length} icon={Bell} />
                 <NotificationMetric label="غير مقروء" value={notifications.filter((notice) => !notice.isRead).length} icon={AlertTriangle} tone="warning" />
                 <NotificationMetric label="إشعارات اليوم" value={notifications.filter((notice) => new Date(notice.createdAt).toDateString() === new Date().toDateString()).length} icon={CalendarDays} />
