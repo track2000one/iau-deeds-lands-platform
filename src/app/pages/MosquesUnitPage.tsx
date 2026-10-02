@@ -225,6 +225,31 @@ const statusBadgeClass = (status: string) => {
   return 'border-sky-300 bg-sky-50 text-sky-700';
 };
 
+const workflowNextActionLabel = (kind: 'request' | 'ticket' | 'leave' | 'job' | undefined, status: string) => {
+  if (kind === 'request') return ({
+    new: 'المراجعة الأولية',
+    under_review: 'الاعتماد أو الإعادة',
+    approved: 'بدء التنفيذ',
+    in_progress: 'توثيق الإنجاز',
+    completed: 'التحقق والإغلاق',
+    returned_for_edit: 'انتظار إعادة الإرسال',
+    closed: 'مكتمل',
+    rejected: 'مغلق بالرفض',
+  } as Record<string, string>)[status] || 'متابعة الحالة';
+  if (kind === 'ticket') return ({
+    new: 'المراجعة أو الإسناد',
+    under_review: 'الإسناد أو بدء المعالجة',
+    assigned: 'بدء المعالجة',
+    in_progress: 'توثيق الحل',
+    resolved: 'التحقق والإغلاق',
+    closed: 'مكتمل',
+    rejected: 'مغلق بالرفض',
+  } as Record<string, string>)[status] || 'متابعة الحالة';
+  if (kind === 'leave') return ['pending', 'under_review'].includes(status) ? 'المراجعة والاعتماد' : status === 'returned_for_edit' ? 'انتظار إعادة الإرسال' : 'متابعة الحالة';
+  if (kind === 'job') return 'متابعة مرحلة الطلب';
+  return 'متابعة الحالة';
+};
+
 const card3d = 'border-[#dcc58e]/70 bg-gradient-to-b from-white via-[#fffdf7] to-[#f8f2e5]/90 shadow-[0_7px_0_rgba(10,74,63,0.08),0_16px_34px_rgba(6,60,51,0.10),inset_0_1px_0_rgba(255,255,255,1)]';
 const button3d = 'shadow-[0_4px_0_rgba(8,63,53,0.14),0_8px_16px_rgba(8,63,53,0.08),inset_0_1px_0_rgba(255,255,255,0.96)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(8,63,53,0.12)]';
 const siteActionButton = `${button3d} h-10 w-full min-w-0 justify-center gap-1.5 whitespace-nowrap px-2 text-xs font-bold leading-none`;
@@ -3071,16 +3096,99 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>}
 
         <TabsContent value="requests" className="space-y-4">
-          {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />الإبلاغ عن مشكلة / طلب صيانة أو احتياج</Button></div>}
-          {requestQuickFilter !== 'all' && <QuickFilterBar label={requestQuickFilter === 'new' ? 'الطلبات الجديدة' : requestQuickFilter === 'under_review' ? 'الطلبات تحت المراجعة' : requestQuickFilter === 'approved' ? 'الطلبات المعتمدة' : 'الطلبات المتأخرة'} onClear={() => setRequestQuickFilter('all')} />}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredRequests.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} statusLabel={quranRequestStatusLabel(item)} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} submitterName={item.applicant?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || 'مقدم الطلب'} onView={() => setViewingWorkflow({ kind: 'request', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedRequestEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('request', item)} />)}</div>
-          {!filteredRequests.length && <Empty text="لا توجد طلبات مطابقة" />}
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">مركز المعاملات</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Wrench className="h-5 w-5" />طلبات الصيانة والاحتياج</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">متابعة الطلب من التقديم والمراجعة والاعتماد حتى التنفيذ والتحقق والإغلاق، مع إبراز الأولوية والإجراء المطلوب لكل معاملة.</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => setActiveTab('requests')}><ClipboardList className="ml-2 h-4 w-4" />الطلبات</Button>
+                  {['head', 'supervisor'].includes(role) && <Button variant="outline" className="border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]" onClick={() => setActiveTab('tickets')}><MessageSquare className="ml-2 h-4 w-4" />البلاغات</Button>}
+                  {role === 'personnel' && <Button variant="outline" className="border-[#d6b46a] bg-[#fff8e8] font-bold text-[#7b5b16]" onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />طلب جديد</Button>}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 p-4 sm:p-5">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <TransactionMetric label="إجمالي الطلبات" value={requests.filter((item) => item.status !== 'archived').length} icon={ClipboardList} />
+                <TransactionMetric label="قيد المتابعة" value={requests.filter((item) => !['closed', 'rejected', 'archived'].includes(item.status)).length} icon={Clock3} />
+                <TransactionMetric label="عاجلة" value={requests.filter((item) => item.priority === 'urgent' && !['closed', 'rejected', 'archived'].includes(item.status)).length} icon={AlertTriangle} tone="urgent" />
+                <TransactionMetric label="متأخرة +7 أيام" value={requests.filter((item) => ['new', 'under_review', 'approved', 'in_progress'].includes(item.status) && new Date(item.createdAt).getTime() < Date.now() - 7 * 24 * 60 * 60 * 1000).length} icon={CalendarDays} tone="warning" />
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="font-black text-[#0b4a3f]">عرض الطلبات حسب الحالة</p>
+                  <p className="mt-1 text-xs text-slate-500">اختر الحالة لتقليل القائمة والتركيز على المعاملات التي تحتاج إجراء.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    ['all', 'الكل'],
+                    ['new', 'جديد'],
+                    ['under_review', 'تحت المراجعة'],
+                    ['approved', 'معتمد'],
+                    ['late', 'متأخر'],
+                  ] as const).map(([value, label]) => <Button key={value} size="sm" variant={requestQuickFilter === value ? 'default' : 'outline'} className={requestQuickFilter === value ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setRequestQuickFilter(value)}>{label}</Button>)}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-black text-[#0b4a3f]">قائمة المعاملات</p><p className="mt-1 text-xs text-slate-500">كل بطاقة توضح صاحب الطلب، الأولوية، الحالة الحالية، والإجراء التالي المقترح وفق سير العمل.</p></div>
+                <Badge variant="outline" className="border-[#d6b46a]/55 bg-[#fffdf8] px-3 py-1.5 font-black text-[#0b4a3f]">{filteredRequests.filter((item) => item.status !== 'archived').length} طلب</Badge>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">{filteredRequests.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} kind="request" title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} statusLabel={quranRequestStatusLabel(item)} priority={item.priority} createdAt={item.createdAt} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} submitterName={item.applicant?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || 'مقدم الطلب'} onView={() => setViewingWorkflow({ kind: 'request', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedRequestEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('request', item)} />)}</div>
+              {!filteredRequests.filter((item) => item.status !== 'archived').length && <Empty text="لا توجد طلبات مطابقة" />}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-4">
-          {ticketQuickFilter !== 'all' && <QuickFilterBar label="البلاغات المفتوحة" onClear={() => setTicketQuickFilter('all')} />}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredTickets.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'بدون وسيلة تواصل']} submitterName={item.reporterName || 'غير محدد'} submitterRole="مقدّم البلاغ" onView={() => setViewingWorkflow({ kind: 'ticket', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={<>{workflowAdminActions('ticket', item)}{['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className={button3d} onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline">مرتبط بطلب صيانة</Badge> : null}</>} />)}</div>
-          {!filteredTickets.length && <Empty text="لا توجد بلاغات مطابقة" />}
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">مركز المعاملات</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><MessageSquare className="h-5 w-5" />البلاغات والملاحظات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">استقبال البلاغ، مراجعته وإسناده ومعالجته، مع إمكانية تحويله إلى طلب صيانة عند الحاجة والمحافظة على الارتباط بين السجلين.</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" className="border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]" onClick={() => setActiveTab('requests')}><ClipboardList className="ml-2 h-4 w-4" />الطلبات</Button>
+                  <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => setActiveTab('tickets')}><MessageSquare className="ml-2 h-4 w-4" />البلاغات</Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 p-4 sm:p-5">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <TransactionMetric label="إجمالي البلاغات" value={tickets.filter((item) => item.status !== 'archived').length} icon={MessageSquare} />
+                <TransactionMetric label="مفتوحة" value={tickets.filter((item) => !['closed', 'rejected', 'archived'].includes(item.status)).length} icon={Clock3} />
+                <TransactionMetric label="قيد المعالجة" value={tickets.filter((item) => ['assigned', 'in_progress'].includes(item.status)).length} icon={Wrench} />
+                <TransactionMetric label="محولة إلى صيانة" value={tickets.filter((item) => Boolean(item.convertedRequestId)).length} icon={CheckCircle2} />
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="font-black text-[#0b4a3f]">حالة البلاغات</p>
+                  <p className="mt-1 text-xs text-slate-500">اعرض جميع البلاغات أو ركّز على البلاغات التي ما زالت تحتاج متابعة.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant={ticketQuickFilter === 'all' ? 'default' : 'outline'} className={ticketQuickFilter === 'all' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setTicketQuickFilter('all')}>الكل</Button>
+                  <Button size="sm" variant={ticketQuickFilter === 'open' ? 'default' : 'outline'} className={ticketQuickFilter === 'open' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setTicketQuickFilter('open')}>المفتوحة</Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-black text-[#0b4a3f]">قائمة البلاغات</p><p className="mt-1 text-xs text-slate-500">الحالة الحالية والإجراء التالي ظاهرين مباشرة على البطاقة؛ تفاصيل السجل والتسلسل الزمني داخل «عرض التفاصيل».</p></div>
+                <Badge variant="outline" className="border-[#d6b46a]/55 bg-[#fffdf8] px-3 py-1.5 font-black text-[#0b4a3f]">{filteredTickets.filter((item) => item.status !== 'archived').length} بلاغ</Badge>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">{filteredTickets.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} kind="ticket" title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} createdAt={item.createdAt} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'بدون وسيلة تواصل']} submitterName={item.reporterName || 'غير محدد'} submitterRole="مقدّم البلاغ" onView={() => setViewingWorkflow({ kind: 'ticket', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={<>{workflowAdminActions('ticket', item)}{['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className="border-[#d6b46a] bg-[#fff8e8] text-[#7b5b16]" onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">مرتبط بطلب صيانة</Badge> : null}</>} />)}</div>
+              {!filteredTickets.filter((item) => item.status !== 'archived').length && <Empty text="لا توجد بلاغات مطابقة" />}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="leaves" className="space-y-4">
@@ -4081,9 +4189,55 @@ const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onEx
   </Card>;
 };
 
-const QuickFilterBar = ({ label, onClear }: { label: string; onClear: () => void }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm"><span>العرض الحالي: <strong>{label}</strong></span><Button variant="outline" size="sm" className={button3d} onClick={onClear}>عرض الكل</Button></div>;
+const QuickFilterBar = ({ label, onClear }: { label: string; onClear: () => void }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e2d4b4] bg-[#fffdf8] px-4 py-3 text-sm"><span>العرض الحالي: <strong className="text-[#0b4a3f]">{label}</strong></span><Button variant="outline" size="sm" className="border-[#d9c9a5] text-[#0b4a3f]" onClick={onClear}>عرض الكل</Button></div>;
 
-const WorkflowCard = ({ title, subtitle, description, status, statusLabel, meta, submitterName, submitterRole, onView, onStatus, extraAction }: { title: string; subtitle: string; description: string; status: string; statusLabel?: string; meta: string[]; submitterName?: string; submitterRole?: string; onView?: () => void; onStatus?: () => void; extraAction?: React.ReactNode }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-[#0b5a49] via-[#d6b46a] to-[#0b5a49]" /><CardContent className="flex min-h-[315px] flex-col p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{title}</p><h3 className="mt-1 font-black text-slate-800">{subtitle}</h3></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabel || statusLabels[status] || status}</Badge></div>{submitterName && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-white/90 p-3"><div><p className="text-[11px] text-muted-foreground">مقدم الإجراء</p><p className="mt-1 font-bold text-slate-800">{submitterName}</p></div>{submitterRole && <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700">{submitterRole}</Badge>}</div>}<p className="mt-3 line-clamp-3 rounded-2xl border bg-slate-50/80 p-3 text-sm leading-6 text-slate-700">{description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">{meta.map((x, i) => <span key={i} className="rounded-xl border bg-white p-2">{x || '-'}</span>)}</div><div className="mt-auto flex flex-wrap gap-2 border-t pt-4">{onView && <Button variant="outline" size="sm" className={button3d} onClick={onView}><Eye className="ml-1 h-3.5 w-3.5" />عرض التفاصيل</Button>}{onStatus && <Button variant="outline" size="sm" className={button3d} onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />إجراء رسمي</Button>}{extraAction}</div></CardContent></Card>;
+const TransactionMetric = ({ label, value, icon: Icon, tone = 'default' }: { label: string; value: number; icon: React.ElementType; tone?: 'default' | 'warning' | 'urgent' }) => {
+  const toneClass = tone === 'urgent'
+    ? 'border-red-200 bg-red-50/70 text-red-700'
+    : tone === 'warning'
+      ? 'border-amber-200 bg-amber-50/70 text-amber-800'
+      : 'border-[#e2d4b4] bg-white text-[#0b4a3f]';
+  return <div className={`flex min-h-[92px] items-center justify-between gap-3 rounded-2xl border p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)] ${toneClass}`}><div><p className="text-[11px] font-bold opacity-75">{label}</p><p className="mt-1 text-2xl font-black">{value.toLocaleString('ar-SA')}</p></div><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-current/15 bg-white/75"><Icon className="h-5 w-5" /></div></div>;
+};
+
+const WorkflowCard = ({ kind, title, subtitle, description, status, statusLabel, priority, createdAt, meta, submitterName, submitterRole, onView, onStatus, extraAction }: { kind?: 'request' | 'ticket' | 'leave' | 'job'; title: string; subtitle: string; description: string; status: string; statusLabel?: string; priority?: string; createdAt?: string; meta: string[]; submitterName?: string; submitterRole?: string; onView?: () => void; onStatus?: () => void; extraAction?: React.ReactNode }) => {
+  const isOpen = !['closed', 'rejected', 'archived'].includes(status);
+  const createdTime = createdAt ? new Date(createdAt).getTime() : NaN;
+  const ageDays = Number.isFinite(createdTime) ? Math.max(0, Math.floor((Date.now() - createdTime) / (24 * 60 * 60 * 1000))) : null;
+  const isLate = kind === 'request' && isOpen && ageDays != null && ageDays >= 7;
+  const icon = kind === 'ticket' ? <MessageSquare className="h-4 w-4" /> : kind === 'request' ? <Wrench className="h-4 w-4" /> : kind === 'leave' ? <CalendarDays className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />;
+
+  return <Card className="group overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_9px_26px_rgba(6,60,51,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_14px_30px_rgba(6,60,51,0.10)]">
+    <CardContent className="flex min-h-[350px] flex-col p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500"><span className="inline-flex items-center gap-1 font-bold text-[#0b5a49]">{icon}{title}</span>{createdAt && <span>• {new Date(createdAt).toLocaleDateString('ar-SA-u-ca-gregory')}</span>}{isLate && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">متأخر</Badge>}</div>
+          <h3 className="mt-2 truncate text-lg font-black text-[#0b4a3f]">{subtitle || 'بدون موقع محدد'}</h3>
+        </div>
+        <Badge variant="outline" className={`shrink-0 ${statusBadgeClass(status)}`}>{statusLabel || statusLabels[status] || status}</Badge>
+      </div>
+
+      {submitterName && <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#e7dcc4] bg-[#fffdf8] px-3 py-2.5"><div className="min-w-0"><p className="text-[10px] font-bold text-slate-500">مقدم المعاملة</p><p className="mt-0.5 truncate text-sm font-black text-slate-800">{submitterName}</p></div>{submitterRole && <Badge variant="outline" className="shrink-0 border-[#d6b46a]/45 bg-white text-[#7b5b16]">{submitterRole}</Badge>}</div>}
+
+      <p className="mt-3 line-clamp-3 min-h-[76px] rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm leading-6 text-slate-700">{description}</p>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        {meta.slice(0,2).map((x, i) => <span key={i} className="rounded-xl border border-[#e4d8bd] bg-white p-2.5 text-center font-bold text-slate-600">{x || '-'}</span>)}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#e3d6b9] bg-[#fbf8f1] px-3 py-2.5">
+        <div><p className="text-[10px] font-bold text-slate-500">الإجراء التالي</p><p className="mt-0.5 text-xs font-black text-[#0b4a3f]">{workflowNextActionLabel(kind, status)}</p></div>
+        <div className="text-left">{priority && <Badge variant="outline" className={priority === 'urgent' ? 'border-red-300 bg-red-50 text-red-700' : priority === 'high' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-600'}>{priorityLabels[priority] || priority}</Badge>}{ageDays != null && <p className="mt-1 text-[10px] text-slate-400">منذ {ageDays} يوم</p>}</div>
+      </div>
+
+      <div className="mt-auto flex flex-wrap gap-2 border-t border-[#eee5d2] pt-4">
+        {onView && <Button size="sm" className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={onView}><Eye className="ml-1 h-3.5 w-3.5" />عرض التفاصيل</Button>}
+        {onStatus && <Button variant="outline" size="sm" className="border-[#d6b46a] bg-[#fff8e8] text-[#7b5b16]" onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />إجراء رسمي</Button>}
+        {extraAction}
+      </div>
+    </CardContent>
+  </Card>;
+};
 
 const WorkflowDetailsDialog = ({ target, onOpenChange }: { target: { kind: 'request' | 'ticket' | 'leave'; item: any } | null; onOpenChange: (open: boolean) => void }) => {
   const [history, setHistory] = useState<MosqueWorkflowHistoryEntry[]>([]);
@@ -4110,10 +4264,12 @@ const WorkflowDetailsDialog = ({ target, onOpenChange }: { target: { kind: 'requ
 
   return (
     <Dialog open={Boolean(target)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[900px]" dir="rtl">
-        <DialogHeader className="text-right">
-          <DialogTitle className="flex items-center gap-2 text-xl font-black"><Eye className="h-5 w-5 text-sky-700" />{isRequest ? 'تفاصيل طلب الصيانة / الاحتياج' : isTicket ? 'تفاصيل البلاغ' : 'تفاصيل الإجازة / الاعتذار'}</DialogTitle>
-          <DialogDescription>{recordNumber}</DialogDescription>
+      <DialogContent className="max-h-[92vh] overflow-y-auto border-[#ded3b8] bg-[#fffdf8] sm:max-w-[980px]" dir="rtl">
+        <DialogHeader className="rounded-2xl border border-[#e3d6b9] bg-white p-4 text-right">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><Badge variant="outline" className="mb-2 border-[#d6b46a]/55 bg-[#fff8e8] text-[#8a6a1f]">{isRequest ? 'طلب صيانة / احتياج' : isTicket ? 'بلاغ' : 'إجازة / اعتذار'}</Badge><DialogTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]"><Eye className="h-5 w-5" />{recordNumber}</DialogTitle><DialogDescription className="mt-1">{item.site?.name || 'بدون موقع محدد'}</DialogDescription></div>
+            <Badge variant="outline" className={statusBadgeClass(item.status)}>{statusLabels[item.status] || item.status}</Badge>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -4132,7 +4288,7 @@ const WorkflowDetailsDialog = ({ target, onOpenChange }: { target: { kind: 'requ
 
           {!isRequest && !isTicket && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">بيانات الإجازة / الاعتذار</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Info label="نوع الطلب" value={leaveTypeLabels[item.requestType] || item.requestType} /><Info label="من" value={item.startDate ? new Date(item.startDate).toLocaleDateString('ar-SA') : '-'} /><Info label="إلى" value={item.endDate ? new Date(item.endDate).toLocaleDateString('ar-SA') : '-'} /><Info label="البديل" value={item.replacementName || '-'} /></div><div><p className="text-[11px] text-muted-foreground">السبب</p><p className="mt-1 rounded-xl border bg-slate-50 p-3 text-sm leading-7">{item.reason || '-'}</p></div>{item.notes && <Info label="الملاحظات" value={item.notes} />}{item.reviewerNote && <Info label="ملاحظة المراجع" value={item.reviewerNote} />}{item.returnReason && <Info label="ملاحظة الإعادة" value={item.returnReason} />}{item.rejectionReason && <Info label="سبب الرفض" value={item.rejectionReason} />}</CardContent></Card>}
 
-          <Card className="border-indigo-200 bg-indigo-50/30"><CardHeader className="pb-3"><CardTitle className="text-base">سجل الإجراءات الرسمي</CardTitle><CardDescription>تسلسل زمني للتعديلات والقرارات المسجلة على المعاملة.</CardDescription></CardHeader><CardContent className="space-y-2">{history.length ? history.map((entry) => <div key={entry.id} className="rounded-xl border bg-white p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{entry.action === 'administrative_edit' ? 'تعديل إداري' : entry.action === 'archive' ? 'حذف / أرشفة' : entry.action === 'resubmitted_after_return' ? 'إعادة إرسال بعد التعديل' : 'تغيير حالة'}</strong><span className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString('ar-SA')}</span></div><p className="mt-1 text-xs text-muted-foreground">{entry.username || entry.userEmail || 'النظام'}{entry.details?.fromStatus || entry.details?.toStatus ? ` — ${statusLabels[entry.details?.fromStatus || ''] || entry.details?.fromStatus || '-'} ← ${statusLabels[entry.details?.toStatus || ''] || entry.details?.toStatus || '-'}` : ''}</p>{entry.details?.note && <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs leading-6">{entry.details.note}</p>}</div>) : <p className="text-sm text-muted-foreground">لا توجد إجراءات مسجلة بعد.</p>}</CardContent></Card>
+          <Card className="border-[#d6b46a]/45 bg-white"><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base font-black text-[#0b4a3f]"><Clock3 className="h-4 w-4" />التسلسل الزمني للمعاملة</CardTitle><CardDescription>كل تغيير حالة أو تعديل إداري محفوظ بترتيبه الزمني.</CardDescription></CardHeader><CardContent>{history.length ? <div className="space-y-0">{history.map((entry, index) => <div key={entry.id} className="relative pr-7 pb-5 last:pb-0"><span className="absolute right-[7px] top-2 h-full w-px bg-[#e4d8bd] last:hidden" /><span className="absolute right-0 top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#d6b46a] bg-white"><span className="h-1.5 w-1.5 rounded-full bg-[#0b5a49]" /></span><div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-[#0b4a3f]">{entry.action === 'administrative_edit' ? 'تعديل إداري' : entry.action === 'archive' ? 'حذف / أرشفة' : entry.action === 'resubmitted_after_return' ? 'إعادة إرسال بعد التعديل' : 'تغيير حالة'}</strong><span className="text-xs text-slate-500">{new Date(entry.createdAt).toLocaleString('ar-SA')}</span></div><p className="mt-1 text-xs text-slate-500">{entry.username || entry.userEmail || 'النظام'}{entry.details?.fromStatus || entry.details?.toStatus ? ` — ${statusLabels[entry.details?.fromStatus || ''] || entry.details?.fromStatus || '-'} ← ${statusLabels[entry.details?.toStatus || ''] || entry.details?.toStatus || '-'}` : ''}</p>{entry.details?.note && <p className="mt-2 rounded-lg border border-slate-100 bg-white p-2 text-xs leading-6 text-slate-700">{entry.details.note}</p>}</div></div>)}</div> : <p className="rounded-xl border border-dashed border-[#d9c9a5] bg-[#fffdf8] p-5 text-center text-sm text-slate-500">لا توجد إجراءات مسجلة بعد.</p>}</CardContent></Card>
 
           {(attachmentUrls.length > 0 || item.completionEvidenceUrl) && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">المرفقات</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">{attachmentUrls.map((url: string, index: number) => <Button key={`${url}-${index}`} variant="outline" size="sm" className={button3d} onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}><ExternalLink className="ml-1 h-3.5 w-3.5" />مرفق {index + 1}</Button>)}{item.completionEvidenceUrl && <Button variant="outline" size="sm" className={button3d} onClick={() => window.open(item.completionEvidenceUrl, '_blank', 'noopener,noreferrer')}><CheckCircle2 className="ml-1 h-3.5 w-3.5" />إثبات الإنجاز</Button>}</CardContent></Card>}
         </div>
