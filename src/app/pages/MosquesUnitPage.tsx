@@ -3226,50 +3226,90 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="buildings" className="space-y-4">
-          <Card className={card3d}>
-            <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-sky-700" />تغطية المباني بخدمة الصلاة</CardTitle>
-                <CardDescription>ملف خدمة الصلاة للمباني المعرفة في السجل المركزي، مع توثيق وجود المصلى والاحتياج وإمكانية الإنشاء والبديل المعتمد.</CardDescription>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {canPrint && <Button className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={() => setBuildingCoverageReportOpen(true)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />تقارير التغطية — PDF / Excel</Button>}
-                <Button className={button3d} variant="outline" onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />السجل المركزي للمباني</Button>
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">التغطية المكانية</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Building2 className="h-5 w-5" />تغطية المباني بخدمة الصلاة</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">تقييم خدمة الصلاة في المباني الجامعية، توثيق وجود مصليات الرجال والنساء، وتحديد الاحتياج وإمكانية الإنشاء أو البديل المعتمد.</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {canPrint && <Button variant="outline" className="border-[#d6b46a] bg-[#fff8e8] font-bold text-[#7b5b16]" onClick={() => setBuildingCoverageReportOpen(true)}><FileSpreadsheet className="ml-2 h-4 w-4" />تقارير التغطية</Button>}
+                  <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => setActiveTab('map')}><MapPin className="ml-2 h-4 w-4" />الخريطة المكانية</Button>
+                  <Button variant="outline" className="border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]" onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />السجل المركزي</Button>
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-7 text-sky-950 md:flex-row md:items-center md:justify-between">
-                <div><strong>مصدر تعريف المباني: السجل المركزي للمباني.</strong><div className="text-xs text-sky-800">إضافة المبنى أو استيراده من Excel أو تعديل رقمه واسمه وموقعه وإحداثياته يتم مركزيًا. هذه الصفحة تحفظ فقط بيانات تغطية خدمة الصلاة.</div></div>
-                <Button type="button" variant="outline" className={button3d} onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />فتح السجل المركزي</Button>
+
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid gap-4 xl:grid-cols-[1.25fr_0.9fr]">
+                <div className="rounded-[22px] border border-[#e2d4b4] bg-[#fbf8f1] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div><p className="font-black text-[#0b4a3f]">نسبة تغطية المباني بخدمة الصلاة</p><p className="mt-1 text-xs text-slate-500">النسبة تحسب من المباني المعتمدة المصنفة «مغطاة بخدمة الصلاة».</p></div>
+                    <div className="text-left"><span className="text-3xl font-black text-[#0b4a3f]">{buildingCoveragePercent}%</span><p className="text-[10px] text-slate-500">{officialBuildings.filter((x) => x.coverageStatus === 'covered').length} من {officialBuildings.length}</p></div>
+                  </div>
+                  <Progress value={buildingCoveragePercent} className="mt-4 h-3" />
+                </div>
+
+                <div className="rounded-[22px] border border-[#d6b46a]/45 bg-[#fff8e8] p-4 text-sm leading-7 text-slate-700">
+                  <div className="flex items-start gap-3"><Building2 className="mt-1 h-5 w-5 shrink-0 text-[#0b5a49]" /><div><strong className="text-[#0b4a3f]">مصدر بيانات المباني: السجل المركزي.</strong><p className="mt-1 text-xs leading-6 text-slate-600">تعريف المبنى ورقمه وموقعه وإحداثياته تُدار مركزيًا؛ هذه الصفحة تختص فقط بحالة تغطية خدمة الصلاة والاحتياج والبدائل.</p></div></div>
+                </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <ReportMetric label="إجمالي المباني المعتمدة" value={officialBuildings.length} />
-                <ReportMetric label="مغطاة بخدمة الصلاة" value={officialBuildings.filter((x) => x.coverageStatus === 'covered').length} />
-                <ReportMetric label="تحتاج مصلى" value={officialBuildings.filter((x) => x.coverageStatus === 'needs_prayer_room').length} />
-                <ReportMetric label="قيد الدراسة / التنفيذ" value={officialBuildings.filter((x) => ['under_feasibility_study', 'under_implementation'].includes(x.coverageStatus)).length} />
-                <ReportMetric label="تعذر الإنشاء + بديل" value={officialBuildings.filter((x) => x.coverageStatus === 'not_feasible_alternative').length} />
+
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <SpatialMetric label="إجمالي المباني" value={officialBuildings.length} icon={Building2} />
+                <SpatialMetric label="مغطاة بالخدمة" value={officialBuildings.filter((x) => x.coverageStatus === 'covered').length} icon={CheckCircle2} />
+                <SpatialMetric label="تحتاج مصلى" value={officialBuildings.filter((x) => x.coverageStatus === 'needs_prayer_room').length} icon={AlertTriangle} tone="warning" />
+                <SpatialMetric label="قيد الدراسة / التنفيذ" value={officialBuildings.filter((x) => ['under_feasibility_study', 'under_implementation'].includes(x.coverageStatus)).length} icon={Clock3} />
+              </div>
+
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">ابحث برقم المبنى أو اسمه أو موقعه، ثم صفِّ حسب حالة التغطية.</p></div>
+                  <Badge variant="outline" className="border-[#d6b46a]/55 bg-white px-3 py-1.5 font-black text-[#0b4a3f]">{filteredCoverageBuildings.length} مبنى</Badge>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_260px_auto]">
+                  <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-11 border-[#d9c9a5] bg-white pr-9" value={buildingCoverageSearch} onChange={(e) => setBuildingCoverageSearch(e.target.value)} placeholder="رقم المبنى، الاسم، الموقع، المدينة..." /></div>
+                  <NativeSelect className="h-11 bg-white" value={buildingCoverageFilter} onChange={(e) => setBuildingCoverageFilter(e.target.value)}><option value="all">جميع حالات التغطية</option>{Object.entries(buildingCoverageStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>
+                  <Button variant="outline" className="h-11 border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => { setBuildingCoverageSearch(''); setBuildingCoverageFilter('all'); }}><X className="ml-1 h-4 w-4" />مسح</Button>
+                </div>
               </div>
             </CardContent>
           </Card>
-          {!officialBuildings.length ? <Empty text="لم تتم إضافة مبانٍ معتمدة إلى سجل تغطية المصليات بعد" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{officialBuildings.map((building) => {
+
+          {!filteredCoverageBuildings.length ? <Empty text="لا توجد مبانٍ مطابقة للبحث والتصفية" /> : <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">{filteredCoverageBuildings.map((building) => {
             const men = building.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'men' && site.status !== 'temporarily_closed');
             const women = building.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'women' && site.status !== 'temporarily_closed');
             const menPresence = buildingPrayerRoomPresence(building, 'men');
             const womenPresence = buildingPrayerRoomPresence(building, 'women');
             const mosque = building.sites?.some((site) => ['mosque', 'jami'].includes(site.siteType) && site.status !== 'temporarily_closed');
             const hasCoordinates = Number.isFinite(Number(building.latitude)) && Number.isFinite(Number(building.longitude));
-            return <Card key={building.id} className={card3d}>
-              <CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2 border-sky-200 bg-sky-50 text-sky-800">مبنى رقم {building.buildingNumber}</Badge><CardTitle className="text-lg">{building.name || ('مبنى ' + building.buildingNumber)}</CardTitle><CardDescription>{[building.campusLocation, building.city, building.district].filter(Boolean).join(' — ') || 'لم يحدد الموقع'}</CardDescription></div><Badge variant="outline">{buildingCoverageStatusLabels[building.coverageStatus] || building.coverageStatus}</Badge></div></CardHeader>
+            const linkedCount = building._count?.sites ?? building.sites?.length ?? 0;
+
+            return <Card key={building.id} className="group overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_8px_24px_rgba(6,60,51,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_14px_28px_rgba(6,60,51,0.10)]">
+              <div className={`h-1.5 ${building.coverageStatus === 'covered' ? 'bg-emerald-600' : building.coverageStatus === 'needs_prayer_room' ? 'bg-amber-500' : 'bg-[#d6b46a]'}`} />
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><Badge variant="outline" className="mb-2 border-[#d6b46a]/45 bg-[#fffdf8] text-[#7b5b16]">مبنى رقم {building.buildingNumber}</Badge><CardTitle className="truncate text-lg font-black text-[#0b4a3f]">{building.name || ('مبنى ' + building.buildingNumber)}</CardTitle><CardDescription className="mt-1 line-clamp-2">{[building.campusLocation, building.city, building.district].filter(Boolean).join(' — ') || 'لم يحدد الموقع'}</CardDescription></div>
+                  <Badge variant="outline" className={building.coverageStatus === 'covered' ? 'shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700' : building.coverageStatus === 'needs_prayer_room' ? 'shrink-0 border-amber-300 bg-amber-50 text-amber-800' : 'shrink-0 border-slate-300 bg-slate-50 text-slate-700'}>{buildingCoverageStatusLabels[building.coverageStatus] || building.coverageStatus}</Badge>
+                </div>
+              </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-2 text-xs"><div className={'rounded-xl border p-2 text-center ' + prayerRoomPresenceClass(menPresence)}>مصلى رجال: <b>{buildingPrayerRoomPresenceLabels[menPresence]}</b></div><div className={'rounded-xl border p-2 text-center ' + prayerRoomPresenceClass(womenPresence)}>مصلى نساء: <b>{buildingPrayerRoomPresenceLabels[womenPresence]}</b></div></div>
-                {!men && !women && building.coverageStatus === 'needs_prayer_room' && <div className="rounded-xl border border-amber-300 bg-amber-50 p-2 text-center text-xs font-bold text-amber-900">لا يوجد مصلى في هذا المبنى — تم تقييمه ويحتاج مصلى</div>}
-                {mosque && <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-center text-xs font-bold text-red-800">سجل قديم يحتاج مراجعة: يوجد مسجد / جامع مرتبط بالمبنى، بينما المباني الجامعية يسمح بربط المصليات فقط.</div>}
-                <Info label="إمكانية إنشاء مصلى" value={buildingFeasibilityLabels[building.creationFeasibility] || building.creationFeasibility} />
-                {hasCoordinates && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200 bg-sky-50/70 p-2 text-xs"><div><span className="font-bold text-slate-700">إحداثيات المبنى: </span><span dir="ltr" className="font-mono text-sky-800">{Number(building.latitude).toFixed(6)}, {Number(building.longitude).toFixed(6)}</span></div><a className="inline-flex items-center gap-1 font-bold text-sky-700 hover:underline" href={'https://www.google.com/maps?q=' + building.latitude + ',' + building.longitude} target="_blank" rel="noreferrer"><MapPin className="h-3.5 w-3.5" />فتح الموقع</a></div>}
-                {building.unavailableReason && <Info label="سبب عدم الإمكانية" value={building.unavailableReason} />}
-                {building.approvedAlternative && <Info label="البديل المعتمد" value={building.approvedAlternative} />}
-                <div className="rounded-xl border bg-slate-50 p-2 text-xs text-slate-600">المواقع المرتبطة: <b>{building._count?.sites ?? building.sites?.length ?? 0}</b></div>
-                {canEdit && ['head', 'supervisor'].includes(role) && <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" className={button3d} onClick={() => openBuildingDialog(building)}><Pencil className="ml-1 h-4 w-4" />ملف خدمة الصلاة</Button><Button variant="outline" size="sm" className={button3d} onClick={() => navigate('/buildings/registry')}><Building2 className="ml-1 h-4 w-4" />السجل المركزي</Button></div>}
+                <div className="grid grid-cols-2 gap-2 text-xs"><div className={'rounded-xl border p-2.5 text-center ' + prayerRoomPresenceClass(menPresence)}><p className="text-[10px] font-bold opacity-75">مصلى الرجال</p><p className="mt-1 font-black">{buildingPrayerRoomPresenceLabels[menPresence]}</p></div><div className={'rounded-xl border p-2.5 text-center ' + prayerRoomPresenceClass(womenPresence)}><p className="text-[10px] font-bold opacity-75">مصلى النساء</p><p className="mt-1 font-black">{buildingPrayerRoomPresenceLabels[womenPresence]}</p></div></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">إمكانية الإنشاء</p><p className="mt-1 text-xs font-black text-[#0b4a3f]">{buildingFeasibilityLabels[building.creationFeasibility] || building.creationFeasibility}</p></div>
+                  <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">المواقع المرتبطة</p><p className="mt-1 text-xs font-black text-[#0b4a3f]">{linkedCount}</p></div>
+                </div>
+                {!men && !women && building.coverageStatus === 'needs_prayer_room' && <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-center text-xs font-bold text-amber-900">تم التحقق من عدم وجود مصلى — المبنى يحتاج خدمة صلاة</div>}
+                {mosque && <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-xs font-bold text-red-800">سجل قديم يحتاج مراجعة: يوجد مسجد / جامع مرتبط بالمبنى.</div>}
+                {building.unavailableReason && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs"><p className="font-bold text-slate-500">سبب عدم الإمكانية</p><p className="mt-1 leading-6 text-slate-700">{building.unavailableReason}</p></div>}
+                {building.approvedAlternative && <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-xs"><p className="font-bold text-emerald-700">البديل المعتمد</p><p className="mt-1 leading-6 text-emerald-800">{building.approvedAlternative}</p></div>}
+                <div className="flex flex-wrap gap-2 border-t border-[#eee5d2] pt-3">
+                  {canEdit && <Button size="sm" className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => openBuildingDialog(building)}><Pencil className="ml-1 h-3.5 w-3.5" />ملف خدمة الصلاة</Button>}
+                  {hasCoordinates && <Button size="sm" variant="outline" className="border-[#d9c9a5] text-[#0b4a3f]" onClick={() => window.open('https://www.google.com/maps?q=' + building.latitude + ',' + building.longitude, '_blank')}><MapPin className="ml-1 h-3.5 w-3.5" />الموقع</Button>}
+                  <Button size="sm" variant="ghost" className="text-slate-600" onClick={() => navigate('/buildings/registry')}><Building2 className="ml-1 h-3.5 w-3.5" />السجل المركزي</Button>
+                </div>
               </CardContent>
             </Card>;
           })}</div>}
