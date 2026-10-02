@@ -594,6 +594,13 @@ export const MosquesUnitPage: React.FC = () => {
   const [siteFilterType, setSiteFilterType] = useState('all');
   const [siteFilterPrayerRoomGender, setSiteFilterPrayerRoomGender] = useState<'all' | 'men' | 'women'>('all');
   const [siteFilterStatus, setSiteFilterStatus] = useState('all');
+  const [buildingCoverageSearch, setBuildingCoverageSearch] = useState('');
+  const [buildingCoverageFilter, setBuildingCoverageFilter] = useState('all');
+  const [mapSearch, setMapSearch] = useState('');
+  const [mapLayer, setMapLayer] = useState<'all' | 'sites' | 'buildings'>('all');
+  const [mapSiteType, setMapSiteType] = useState('all');
+  const [mapSiteStatus, setMapSiteStatus] = useState('all');
+  const [mapBuildingCoverage, setMapBuildingCoverage] = useState('all');
   const [siteSortBy, setSiteSortBy] = useState('name');
   const [siteSortDirection, setSiteSortDirection] = useState<'asc' | 'desc'>('asc');
   const [sitePrintColumns, setSitePrintColumns] = useState<SitePrintColumnKey[]>([...DEFAULT_SITE_PRINT_COLUMNS]);
@@ -1550,11 +1557,59 @@ ${quranStockMovementForm.notes}` : ''}`
     setSitePrintOrientation('auto');
   };
 
-  const mapSites = useMemo(() => visibleSites.filter((site) => Number.isFinite(Number(site.latitude)) && Number.isFinite(Number(site.longitude))), [visibleSites]);
+  const filteredCoverageBuildings = useMemo(() => {
+    const q = buildingCoverageSearch.trim().toLowerCase();
+    return officialBuildings.filter((building) => {
+      const matchesSearch = !q || [building.buildingNumber, building.name, building.campusLocation, building.city, building.district]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesCoverage = buildingCoverageFilter === 'all' || building.coverageStatus === buildingCoverageFilter;
+      return matchesSearch && matchesCoverage;
+    });
+  }, [officialBuildings, buildingCoverageSearch, buildingCoverageFilter]);
+
+  const spatialMapSites = useMemo(() => {
+    const q = mapSearch.trim().toLowerCase();
+    return sites.filter((site) => {
+      if (!Number.isFinite(Number(site.latitude)) || !Number.isFinite(Number(site.longitude))) return false;
+      const matchesSearch = !q || [site.name, site.campusLocation, site.city, site.district, site.building?.buildingNumber]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesType = mapSiteType === 'all' || site.siteType === mapSiteType;
+      const matchesStatus = mapSiteStatus === 'all' || site.status === mapSiteStatus;
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  }, [sites, mapSearch, mapSiteType, mapSiteStatus]);
+
+  const spatialMapBuildings = useMemo(() => {
+    const q = mapSearch.trim().toLowerCase();
+    return officialBuildings.filter((building) => {
+      if (!Number.isFinite(Number(building.latitude)) || !Number.isFinite(Number(building.longitude))) return false;
+      const matchesSearch = !q || [building.buildingNumber, building.name, building.campusLocation, building.city, building.district]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesCoverage = mapBuildingCoverage === 'all' || building.coverageStatus === mapBuildingCoverage;
+      return matchesSearch && matchesCoverage;
+    });
+  }, [officialBuildings, mapSearch, mapBuildingCoverage]);
+
+  const mapSites = mapLayer === 'buildings' ? [] : spatialMapSites;
+  const mapBuildings = ['head', 'supervisor'].includes(role) && mapLayer !== 'sites' ? spatialMapBuildings : [];
   const mapCenter: [number, number] = useMemo(() => {
-    if (!mapSites.length) return [26.3927, 50.0438];
-    return [mapSites.reduce((s, x) => s + Number(x.latitude), 0) / mapSites.length, mapSites.reduce((s, x) => s + Number(x.longitude), 0) / mapSites.length];
-  }, [mapSites]);
+    const points = [
+      ...mapSites.map((site) => [Number(site.latitude), Number(site.longitude)] as [number, number]),
+      ...mapBuildings.map((building) => [Number(building.latitude), Number(building.longitude)] as [number, number]),
+    ];
+    if (!points.length) return [26.3927, 50.0438];
+    return [
+      points.reduce((sum, point) => sum + point[0], 0) / points.length,
+      points.reduce((sum, point) => sum + point[1], 0) / points.length,
+    ];
+  }, [mapSites, mapBuildings]);
+
+  const buildingCoveragePercent = officialBuildings.length
+    ? Math.round((officialBuildings.filter((building) => building.coverageStatus === 'covered').length / officialBuildings.length) * 100)
+    : 0;
 
   const publicUrlForSite = (site: MosqueSite) => `${window.location.origin}${window.location.pathname}#/mosques/public?site=${encodeURIComponent(site.publicToken)}`;
 
