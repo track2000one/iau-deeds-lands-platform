@@ -579,6 +579,9 @@ export const MosquesUnitPage: React.FC = () => {
   const [requestQuickFilter, setRequestQuickFilter] = useState<'all' | 'new' | 'under_review' | 'approved' | 'late'>('all');
   const [ticketQuickFilter, setTicketQuickFilter] = useState<'all' | 'open'>('all');
   const [leaveQuickFilter, setLeaveQuickFilter] = useState<'all' | 'pending'>('all');
+  const [personnelSearch, setPersonnelSearch] = useState('');
+  const [personnelRoleFilter, setPersonnelRoleFilter] = useState('all');
+  const [personnelStatusFilter, setPersonnelStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   const [buildingDialog, setBuildingDialog] = useState(false);
   const [buildingCoverageReportOpen, setBuildingCoverageReportOpen] = useState(false);
@@ -2663,6 +2666,17 @@ ${quranStockMovementForm.notes}` : ''}`
   }, [requests, requestQuickFilter]);
   const filteredTickets = useMemo(() => ticketQuickFilter === 'open' ? tickets.filter((item) => !['closed', 'rejected'].includes(item.status)) : tickets, [tickets, ticketQuickFilter]);
   const filteredLeaves = useMemo(() => leaveQuickFilter === 'pending' ? leaves.filter((item) => ['pending', 'under_review'].includes(item.status)) : leaves, [leaves, leaveQuickFilter]);
+  const filteredPersonnel = useMemo(() => {
+    const q = personnelSearch.trim().toLowerCase();
+    return personnel.filter((item) => {
+      const matchesSearch = !q || [item.name, item.mobile, item.email, item.site?.name, sites.find((site) => site.id === item.siteId)?.name]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesRole = personnelRoleFilter === 'all' || item.role === personnelRoleFilter;
+      const matchesStatus = personnelStatusFilter === 'all' || (personnelStatusFilter === 'active' ? item.active : !item.active);
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [personnel, personnelSearch, personnelRoleFilter, personnelStatusFilter, sites]);
 
   const goToDashboardSection = (tab: string, filters: { request?: 'all' | 'new' | 'under_review' | 'approved' | 'late'; ticket?: 'all' | 'open'; leave?: 'all' | 'pending' } = {}) => {
     setRequestQuickFilter(filters.request || 'all');
@@ -3499,27 +3513,91 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>
 
         <TabsContent value="team" className="space-y-4">
-          {canCreateUser && ['head', 'supervisor'].includes(role) && <div className="flex justify-end"><Button className={button3d} onClick={() => openPersonnelDialog()}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب + حساب دخول</Button></div>}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-            {personnel.map((item) => (
-              <Card key={item.id} className={`${card3d} overflow-hidden`}>
-                <div className="h-1.5 bg-gradient-to-l from-[#0b5a49] via-[#d6b46a] to-[#0b5a49]" />
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div><h3 className="font-black">{item.name}</h3><p className="text-sm text-muted-foreground">{item.site?.name || '-'}</p></div>
-                    <div className="flex flex-col items-end gap-1"><Badge variant="outline">{personnelRoleLabels[item.role] || item.role}</Badge><Badge variant="outline" className={item.active ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-600'}>{item.active ? 'نشط' : 'غير نشط'}</Badge></div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-sm"><Info label="الجوال" value={item.mobile || '-'} /><Info label="البريد" value={item.email || '-'} /></div>
-                  <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                    <Button variant="outline" size="sm" className={button3d} onClick={() => setViewingPersonnel(item)}><Eye className="ml-1 h-3.5 w-3.5" />عرض</Button>
-                    {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" size="sm" className={button3d} onClick={() => openPersonnelDialog(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل</Button>}
-                    {canDelete && role === 'head' && <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => deletePersonnel(item)}><Trash2 className="ml-1 h-3.5 w-3.5" />حذف</Button>}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          {!personnel.length && <Empty text="لا يوجد منسوبون مسجلون" />}
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">الكوادر التشغيلية</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Users className="h-5 w-5" />منسوبو المساجد والمصليات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">سجل موحد للأئمة والمؤذنين والخطباء والخطباء المتعاونين، مرتبط بالموقع والحساب التشغيلي وطلبات الإجازة والاعتذار.</CardDescription>
+                </div>
+                {canCreateUser && ['head', 'supervisor'].includes(role) && <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => openPersonnelDialog()}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب</Button>}
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <PersonnelMetric label="إجمالي المنسوبين" value={personnel.length} icon={Users} />
+                <PersonnelMetric label="السجلات النشطة" value={personnel.filter((item) => item.active).length} icon={CheckCircle2} />
+                <PersonnelMetric label="حسابات دخول مرتبطة" value={personnel.filter((item) => Boolean(item.userId)).length} icon={Shield} />
+                <PersonnelMetric label="إجازات / اعتذارات معلقة" value={leaves.filter((item) => ['pending', 'under_review'].includes(item.status)).length} icon={CalendarDays} />
+              </div>
+
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">ابحث بالاسم أو الجوال أو البريد أو المسجد، ثم صفِّ حسب الصفة والحالة.</p></div>
+                  <Badge variant="outline" className="border-[#d6b46a]/55 bg-white px-3 py-1.5 font-black text-[#0b4a3f]">{filteredPersonnel.length} نتيجة</Badge>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_210px_180px_auto]">
+                  <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-11 border-[#d9c9a5] bg-white pr-9" value={personnelSearch} onChange={(e) => setPersonnelSearch(e.target.value)} placeholder="الاسم، الجوال، البريد، المسجد / المصلى..." /></div>
+                  <NativeSelect className="h-11 bg-white" value={personnelRoleFilter} onChange={(e) => setPersonnelRoleFilter(e.target.value)}><option value="all">جميع الصفات</option><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option></NativeSelect>
+                  <NativeSelect className="h-11 bg-white" value={personnelStatusFilter} onChange={(e) => setPersonnelStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}><option value="all">جميع الحالات</option><option value="active">نشط</option><option value="inactive">غير نشط</option></NativeSelect>
+                  <Button variant="outline" className="h-11 border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => { setPersonnelSearch(''); setPersonnelRoleFilter('all'); setPersonnelStatusFilter('all'); }}><X className="ml-1 h-4 w-4" />مسح</Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-black text-[#0b4a3f]">الملفات التشغيلية</p><p className="mt-1 text-xs text-slate-500">كل بطاقة مرتبطة مباشرة بالمسجد أو المصلى وحالة الحساب والتواصل.</p></div>
+                {isAdmin && <Button variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => setActiveTab('roles')}><Shield className="ml-2 h-4 w-4" />إدارة الأدوار والربط</Button>}
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+                {filteredPersonnel.map((item) => {
+                  const site = sites.find((row) => row.id === item.siteId);
+                  const media = normalizeSiteMedia(site?.images || null);
+                  const cover = media.photos.find((photo) => photo.category === 'mosque_image') || media.photos[0];
+                  const personnelLeaves = leaves.filter((leave) => leave.personnelId === item.id);
+                  const pendingLeaves = personnelLeaves.filter((leave) => ['pending', 'under_review'].includes(leave.status)).length;
+                  const initials = item.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('');
+
+                  return <Card key={item.id} className="group overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_9px_26px_rgba(6,60,51,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_14px_30px_rgba(6,60,51,0.10)]">
+                    <div className="relative h-24 overflow-hidden bg-[#f2ecdf]">
+                      {cover ? <MosqueMediaImage item={cover} alt={cover.fileName || site?.name || item.name} className="h-full w-full object-cover opacity-85 transition-transform duration-300 group-hover:scale-[1.03]" /> : <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,#fff8e8,#e9e0cf)]" />}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#073f35]/80 via-[#073f35]/30 to-transparent" />
+                      <div className="absolute inset-x-0 bottom-2 flex items-end justify-between gap-3 px-4">
+                        <div className="min-w-0 text-white"><p className="truncate text-xs font-bold text-emerald-50/85">{site?.name || item.site?.name || 'بدون موقع محدد'}</p><p className="mt-0.5 text-[10px] text-white/70">{site ? siteTypeDisplayLabel(site) : 'موقع تشغيلي'}</p></div>
+                        <Badge variant="outline" className={item.active ? 'border-emerald-200/60 bg-emerald-50/90 text-emerald-800' : 'border-white/40 bg-white/85 text-slate-600'}>{item.active ? 'نشط' : 'غير نشط'}</Badge>
+                      </div>
+                    </div>
+
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/55 bg-[#fff8e8] text-base font-black text-[#0b4a3f] shadow-sm">{initials || 'م'}</div>
+                        <div className="min-w-0 flex-1"><h3 className="truncate text-lg font-black text-[#0b4a3f]">{item.name}</h3><div className="mt-1 flex flex-wrap gap-1.5"><Badge variant="outline" className="border-[#d6b46a]/45 bg-[#fffdf8] text-[#7b5b16]">{personnelRoleLabels[item.role] || item.role}</Badge>{item.userId ? <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">حساب مرتبط</Badge> : <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">بدون حساب</Badge>}</div></div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">الجوال</p><p dir="ltr" className="mt-1 truncate text-right text-xs font-black text-slate-700">{item.mobile || '-'}</p></div>
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">البريد</p><p dir="ltr" className="mt-1 truncate text-right text-xs font-black text-slate-700">{item.email || '-'}</p></div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                        <div className="rounded-xl border border-[#e4d8bd] bg-white p-2.5"><p className="text-[10px] font-bold text-slate-500">إجمالي الإجازات</p><p className="mt-1 text-lg font-black text-[#0b4a3f]">{personnelLeaves.length}</p></div>
+                        <div className={`rounded-xl border p-2.5 ${pendingLeaves > 0 ? 'border-amber-200 bg-amber-50/70' : 'border-emerald-200 bg-emerald-50/55'}`}><p className="text-[10px] font-bold text-slate-500">قيد المراجعة</p><p className={`mt-1 text-lg font-black ${pendingLeaves > 0 ? 'text-amber-800' : 'text-emerald-700'}`}>{pendingLeaves}</p></div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2 border-t border-[#eee5d2] pt-4">
+                        <Button size="sm" className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => setViewingPersonnel(item)}><Eye className="ml-1 h-3.5 w-3.5" />فتح الملف</Button>
+                        {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" size="sm" className="border-[#d6b46a] bg-[#fff8e8] text-[#7b5b16]" onClick={() => openPersonnelDialog(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل</Button>}
+                        {canDelete && role === 'head' && <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => deletePersonnel(item)}><Trash2 className="ml-1 h-3.5 w-3.5" />حذف</Button>}
+                      </div>
+                    </CardContent>
+                  </Card>;
+                })}
+              </div>
+              {!filteredPersonnel.length && <Empty text="لا يوجد منسوبون مطابقون للبحث والتصفية" />}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="roles" className="space-y-4">
@@ -4042,38 +4120,98 @@ ${quranStockMovementForm.notes}` : ''}`
       </Dialog>
 
       <Dialog open={Boolean(viewingPersonnel)} onOpenChange={(open) => !open && setViewingPersonnel(null)}>
-        <DialogContent className="sm:max-w-[720px]" dir="rtl">
-          <DialogHeader className="text-right">
-            <DialogTitle className="flex items-center gap-2 text-xl font-black"><Eye className="h-5 w-5 text-sky-700" />عرض بيانات منسوب المسجد</DialogTitle>
-            <DialogDescription>بيانات الارتباط التشغيلي والحساب المسجل للمنسوب.</DialogDescription>
-          </DialogHeader>
-          {viewingPersonnel && <div className="space-y-4">
-            <div className="grid gap-3 rounded-2xl border bg-slate-50/80 p-4 sm:grid-cols-2">
-              <Info label="الاسم الكامل" value={viewingPersonnel.name} />
-              <Info label="الصفة التشغيلية" value={personnelRoleLabels[viewingPersonnel.role] || viewingPersonnel.role} />
-              <Info label="المسجد / المصلى" value={viewingPersonnel.site?.name || sites.find((site) => site.id === viewingPersonnel.siteId)?.name || '-'} />
-              <Info label="حالة السجل" value={viewingPersonnel.active ? 'نشط' : 'غير نشط'} />
-              <Info label="رقم الجوال" value={viewingPersonnel.mobile || '-'} />
-              <Info label="البريد الإلكتروني" value={viewingPersonnel.email || '-'} />
-              <Info label="حساب مستخدم مرتبط" value={viewingPersonnel.userId ? 'نعم' : 'لا'} />
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" className={button3d} onClick={() => { const item = viewingPersonnel; setViewingPersonnel(null); openPersonnelDialog(item); }}><Pencil className="ml-2 h-4 w-4" />تعديل</Button>}
-              {canDelete && role === 'head' && <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => deletePersonnel(viewingPersonnel)}><Trash2 className="ml-2 h-4 w-4" />حذف</Button>}
-            </div>
-          </div>}
+        <DialogContent className="max-h-[92vh] overflow-y-auto border-[#ded3b8] bg-[#fffdf8] sm:max-w-[860px]" dir="rtl">
+          {viewingPersonnel && (() => {
+            const site = sites.find((row) => row.id === viewingPersonnel.siteId);
+            const media = normalizeSiteMedia(site?.images || null);
+            const cover = media.photos.find((photo) => photo.category === 'mosque_image') || media.photos[0];
+            const personnelLeaves = leaves.filter((leave) => leave.personnelId === viewingPersonnel.id).slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            const initials = viewingPersonnel.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('');
+
+            return <div className="space-y-4">
+              <div className="relative overflow-hidden rounded-[22px] border border-[#d6b46a]/45 bg-[#0b4a3f]">
+                <div className="h-36">{cover ? <MosqueMediaImage item={cover} alt={cover.fileName || site?.name || viewingPersonnel.name} className="h-full w-full object-cover opacity-70" /> : <div className="h-full bg-[radial-gradient(circle_at_top_left,#167060,#073f35)]" />}</div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#073f35] via-[#073f35]/55 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 flex items-end gap-4 p-5 text-white">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/30 bg-white/15 text-xl font-black backdrop-blur-sm">{initials || 'م'}</div>
+                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-xl font-black md:text-2xl">{viewingPersonnel.name}</h2><Badge variant="outline" className="border-[#e6c878]/70 bg-[#d6b46a]/20 text-[#ffe9b5]">{personnelRoleLabels[viewingPersonnel.role] || viewingPersonnel.role}</Badge></div><p className="mt-1 truncate text-sm text-emerald-50/85">{site?.name || viewingPersonnel.site?.name || 'بدون موقع محدد'}</p></div>
+                  <Badge variant="outline" className={viewingPersonnel.active ? 'border-emerald-200/60 bg-emerald-50/90 text-emerald-800' : 'border-white/40 bg-white/85 text-slate-600'}>{viewingPersonnel.active ? 'نشط' : 'غير نشط'}</Badge>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[1.35fr_0.9fr]">
+                <Card className="border-[#e2d4b4] bg-white">
+                  <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">بيانات الملف التشغيلي</CardTitle></CardHeader>
+                  <CardContent className="grid gap-3 sm:grid-cols-2">
+                    <Info label="الاسم الكامل" value={viewingPersonnel.name} />
+                    <Info label="الصفة التشغيلية" value={personnelRoleLabels[viewingPersonnel.role] || viewingPersonnel.role} />
+                    <Info label="المسجد / المصلى" value={site?.name || viewingPersonnel.site?.name || '-'} />
+                    <Info label="حالة السجل" value={viewingPersonnel.active ? 'نشط' : 'غير نشط'} />
+                    <Info label="رقم الجوال" value={viewingPersonnel.mobile || '-'} />
+                    <Info label="البريد الإلكتروني" value={viewingPersonnel.email || '-'} />
+                    <Info label="حساب مستخدم مرتبط" value={viewingPersonnel.userId ? 'نعم' : 'لا'} />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-[#e2d4b4] bg-[#fffdf8]">
+                  <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">ملخص الإجازات والاعتذارات</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">الإجمالي</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{personnelLeaves.length}</p></div>
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-center"><p className="text-[10px] font-bold text-amber-700">قيد المراجعة</p><p className="mt-1 text-2xl font-black text-amber-800">{personnelLeaves.filter((leave) => ['pending', 'under_review'].includes(leave.status)).length}</p></div>
+                    </div>
+                    {personnelLeaves.slice(0, 3).map((leave) => <div key={leave.id} className="rounded-xl border border-[#e4d8bd] bg-white p-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-black text-[#0b4a3f]">{leaveTypeLabels[leave.requestType] || leave.requestType}</span><Badge variant="outline" className={statusBadgeClass(leave.status)}>{statusLabels[leave.status] || leave.status}</Badge></div><p className="mt-1 text-[11px] text-slate-500">{new Date(leave.startDate).toLocaleDateString('ar-SA-u-ca-gregory')} — {new Date(leave.endDate).toLocaleDateString('ar-SA-u-ca-gregory')}</p></div>)}
+                    {!personnelLeaves.length && <p className="rounded-xl border border-dashed border-[#d9c9a5] bg-white p-4 text-center text-xs text-slate-500">لا توجد إجازات أو اعتذارات مسجلة.</p>}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-2 border-t border-[#e8ddc3] pt-4">
+                {canEdit && ['head', 'supervisor'].includes(role) && <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => { const item = viewingPersonnel; setViewingPersonnel(null); openPersonnelDialog(item); }}><Pencil className="ml-2 h-4 w-4" />تعديل الملف</Button>}
+                {canDelete && role === 'head' && <Button variant="outline" className="border-red-300 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => deletePersonnel(viewingPersonnel)}><Trash2 className="ml-2 h-4 w-4" />حذف</Button>}
+              </div>
+            </div>;
+          })()}
         </DialogContent>
       </Dialog>
 
       <Dialog open={personnelDialog} onOpenChange={(open) => { setPersonnelDialog(open); if (!open) setEditingPersonnel(null); }}>
-        <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-emerald-50/20 sm:max-w-[900px]" dir="rtl">
-          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6"><DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl">{editingPersonnel ? <Pencil className="h-5 w-5 text-sky-700" /> : <UserPlus className="h-5 w-5 text-sky-700" />}{editingPersonnel ? 'تعديل بيانات منسوب المسجد / الجامع / المصلى' : 'إضافة منسوب مسجد / جامع / مصلى'}</DialogTitle><DialogDescription>{editingPersonnel ? 'يمكن للمسؤول تحديث بيانات المنسوب والموقع والصفة التشغيلية، وتنعكس التغييرات على ربط حسابه.' : 'إجراء موحد: إضافة المنسوب وتحديد المسجد والصفة، ثم إنشاء حساب دخول جديد تلقائيًا أو ربط الحساب الموجود وإرسال بيانات التفعيل بالبريد.'}</DialogDescription></DialogHeader>
-          <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-4 md:p-6">
-            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-violet-50/40 pb-4"><CardTitle className="text-base md:text-lg">الارتباط والصفة</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><Field label="المسجد / المصلى *"><NativeSelect className="h-11" value={personnelForm.siteId} onChange={(e) => setPersonnelForm({ ...personnelForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="الصفة *"><NativeSelect className="h-11" value={personnelForm.role} onChange={(e) => setPersonnelForm({ ...personnelForm, role: e.target.value })}><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option></NativeSelect></Field></CardContent></Card>
-            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-emerald-50/40 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><Users className="h-5 w-5" />بيانات المنسوب</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><div className="md:col-span-2"><Field label="الاسم الكامل *"><Input className="h-11" autoFocus value={personnelForm.name} onChange={(e) => setPersonnelForm({ ...personnelForm, name: e.target.value })} placeholder="الاسم الرباعي" /></Field></div><Field label="رقم الجوال"><Input className="h-11" type="tel" inputMode="tel" value={personnelForm.mobile} onChange={(e) => setPersonnelForm({ ...personnelForm, mobile: e.target.value })} placeholder="05xxxxxxxx" /></Field><Field label="البريد الإلكتروني *"><Input className="h-11" type="email" inputMode="email" value={personnelForm.email} onChange={(e) => setPersonnelForm({ ...personnelForm, email: e.target.value })} placeholder="name@iau.edu.sa" /></Field></CardContent></Card>
-            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-6 text-slate-700"><strong>{editingPersonnel ? 'تعديل حساب منسوب المسجد:' : 'حساب منسوب المسجد:'}</strong> {editingPersonnel ? 'يتم تحديث بيانات السجل والربط التشغيلي وحساب المستخدم المرتبط دون إنشاء حساب جديد أو إعادة إرسال دعوة التفعيل.' : 'عند الحفظ يتم إنشاء حساب دخول جديد إذا لم يكن البريد مسجلًا، أو ربط الحساب الموجود. الحساب يمنح المنسوب الدخول إلى موقعه فقط لتقديم طلب صيانة/احتياج، إجازة أو اعتذار، متابعة طلباته واستقبال الإشعارات. ويستلم الحساب الجديد رابط التفعيل وبيانات الدخول عبر البريد الإلكتروني.'}</div>
+        <DialogContent className="max-h-[92vh] overflow-hidden gap-0 border-[#ded3b8] bg-[#fffdf8] p-0 sm:max-w-[900px]" dir="rtl">
+          <DialogHeader className="border-b border-[#e8ddc3] bg-white p-5 text-right md:p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#fff8e8] text-[#0b5a49]">{editingPersonnel ? <Pencil className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}</div>
+              <div><Badge variant="outline" className="mb-2 border-[#d6b46a]/55 bg-[#fff8e8] text-[#8a6a1f]">{editingPersonnel ? 'تحديث ملف تشغيلي' : 'ملف تشغيلي جديد'}</Badge><DialogTitle className="text-xl font-black text-[#0b4a3f] md:text-2xl">{editingPersonnel ? 'تعديل بيانات منسوب المسجد / المصلى' : 'إضافة منسوب مسجد / مصلى'}</DialogTitle><DialogDescription className="mt-1 leading-6">{editingPersonnel ? 'تحديث الموقع والصفة وبيانات التواصل مع المحافظة على الحساب المرتبط.' : 'تسجيل المنسوب وربطه بالمسجد أو المصلى والصفة التشغيلية، ثم إنشاء أو ربط حساب الدخول.'}</DialogDescription></div>
+            </div>
+          </DialogHeader>
+
+          <div className="max-h-[calc(92vh-170px)] space-y-4 overflow-y-auto p-4 md:p-6">
+            <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
+              <Card className="border-[#e2d4b4] bg-white shadow-sm">
+                <CardHeader className="border-b border-[#eee5d2] bg-[#fffdf8] pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">البيانات الأساسية</CardTitle><CardDescription>الاسم وبيانات التواصل المستخدمة في الملف والحساب.</CardDescription></CardHeader>
+                <CardContent className="grid gap-4 pt-5">
+                  <Field label="الاسم الكامل *"><Input className="h-11 border-[#d9c9a5]" autoFocus value={personnelForm.name} onChange={(e) => setPersonnelForm({ ...personnelForm, name: e.target.value })} placeholder="الاسم الرباعي" /></Field>
+                  <div className="grid gap-4 md:grid-cols-2"><Field label="رقم الجوال"><Input className="h-11 border-[#d9c9a5]" type="tel" inputMode="tel" value={personnelForm.mobile} onChange={(e) => setPersonnelForm({ ...personnelForm, mobile: e.target.value })} placeholder="05xxxxxxxx" /></Field><Field label="البريد الإلكتروني *"><Input className="h-11 border-[#d9c9a5]" type="email" inputMode="email" value={personnelForm.email} onChange={(e) => setPersonnelForm({ ...personnelForm, email: e.target.value })} placeholder="name@iau.edu.sa" /></Field></div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-[#e2d4b4] bg-white shadow-sm">
+                <CardHeader className="border-b border-[#eee5d2] bg-[#fffdf8] pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">الارتباط التشغيلي</CardTitle><CardDescription>الموقع والصفة التي تحدد نطاق عمل المنسوب.</CardDescription></CardHeader>
+                <CardContent className="grid gap-4 pt-5">
+                  <Field label="المسجد / المصلى *"><NativeSelect className="h-11 border-[#d9c9a5] bg-white" value={personnelForm.siteId} onChange={(e) => setPersonnelForm({ ...personnelForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field>
+                  <Field label="الصفة التشغيلية *"><NativeSelect className="h-11 border-[#d9c9a5] bg-white" value={personnelForm.role} onChange={(e) => setPersonnelForm({ ...personnelForm, role: e.target.value })}><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option></NativeSelect></Field>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="rounded-2xl border border-[#d6b46a]/45 bg-[#fff8e8] p-4 text-sm leading-7 text-slate-700">
+              <div className="flex items-start gap-3"><Shield className="mt-1 h-5 w-5 shrink-0 text-[#0b5a49]" /><div><strong className="text-[#0b4a3f]">{editingPersonnel ? 'الحساب المرتبط:' : 'إنشاء وربط الحساب:'}</strong> {editingPersonnel ? 'يتم تحديث بيانات الملف والربط التشغيلي فقط، مع الإبقاء على حساب المستخدم الحالي.' : 'عند الحفظ يتم إنشاء حساب جديد إذا لم يكن البريد مسجلًا، أو ربط الحساب الموجود. ويكون وصول المنسوب مقصورًا على موقعه والطلبات والإجازات والإشعارات المرتبطة به.'}</div></div>
+            </div>
           </div>
-          <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => { setPersonnelDialog(false); setEditingPersonnel(null); }}>إلغاء</Button><Button className={'min-w-32 ' + button3d} onClick={savePersonnel} disabled={saving}><Save className="ml-2 h-4 w-4" />{saving ? 'جاري الحفظ...' : editingPersonnel ? 'حفظ التعديلات' : 'حفظ المنسوب'}</Button></DialogFooter>
+
+          <DialogFooter className="border-t border-[#e8ddc3] bg-white p-4 md:px-6">
+            <Button variant="outline" className="border-[#d9c9a5] text-[#0b4a3f]" onClick={() => { setPersonnelDialog(false); setEditingPersonnel(null); }}>إلغاء</Button>
+            <Button className="min-w-36 border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={savePersonnel} disabled={saving}><Save className="ml-2 h-4 w-4" />{saving ? 'جاري الحفظ...' : editingPersonnel ? 'حفظ التعديلات' : 'حفظ المنسوب'}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -4113,6 +4251,13 @@ const Empty = ({ text }: { text: string }) => <div className="rounded-2xl border
 const Rule = ({ title, text }: { title: string; text: string }) => <div className="rounded-2xl border border-[#dfcfaa] bg-gradient-to-br from-white to-[#fbf6ea] p-4 shadow-sm"><div className="mb-2 h-1 w-10 rounded-full bg-[#d6b46a]" /><p className="font-black text-[#0b4a3f]">{title}</p><p className="mt-1 text-sm leading-6 text-slate-600">{text}</p></div>;
 const ReportMetric = ({ label, value }: { label: string; value: number }) => <div className="rounded-2xl border border-[#dfcfaa] bg-gradient-to-b from-white to-[#f9f3e7] p-5 text-center shadow-sm"><p className="text-sm font-bold text-slate-500">{label}</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{value}</p></div>;
 const MiniRow = ({ title, subtitle, status }: { title: string; subtitle: string; status: string }) => <div className="flex items-start justify-between gap-3 rounded-2xl border border-[#e3d5b4] bg-[#fffdf8] p-3 shadow-[0_4px_12px_rgba(6,60,51,0.05)]"><div className="min-w-0"><p className="truncate font-black text-[#0b4a3f]">{title}</p><p className="mt-1 line-clamp-1 text-xs text-slate-500">{subtitle}</p></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>;
+
+const PersonnelMetric = ({ label, value, icon: Icon }: { label: string; value: number; icon: React.ElementType }) => (
+  <div className="flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
+    <div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{value.toLocaleString('ar-SA')}</p></div>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#fff8e8] text-[#0b5a49]"><Icon className="h-5 w-5" /></div>
+  </div>
+);
 
 const SiteRegistryMetric = ({ label, value, suffix }: { label: string; value: number; suffix?: string }) => (
   <div className="rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
