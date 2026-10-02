@@ -104,6 +104,26 @@ const roleScopeLabel = (role: MosqueModuleRole) => role === 'head'
     : role === 'personnel'
       ? 'وصول مقيد بالموقع المرتبط'
       : 'وصول خدمات منسوب الجامعة';
+
+const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other' => {
+  const type = String(notice.entityType || '').toLowerCase();
+  const text = `${notice.title || ''} ${notice.message || ''}`.toLowerCase();
+  if (type.includes('request') || text.includes('طلب صيانة') || text.includes('طلب احتياج')) return 'request';
+  if (type.includes('ticket') || text.includes('بلاغ')) return 'ticket';
+  if (type.includes('leave') || text.includes('إجاز') || text.includes('اعتذار')) return 'leave';
+  if (type.includes('site') || type.includes('mosque') || text.includes('مسجد') || text.includes('مصلى')) return 'site';
+  if (type.includes('quran') || text.includes('مصحف') || text.includes('مصاحف')) return 'quran';
+  return 'other';
+};
+
+const notificationCategoryLabel: Record<'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other', string> = {
+  request: 'طلب صيانة / احتياج',
+  ticket: 'بلاغ',
+  site: 'مسجد / مصلى',
+  leave: 'إجازة / اعتذار',
+  quran: 'المصاحف',
+  other: 'إشعار عام',
+};
 const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', jami: 'جامع', prayer_room: 'مصلى' };
 const siteStatusLabels: Record<string, string> = { active: 'نشط', maintenance: 'تحت الصيانة', temporarily_closed: 'مغلق مؤقتًا' };
 const prayerRoomGenderLabels: Record<string, string> = { men: 'رجال', women: 'نساء' };
@@ -591,6 +611,9 @@ export const MosquesUnitPage: React.FC = () => {
   const [personnelStatusFilter, setPersonnelStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [roleUserSearch, setRoleUserSearch] = useState('');
   const [roleUserFilter, setRoleUserFilter] = useState<'all' | MosqueModuleRole>('all');
+  const [notificationSearch, setNotificationSearch] = useState('');
+  const [notificationReadFilter, setNotificationReadFilter] = useState<'all' | 'unread' | 'read'>('all');
+  const [notificationTypeFilter, setNotificationTypeFilter] = useState<'all' | 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other'>('all');
 
   const [buildingDialog, setBuildingDialog] = useState(false);
   const [buildingCoverageReportOpen, setBuildingCoverageReportOpen] = useState(false);
@@ -2701,6 +2724,75 @@ ${quranStockMovementForm.notes}` : ''}`
     });
   }, [staffUsers, assignments, sites, roleUserSearch, roleUserFilter]);
 
+  const filteredNotifications = useMemo(() => {
+    const q = notificationSearch.trim().toLowerCase();
+    return notifications.filter((notice) => {
+      const category = notificationCategory(notice);
+      const matchesSearch = !q || [notice.title, notice.message, notice.entityType]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesRead = notificationReadFilter === 'all'
+        || (notificationReadFilter === 'unread' ? !notice.isRead : notice.isRead);
+      const matchesType = notificationTypeFilter === 'all' || category === notificationTypeFilter;
+      return matchesSearch && matchesRead && matchesType;
+    });
+  }, [notifications, notificationSearch, notificationReadFilter, notificationTypeFilter]);
+
+  const openNotificationTarget = async (notice: MosqueNotification) => {
+    if (!notice.isRead) {
+      try {
+        await mosqueApi.readNotification(notice.id);
+        setNotifications((current) => current.map((item) => item.id === notice.id ? { ...item, isRead: true } : item));
+      } catch {
+        // Navigation should still work even if marking the notification as read fails.
+      }
+    }
+
+    const category = notificationCategory(notice);
+    const entityId = notice.entityId || '';
+
+    if (category === 'request') {
+      const item = requests.find((row) => row.id === entityId);
+      setActiveTab('requests');
+      if (item) setViewingWorkflow({ kind: 'request', item });
+      return;
+    }
+    if (category === 'ticket') {
+      const item = tickets.find((row) => row.id === entityId);
+      setActiveTab('tickets');
+      if (item) setViewingWorkflow({ kind: 'ticket', item });
+      return;
+    }
+    if (category === 'leave') {
+      const item = leaves.find((row) => row.id === entityId);
+      setActiveTab('leaves');
+      if (item) setViewingWorkflow({ kind: 'leave', item });
+      return;
+    }
+    if (category === 'site') {
+      const site = sites.find((row) => row.id === entityId);
+      setActiveTab('sites');
+      if (site) setPreviewSite(site);
+      return;
+    }
+    if (category === 'quran') {
+      setActiveTab('quran');
+      return;
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    const unread = notifications.filter((notice) => !notice.isRead);
+    if (!unread.length) return;
+    try {
+      await Promise.all(unread.map((notice) => mosqueApi.readNotification(notice.id)));
+      setNotifications((current) => current.map((notice) => ({ ...notice, isRead: true })));
+      toast.success('تم تحديد جميع الإشعارات كمقروءة');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحديث جميع الإشعارات');
+    }
+  };
+
   const goToDashboardSection = (tab: string, filters: { request?: 'all' | 'new' | 'under_review' | 'approved' | 'late'; ticket?: 'all' | 'open'; leave?: 'all' | 'pending' } = {}) => {
     setRequestQuickFilter(filters.request || 'all');
     setTicketQuickFilter(filters.ticket || 'all');
@@ -3738,9 +3830,86 @@ ${quranStockMovementForm.notes}` : ''}`
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-3">
-          {notifications.map((notice) => <button key={notice.id} onClick={async () => { if (!notice.isRead) { await mosqueApi.readNotification(notice.id); setNotifications((current) => current.map((x) => x.id === notice.id ? { ...x, isRead: true } : x)); } }} className={`w-full rounded-2xl border p-4 text-right transition ${notice.isRead ? 'bg-white' : 'border-sky-300 bg-sky-50 shadow-sm'}`}><div className="flex items-start justify-between gap-3"><div><p className="font-bold">{notice.title}</p><p className="mt-1 text-sm text-muted-foreground">{notice.message}</p></div><Bell className={`h-5 w-5 ${notice.isRead ? 'text-slate-400' : 'text-sky-600'}`} /></div><p className="mt-2 text-xs text-muted-foreground">{new Date(notice.createdAt).toLocaleString('ar-SA')}</p></button>)}
-          {!notifications.length && <Empty text="لا توجد إشعارات" />}
+        <TabsContent value="notifications" className="space-y-4">
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">مركز التنبيهات</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Bell className="h-5 w-5" />الإشعارات والتنبيهات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">متابعة الإشعارات غير المقروءة وربطها بالطلبات والبلاغات والمواقع والمصاحف، مع انتقال مباشر إلى السجل المرتبط عند توفره.</CardDescription>
+                </div>
+                <Button variant="outline" className="border-[#d6b46a] bg-[#fff8e8] font-bold text-[#7b5b16]" disabled={!notifications.some((notice) => !notice.isRead)} onClick={() => void markAllNotificationsRead()}><CheckCircle2 className="ml-2 h-4 w-4" />تحديد الكل كمقروء</Button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <NotificationMetric label="إجمالي الإشعارات" value={notifications.length} icon={Bell} />
+                <NotificationMetric label="غير مقروء" value={notifications.filter((notice) => !notice.isRead).length} icon={AlertTriangle} tone="warning" />
+                <NotificationMetric label="إشعارات اليوم" value={notifications.filter((notice) => new Date(notice.createdAt).toDateString() === new Date().toDateString()).length} icon={CalendarDays} />
+                <NotificationMetric label="مرتبطة بمعاملة / موقع" value={notifications.filter((notice) => Boolean(notice.entityType || notice.entityId)).length} icon={ExternalLink} />
+              </div>
+
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">صفِّ الإشعارات حسب حالة القراءة أو نوع السجل المرتبط.</p></div>
+                  <Badge variant="outline" className="border-[#d6b46a]/55 bg-white px-3 py-1.5 font-black text-[#0b4a3f]">{filteredNotifications.length} إشعار</Badge>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_190px_230px_auto]">
+                  <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-11 border-[#d9c9a5] bg-white pr-9" value={notificationSearch} onChange={(e) => setNotificationSearch(e.target.value)} placeholder="بحث في عنوان الإشعار أو محتواه..." /></div>
+                  <NativeSelect className="h-11 bg-white" value={notificationReadFilter} onChange={(e) => setNotificationReadFilter(e.target.value as 'all' | 'unread' | 'read')}><option value="all">الكل</option><option value="unread">غير مقروء</option><option value="read">مقروء</option></NativeSelect>
+                  <NativeSelect className="h-11 bg-white" value={notificationTypeFilter} onChange={(e) => setNotificationTypeFilter(e.target.value as 'all' | 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other')}><option value="all">جميع الأنواع</option><option value="request">طلبات الصيانة والاحتياج</option><option value="ticket">البلاغات</option><option value="site">المساجد والمصليات</option><option value="leave">الإجازات والاعتذارات</option><option value="quran">المصاحف</option><option value="other">إشعارات عامة</option></NativeSelect>
+                  <Button variant="outline" className="h-11 border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => { setNotificationSearch(''); setNotificationReadFilter('all'); setNotificationTypeFilter('all'); }}><X className="ml-1 h-4 w-4" />مسح</Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-black text-[#0b4a3f]">سجل الإشعارات</p><p className="mt-1 text-xs text-slate-500">الإشعارات الأحدث تظهر أولًا، والبطاقة غير المقروءة مميزة بصريًا.</p></div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant={notificationReadFilter === 'unread' ? 'default' : 'outline'} className={notificationReadFilter === 'unread' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setNotificationReadFilter(notificationReadFilter === 'unread' ? 'all' : 'unread')}><Bell className="ml-1 h-3.5 w-3.5" />غير المقروء فقط</Button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {filteredNotifications.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((notice) => {
+                  const category = notificationCategory(notice);
+                  const urgent = /عاجل|urgent|طارئ/i.test(`${notice.title} ${notice.message}`);
+                  const targetAvailable = Boolean(notice.entityType || notice.entityId) && category !== 'other';
+                  const categoryIcon = category === 'request' ? <Wrench className="h-4 w-4" /> : category === 'ticket' ? <MessageSquare className="h-4 w-4" /> : category === 'site' ? <Building2 className="h-4 w-4" /> : category === 'leave' ? <CalendarDays className="h-4 w-4" /> : category === 'quran' ? <BookOpen className="h-4 w-4" /> : <Bell className="h-4 w-4" />;
+
+                  return <div key={notice.id} className={`relative overflow-hidden rounded-[20px] border p-4 transition-all ${notice.isRead ? 'border-[#e2d4b4] bg-white' : 'border-[#d6b46a] bg-[#fffaf0] shadow-[0_8px_22px_rgba(6,60,51,0.07)]'}`}>
+                    {!notice.isRead && <span className="absolute bottom-0 right-0 top-0 w-1.5 bg-[#0b5a49]" />}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 gap-3">
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border ${notice.isRead ? 'border-[#e2d4b4] bg-[#fffdf8] text-[#0b5a49]' : 'border-[#d6b46a]/55 bg-[#0b4a3f] text-[#f0d18b]'}`}>{categoryIcon}</div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-black text-[#0b4a3f]">{notice.title}</h3>
+                            <Badge variant="outline" className="border-[#d6b46a]/45 bg-white text-[#7b5b16]">{notificationCategoryLabel[category]}</Badge>
+                            {urgent && <Badge className="bg-red-600 text-white">عاجل</Badge>}
+                            {!notice.isRead && <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">جديد</Badge>}
+                          </div>
+                          <p className="mt-2 max-w-4xl text-sm leading-7 text-slate-600">{notice.message}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                            <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" />{new Date(notice.createdAt).toLocaleString('ar-SA')}</span>
+                            {notice.entityType && <span>النوع المرجعي: {notice.entityType}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        {!notice.isRead && <Button size="sm" variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={async () => { try { await mosqueApi.readNotification(notice.id); setNotifications((current) => current.map((item) => item.id === notice.id ? { ...item, isRead: true } : item)); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تحديث الإشعار'); } }}><CheckCircle2 className="ml-1 h-3.5 w-3.5" />مقروء</Button>}
+                        {targetAvailable && <Button size="sm" className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => void openNotificationTarget(notice)}><ExternalLink className="ml-1 h-3.5 w-3.5" />فتح السجل</Button>}
+                      </div>
+                    </div>
+                  </div>;
+                })}
+              </div>
+
+              {!filteredNotifications.length && <Empty text="لا توجد إشعارات مطابقة للبحث والتصفية" />}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
@@ -4347,6 +4516,13 @@ const Empty = ({ text }: { text: string }) => <div className="rounded-2xl border
 const Rule = ({ title, text }: { title: string; text: string }) => <div className="rounded-2xl border border-[#dfcfaa] bg-gradient-to-br from-white to-[#fbf6ea] p-4 shadow-sm"><div className="mb-2 h-1 w-10 rounded-full bg-[#d6b46a]" /><p className="font-black text-[#0b4a3f]">{title}</p><p className="mt-1 text-sm leading-6 text-slate-600">{text}</p></div>;
 const ReportMetric = ({ label, value }: { label: string; value: number }) => <div className="rounded-2xl border border-[#dfcfaa] bg-gradient-to-b from-white to-[#f9f3e7] p-5 text-center shadow-sm"><p className="text-sm font-bold text-slate-500">{label}</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{value}</p></div>;
 const MiniRow = ({ title, subtitle, status }: { title: string; subtitle: string; status: string }) => <div className="flex items-start justify-between gap-3 rounded-2xl border border-[#e3d5b4] bg-[#fffdf8] p-3 shadow-[0_4px_12px_rgba(6,60,51,0.05)]"><div className="min-w-0"><p className="truncate font-black text-[#0b4a3f]">{title}</p><p className="mt-1 line-clamp-1 text-xs text-slate-500">{subtitle}</p></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>;
+
+const NotificationMetric = ({ label, value, icon: Icon, tone = 'default' }: { label: string; value: number; icon: React.ElementType; tone?: 'default' | 'warning' }) => (
+  <div className={`flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)] ${tone === 'warning' ? 'border-amber-200 bg-amber-50/70 text-amber-800' : 'border-[#e2d4b4] bg-white text-[#0b4a3f]'}`}>
+    <div><p className="text-[11px] font-bold opacity-75">{label}</p><p className="mt-1 text-2xl font-black">{value.toLocaleString('ar-SA')}</p></div>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-current/15 bg-white/75"><Icon className="h-5 w-5" /></div>
+  </div>
+);
 
 const RoleMetric = ({ label, value, icon: Icon }: { label: string; value: number; icon: React.ElementType }) => (
   <div className="flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
