@@ -98,6 +98,8 @@ const roleLabels: Record<MosqueModuleRole, string> = {
 };
 
 const personnelRoleLabels: Record<string, string> = { imam: 'إمام', muezzin: 'مؤذن', khateeb: 'خطيب', collaborating_khateeb: 'خطيب متعاون', collaborator: 'خطيب متعاون' };
+const mosqueTabTriggerClass = 'min-w-max flex-none border-transparent px-3 text-emerald-50 hover:bg-white/10 hover:text-white data-[state=active]:border-[#d6b46a] data-[state=active]:bg-[#d6b46a] data-[state=active]:font-black data-[state=active]:text-[#083f35] data-[state=active]:shadow-sm';
+
 const roleScopeLabel = (role: MosqueModuleRole) => role === 'head'
   ? 'إدارة كاملة للوحدة'
   : role === 'supervisor'
@@ -2935,21 +2937,24 @@ ${quranStockMovementForm.notes}` : ''}`
           </NativeSelect>
         </div>
 
-        <TabsList className="hidden h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-[#d6b46a]/55 bg-[#0b4a3f] p-2 shadow-[0_8px_24px_rgba(6,60,51,0.16)] sm:flex [&>[data-slot=tabs-trigger]]:min-w-max [&>[data-slot=tabs-trigger]]:flex-none [&>[data-slot=tabs-trigger]]:text-emerald-50 [&>[data-state=active]]:bg-[#d6b46a] [&>[data-state=active]]:text-[#083f35] [&>[data-state=active]]:shadow-sm">
-          <TabsTrigger value="overview">الرئيسية</TabsTrigger>
-          <TabsTrigger value="sites">المساجد والمصليات</TabsTrigger>
-          {['head', 'supervisor'].includes(role) && <TabsTrigger value="buildings">تغطية المباني بخدمة الصلاة</TabsTrigger>}
-          {['head', 'supervisor'].includes(role) && <TabsTrigger value="field-visits">الجولات والزيارات</TabsTrigger>}
-          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger value="quran">المصاحف</TabsTrigger>}
-          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger value="requests">الطلبات</TabsTrigger>}
-          {['head', 'supervisor'].includes(role) && <TabsTrigger value="tickets">البلاغات</TabsTrigger>}
-          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger value="leaves">الإجازات</TabsTrigger>}
-          {['head', 'supervisor'].includes(role) && <TabsTrigger value="jobs">التوظيف</TabsTrigger>}
-          <TabsTrigger value="map">الخريطة</TabsTrigger>
-          {['head', 'supervisor'].includes(role) && <TabsTrigger value="reports">التقارير</TabsTrigger>}
-          {['head', 'supervisor'].includes(role) && <TabsTrigger value="team">منسوبو المساجد</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="roles">الأدوار التشغيلية</TabsTrigger>}
-          {role !== 'university_member' && role !== 'viewer' && <TabsTrigger value="notifications" className="gap-1">الإشعارات {unreadNotifications > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{unreadNotifications}</span>}</TabsTrigger>}
+        <TabsList
+          className="hidden h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-[#d6b46a]/55 p-2 shadow-[0_8px_24px_rgba(6,60,51,0.16)] sm:flex"
+          style={{ backgroundColor: '#0b4a3f' }}
+        >
+          <TabsTrigger className={mosqueTabTriggerClass} value="overview">الرئيسية</TabsTrigger>
+          <TabsTrigger className={mosqueTabTriggerClass} value="sites">المساجد والمصليات</TabsTrigger>
+          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="buildings">تغطية المباني بخدمة الصلاة</TabsTrigger>}
+          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="field-visits">الجولات والزيارات</TabsTrigger>}
+          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="quran">المصاحف</TabsTrigger>}
+          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="requests">الطلبات</TabsTrigger>}
+          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="tickets">البلاغات</TabsTrigger>}
+          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="leaves">الإجازات</TabsTrigger>}
+          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="jobs">التوظيف</TabsTrigger>}
+          <TabsTrigger className={mosqueTabTriggerClass} value="map">الخريطة</TabsTrigger>
+          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="reports">التقارير</TabsTrigger>}
+          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="team">منسوبو المساجد</TabsTrigger>}
+          {isAdmin && <TabsTrigger className={mosqueTabTriggerClass} value="roles">الأدوار التشغيلية</TabsTrigger>}
+          {role !== 'university_member' && role !== 'viewer' && <TabsTrigger value="notifications" className={`${mosqueTabTriggerClass} gap-1`}>الإشعارات {unreadNotifications > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{unreadNotifications}</span>}</TabsTrigger>}
         </TabsList>
         </div>
 
