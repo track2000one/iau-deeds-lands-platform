@@ -3046,17 +3046,25 @@ ${quranStockMovementForm.notes}` : ''}`
 
             <div className="grid gap-4 xl:grid-cols-2">
               <Card className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-                <CardHeader className="border-b border-slate-100 pb-3"><CardTitle className="text-base font-black text-slate-800">ملخص التغطية التشغيلية</CardTitle><CardDescription>مؤشرات مختصرة بأسلوب بصري قريب من الواجهة المرجعية.</CardDescription></CardHeader>
-                <CardContent className="space-y-4 p-5">
-                  {[
-                    ['المواقع النشطة', referenceActiveSites, Math.max(sites.length, 1), '#006b63'],
-                    ['المباني المغطاة بخدمة الصلاة', referenceCoveredBuildings, Math.max(officialBuildings.length, 1), '#2e8b57'],
-                    ['المواقع التي تم جرد مصاحفها', quranSummary.countedSites, Math.max(quranSummary.sites, 1), '#d4a72c'],
-                    ['المنسوبون النشطون', referenceActivePersonnel, Math.max(personnel.length, 1), '#6f8f78'],
-                  ].map(([label, value, total, color]) => {
-                    const percent = Math.max(4, Math.min(100, Math.round((Number(value) / Number(total)) * 100)));
-                    return <div key={String(label)}><div className="mb-1.5 flex items-center justify-between gap-3"><span className="text-xs font-bold text-slate-600">{label}</span><span className="text-xs font-black text-slate-800">{Number(value).toLocaleString('ar-SA')}</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full transition-all" style={{ width: `${percent}%`, backgroundColor: String(color) }} /></div></div>;
-                  })}
+                <CardHeader className="border-b border-slate-100 pb-3"><CardTitle className="text-base font-black text-slate-800">ملخص التغطية التشغيلية</CardTitle><CardDescription>عرض بصري مختصر للمؤشرات الرئيسية.</CardDescription></CardHeader>
+                <CardContent className="p-5">
+                  <div className="flex h-[235px] items-end justify-around gap-3 border-b border-slate-200 px-2 pb-3">
+                    {[
+                      ['المواقع', referenceActiveSites, Math.max(sites.length, 1), '#006b63'],
+                      ['المباني', referenceCoveredBuildings, Math.max(officialBuildings.length, 1), '#2e8b57'],
+                      ['الجرد', quranSummary.countedSites, Math.max(quranSummary.sites, 1), '#d4a72c'],
+                      ['المنسوبون', referenceActivePersonnel, Math.max(personnel.length, 1), '#7aa984'],
+                    ].map(([label, value, total, color]) => {
+                      const percent = Math.max(10, Math.min(100, Math.round((Number(value) / Number(total)) * 100)));
+                      return <div key={String(label)} className="flex h-full flex-1 flex-col items-center justify-end">
+                        <span className="mb-2 text-xs font-black text-slate-700">{Number(value).toLocaleString('ar-SA')}</span>
+                        <div className="flex h-[160px] w-full max-w-[52px] items-end overflow-hidden rounded-t-xl bg-slate-100">
+                          <div className="w-full rounded-t-xl transition-all" style={{ height: `${percent}%`, backgroundColor: String(color) }} />
+                        </div>
+                        <span className="mt-2 text-[10px] font-bold text-slate-500">{label}</span>
+                      </div>;
+                    })}
+                  </div>
                 </CardContent>
               </Card>
 
