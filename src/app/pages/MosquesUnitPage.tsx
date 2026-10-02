@@ -48,7 +48,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { NativeSelect } from '../components/ui/native-select';
 import { Progress } from '../components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsContent } from '../components/ui/tabs';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { MosqueFieldVisitsPanel } from '../components/MosqueFieldVisitsPanel';
 import { MosqueReportsCenter } from '../components/MosqueReportsCenter';
@@ -98,7 +98,17 @@ const roleLabels: Record<MosqueModuleRole, string> = {
 };
 
 const personnelRoleLabels: Record<string, string> = { imam: 'إمام', muezzin: 'مؤذن', khateeb: 'خطيب', collaborating_khateeb: 'خطيب متعاون', collaborator: 'خطيب متعاون' };
-const mosqueTabTriggerClass = 'min-w-max flex-none border-transparent px-3 text-emerald-50 hover:bg-white/10 hover:text-white data-[state=active]:border-[#d6b46a] data-[state=active]:bg-[#d6b46a] data-[state=active]:font-black data-[state=active]:text-[#083f35] data-[state=active]:shadow-sm';
+const MosqueSideNavButton = ({ label, icon: Icon, active, onClick, badge }: { label: string; icon: React.ElementType; active: boolean; onClick: () => void; badge?: number }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm font-bold transition-all ${active ? 'bg-[#006b63] text-white shadow-[0_8px_18px_rgba(0,107,99,0.18)]' : 'text-slate-600 hover:bg-white hover:text-[#006b63]'}`}
+  >
+    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${active ? 'border-white/20 bg-white/10 text-white' : 'border-slate-200 bg-white text-[#006b63]'}`}><Icon className="h-4 w-4" /></span>
+    <span className="min-w-0 flex-1 truncate">{label}</span>
+    {badge != null && badge > 0 && <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${active ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'}`}>{badge}</span>}
+  </button>
+);
 
 const roleScopeLabel = (role: MosqueModuleRole) => role === 'head'
   ? 'إدارة كاملة للوحدة'
@@ -2858,6 +2868,19 @@ ${quranStockMovementForm.notes}` : ''}`
     setActiveTab(tab);
   };
 
+  const referenceMosqueCount = sites.filter((site) => ['mosque', 'jami'].includes(site.siteType)).length;
+  const referencePrayerRoomCount = sites.filter((site) => site.siteType === 'prayer_room').length;
+  const referenceMenPrayerRooms = sites.filter((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'men').length;
+  const referenceWomenPrayerRooms = sites.filter((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'women').length;
+  const referenceActiveSites = sites.filter((site) => site.status === 'active').length;
+  const referenceCoveredBuildings = officialBuildings.filter((building) => building.coverageStatus === 'covered').length;
+  const referenceActivePersonnel = personnel.filter((item) => item.active).length;
+  const referenceTrackedRequests = requests.filter((item) => item.status !== 'archived');
+  const referenceCompletedRequests = referenceTrackedRequests.filter((item) => ['completed', 'closed'].includes(item.status)).length;
+  const referenceInProgressRequests = referenceTrackedRequests.filter((item) => ['approved', 'in_progress', 'under_review'].includes(item.status)).length;
+  const referenceLateRequests = referenceTrackedRequests.filter((item) => ['new', 'under_review', 'approved', 'in_progress'].includes(item.status) && new Date(item.createdAt).getTime() < Date.now() - 7 * 24 * 60 * 60 * 1000).length;
+  const referenceCompletionPercent = referenceTrackedRequests.length ? Math.round((referenceCompletedRequests / referenceTrackedRequests.length) * 100) : 0;
+
   const handleTabChange = (tab: string) => goToDashboardSection(tab);
 
   if (loading) {
@@ -2865,98 +2888,103 @@ ${quranStockMovementForm.notes}` : ''}`
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1760px] space-y-5 rounded-[30px] bg-[radial-gradient(circle_at_top_right,rgba(198,156,60,0.12),transparent_24%),linear-gradient(180deg,#fffdf8_0%,#f8f2e6_46%,#f3eee4_100%)] p-1 sm:p-3 md:p-5" dir="rtl">
-      <section className="relative overflow-hidden rounded-[30px] border border-[#d6b46a]/80 bg-[linear-gradient(135deg,#073f35_0%,#0b5a49_52%,#073a32_100%)] p-5 text-white shadow-[0_22px_60px_rgba(6,60,51,0.24)] md:p-7">
-        <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_12%_20%,rgba(255,255,255,0.18)_0_1px,transparent_1.5px),radial-gradient(circle_at_88%_18%,rgba(214,180,106,0.22)_0_1px,transparent_1.5px)] [background-size:24px_24px,34px_34px]" />
-        <div className="pointer-events-none absolute -left-16 -top-24 h-64 w-64 rounded-full border border-[#d6b46a]/30 bg-[#d6b46a]/10 blur-[1px]" />
-        <div className="pointer-events-none absolute -bottom-24 right-[-30px] h-72 w-72 rounded-full border border-white/10 bg-white/5" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-4xl">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="border-[#dfc37f]/70 bg-[#d6b46a]/15 text-[#f7dfaa]">منصة تشغيلية متكاملة</Badge>
-              <Badge variant="outline" className="border-white/25 bg-white/10 text-white"><Shield className="ml-1 h-3.5 w-3.5 text-[#e6c878]" />{fullPermissionAccess ? 'مسؤول الوحدة — صلاحية كاملة' : role === 'personnel' && myPersonnelRole ? personnelRoleLabels[myPersonnelRole] || myPersonnelRole : roleLabels[role]}</Badge>
+    <div className="mx-auto w-full max-w-[1780px] rounded-[30px] bg-[#edf3f7] p-2 sm:p-4 md:p-5" dir="rtl">
+      <section className="mb-5 overflow-hidden rounded-[26px] border border-slate-200/90 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.07)]">
+        <div className="flex flex-col gap-4 px-4 py-4 md:px-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <img src="/platform-logo.png" alt="جامعة الإمام عبدالرحمن بن فيصل" className="h-11 w-11 object-contain" />
             </div>
-            <div className="flex items-center gap-3">
-              <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/60 bg-white/10 text-[#f0d18b] shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] sm:flex">
-                <Building2 className="h-7 w-7" />
-              </div>
-              <div>
-                <p className="text-xs font-bold tracking-wide text-[#e6c878]">جامعة الإمام عبدالرحمن بن فيصل</p>
-                <h1 className="mt-1 text-2xl font-black text-white md:text-4xl">وحدة العناية بالمساجد والمصليات الجامعية</h1>
-              </div>
-            </div>
-            <p className="mt-3 max-w-4xl text-sm leading-7 text-emerald-50/90 md:text-base">إدارة متكاملة للمساجد والمصليات والجولات الميدانية والصيانة والبلاغات والمصاحف والتقارير ضمن مسار موحد يحفظ الأعمال ويسهّل المتابعة.</p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-emerald-50/90">
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5">الجولات الميدانية</span>
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5">الصيانة والتشغيل</span>
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5">التقارير والمؤشرات</span>
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5">إدارة المصاحف</span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-black tracking-wide text-[#006b63]">جامعة الإمام عبدالرحمن بن فيصل</p>
+              <h1 className="mt-0.5 truncate text-xl font-black text-slate-900 md:text-2xl">وحدة العناية بالمساجد والمصليات الجامعية</h1>
+              <p className="mt-1 hidden text-xs text-slate-500 md:block">لوحة تشغيل موحدة للمواقع والجولات والطلبات والمصاحف والتقارير.</p>
             </div>
           </div>
-          <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-[580px] lg:shrink-0">
-            {canAdd && ['head', 'supervisor'].includes(role) && <Button className={`${button3d} min-h-12 w-full border border-[#e1bd68] bg-[#d6b46a] px-5 text-base font-black text-[#083f35] hover:bg-[#e0c27c] hover:text-[#083f35] sm:col-span-2`} onClick={() => openSiteDialog()}><Plus className="ml-2 h-5 w-5" />إضافة مسجد / مصلى</Button>}
-            {['head', 'supervisor'].includes(role) && <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-white/25 bg-white/10 font-bold text-white hover:border-[#d6b46a]/70 hover:bg-white/15 hover:text-white`} onClick={() => goToDashboardSection('field-visits')}><ClipboardList className="ml-2 h-4 w-4 text-[#f0d18b]" />الجولات والزيارات</Button>}
-            <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-white/25 bg-white/10 font-bold text-white hover:border-[#d6b46a]/70 hover:bg-white/15 hover:text-white`} onClick={() => navigate('/mosques/public')}><ExternalLink className="ml-2 h-4 w-4 text-[#f0d18b]" />البوابة العامة</Button>
-            <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-white/25 bg-white/10 font-bold text-white hover:border-[#d6b46a]/70 hover:bg-white/15 hover:text-white`} onClick={loadAll}><RefreshCw className="ml-2 h-4 w-4 text-[#f0d18b]" />تحديث</Button>
-            {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-white/25 bg-white/10 font-bold text-white hover:border-[#d6b46a]/70 hover:bg-white/15 hover:text-white`} onClick={openMediaImportDialog}><FileText className="ml-2 h-4 w-4 text-[#f0d18b]" />استيراد مكتبة ZIP</Button>}
+
+          <div className="flex flex-1 flex-col gap-2 lg:max-w-[720px] lg:flex-row lg:items-center lg:justify-end">
+            <div className="relative min-w-0 flex-1 lg:max-w-[340px]">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                className="h-11 rounded-xl border-slate-200 bg-[#f7f9fb] pr-9 text-sm focus-visible:border-[#006b63] focus-visible:ring-[#006b63]/15"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') goToDashboardSection('sites'); }}
+                placeholder="ابحث عن مسجد أو مصلى..."
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="h-11 border-slate-200 bg-white text-slate-600 hover:text-[#006b63]" onClick={loadAll}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button>
+              <Button variant="outline" className="h-11 border-slate-200 bg-white text-slate-600 hover:text-[#006b63]" onClick={() => navigate('/mosques/public')}><ExternalLink className="ml-2 h-4 w-4" />البوابة العامة</Button>
+              {canAdd && ['head', 'supervisor'].includes(role) && <Button className="h-11 bg-[#006b63] px-5 font-black text-white hover:bg-[#005a53]" onClick={() => openSiteDialog()}><Plus className="ml-2 h-4 w-4" />إضافة موقع</Button>}
+            </div>
           </div>
         </div>
       </section>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        {/* STICKY_UNIT_NAV_V2: navigation stays above KPI cards and remains visible while scrolling on desktop and mobile. */}
-        <div className="sticky top-0 z-40 -mx-1 rounded-2xl border border-[#d6b46a]/55 bg-[#fffdf8]/95 p-1.5 shadow-[0_10px_30px_rgba(6,60,51,0.13)] backdrop-blur-xl supports-[backdrop-filter]:bg-[#fffdf8]/90">
-          <div className="relative overflow-hidden rounded-2xl border border-[#d6b46a]/70 bg-gradient-to-br from-[#fff8e8] via-white to-emerald-50 p-3 shadow-[0_10px_28px_rgba(6,60,51,0.10),0_0_0_1px_rgba(214,180,106,0.10)] ring-1 ring-[#e8d7ad]/80 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:border before:border-[#d6b46a]/35 before:opacity-40 before:content-[''] sm:hidden">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-bold text-emerald-800">التنقل بين أقسام الوحدة</p>
-              <p className="mt-0.5 text-xs text-slate-500">اختر القسم المطلوب من القائمة</p>
-            </div>
-            {unreadNotifications > 0 && role !== 'university_member' && role !== 'viewer' && <Badge className="shrink-0 bg-amber-500 text-white">{unreadNotifications} إشعار</Badge>}
-          </div>
-          <NativeSelect
-            className="h-12 w-full rounded-xl border-[#d6b46a]/70 bg-white px-3 text-sm font-bold text-[#0b4a3f] shadow-sm focus:border-[#0b5a49]"
-            value={activeTab}
-            onChange={(e) => handleTabChange(e.target.value)}
-            aria-label="اختيار قسم وحدة المساجد والمصليات"
-          >
-            <option value="overview">الرئيسية</option>
-            <option value="sites">المساجد والمصليات</option>
-            {['head', 'supervisor'].includes(role) && <option value="buildings">تغطية المباني بخدمة الصلاة</option>}
-            {['head', 'supervisor'].includes(role) && <option value="field-visits">الجولات والزيارات</option>}
-            {['head', 'supervisor', 'personnel'].includes(role) && <option value="quran">المصاحف</option>}
-            {['head', 'supervisor', 'personnel'].includes(role) && <option value="requests">الطلبات</option>}
-            {['head', 'supervisor'].includes(role) && <option value="tickets">البلاغات</option>}
-            {['head', 'supervisor', 'personnel'].includes(role) && <option value="leaves">الإجازات</option>}
-            {['head', 'supervisor'].includes(role) && <option value="jobs">التوظيف</option>}
-            <option value="map">الخريطة</option>
-            {['head', 'supervisor'].includes(role) && <option value="reports">التقارير</option>}
-            {['head', 'supervisor'].includes(role) && <option value="team">منسوبو المساجد</option>}
-            {isAdmin && <option value="roles">الأدوار التشغيلية</option>}
-            {role !== 'university_member' && role !== 'viewer' && <option value="notifications">الإشعارات{unreadNotifications > 0 ? ` (${unreadNotifications})` : ''}</option>}
-          </NativeSelect>
-        </div>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[285px_minmax(0,1fr)]">
+          <aside className="hidden lg:block">
+            <div className="sticky top-4 overflow-hidden rounded-[24px] border border-slate-200 bg-[#e7edf2] shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+              <div className="border-b border-slate-200/80 bg-white px-4 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#006b63] text-white"><Building2 className="h-5 w-5" /></div>
+                  <div className="min-w-0"><p className="truncate text-sm font-black text-slate-800">إدارة الوحدة</p><p className="mt-0.5 truncate text-[11px] text-slate-500">{fullPermissionAccess ? 'رئيس الوحدة — صلاحية كاملة' : role === 'personnel' && myPersonnelRole ? personnelRoleLabels[myPersonnelRole] || myPersonnelRole : roleLabels[role]}</p></div>
+                </div>
+              </div>
 
-        <TabsList
-          className="hidden h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-[#d6b46a]/55 p-2 shadow-[0_8px_24px_rgba(6,60,51,0.16)] sm:flex"
-          style={{ backgroundColor: '#0b4a3f' }}
-        >
-          <TabsTrigger className={mosqueTabTriggerClass} value="overview">الرئيسية</TabsTrigger>
-          <TabsTrigger className={mosqueTabTriggerClass} value="sites">المساجد والمصليات</TabsTrigger>
-          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="buildings">تغطية المباني بخدمة الصلاة</TabsTrigger>}
-          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="field-visits">الجولات والزيارات</TabsTrigger>}
-          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="quran">المصاحف</TabsTrigger>}
-          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="requests">الطلبات</TabsTrigger>}
-          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="tickets">البلاغات</TabsTrigger>}
-          {['head', 'supervisor', 'personnel'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="leaves">الإجازات</TabsTrigger>}
-          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="jobs">التوظيف</TabsTrigger>}
-          <TabsTrigger className={mosqueTabTriggerClass} value="map">الخريطة</TabsTrigger>
-          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="reports">التقارير</TabsTrigger>}
-          {['head', 'supervisor'].includes(role) && <TabsTrigger className={mosqueTabTriggerClass} value="team">منسوبو المساجد</TabsTrigger>}
-          {isAdmin && <TabsTrigger className={mosqueTabTriggerClass} value="roles">الأدوار التشغيلية</TabsTrigger>}
-          {role !== 'university_member' && role !== 'viewer' && <TabsTrigger value="notifications" className={`${mosqueTabTriggerClass} gap-1`}>الإشعارات {unreadNotifications > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{unreadNotifications}</span>}</TabsTrigger>}
-        </TabsList>
-        </div>
+              <nav className="space-y-1 p-3">
+                <MosqueSideNavButton label="الرئيسية" icon={BarChart3} active={activeTab === 'overview'} onClick={() => goToDashboardSection('overview')} />
+                <MosqueSideNavButton label="المساجد والمصليات" icon={Building2} active={activeTab === 'sites'} onClick={() => goToDashboardSection('sites')} />
+                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="تغطية المباني" icon={MapPin} active={activeTab === 'buildings'} onClick={() => goToDashboardSection('buildings')} />}
+                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="الجولات والزيارات" icon={ClipboardList} active={activeTab === 'field-visits'} onClick={() => goToDashboardSection('field-visits')} />}
+                {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="المصاحف" icon={BookOpen} active={activeTab === 'quran'} onClick={() => goToDashboardSection('quran')} />}
+                {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="الطلبات والصيانة" icon={Wrench} active={activeTab === 'requests'} onClick={() => goToDashboardSection('requests')} badge={dashboard?.stats.newRequests || 0} />}
+                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="البلاغات" icon={MessageSquare} active={activeTab === 'tickets'} onClick={() => goToDashboardSection('tickets')} badge={dashboard?.stats.openTickets || 0} />}
+                {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="الإجازات والاعتذارات" icon={CalendarDays} active={activeTab === 'leaves'} onClick={() => goToDashboardSection('leaves')} />}
+                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="التقارير" icon={FileText} active={activeTab === 'reports'} onClick={() => goToDashboardSection('reports')} />}
+                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="منسوبو المساجد" icon={Users} active={activeTab === 'team'} onClick={() => goToDashboardSection('team')} />}
+                <MosqueSideNavButton label="الخريطة" icon={MapPin} active={activeTab === 'map'} onClick={() => goToDashboardSection('map')} />
+                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="طلبات التعاون" icon={Briefcase} active={activeTab === 'jobs'} onClick={() => goToDashboardSection('jobs')} />}
+                {isAdmin && <MosqueSideNavButton label="الأدوار التشغيلية" icon={Shield} active={activeTab === 'roles'} onClick={() => goToDashboardSection('roles')} />}
+                {role !== 'university_member' && role !== 'viewer' && <MosqueSideNavButton label="الإشعارات" icon={Bell} active={activeTab === 'notifications'} onClick={() => goToDashboardSection('notifications')} badge={unreadNotifications} />}
+              </nav>
+
+              <div className="border-t border-slate-200 p-3">
+                <div className="rounded-2xl border border-white/80 bg-white/75 p-3">
+                  <p className="text-[10px] font-bold text-slate-400">الوصول السريع</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => goToDashboardSection('reports')} className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-[#006b63]">التقارير</button>
+                    <button type="button" onClick={() => goToDashboardSection('map')} className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-[#006b63]">الخريطة</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <main className="min-w-0 space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:hidden">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div><p className="text-[11px] font-bold text-[#006b63]">التنقل بين أقسام الوحدة</p><p className="mt-0.5 text-xs text-slate-500">اختر القسم المطلوب</p></div>
+                {unreadNotifications > 0 && role !== 'university_member' && role !== 'viewer' && <Badge className="shrink-0 bg-amber-500 text-white">{unreadNotifications} إشعار</Badge>}
+              </div>
+              <NativeSelect className="h-12 w-full rounded-xl border-slate-200 bg-[#f7f9fb] px-3 text-sm font-bold text-slate-700" value={activeTab} onChange={(e) => handleTabChange(e.target.value)}>
+                <option value="overview">الرئيسية</option>
+                <option value="sites">المساجد والمصليات</option>
+                {['head', 'supervisor'].includes(role) && <option value="buildings">تغطية المباني بخدمة الصلاة</option>}
+                {['head', 'supervisor'].includes(role) && <option value="field-visits">الجولات والزيارات</option>}
+                {['head', 'supervisor', 'personnel'].includes(role) && <option value="quran">المصاحف</option>}
+                {['head', 'supervisor', 'personnel'].includes(role) && <option value="requests">الطلبات</option>}
+                {['head', 'supervisor'].includes(role) && <option value="tickets">البلاغات</option>}
+                {['head', 'supervisor', 'personnel'].includes(role) && <option value="leaves">الإجازات</option>}
+                {['head', 'supervisor'].includes(role) && <option value="jobs">طلبات التعاون</option>}
+                <option value="map">الخريطة</option>
+                {['head', 'supervisor'].includes(role) && <option value="reports">التقارير</option>}
+                {['head', 'supervisor'].includes(role) && <option value="team">منسوبو المساجد</option>}
+                {isAdmin && <option value="roles">الأدوار التشغيلية</option>}
+                {role !== 'university_member' && role !== 'viewer' && <option value="notifications">الإشعارات{unreadNotifications > 0 ? ` (${unreadNotifications})` : ''}</option>}
+              </NativeSelect>
+            </div>
 
         {/* Quran inventory search — filters the operational inventory cards below. */}
         {activeTab === 'quran' && <div className="grid gap-3 rounded-2xl border border-[#e2d4b4] bg-[#fffdf8] p-3 shadow-[0_8px_22px_rgba(6,60,51,0.06)] md:grid-cols-[1fr_240px_auto] md:items-center">
@@ -3002,88 +3030,67 @@ ${quranStockMovementForm.notes}` : ''}`
 
         <TabsContent value="overview" className="space-y-4">
           {role === 'head' && <>
-            <section className="grid gap-5 xl:grid-cols-[1.55fr_0.95fr]">
-              <Card className={`${card3d} overflow-hidden rounded-[26px]`}>
-                <CardHeader className="border-b border-[#e7d9b8] bg-white/85 pb-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-[#fff8e8] text-[#8a6a1f]">لوحة المتابعة التشغيلية</Badge>
-                      <CardTitle className="text-xl font-black text-[#0b4a3f] md:text-2xl">صورة موحدة لأعمال الوحدة</CardTitle>
-                      <CardDescription className="mt-1 leading-6">متابعة المواقع والطلبات والبلاغات والمصاحف من شاشة واحدة، مع انتقال مباشر لكل قسم.</CardDescription>
-                    </div>
-                    <Button className={`${button3d} border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]`} onClick={() => goToDashboardSection('reports')}><BarChart3 className="ml-2 h-4 w-4" />التقارير</Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-5 p-4 sm:p-5">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <OverviewMetric label="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} onClick={() => goToDashboardSection('sites')} />
-                    <OverviewMetric label="إجمالي المصاحف" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
-                    <OverviewMetric label="طلبات تحتاج متابعة" value={(dashboard?.stats.newRequests || 0) + (dashboard?.stats.reviewRequests || 0)} icon={ClipboardList} onClick={() => goToDashboardSection('requests')} />
-                    <OverviewMetric label="بلاغات مفتوحة" value={dashboard?.stats.openTickets || 0} icon={MessageSquare} onClick={() => goToDashboardSection('tickets')} />
-                  </div>
+            <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_10px_26px_rgba(15,23,42,0.05)] sm:p-5">
+              <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div><p className="text-xs font-black text-[#006b63]">لوحة المعلومات الرئيسية</p><h2 className="mt-1 text-2xl font-black text-slate-900">نظرة عامة على المساجد والمصليات</h2><p className="mt-1 text-sm text-slate-500">ملخص تشغيلي مباشر مستوحى من الواجهة المرجعية مع إبقاء جميع البيانات والوظائف الفعلية.</p></div>
+                <Badge variant="outline" className="w-fit border-slate-200 bg-[#f7f9fb] px-3 py-1.5 text-slate-600">محدث من بيانات المنصة</Badge>
+              </div>
 
-                  <div className="rounded-[22px] border border-[#e3d7bb] bg-[#fbf8f1] p-3 sm:p-4">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="font-black text-[#0b4a3f]">آخر الحركة التشغيلية</p>
-                        <p className="mt-0.5 text-xs text-slate-500">أحدث الطلبات والبلاغات التي تتطلب المتابعة.</p>
-                      </div>
-                      <Badge variant="outline" className="border-[#d6b46a]/50 bg-white text-[#0b4a3f]">محدث من بيانات المنصة</Badge>
-                    </div>
-                    <div className="grid gap-3 lg:grid-cols-2">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between px-1"><span className="text-sm font-black text-slate-700">طلبات الصيانة والاحتياج</span><Button variant="ghost" size="sm" className="h-8 text-xs text-[#0b5a49]" onClick={() => goToDashboardSection('requests')}>عرض الكل</Button></div>
-                        {(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.slice(0, 3).map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <EmptyCompact text="لا توجد طلبات حتى الآن" />}
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between px-1"><span className="text-sm font-black text-slate-700">البلاغات</span><Button variant="ghost" size="sm" className="h-8 text-xs text-[#0b5a49]" onClick={() => goToDashboardSection('tickets')}>عرض الكل</Button></div>
-                        {(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.slice(0, 3).map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <EmptyCompact text="لا توجد بلاغات حتى الآن" />}
-                      </div>
-                    </div>
-                  </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <button type="button" onClick={() => goToDashboardSection('sites')} className="rounded-2xl border border-slate-200 bg-white p-4 text-right shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md">
+                  <div className="flex items-center justify-between"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eaf6f4] text-[#006b63]"><Building2 className="h-5 w-5" /></span><span className="text-3xl font-black text-slate-900">{referenceMosqueCount}</span></div>
+                  <p className="mt-4 text-sm font-black text-slate-700">عدد المساجد والجوامع</p>
+                </button>
+                <button type="button" onClick={() => goToDashboardSection('sites')} className="rounded-2xl border border-slate-200 bg-white p-4 text-right shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md">
+                  <div className="flex items-center justify-between"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eaf6f4] text-[#006b63]"><MapPin className="h-5 w-5" /></span><span className="text-3xl font-black text-slate-900">{referencePrayerRoomCount}</span></div>
+                  <p className="mt-4 text-sm font-black text-slate-700">عدد المصليات</p>
+                </button>
+                <button type="button" onClick={() => { setSiteFilterType('prayer_room'); setSiteFilterPrayerRoomGender('men'); goToDashboardSection('sites'); }} className="rounded-2xl border border-slate-200 bg-white p-4 text-right shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md">
+                  <div className="flex items-center justify-between"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#edf7f1] text-[#16704c]"><Users className="h-5 w-5" /></span><span className="text-3xl font-black text-slate-900">{referenceMenPrayerRooms}</span></div>
+                  <p className="mt-4 text-sm font-black text-slate-700">المصليات الرجالية</p>
+                </button>
+                <button type="button" onClick={() => { setSiteFilterType('prayer_room'); setSiteFilterPrayerRoomGender('women'); goToDashboardSection('sites'); }} className="rounded-2xl border border-slate-200 bg-white p-4 text-right shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md">
+                  <div className="flex items-center justify-between"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f3f0fb] text-[#7561a8]"><Users className="h-5 w-5" /></span><span className="text-3xl font-black text-slate-900">{referenceWomenPrayerRooms}</span></div>
+                  <p className="mt-4 text-sm font-black text-slate-700">المصليات النسائية</p>
+                </button>
+              </div>
+            </div>
 
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('field-visits')}><ClipboardList className="ml-2 h-4 w-4" />جولة ميدانية</Button>
-                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('quran')}><BookOpen className="ml-2 h-4 w-4" />المصاحف</Button>
-                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('team')}><Users className="ml-2 h-4 w-4" />منسوبو المساجد</Button>
-                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('map')}><MapPin className="ml-2 h-4 w-4" />الخريطة</Button>
-                  </div>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <Card className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+                <CardHeader className="border-b border-slate-100 pb-3"><CardTitle className="text-base font-black text-slate-800">ملخص التغطية التشغيلية</CardTitle><CardDescription>مؤشرات مختصرة بأسلوب بصري قريب من الواجهة المرجعية.</CardDescription></CardHeader>
+                <CardContent className="space-y-4 p-5">
+                  {[
+                    ['المواقع النشطة', referenceActiveSites, Math.max(sites.length, 1), '#006b63'],
+                    ['المباني المغطاة بخدمة الصلاة', referenceCoveredBuildings, Math.max(officialBuildings.length, 1), '#2e8b57'],
+                    ['المواقع التي تم جرد مصاحفها', quranSummary.countedSites, Math.max(quranSummary.sites, 1), '#d4a72c'],
+                    ['المنسوبون النشطون', referenceActivePersonnel, Math.max(personnel.length, 1), '#6f8f78'],
+                  ].map(([label, value, total, color]) => {
+                    const percent = Math.max(4, Math.min(100, Math.round((Number(value) / Number(total)) * 100)));
+                    return <div key={String(label)}><div className="mb-1.5 flex items-center justify-between gap-3"><span className="text-xs font-bold text-slate-600">{label}</span><span className="text-xs font-black text-slate-800">{Number(value).toLocaleString('ar-SA')}</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full transition-all" style={{ width: `${percent}%`, backgroundColor: String(color) }} /></div></div>;
+                  })}
                 </CardContent>
               </Card>
 
-              <div className="grid content-start gap-3">
-                <OverviewSectionCard
-                  title="المساجد والمصليات"
-                  description="السجل التشغيلي للمواقع، البيانات الأساسية، الخرائط، QR والمرفقات."
-                  value={dashboard?.stats.sites || 0}
-                  icon={Building2}
-                  onClick={() => goToDashboardSection('sites')}
-                />
-                <OverviewSectionCard
-                  title="الجولات والزيارات الميدانية"
-                  description="توثيق الزيارة، قوائم الفحص، الصور والملاحظات ومتابعة المعالجة."
-                  value={officialBuildings.length}
-                  icon={ClipboardList}
-                  onClick={() => goToDashboardSection('field-visits')}
-                />
-                <OverviewSectionCard
-                  title="الطلبات والصيانة"
-                  description="إدارة الطلبات من التسجيل والمراجعة حتى التنفيذ والإغلاق."
-                  value={(dashboard?.stats.newRequests || 0) + (dashboard?.stats.reviewRequests || 0) + (dashboard?.stats.approvedRequests || 0)}
-                  icon={Wrench}
-                  onClick={() => goToDashboardSection('requests')}
-                />
-                <OverviewSectionCard
-                  title="المصاحف والتقارير"
-                  description="متابعة الأرصدة والجرد والاحتياج، مع تقارير تشغيلية قابلة للطباعة والتصدير."
-                  value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0}
-                  icon={BookOpen}
-                  onClick={() => goToDashboardSection('quran')}
-                />
-              </div>
-            </section>
+              <Card className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+                <CardHeader className="border-b border-slate-100 pb-3"><CardTitle className="text-base font-black text-slate-800">حالة الطلبات</CardTitle><CardDescription>نسبة الإنجاز وتوزيع الطلبات الحالية.</CardDescription></CardHeader>
+                <CardContent className="grid gap-5 p-5 sm:grid-cols-[180px_1fr] sm:items-center">
+                  <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full" style={{ background: `conic-gradient(#006b63 0 ${referenceCompletionPercent}%, #d9a400 ${referenceCompletionPercent}% ${Math.min(100, referenceCompletionPercent + (referenceTrackedRequests.length ? Math.round((referenceInProgressRequests / referenceTrackedRequests.length) * 100) : 0))}%, #e5534b 0)` }}>
+                    <div className="flex h-28 w-28 flex-col items-center justify-center rounded-full bg-white shadow-inner"><span className="text-3xl font-black text-slate-900">{referenceCompletionPercent}%</span><span className="mt-1 text-[10px] font-bold text-slate-500">نسبة الإنجاز</span></div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-[#f8fafb] px-3 py-2.5"><span className="flex items-center gap-2 text-sm font-bold text-slate-600"><span className="h-3 w-3 rounded-full bg-[#006b63]" />مكتملة</span><strong className="text-slate-900">{referenceCompletedRequests}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-[#f8fafb] px-3 py-2.5"><span className="flex items-center gap-2 text-sm font-bold text-slate-600"><span className="h-3 w-3 rounded-full bg-[#d9a400]" />قيد المتابعة</span><strong className="text-slate-900">{referenceInProgressRequests}</strong></div>
+                    <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-[#f8fafb] px-3 py-2.5"><span className="flex items-center gap-2 text-sm font-bold text-slate-600"><span className="h-3 w-3 rounded-full bg-[#e5534b]" />متأخرة</span><strong className="text-slate-900">{referenceLateRequests}</strong></div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-            <Card className={card3d}><CardHeader><CardTitle className="text-[#0b4a3f]">إدارة المنظومة</CardTitle><CardDescription>صلاحيات رئيس الوحدة موزعة إلى مسارات عمل واضحة بدل عرضها كنصوص متفرقة.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="الإشراف الشامل" text="متابعة جميع المساجد والمصليات والطلبات والبلاغات." /><Rule title="الاعتماد" text="اعتماد الطلبات والإجازات والقرارات النهائية." /><Rule title="المؤشرات" text="متابعة الأداء والطلبات المتأخرة والحالات العاجلة." /><Rule title="منسوبو المساجد" text="إدارة ومتابعة الإمام والمؤذن والخطيب والخطيب المتعاون فقط." /></CardContent></Card>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <Card className="rounded-[24px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]"><CardHeader className="pb-3"><div className="flex items-center justify-between"><div><CardTitle className="text-base font-black text-slate-800">آخر طلبات الصيانة والاحتياج</CardTitle><CardDescription>أحدث المعاملات التي تحتاج متابعة.</CardDescription></div><Button variant="ghost" size="sm" className="text-[#006b63]" onClick={() => goToDashboardSection('requests')}>عرض الكل</Button></div></CardHeader><CardContent className="space-y-2">{(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.slice(0, 4).map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <EmptyCompact text="لا توجد طلبات حتى الآن" />}</CardContent></Card>
+              <Card className="rounded-[24px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]"><CardHeader className="pb-3"><div className="flex items-center justify-between"><div><CardTitle className="text-base font-black text-slate-800">آخر البلاغات</CardTitle><CardDescription>بلاغات الزوار ومنسوبي الجامعة.</CardDescription></div><Button variant="ghost" size="sm" className="text-[#006b63]" onClick={() => goToDashboardSection('tickets')}>عرض الكل</Button></div></CardHeader><CardContent className="space-y-2">{(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.slice(0, 4).map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <EmptyCompact text="لا توجد بلاغات حتى الآن" />}</CardContent></Card>
+            </div>
           </>}
 
           {role === 'supervisor' && <>
@@ -4151,6 +4158,8 @@ ${quranStockMovementForm.notes}` : ''}`
             </CardContent>
           </Card>
         </TabsContent>
+          </main>
+        </div>
       </Tabs>
 
       <Dialog open={mediaImportDialog} onOpenChange={(open) => { if (!mediaImportSaving) { setMediaImportDialog(open); if (!open) { setMediaImportRows([]); mediaImportZipRef.current = null; setMediaImportProgress({ done: 0, total: 0, label: '' }); } } }}>
