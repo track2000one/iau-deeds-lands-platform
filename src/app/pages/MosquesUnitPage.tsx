@@ -97,6 +97,33 @@ const roleLabels: Record<MosqueModuleRole, string> = {
 };
 
 const personnelRoleLabels: Record<string, string> = { imam: 'إمام', muezzin: 'مؤذن', khateeb: 'خطيب', collaborating_khateeb: 'خطيب متعاون', collaborator: 'خطيب متعاون' };
+const roleScopeLabel = (role: MosqueModuleRole) => role === 'head'
+  ? 'إدارة كاملة للوحدة'
+  : role === 'supervisor'
+    ? 'إشراف تشغيلي على الوحدة'
+    : role === 'personnel'
+      ? 'وصول مقيد بالموقع المرتبط'
+      : 'وصول خدمات منسوب الجامعة';
+
+const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other' => {
+  const type = String(notice.entityType || '').toLowerCase();
+  const text = `${notice.title || ''} ${notice.message || ''}`.toLowerCase();
+  if (type.includes('request') || text.includes('طلب صيانة') || text.includes('طلب احتياج')) return 'request';
+  if (type.includes('ticket') || text.includes('بلاغ')) return 'ticket';
+  if (type.includes('leave') || text.includes('إجاز') || text.includes('اعتذار')) return 'leave';
+  if (type.includes('quran') || text.includes('مصحف') || text.includes('مصاحف')) return 'quran';
+  if (type.includes('site') || type.includes('mosque') || text.includes('مسجد') || text.includes('مصلى')) return 'site';
+  return 'other';
+};
+
+const notificationCategoryLabel: Record<'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other', string> = {
+  request: 'طلب صيانة / احتياج',
+  ticket: 'بلاغ',
+  site: 'مسجد / مصلى',
+  leave: 'إجازة / اعتذار',
+  quran: 'المصاحف',
+  other: 'إشعار عام',
+};
 const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', jami: 'جامع', prayer_room: 'مصلى' };
 const siteStatusLabels: Record<string, string> = { active: 'نشط', maintenance: 'تحت الصيانة', temporarily_closed: 'مغلق مؤقتًا' };
 const prayerRoomGenderLabels: Record<string, string> = { men: 'رجال', women: 'نساء' };
@@ -225,8 +252,33 @@ const statusBadgeClass = (status: string) => {
   return 'border-sky-300 bg-sky-50 text-sky-700';
 };
 
-const card3d = 'border-slate-200/90 bg-gradient-to-b from-white to-slate-50/80 shadow-[0_6px_0_rgba(51,65,85,0.10),0_13px_26px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,1)]';
-const button3d = 'shadow-[0_4px_0_rgba(71,85,105,0.13),0_7px_12px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,1)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(71,85,105,0.12)]';
+const workflowNextActionLabel = (kind: 'request' | 'ticket' | 'leave' | 'job' | undefined, status: string) => {
+  if (kind === 'request') return ({
+    new: 'المراجعة الأولية',
+    under_review: 'الاعتماد أو الإعادة',
+    approved: 'بدء التنفيذ',
+    in_progress: 'توثيق الإنجاز',
+    completed: 'التحقق والإغلاق',
+    returned_for_edit: 'انتظار إعادة الإرسال',
+    closed: 'مكتمل',
+    rejected: 'مغلق بالرفض',
+  } as Record<string, string>)[status] || 'متابعة الحالة';
+  if (kind === 'ticket') return ({
+    new: 'المراجعة أو الإسناد',
+    under_review: 'الإسناد أو بدء المعالجة',
+    assigned: 'بدء المعالجة',
+    in_progress: 'توثيق الحل',
+    resolved: 'التحقق والإغلاق',
+    closed: 'مكتمل',
+    rejected: 'مغلق بالرفض',
+  } as Record<string, string>)[status] || 'متابعة الحالة';
+  if (kind === 'leave') return ['pending', 'under_review'].includes(status) ? 'المراجعة والاعتماد' : status === 'returned_for_edit' ? 'انتظار إعادة الإرسال' : 'متابعة الحالة';
+  if (kind === 'job') return 'متابعة مرحلة الطلب';
+  return 'متابعة الحالة';
+};
+
+const card3d = 'border-[#dcc58e]/70 bg-gradient-to-b from-white via-[#fffdf7] to-[#f8f2e5]/90 shadow-[0_7px_0_rgba(10,74,63,0.08),0_16px_34px_rgba(6,60,51,0.10),inset_0_1px_0_rgba(255,255,255,1)]';
+const button3d = 'shadow-[0_4px_0_rgba(8,63,53,0.14),0_8px_16px_rgba(8,63,53,0.08),inset_0_1px_0_rgba(255,255,255,0.96)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(8,63,53,0.12)]';
 const siteActionButton = `${button3d} h-10 w-full min-w-0 justify-center gap-1.5 whitespace-nowrap px-2 text-xs font-bold leading-none`;
 
 const emptySite = {
@@ -542,6 +594,13 @@ export const MosquesUnitPage: React.FC = () => {
   const [siteFilterType, setSiteFilterType] = useState('all');
   const [siteFilterPrayerRoomGender, setSiteFilterPrayerRoomGender] = useState<'all' | 'men' | 'women'>('all');
   const [siteFilterStatus, setSiteFilterStatus] = useState('all');
+  const [buildingCoverageSearch, setBuildingCoverageSearch] = useState('');
+  const [buildingCoverageFilter, setBuildingCoverageFilter] = useState('all');
+  const [mapSearch, setMapSearch] = useState('');
+  const [mapLayer, setMapLayer] = useState<'all' | 'sites' | 'buildings'>('all');
+  const [mapSiteType, setMapSiteType] = useState('all');
+  const [mapSiteStatus, setMapSiteStatus] = useState('all');
+  const [mapBuildingCoverage, setMapBuildingCoverage] = useState('all');
   const [siteSortBy, setSiteSortBy] = useState('name');
   const [siteSortDirection, setSiteSortDirection] = useState<'asc' | 'desc'>('asc');
   const [sitePrintColumns, setSitePrintColumns] = useState<SitePrintColumnKey[]>([...DEFAULT_SITE_PRINT_COLUMNS]);
@@ -554,6 +613,14 @@ export const MosquesUnitPage: React.FC = () => {
   const [requestQuickFilter, setRequestQuickFilter] = useState<'all' | 'new' | 'under_review' | 'approved' | 'late'>('all');
   const [ticketQuickFilter, setTicketQuickFilter] = useState<'all' | 'open'>('all');
   const [leaveQuickFilter, setLeaveQuickFilter] = useState<'all' | 'pending'>('all');
+  const [personnelSearch, setPersonnelSearch] = useState('');
+  const [personnelRoleFilter, setPersonnelRoleFilter] = useState('all');
+  const [personnelStatusFilter, setPersonnelStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [roleUserSearch, setRoleUserSearch] = useState('');
+  const [roleUserFilter, setRoleUserFilter] = useState<'all' | MosqueModuleRole>('all');
+  const [notificationSearch, setNotificationSearch] = useState('');
+  const [notificationReadFilter, setNotificationReadFilter] = useState<'all' | 'unread' | 'read'>('all');
+  const [notificationTypeFilter, setNotificationTypeFilter] = useState<'all' | 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other'>('all');
 
   const [buildingDialog, setBuildingDialog] = useState(false);
   const [buildingCoverageReportOpen, setBuildingCoverageReportOpen] = useState(false);
@@ -1490,11 +1557,59 @@ ${quranStockMovementForm.notes}` : ''}`
     setSitePrintOrientation('auto');
   };
 
-  const mapSites = useMemo(() => visibleSites.filter((site) => Number.isFinite(Number(site.latitude)) && Number.isFinite(Number(site.longitude))), [visibleSites]);
+  const filteredCoverageBuildings = useMemo(() => {
+    const q = buildingCoverageSearch.trim().toLowerCase();
+    return officialBuildings.filter((building) => {
+      const matchesSearch = !q || [building.buildingNumber, building.name, building.campusLocation, building.city, building.district]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesCoverage = buildingCoverageFilter === 'all' || building.coverageStatus === buildingCoverageFilter;
+      return matchesSearch && matchesCoverage;
+    });
+  }, [officialBuildings, buildingCoverageSearch, buildingCoverageFilter]);
+
+  const spatialMapSites = useMemo(() => {
+    const q = mapSearch.trim().toLowerCase();
+    return sites.filter((site) => {
+      if (!Number.isFinite(Number(site.latitude)) || !Number.isFinite(Number(site.longitude))) return false;
+      const matchesSearch = !q || [site.name, site.campusLocation, site.city, site.district, site.building?.buildingNumber]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesType = mapSiteType === 'all' || site.siteType === mapSiteType;
+      const matchesStatus = mapSiteStatus === 'all' || site.status === mapSiteStatus;
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  }, [sites, mapSearch, mapSiteType, mapSiteStatus]);
+
+  const spatialMapBuildings = useMemo(() => {
+    const q = mapSearch.trim().toLowerCase();
+    return officialBuildings.filter((building) => {
+      if (!Number.isFinite(Number(building.latitude)) || !Number.isFinite(Number(building.longitude))) return false;
+      const matchesSearch = !q || [building.buildingNumber, building.name, building.campusLocation, building.city, building.district]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesCoverage = mapBuildingCoverage === 'all' || building.coverageStatus === mapBuildingCoverage;
+      return matchesSearch && matchesCoverage;
+    });
+  }, [officialBuildings, mapSearch, mapBuildingCoverage]);
+
+  const mapSites = mapLayer === 'buildings' ? [] : spatialMapSites;
+  const mapBuildings = ['head', 'supervisor'].includes(role) && mapLayer !== 'sites' ? spatialMapBuildings : [];
   const mapCenter: [number, number] = useMemo(() => {
-    if (!mapSites.length) return [26.3927, 50.0438];
-    return [mapSites.reduce((s, x) => s + Number(x.latitude), 0) / mapSites.length, mapSites.reduce((s, x) => s + Number(x.longitude), 0) / mapSites.length];
-  }, [mapSites]);
+    const points = [
+      ...mapSites.map((site) => [Number(site.latitude), Number(site.longitude)] as [number, number]),
+      ...mapBuildings.map((building) => [Number(building.latitude), Number(building.longitude)] as [number, number]),
+    ];
+    if (!points.length) return [26.3927, 50.0438];
+    return [
+      points.reduce((sum, point) => sum + point[0], 0) / points.length,
+      points.reduce((sum, point) => sum + point[1], 0) / points.length,
+    ];
+  }, [mapSites, mapBuildings]);
+
+  const buildingCoveragePercent = officialBuildings.length
+    ? Math.round((officialBuildings.filter((building) => building.coverageStatus === 'covered').length / officialBuildings.length) * 100)
+    : 0;
 
   const publicUrlForSite = (site: MosqueSite) => `${window.location.origin}${window.location.pathname}#/mosques/public?site=${encodeURIComponent(site.publicToken)}`;
 
@@ -2638,6 +2753,100 @@ ${quranStockMovementForm.notes}` : ''}`
   }, [requests, requestQuickFilter]);
   const filteredTickets = useMemo(() => ticketQuickFilter === 'open' ? tickets.filter((item) => !['closed', 'rejected'].includes(item.status)) : tickets, [tickets, ticketQuickFilter]);
   const filteredLeaves = useMemo(() => leaveQuickFilter === 'pending' ? leaves.filter((item) => ['pending', 'under_review'].includes(item.status)) : leaves, [leaves, leaveQuickFilter]);
+  const filteredPersonnel = useMemo(() => {
+    const q = personnelSearch.trim().toLowerCase();
+    return personnel.filter((item) => {
+      const matchesSearch = !q || [item.name, item.mobile, item.email, item.site?.name, sites.find((site) => site.id === item.siteId)?.name]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesRole = personnelRoleFilter === 'all' || item.role === personnelRoleFilter;
+      const matchesStatus = personnelStatusFilter === 'all' || (personnelStatusFilter === 'active' ? item.active : !item.active);
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [personnel, personnelSearch, personnelRoleFilter, personnelStatusFilter, sites]);
+
+  const filteredStaffUsers = useMemo(() => {
+    const q = roleUserSearch.trim().toLowerCase();
+    return staffUsers.filter((user) => {
+      const current = assignments.find((item) => item.userId === user.uid);
+      const effectiveRole = current?.role || user.moduleRole || 'viewer';
+      const siteName = current?.site?.name || sites.find((site) => site.id === (current?.siteId || user.siteId))?.name || '';
+      const matchesSearch = !q || [user.username, user.email, siteName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesRole = roleUserFilter === 'all' || effectiveRole === roleUserFilter || (roleUserFilter === 'university_member' && effectiveRole === 'viewer');
+      return matchesSearch && matchesRole;
+    });
+  }, [staffUsers, assignments, sites, roleUserSearch, roleUserFilter]);
+
+  const filteredNotifications = useMemo(() => {
+    const q = notificationSearch.trim().toLowerCase();
+    return notifications.filter((notice) => {
+      const category = notificationCategory(notice);
+      const matchesSearch = !q || [notice.title, notice.message, notice.entityType]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesRead = notificationReadFilter === 'all'
+        || (notificationReadFilter === 'unread' ? !notice.isRead : notice.isRead);
+      const matchesType = notificationTypeFilter === 'all' || category === notificationTypeFilter;
+      return matchesSearch && matchesRead && matchesType;
+    });
+  }, [notifications, notificationSearch, notificationReadFilter, notificationTypeFilter]);
+
+  const openNotificationTarget = async (notice: MosqueNotification) => {
+    if (!notice.isRead) {
+      try {
+        await mosqueApi.readNotification(notice.id);
+        setNotifications((current) => current.map((item) => item.id === notice.id ? { ...item, isRead: true } : item));
+      } catch {
+        // Navigation should still work even if marking the notification as read fails.
+      }
+    }
+
+    const category = notificationCategory(notice);
+    const entityId = notice.entityId || '';
+
+    if (category === 'request') {
+      const item = requests.find((row) => row.id === entityId);
+      setActiveTab('requests');
+      if (item) setViewingWorkflow({ kind: 'request', item });
+      return;
+    }
+    if (category === 'ticket') {
+      const item = tickets.find((row) => row.id === entityId);
+      setActiveTab('tickets');
+      if (item) setViewingWorkflow({ kind: 'ticket', item });
+      return;
+    }
+    if (category === 'leave') {
+      const item = leaves.find((row) => row.id === entityId);
+      setActiveTab('leaves');
+      if (item) setViewingWorkflow({ kind: 'leave', item });
+      return;
+    }
+    if (category === 'site') {
+      const site = sites.find((row) => row.id === entityId);
+      setActiveTab('sites');
+      if (site) setPreviewSite(site);
+      return;
+    }
+    if (category === 'quran') {
+      setActiveTab('quran');
+      return;
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    const unread = notifications.filter((notice) => !notice.isRead);
+    if (!unread.length) return;
+    try {
+      await Promise.all(unread.map((notice) => mosqueApi.readNotification(notice.id)));
+      setNotifications((current) => current.map((notice) => ({ ...notice, isRead: true })));
+      toast.success('تم تحديد جميع الإشعارات كمقروءة');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحديث جميع الإشعارات');
+    }
+  };
 
   const goToDashboardSection = (tab: string, filters: { request?: 'all' | 'new' | 'under_review' | 'approved' | 'late'; ticket?: 'all' | 'open'; leave?: 'all' | 'pending' } = {}) => {
     setRequestQuickFilter(filters.request || 'all');
@@ -2653,32 +2862,48 @@ ${quranStockMovementForm.notes}` : ''}`
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1760px] space-y-5 p-1 sm:p-3 md:p-5" dir="rtl">
-      <section className="relative overflow-hidden rounded-[28px] border border-sky-200/70 bg-gradient-to-l from-white via-sky-50/70 to-emerald-50/40 p-5 shadow-[0_12px_35px_rgba(15,23,42,0.08)] md:p-7">
-        <div className="absolute -left-16 -top-20 h-52 w-52 rounded-full bg-sky-300/20 blur-3xl" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">وحدة تشغيلية متكاملة</Badge>
-              <Badge variant="outline" className="border-sky-300 bg-white text-sky-700"><Shield className="ml-1 h-3.5 w-3.5" />{fullPermissionAccess ? 'مسؤول الوحدة — صلاحية كاملة' : role === 'personnel' && myPersonnelRole ? personnelRoleLabels[myPersonnelRole] || myPersonnelRole : roleLabels[role]}</Badge>
+    <div className="mx-auto w-full max-w-[1760px] space-y-5 rounded-[30px] bg-[radial-gradient(circle_at_top_right,rgba(198,156,60,0.12),transparent_24%),linear-gradient(180deg,#fffdf8_0%,#f8f2e6_46%,#f3eee4_100%)] p-1 sm:p-3 md:p-5" dir="rtl">
+      <section className="relative overflow-hidden rounded-[30px] border border-[#d6b46a]/80 bg-[linear-gradient(135deg,#073f35_0%,#0b5a49_52%,#073a32_100%)] p-5 text-white shadow-[0_22px_60px_rgba(6,60,51,0.24)] md:p-7">
+        <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_12%_20%,rgba(255,255,255,0.18)_0_1px,transparent_1.5px),radial-gradient(circle_at_88%_18%,rgba(214,180,106,0.22)_0_1px,transparent_1.5px)] [background-size:24px_24px,34px_34px]" />
+        <div className="pointer-events-none absolute -left-16 -top-24 h-64 w-64 rounded-full border border-[#d6b46a]/30 bg-[#d6b46a]/10 blur-[1px]" />
+        <div className="pointer-events-none absolute -bottom-24 right-[-30px] h-72 w-72 rounded-full border border-white/10 bg-white/5" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-4xl">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="border-[#dfc37f]/70 bg-[#d6b46a]/15 text-[#f7dfaa]">منصة تشغيلية متكاملة</Badge>
+              <Badge variant="outline" className="border-white/25 bg-white/10 text-white"><Shield className="ml-1 h-3.5 w-3.5 text-[#e6c878]" />{fullPermissionAccess ? 'مسؤول الوحدة — صلاحية كاملة' : role === 'personnel' && myPersonnelRole ? personnelRoleLabels[myPersonnelRole] || myPersonnelRole : roleLabels[role]}</Badge>
             </div>
-            <h1 className="text-2xl font-black text-slate-900 md:text-4xl">وحدة العناية بالمساجد والمصليات الجامعية</h1>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-slate-600 md:text-base">إدارة المساجد والمصليات، الطلبات والصيانة، البلاغات، الإجازات، التوظيف، الخرائط، التقارير والإشعارات ضمن مسار حوكمة موحد.</p>
+            <div className="flex items-center gap-3">
+              <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/60 bg-white/10 text-[#f0d18b] shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] sm:flex">
+                <Building2 className="h-7 w-7" />
+              </div>
+              <div>
+                <p className="text-xs font-bold tracking-wide text-[#e6c878]">جامعة الإمام عبدالرحمن بن فيصل</p>
+                <h1 className="mt-1 text-2xl font-black text-white md:text-4xl">وحدة العناية بالمساجد والمصليات الجامعية</h1>
+              </div>
+            </div>
+            <p className="mt-3 max-w-4xl text-sm leading-7 text-emerald-50/90 md:text-base">إدارة متكاملة للمساجد والمصليات والجولات الميدانية والصيانة والبلاغات والمصاحف والتقارير ضمن مسار موحد يحفظ الأعمال ويسهّل المتابعة.</p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-emerald-50/90">
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5">الجولات الميدانية</span>
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5">الصيانة والتشغيل</span>
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5">التقارير والمؤشرات</span>
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5">إدارة المصاحف</span>
+            </div>
           </div>
-                    <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-[580px] lg:shrink-0">
-            {canAdd && ['head', 'supervisor'].includes(role) && <Button className={`${button3d} min-h-12 w-full border border-emerald-700 bg-emerald-600 px-5 text-base font-black text-white shadow-[0_5px_0_rgba(4,120,87,0.22),0_10px_20px_rgba(5,150,105,0.16)] hover:border-emerald-800 hover:bg-emerald-700 hover:text-white focus-visible:ring-emerald-500 sm:col-span-2`} onClick={() => openSiteDialog()}><Plus className="ml-2 h-5 w-5 text-white" />إضافة مسجد / مصلى</Button>}
-            {['head', 'supervisor'].includes(role) && <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-slate-300 bg-white font-bold text-slate-800 hover:border-sky-300 hover:bg-sky-50`} onClick={() => goToDashboardSection('field-visits')}><ClipboardList className="ml-2 h-4 w-4 text-sky-700" />الجولات والزيارات</Button>}
-            <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-slate-300 bg-white font-bold text-slate-800 hover:border-sky-300 hover:bg-sky-50`} onClick={() => navigate('/mosques/public')}><ExternalLink className="ml-2 h-4 w-4 text-sky-700" />البوابة العامة</Button>
-            <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-slate-300 bg-white font-bold text-slate-800 hover:border-slate-400 hover:bg-slate-50`} onClick={loadAll}><RefreshCw className="ml-2 h-4 w-4 text-slate-600" />تحديث</Button>
-            {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-slate-300 bg-white font-bold text-slate-800 hover:border-slate-400 hover:bg-slate-50`} onClick={openMediaImportDialog}><FileText className="ml-2 h-4 w-4 text-slate-600" />استيراد مكتبة ZIP</Button>}
+          <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-[580px] lg:shrink-0">
+            {canAdd && ['head', 'supervisor'].includes(role) && <Button className={`${button3d} min-h-12 w-full border border-[#e1bd68] bg-[#d6b46a] px-5 text-base font-black text-[#083f35] hover:bg-[#e0c27c] hover:text-[#083f35] sm:col-span-2`} onClick={() => openSiteDialog()}><Plus className="ml-2 h-5 w-5" />إضافة مسجد / مصلى</Button>}
+            {['head', 'supervisor'].includes(role) && <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-white/25 bg-white/10 font-bold text-white hover:border-[#d6b46a]/70 hover:bg-white/15 hover:text-white`} onClick={() => goToDashboardSection('field-visits')}><ClipboardList className="ml-2 h-4 w-4 text-[#f0d18b]" />الجولات والزيارات</Button>}
+            <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-white/25 bg-white/10 font-bold text-white hover:border-[#d6b46a]/70 hover:bg-white/15 hover:text-white`} onClick={() => navigate('/mosques/public')}><ExternalLink className="ml-2 h-4 w-4 text-[#f0d18b]" />البوابة العامة</Button>
+            <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-white/25 bg-white/10 font-bold text-white hover:border-[#d6b46a]/70 hover:bg-white/15 hover:text-white`} onClick={loadAll}><RefreshCw className="ml-2 h-4 w-4 text-[#f0d18b]" />تحديث</Button>
+            {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" className={`${button3d} min-h-11 w-full justify-center border-white/25 bg-white/10 font-bold text-white hover:border-[#d6b46a]/70 hover:bg-white/15 hover:text-white`} onClick={openMediaImportDialog}><FileText className="ml-2 h-4 w-4 text-[#f0d18b]" />استيراد مكتبة ZIP</Button>}
           </div>
         </div>
       </section>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         {/* STICKY_UNIT_NAV_V2: navigation stays above KPI cards and remains visible while scrolling on desktop and mobile. */}
-        <div className="sticky top-0 z-40 -mx-1 rounded-2xl border border-slate-200/80 bg-white/95 p-1.5 shadow-[0_10px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl supports-[backdrop-filter]:bg-white/85">
-          <div className="relative overflow-hidden rounded-2xl border border-emerald-300/90 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-3 shadow-[0_10px_28px_rgba(5,150,105,0.10),0_0_0_1px_rgba(16,185,129,0.08),0_0_24px_rgba(45,212,191,0.12)] ring-1 ring-emerald-100/80 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:border before:border-emerald-300/60 before:opacity-35 before:content-[''] before:animate-pulse motion-reduce:before:animate-none sm:hidden">
+        <div className="sticky top-0 z-40 -mx-1 rounded-2xl border border-[#d6b46a]/55 bg-[#fffdf8]/95 p-1.5 shadow-[0_10px_30px_rgba(6,60,51,0.13)] backdrop-blur-xl supports-[backdrop-filter]:bg-[#fffdf8]/90">
+          <div className="relative overflow-hidden rounded-2xl border border-[#d6b46a]/70 bg-gradient-to-br from-[#fff8e8] via-white to-emerald-50 p-3 shadow-[0_10px_28px_rgba(6,60,51,0.10),0_0_0_1px_rgba(214,180,106,0.10)] ring-1 ring-[#e8d7ad]/80 before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:border before:border-[#d6b46a]/35 before:opacity-40 before:content-[''] sm:hidden">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold text-emerald-800">التنقل بين أقسام الوحدة</p>
@@ -2687,7 +2912,7 @@ ${quranStockMovementForm.notes}` : ''}`
             {unreadNotifications > 0 && role !== 'university_member' && role !== 'viewer' && <Badge className="shrink-0 bg-amber-500 text-white">{unreadNotifications} إشعار</Badge>}
           </div>
           <NativeSelect
-            className="h-12 w-full rounded-xl border-sky-200 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm focus:border-sky-400"
+            className="h-12 w-full rounded-xl border-[#d6b46a]/70 bg-white px-3 text-sm font-bold text-[#0b4a3f] shadow-sm focus:border-[#0b5a49]"
             value={activeTab}
             onChange={(e) => handleTabChange(e.target.value)}
             aria-label="اختيار قسم وحدة المساجد والمصليات"
@@ -2709,7 +2934,7 @@ ${quranStockMovementForm.notes}` : ''}`
           </NativeSelect>
         </div>
 
-        <TabsList className="hidden h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-sky-200/80 bg-white/95 p-2 shadow-sm sm:flex [&>[data-slot=tabs-trigger]]:min-w-max [&>[data-slot=tabs-trigger]]:flex-none">
+        <TabsList className="hidden h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-[#d6b46a]/55 bg-[#0b4a3f] p-2 shadow-[0_8px_24px_rgba(6,60,51,0.16)] sm:flex [&>[data-slot=tabs-trigger]]:min-w-max [&>[data-slot=tabs-trigger]]:flex-none [&>[data-slot=tabs-trigger]]:text-emerald-50 [&>[data-state=active]]:bg-[#d6b46a] [&>[data-state=active]]:text-[#083f35] [&>[data-state=active]]:shadow-sm">
           <TabsTrigger value="overview">الرئيسية</TabsTrigger>
           <TabsTrigger value="sites">المساجد والمصليات</TabsTrigger>
           {['head', 'supervisor'].includes(role) && <TabsTrigger value="buildings">تغطية المباني بخدمة الصلاة</TabsTrigger>}
@@ -2727,147 +2952,16 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsList>
         </div>
 
-        {/* QURAN_TOP_SEARCH_V1: show Quran search immediately below navigation and above KPI cards. */}
-        {activeTab === 'quran' && <div className="grid gap-3 rounded-2xl border-2 border-sky-300 bg-gradient-to-l from-sky-100 via-sky-50 to-white p-3 shadow-[0_8px_24px_rgba(14,165,233,0.16)] md:grid-cols-[1fr_220px_auto] md:items-center">
-          <div className="relative"><Search className="absolute right-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-sky-700" /><Input className="h-12 rounded-xl border-2 border-sky-500 bg-white pr-11 text-sm font-bold text-slate-900 shadow-[0_4px_12px_rgba(14,165,233,0.16),inset_0_1px_0_rgba(255,255,255,0.95)] placeholder:font-semibold placeholder:text-slate-600 focus-visible:border-sky-600 focus-visible:bg-sky-50 focus-visible:ring-4 focus-visible:ring-sky-200/80 focus-visible:ring-offset-0" value={quranSearch} onChange={(e) => setQuranSearch(e.target.value)} placeholder="بحث باسم المسجد أو المصلى أو المدينة أو الموقع..." /></div>
-          <label className={`flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 text-sm font-bold ${quranNeedOnly ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-sky-200 bg-white text-slate-700'}`}><input type="checkbox" className="h-4 w-4 accent-amber-600" checked={quranNeedOnly} onChange={(e) => setQuranNeedOnly(e.target.checked)} />المواقع التي لديها احتياج فقط</label>
-          <Badge variant="outline" className="h-10 justify-center border-sky-300 bg-white px-3 font-bold text-sky-800">تم جرد {quranSummary.countedSites} من {quranSummary.sites}</Badge>
+        {/* Quran inventory search — filters the operational inventory cards below. */}
+        {activeTab === 'quran' && <div className="grid gap-3 rounded-2xl border border-[#e2d4b4] bg-[#fffdf8] p-3 shadow-[0_8px_22px_rgba(6,60,51,0.06)] md:grid-cols-[1fr_240px_auto] md:items-center">
+          <div className="relative"><Search className="absolute right-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-12 rounded-xl border-[#d9c9a5] bg-white pr-11 text-sm font-bold text-slate-900 placeholder:font-medium placeholder:text-slate-500 focus-visible:border-[#0b5a49] focus-visible:ring-[#0b5a49]/20" value={quranSearch} onChange={(e) => setQuranSearch(e.target.value)} placeholder="بحث باسم المسجد أو المصلى أو المدينة أو الموقع..." />{quranSearch && <Button type="button" size="icon" variant="ghost" className="absolute left-1.5 top-1/2 h-8 w-8 -translate-y-1/2 text-slate-400" onClick={() => setQuranSearch('')}><X className="h-4 w-4" /></Button>}</div>
+          <label className={`flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 text-sm font-bold ${quranNeedOnly ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-[#d9c9a5] bg-white text-slate-700'}`}><input type="checkbox" className="h-4 w-4 accent-amber-600" checked={quranNeedOnly} onChange={(e) => setQuranNeedOnly(e.target.checked)} />المواقع التي لديها احتياج فقط</label>
+          <Badge variant="outline" className="h-10 justify-center border-[#d6b46a]/55 bg-white px-3 font-bold text-[#0b4a3f]">تم جرد {quranSummary.countedSites} من {quranSummary.sites}</Badge>
         </div>}
 
-        {/* QURAN_LIVE_SEARCH_CARDS_V3: full inventory cards directly below the live search field. */}
-        {activeTab === 'quran' && quranSearch.trim() && <section className="overflow-hidden rounded-2xl border-2 border-sky-200 bg-white shadow-[0_12px_30px_rgba(14,165,233,0.12)]">
-          <div className="flex flex-col gap-3 border-b border-sky-100 bg-gradient-to-l from-sky-100/90 via-sky-50 to-white px-4 py-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-200 bg-white text-sky-700 shadow-sm">
-                <Search className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-black text-slate-900">نتائج البحث المباشر</p>
-                  <Badge variant="outline" className="border-sky-300 bg-white text-sky-800">{filteredQuranInventoryItems.length} نتيجة</Badge>
-                </div>
-                <p className="mt-0.5 text-xs font-medium text-slate-500">تظهر بطاقة المسجد أو المصلى كاملة بجميع بيانات الرصيد والإجراءات مباشرة تحت البحث.</p>
-              </div>
-            </div>
-            <Button type="button" size="sm" variant="outline" className={button3d + ' h-9 shrink-0 border-slate-200 bg-white text-slate-600 hover:bg-slate-50'} onClick={() => setQuranSearch('')}>
-              <X className="ml-1 h-4 w-4" />مسح البحث
-            </Button>
-          </div>
 
-          {filteredQuranInventoryItems.length ? <div className="grid gap-4 p-3 xl:grid-cols-2">
-            {filteredQuranInventoryItems.slice(0, 6).map((item, index) => {
-              const site = sites.find((row) => row.id === item.site.id) || item.site as MosqueSite;
-              const latest = item.latest;
-              const stockRow = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id);
-              const systemStock = stockRow?.systemStock;
-              const withdrawnStock = stockRow?.withdrawnStock;
-              const largeCount = systemStock?.largeCount ?? latest?.largeCount ?? 0;
-              const mediumCount = systemStock?.mediumCount ?? latest?.mediumCount ?? 0;
-              const smallCount = systemStock?.smallCount ?? latest?.smallCount ?? 0;
-              const totalCount = systemStock?.totalCount ?? latest?.totalCount ?? 0;
-              const needCount = Number(stockRow?.needCount || 0);
-              const baselineCounted = Boolean(quranOpeningBaselineStatus?.items.find((row) => row.site.id === site.id)?.counted);
-              const canManageTarget = canEdit && ['head', 'supervisor'].includes(role);
-              const canManageBaseline = role === 'head' && quranOpeningBaselineStatus && !quranOpeningBaselineStatus.closed;
-              const coverageClass = stockRow?.needLevel === 'complete'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : stockRow?.needLevel === 'low'
-                  ? 'border-amber-200 bg-amber-50 text-amber-800'
-                  : stockRow?.needLevel === 'medium'
-                    ? 'border-orange-200 bg-orange-50 text-orange-800'
-                    : 'border-red-200 bg-red-50 text-red-700';
 
-              return <Card key={'quick-full-' + item.site.id} className={`${card3d} overflow-hidden rounded-2xl ${index === 0 ? 'ring-2 ring-sky-300/80' : ''}`}>
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-700">
-                        <Building2 className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="break-words text-base font-black text-slate-900 sm:text-lg">{item.site.name}</p>
-                          {index === 0 && <Badge className="shrink-0 bg-sky-600 text-white">الأقرب للبحث</Badge>}
-                        </div>
-                        <p className="mt-1 flex items-start gap-1 text-xs leading-5 text-slate-500">
-                          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          <span>{siteTypeDisplayLabel(item.site as MosqueSite)} — {item.site.campusLocation || item.site.city || '-'}</span>
-                        </p>
-                      </div>
-                    </div>
-                    {needCount > 0
-                      ? <Badge variant="outline" className="shrink-0 border-amber-300 bg-amber-50 text-amber-800">احتياج {needCount}</Badge>
-                      : <Badge variant="outline" className="shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700">مكتمل</Badge>}
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 text-center">
-                      <p className="text-[11px] font-bold text-slate-500">الإجمالي</p>
-                      <p className="mt-1 text-2xl font-black text-emerald-700">{totalCount}</p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-3 text-center">
-                      <p className="text-[11px] font-bold text-slate-500">كبيرة</p>
-                      <p className="mt-1 text-xl font-black text-slate-800">{largeCount}</p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-3 text-center">
-                      <p className="text-[11px] font-bold text-slate-500">متوسطة</p>
-                      <p className="mt-1 text-xl font-black text-slate-800">{mediumCount}</p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-3 text-center">
-                      <p className="text-[11px] font-bold text-slate-500">صغيرة</p>
-                      <p className="mt-1 text-xl font-black text-slate-800">{smallCount}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-center">
-                      <p className="text-[10px] font-bold text-slate-500">المسحوبة</p>
-                      <p className="mt-1 font-black text-red-600">{withdrawnStock?.totalCount ?? 0}</p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-center">
-                      <p className="text-[10px] font-bold text-slate-500">المستهدف</p>
-                      <p className="mt-1 font-black text-slate-800">{stockRow?.targetCount ? stockRow.targetCount : 'غير محدد'}</p>
-                    </div>
-                    <div className={`rounded-xl border px-3 py-2 text-center ${stockRow?.coveragePercent != null ? coverageClass : 'border-slate-200 bg-slate-50/70 text-slate-500'}`}>
-                      <p className="text-[10px] font-bold opacity-80">التغطية</p>
-                      <p className="mt-1 font-black">{stockRow?.coveragePercent != null ? `${stockRow.coveragePercent}%` : '-'}</p>
-                    </div>
-                    <div className={`rounded-xl border px-3 py-2 text-center ${needCount > 0 ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                      <p className="text-[10px] font-bold opacity-80">الاحتياج</p>
-                      <p className="mt-1 font-black">{needCount}</p>
-                    </div>
-                    <div className="col-span-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-center sm:col-span-1">
-                      <p className="text-[10px] font-bold text-slate-500">آخر جرد</p>
-                      <p className="mt-1 text-xs font-black text-slate-700">{latest ? new Date(latest.countedAt).toLocaleDateString('ar-SA-u-ca-gregory') : 'لم يجرد'}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 border-t border-slate-100 pt-4">
-                    {(canManageTarget || canManageBaseline) && <div className={`grid gap-2 ${canManageTarget && canManageBaseline ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                      {canManageTarget && <Button size="sm" variant="outline" className={`${button3d} h-11 border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100`} onClick={() => openSiteDialog(site)}><Pencil className="ml-1 h-4 w-4" />ضبط المستهدف</Button>}
-                      {canManageBaseline && <Button size="sm" className={`${button3d} h-11 border border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200 hover:text-slate-900`} onClick={() => openQuranOpeningBaselineForSite(site)}><ClipboardList className="ml-1 h-4 w-4" />{baselineCounted ? 'تحديث الجرد التأسيسي' : 'الجرد التأسيسي'}</Button>}
-                    </div>}
-                    {role === 'head' && <Button size="sm" className={`${button3d} mt-2 h-12 w-full border border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-600`} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-4 w-4" />إضافة مصحف من المكتبة</Button>}
-                    <div className={`mt-2 grid gap-2 ${role === 'head' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                      {role === 'head' && <Button size="sm" className={`${button3d} h-11 border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:text-amber-900`} onClick={() => openQuranWithdrawalForSite(site)}><RefreshCw className="ml-1 h-4 w-4" />سحب مصاحف</Button>}
-                      <Button size="sm" variant="outline" className={`${button3d} h-11`} onClick={() => openQuranHistory(site)}><Clock3 className="ml-1 h-4 w-4" />السجل</Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>;
-            })}
-          </div> : <div className="p-4">
-            <div className="rounded-xl border border-dashed border-sky-300 bg-sky-50/60 px-4 py-7 text-center">
-              <Search className="mx-auto h-7 w-7 text-sky-400" />
-              <p className="mt-2 text-sm font-black text-slate-700">لا توجد نتيجة مطابقة</p>
-              <p className="mt-1 text-xs text-slate-500">جرّب اسمًا أقصر، أو ابحث باسم المسجد أو المصلى أو المدينة أو الموقع.</p>
-            </div>
-          </div>}
-
-          {filteredQuranInventoryItems.length > 6 && <div className="border-t border-sky-100 bg-sky-50/50 px-4 py-2.5 text-center text-xs font-bold text-sky-800">يتم عرض أول 6 نتائج من أصل {filteredQuranInventoryItems.length} — استمر في الكتابة لتضييق النتائج.</div>}
-        </section>}
-
-      {role === 'head' && <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-9">
+      {activeTab !== 'overview' && activeTab !== 'quran' && role === 'head' && <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-9">
         <Stat title="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} onClick={() => goToDashboardSection('sites')} />
         <Stat title="إجمالي المصاحف" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
         <Stat title="طلبات جديدة" value={dashboard?.stats.newRequests || 0} icon={ClipboardList} onClick={() => goToDashboardSection('requests', { request: 'new' })} />
@@ -2879,7 +2973,7 @@ ${quranStockMovementForm.notes}` : ''}`
         <Stat title="طلبات توظيف" value={dashboard?.stats.jobs || 0} icon={Briefcase} onClick={() => goToDashboardSection('jobs')} />
       </div>}
 
-      {role === 'supervisor' && <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
+      {activeTab !== 'overview' && activeTab !== 'quran' && role === 'supervisor' && <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
         <Stat title="المساجد التابعة لي" value={dashboard?.stats.managedSites || 0} icon={Building2} />
         <Stat title="إجمالي المصاحف" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
         <Stat title="طلبات تحتاج متابعة" value={dashboard?.stats.assignedRequests || 0} icon={ClipboardList} />
@@ -2889,7 +2983,7 @@ ${quranStockMovementForm.notes}` : ''}`
         <Stat title="التنبيهات" value={unreadNotifications} icon={Bell} />
       </div>}
 
-      {role === 'personnel' && <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+      {activeTab !== 'overview' && activeTab !== 'quran' && role === 'personnel' && <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         <Stat title="الموقع المرتبط" value={linkedSite ? 1 : 0} icon={Building2} />
         <Stat title="مصاحف الموقع" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
         <Stat title="طلباتي الحالية" value={dashboard?.stats.myRequests || activeMyRequests.length} icon={ClipboardList} />
@@ -2902,11 +2996,88 @@ ${quranStockMovementForm.notes}` : ''}`
 
         <TabsContent value="overview" className="space-y-4">
           {role === 'head' && <>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card className={card3d}><CardHeader><CardTitle>آخر طلبات الصيانة والاحتياج</CardTitle><CardDescription>أحدث العمليات داخل منظومة الوحدة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد طلبات حتى الآن" />}</CardContent></Card>
-              <Card className={card3d}><CardHeader><CardTitle>آخر البلاغات</CardTitle><CardDescription>بلاغات الزوار ومنسوبي الجامعة التي تحتاج متابعة.</CardDescription></CardHeader><CardContent className="space-y-2">{(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <Empty text="لا توجد بلاغات حتى الآن" />}</CardContent></Card>
-            </div>
-            <Card className={card3d}><CardHeader><CardTitle>إدارة المنظومة</CardTitle><CardDescription>رئيس الوحدة يملك الرؤية الشاملة والتقارير والإعدادات واعتماد الإجراءات.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="الإشراف الشامل" text="متابعة جميع المساجد والمصليات والطلبات والبلاغات." /><Rule title="الاعتماد" text="اعتماد الطلبات والإجازات والقرارات النهائية." /><Rule title="المؤشرات" text="متابعة الأداء والطلبات المتأخرة والحالات العاجلة." /><Rule title="منسوبو المساجد" text="إدارة ومتابعة الإمام والمؤذن والخطيب والخطيب المتعاون فقط." /></CardContent></Card>
+            <section className="grid gap-5 xl:grid-cols-[1.55fr_0.95fr]">
+              <Card className={`${card3d} overflow-hidden rounded-[26px]`}>
+                <CardHeader className="border-b border-[#e7d9b8] bg-white/85 pb-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-[#fff8e8] text-[#8a6a1f]">لوحة المتابعة التشغيلية</Badge>
+                      <CardTitle className="text-xl font-black text-[#0b4a3f] md:text-2xl">صورة موحدة لأعمال الوحدة</CardTitle>
+                      <CardDescription className="mt-1 leading-6">متابعة المواقع والطلبات والبلاغات والمصاحف من شاشة واحدة، مع انتقال مباشر لكل قسم.</CardDescription>
+                    </div>
+                    <Button className={`${button3d} border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]`} onClick={() => goToDashboardSection('reports')}><BarChart3 className="ml-2 h-4 w-4" />التقارير</Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-5 p-4 sm:p-5">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <OverviewMetric label="المساجد والمصليات" value={dashboard?.stats.sites || 0} icon={Building2} onClick={() => goToDashboardSection('sites')} />
+                    <OverviewMetric label="إجمالي المصاحف" value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0} icon={BookOpen} onClick={() => goToDashboardSection('quran')} />
+                    <OverviewMetric label="طلبات تحتاج متابعة" value={(dashboard?.stats.newRequests || 0) + (dashboard?.stats.reviewRequests || 0)} icon={ClipboardList} onClick={() => goToDashboardSection('requests')} />
+                    <OverviewMetric label="بلاغات مفتوحة" value={dashboard?.stats.openTickets || 0} icon={MessageSquare} onClick={() => goToDashboardSection('tickets')} />
+                  </div>
+
+                  <div className="rounded-[22px] border border-[#e3d7bb] bg-[#fbf8f1] p-3 sm:p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-black text-[#0b4a3f]">آخر الحركة التشغيلية</p>
+                        <p className="mt-0.5 text-xs text-slate-500">أحدث الطلبات والبلاغات التي تتطلب المتابعة.</p>
+                      </div>
+                      <Badge variant="outline" className="border-[#d6b46a]/50 bg-white text-[#0b4a3f]">محدث من بيانات المنصة</Badge>
+                    </div>
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1"><span className="text-sm font-black text-slate-700">طلبات الصيانة والاحتياج</span><Button variant="ghost" size="sm" className="h-8 text-xs text-[#0b5a49]" onClick={() => goToDashboardSection('requests')}>عرض الكل</Button></div>
+                        {(dashboard?.recentRequests || []).length ? dashboard!.recentRequests.slice(0, 3).map((item) => <MiniRow key={item.id} title={`${item.requestNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <EmptyCompact text="لا توجد طلبات حتى الآن" />}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1"><span className="text-sm font-black text-slate-700">البلاغات</span><Button variant="ghost" size="sm" className="h-8 text-xs text-[#0b5a49]" onClick={() => goToDashboardSection('tickets')}>عرض الكل</Button></div>
+                        {(dashboard?.recentTickets || []).length ? dashboard!.recentTickets.slice(0, 3).map((item) => <MiniRow key={item.id} title={`${item.ticketNumber} — ${item.site?.name || ''}`} subtitle={item.description} status={item.status} />) : <EmptyCompact text="لا توجد بلاغات حتى الآن" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('field-visits')}><ClipboardList className="ml-2 h-4 w-4" />جولة ميدانية</Button>
+                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('quran')}><BookOpen className="ml-2 h-4 w-4" />المصاحف</Button>
+                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('team')}><Users className="ml-2 h-4 w-4" />منسوبو المساجد</Button>
+                    <Button variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]`} onClick={() => goToDashboardSection('map')}><MapPin className="ml-2 h-4 w-4" />الخريطة</Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid content-start gap-3">
+                <OverviewSectionCard
+                  title="المساجد والمصليات"
+                  description="السجل التشغيلي للمواقع، البيانات الأساسية، الخرائط، QR والمرفقات."
+                  value={dashboard?.stats.sites || 0}
+                  icon={Building2}
+                  onClick={() => goToDashboardSection('sites')}
+                />
+                <OverviewSectionCard
+                  title="الجولات والزيارات الميدانية"
+                  description="توثيق الزيارة، قوائم الفحص، الصور والملاحظات ومتابعة المعالجة."
+                  value={officialBuildings.length}
+                  icon={ClipboardList}
+                  onClick={() => goToDashboardSection('field-visits')}
+                />
+                <OverviewSectionCard
+                  title="الطلبات والصيانة"
+                  description="إدارة الطلبات من التسجيل والمراجعة حتى التنفيذ والإغلاق."
+                  value={(dashboard?.stats.newRequests || 0) + (dashboard?.stats.reviewRequests || 0) + (dashboard?.stats.approvedRequests || 0)}
+                  icon={Wrench}
+                  onClick={() => goToDashboardSection('requests')}
+                />
+                <OverviewSectionCard
+                  title="المصاحف والتقارير"
+                  description="متابعة الأرصدة والجرد والاحتياج، مع تقارير تشغيلية قابلة للطباعة والتصدير."
+                  value={quranStockDashboard?.summary.siteSystemTotal ?? quranSummary.total ?? 0}
+                  icon={BookOpen}
+                  onClick={() => goToDashboardSection('quran')}
+                />
+              </div>
+            </section>
+
+            <Card className={card3d}><CardHeader><CardTitle className="text-[#0b4a3f]">إدارة المنظومة</CardTitle><CardDescription>صلاحيات رئيس الوحدة موزعة إلى مسارات عمل واضحة بدل عرضها كنصوص متفرقة.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Rule title="الإشراف الشامل" text="متابعة جميع المساجد والمصليات والطلبات والبلاغات." /><Rule title="الاعتماد" text="اعتماد الطلبات والإجازات والقرارات النهائية." /><Rule title="المؤشرات" text="متابعة الأداء والطلبات المتأخرة والحالات العاجلة." /><Rule title="منسوبو المساجد" text="إدارة ومتابعة الإمام والمؤذن والخطيب والخطيب المتعاون فقط." /></CardContent></Card>
           </>}
 
           {role === 'supervisor' && <>
@@ -2930,22 +3101,35 @@ ${quranStockMovementForm.notes}` : ''}`
 
         <TabsContent value="sites" className="space-y-4">
           <Card className="overflow-hidden border-sky-200/70 bg-white/85 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-            <CardHeader className="border-b border-sky-100/80 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/75 pb-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2 text-lg"><Filter className="h-5 w-5 text-sky-700" />التصفية والفرز للطباعة</CardTitle>
-                  <CardDescription className="mt-1">حدد السجلات ورتبها كما تريد؛ نفس النتائج الظاهرة هي التي ستُطبع أو تحفظ PDF.</CardDescription>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">سجل المواقع</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]"><Building2 className="h-5 w-5" />المساجد والمصليات الجامعية</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">استعرض كل مسجد ومصلى كبطاقة تشغيلية تجمع الموقع والمنسوبين والطلبات والبلاغات والمصاحف، مع أدوات البحث والتقرير في نفس الصفحة.</CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" className={button3d} onClick={resetSiteFilters}><X className="ml-2 h-4 w-4" />مسح التصفية</Button>
-                  {canPrint && visibleSites.length > 0 && <Button variant="outline" className={button3d} onClick={() => printSitesTable(visibleSites, 'preview')}><Eye className="ml-2 h-4 w-4" />معاينة التقرير</Button>}
-                  {canPrint && visibleSites.length > 0 && <Button className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={() => exportSitesExcel(visibleSites)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel ({visibleSites.length})</Button>}
-                  {canPrint && visibleSites.length > 0 && <Button className={`${button3d} bg-sky-700 hover:bg-sky-800`} onClick={() => printSitesTable(visibleSites, 'print')}><Printer className="ml-2 h-4 w-4" />طباعة / PDF كجدول ({visibleSites.length})</Button>}
+                  {canAdd && ['head', 'supervisor'].includes(role) && <Button className={`${button3d} border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]`} onClick={() => openSiteDialog()}><Plus className="ml-2 h-4 w-4" />إضافة مسجد / مصلى</Button>}
+                  <Button variant="outline" className={`${button3d} border-[#d9c9a5] bg-white text-[#0b4a3f]`} onClick={resetSiteFilters}><X className="ml-2 h-4 w-4" />مسح التصفية</Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <SiteRegistryMetric label="السجلات الظاهرة" value={siteFilterStats.total} />
+                <SiteRegistryMetric label="المساجد والجوامع" value={siteFilterStats.mosques} />
+                <SiteRegistryMetric label="المصليات" value={siteFilterStats.prayerRooms} />
+                <SiteRegistryMetric label="إجمالي المساحة" value={siteFilterStats.totalArea} suffix="م²" />
+              </div>
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">تتحدث البطاقات والنتائج والتقارير مباشرة وفق المعايير المختارة.</p></div>
+                  <div className="flex items-center gap-2 rounded-xl border border-[#dfcfaa] bg-white p-2">
+                    <span className="whitespace-nowrap text-xs font-semibold text-slate-600">اتجاه الفرز</span>
+                    <NativeSelect className="h-9 min-w-[120px]" value={siteSortDirection} onChange={(e) => setSiteSortDirection(e.target.value as 'asc' | 'desc')}><option value="asc">تصاعدي ↑</option><option value="desc">تنازلي ↓</option></NativeSelect>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
                 <div className="relative md:col-span-2 xl:col-span-2">
                   <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input className="h-11 rounded-xl pr-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالاسم أو المدينة أو الحي أو الموقع أو الإمام..." />
@@ -2956,8 +3140,16 @@ ${quranStockMovementForm.notes}` : ''}`
                 {siteFilterType === 'prayer_room' && <NativeSelect className="h-11 rounded-xl border-emerald-200 bg-emerald-50/40" value={siteFilterPrayerRoomGender} onChange={(e) => setSiteFilterPrayerRoomGender(e.target.value as 'all' | 'men' | 'women')}><option value="all">كل المصليات</option><option value="men">مصلى رجال</option><option value="women">مصلى نساء</option></NativeSelect>}
                 <NativeSelect className="h-11 rounded-xl" value={siteFilterStatus} onChange={(e) => setSiteFilterStatus(e.target.value)}><option value="all">جميع الحالات</option><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect>
                 <NativeSelect className="h-11 rounded-xl" value={siteSortBy} onChange={(e) => setSiteSortBy(e.target.value)}><option value="name">فرز حسب الاسم</option><option value="building">فرز حسب رقم المبنى</option><option value="city">فرز حسب المدينة</option><option value="type">فرز حسب النوع</option><option value="status">فرز حسب الحالة</option><option value="area">فرز حسب المساحة</option></NativeSelect>
+                </div>
               </div>
 
+              <details className="group overflow-hidden rounded-2xl border border-[#e3d6b9] bg-white">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[#fffdf8] px-4 py-3">
+                  <div><p className="font-black text-[#0b4a3f]">إعدادات التقرير والطباعة</p><p className="mt-1 text-xs text-slate-500">اختياري — افتح هذا القسم فقط عند الحاجة لتخصيص الأعمدة والخط واتجاه الصفحة.</p></div>
+                  <span className="rounded-full border border-[#d6b46a]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6a1f] group-open:hidden">إظهار الإعدادات</span>
+                  <span className="hidden rounded-full border border-[#d6b46a]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6a1f] group-open:inline">إخفاء الإعدادات</span>
+                </summary>
+                <div className="space-y-4 border-t border-[#eee4ce] p-3 sm:p-4">
               <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-l from-sky-50/80 via-white to-emerald-50/60 p-3 sm:p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
@@ -3007,17 +3199,15 @@ ${quranStockMovementForm.notes}` : ''}`
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[11px] leading-6 text-sky-900"><strong>التنسيق الحالي:</strong><span>الخط: {sitePrintFontAuto ? 'تلقائي' : `${sitePrintFontSize} px`}</span><span>•</span><span>الأعمدة: {sitePrintWidthMode === 'smart' ? 'ذكية حسب المحتوى' : sitePrintWidthMode === 'compact' ? 'مضغوطة' : 'متساوية'}</span><span>•</span><span>النص: {sitePrintWrapMode === 'wrap' ? 'التفاف' : 'سطر واحد'}</span><span>•</span><span>الصفحة: {sitePrintOrientation === 'auto' ? 'تلقائية' : sitePrintOrientation === 'portrait' ? 'عمودية' : 'أفقية'}</span></div>
               </div>
-
-              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
-                  <div className="rounded-xl border bg-white px-3 py-2"><p className="text-[11px] text-muted-foreground">السجلات الظاهرة</p><p className="mt-1 text-lg font-black text-slate-800">{siteFilterStats.total.toLocaleString('ar-SA')}</p></div>
-                  <div className="rounded-xl border bg-white px-3 py-2"><p className="text-[11px] text-muted-foreground">المساجد والجوامع</p><p className="mt-1 text-lg font-black text-slate-800">{siteFilterStats.mosques.toLocaleString('ar-SA')}</p></div>
-                  <div className="rounded-xl border bg-white px-3 py-2"><p className="text-[11px] text-muted-foreground">المصليات</p><p className="mt-1 text-lg font-black text-slate-800">{siteFilterStats.prayerRooms.toLocaleString('ar-SA')}</p></div>
-                  <div className="rounded-xl border bg-white px-3 py-2"><p className="text-[11px] text-muted-foreground">إجمالي المساحة</p><p className="mt-1 text-lg font-black text-slate-800">{siteFilterStats.totalArea.toLocaleString('ar-SA', { maximumFractionDigits: 2 })} م²</p></div>
                 </div>
-                <div className="flex min-w-[190px] items-center gap-2 rounded-xl border bg-white p-2">
-                  <span className="whitespace-nowrap text-xs font-semibold text-slate-600">اتجاه الفرز</span>
-                  <NativeSelect className="h-9 flex-1" value={siteSortDirection} onChange={(e) => setSiteSortDirection(e.target.value as 'asc' | 'desc')}><option value="asc">تصاعدي ↑</option><option value="desc">تنازلي ↓</option></NativeSelect>
+              </details>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-[#e3d6b9] bg-[#fffdf8] p-3 lg:flex-row lg:items-center lg:justify-between">
+                <div><p className="font-black text-[#0b4a3f]">التقرير الحالي</p><p className="mt-1 text-xs text-slate-500">سيستخدم نفس السجلات الظاهرة ونفس ترتيبها الحالي.</p></div>
+                <div className="flex flex-wrap gap-2">
+                  {canPrint && visibleSites.length > 0 && <Button variant="outline" className={`${button3d} border-[#d9c9a5] bg-white text-[#0b4a3f]`} onClick={() => printSitesTable(visibleSites, 'preview')}><Eye className="ml-2 h-4 w-4" />معاينة التقرير</Button>}
+                  {canPrint && visibleSites.length > 0 && <Button variant="outline" className={`${button3d} border-[#d9c9a5] bg-white text-[#0b4a3f]`} onClick={() => exportSitesExcel(visibleSites)}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel ({visibleSites.length})</Button>}
+                  {canPrint && visibleSites.length > 0 && <Button className={`${button3d} border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]`} onClick={() => printSitesTable(visibleSites, 'print')}><Printer className="ml-2 h-4 w-4" />طباعة / PDF ({visibleSites.length})</Button>}
                 </div>
               </div>
 
@@ -3032,54 +3222,94 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>}
             </CardContent>
           </Card>
-          {visibleSites.length === 0 ? <Empty text="لا توجد مساجد أو مصليات مسجلة" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{visibleSites.map((site) => <SiteCard key={site.id} site={site} canEdit={canEdit && ['head', 'supervisor'].includes(role)} canDelete={canDelete && role === 'head'} canPrint={canPrint} onPreview={() => setPreviewSite(site)} onPrint={() => void printSiteCard(site)} onExcel={() => exportSitesExcel([site], `mosque-${site.publicToken || site.id}`)} onEdit={() => openSiteDialog(site)} onDelete={() => deleteSite(site)} onQr={() => setQrSite(site)} quranInventory={quranLatestBySite[site.id] as MosqueQuranInventory | null | undefined} />)}</div>}
+          {visibleSites.length === 0 ? <Empty text="لا توجد مساجد أو مصليات مسجلة" /> : <div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">{visibleSites.map((site) => <SiteCard key={site.id} site={site} canEdit={canEdit && ['head', 'supervisor'].includes(role)} canDelete={canDelete && role === 'head'} canPrint={canPrint} onPreview={() => setPreviewSite(site)} onPrint={() => void printSiteCard(site)} onExcel={() => exportSitesExcel([site], `mosque-${site.publicToken || site.id}`)} onEdit={() => openSiteDialog(site)} onDelete={() => deleteSite(site)} onQr={() => setQrSite(site)} quranInventory={quranLatestBySite[site.id] as MosqueQuranInventory | null | undefined} />)}</div>}
         </TabsContent>
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="buildings" className="space-y-4">
-          <Card className={card3d}>
-            <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-sky-700" />تغطية المباني بخدمة الصلاة</CardTitle>
-                <CardDescription>ملف خدمة الصلاة للمباني المعرفة في السجل المركزي، مع توثيق وجود المصلى والاحتياج وإمكانية الإنشاء والبديل المعتمد.</CardDescription>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {canPrint && <Button className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={() => setBuildingCoverageReportOpen(true)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />تقارير التغطية — PDF / Excel</Button>}
-                <Button className={button3d} variant="outline" onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />السجل المركزي للمباني</Button>
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">التغطية المكانية</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Building2 className="h-5 w-5" />تغطية المباني بخدمة الصلاة</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">تقييم خدمة الصلاة في المباني الجامعية، توثيق وجود مصليات الرجال والنساء، وتحديد الاحتياج وإمكانية الإنشاء أو البديل المعتمد.</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {canPrint && <Button variant="outline" className="border-[#d6b46a] bg-[#fff8e8] font-bold text-[#7b5b16]" onClick={() => setBuildingCoverageReportOpen(true)}><FileSpreadsheet className="ml-2 h-4 w-4" />تقارير التغطية</Button>}
+                  <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => setActiveTab('map')}><MapPin className="ml-2 h-4 w-4" />الخريطة المكانية</Button>
+                  <Button variant="outline" className="border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]" onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />السجل المركزي</Button>
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-7 text-sky-950 md:flex-row md:items-center md:justify-between">
-                <div><strong>مصدر تعريف المباني: السجل المركزي للمباني.</strong><div className="text-xs text-sky-800">إضافة المبنى أو استيراده من Excel أو تعديل رقمه واسمه وموقعه وإحداثياته يتم مركزيًا. هذه الصفحة تحفظ فقط بيانات تغطية خدمة الصلاة.</div></div>
-                <Button type="button" variant="outline" className={button3d} onClick={() => navigate('/buildings/registry')}><Building2 className="ml-2 h-4 w-4" />فتح السجل المركزي</Button>
+
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid gap-4 xl:grid-cols-[1.25fr_0.9fr]">
+                <div className="rounded-[22px] border border-[#e2d4b4] bg-[#fbf8f1] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div><p className="font-black text-[#0b4a3f]">نسبة تغطية المباني بخدمة الصلاة</p><p className="mt-1 text-xs text-slate-500">النسبة تحسب من المباني المعتمدة المصنفة «مغطاة بخدمة الصلاة».</p></div>
+                    <div className="text-left"><span className="text-3xl font-black text-[#0b4a3f]">{buildingCoveragePercent}%</span><p className="text-[10px] text-slate-500">{officialBuildings.filter((x) => x.coverageStatus === 'covered').length} من {officialBuildings.length}</p></div>
+                  </div>
+                  <Progress value={buildingCoveragePercent} className="mt-4 h-3" />
+                </div>
+
+                <div className="rounded-[22px] border border-[#d6b46a]/45 bg-[#fff8e8] p-4 text-sm leading-7 text-slate-700">
+                  <div className="flex items-start gap-3"><Building2 className="mt-1 h-5 w-5 shrink-0 text-[#0b5a49]" /><div><strong className="text-[#0b4a3f]">مصدر بيانات المباني: السجل المركزي.</strong><p className="mt-1 text-xs leading-6 text-slate-600">تعريف المبنى ورقمه وموقعه وإحداثياته تُدار مركزيًا؛ هذه الصفحة تختص فقط بحالة تغطية خدمة الصلاة والاحتياج والبدائل.</p></div></div>
+                </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <ReportMetric label="إجمالي المباني المعتمدة" value={officialBuildings.length} />
-                <ReportMetric label="مغطاة بخدمة الصلاة" value={officialBuildings.filter((x) => x.coverageStatus === 'covered').length} />
-                <ReportMetric label="تحتاج مصلى" value={officialBuildings.filter((x) => x.coverageStatus === 'needs_prayer_room').length} />
-                <ReportMetric label="قيد الدراسة / التنفيذ" value={officialBuildings.filter((x) => ['under_feasibility_study', 'under_implementation'].includes(x.coverageStatus)).length} />
-                <ReportMetric label="تعذر الإنشاء + بديل" value={officialBuildings.filter((x) => x.coverageStatus === 'not_feasible_alternative').length} />
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <SpatialMetric label="إجمالي المباني" value={officialBuildings.length} icon={Building2} />
+                <SpatialMetric label="مغطاة بالخدمة" value={officialBuildings.filter((x) => x.coverageStatus === 'covered').length} icon={CheckCircle2} />
+                <SpatialMetric label="تحتاج مصلى" value={officialBuildings.filter((x) => x.coverageStatus === 'needs_prayer_room').length} icon={AlertTriangle} tone="warning" />
+                <SpatialMetric label="قيد الدراسة / التنفيذ" value={officialBuildings.filter((x) => ['under_feasibility_study', 'under_implementation'].includes(x.coverageStatus)).length} icon={Clock3} />
+              </div>
+
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">ابحث برقم المبنى أو اسمه أو موقعه، ثم صفِّ حسب حالة التغطية.</p></div>
+                  <Badge variant="outline" className="border-[#d6b46a]/55 bg-white px-3 py-1.5 font-black text-[#0b4a3f]">{filteredCoverageBuildings.length} مبنى</Badge>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_260px_auto]">
+                  <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-11 border-[#d9c9a5] bg-white pr-9" value={buildingCoverageSearch} onChange={(e) => setBuildingCoverageSearch(e.target.value)} placeholder="رقم المبنى، الاسم، الموقع، المدينة..." /></div>
+                  <NativeSelect className="h-11 bg-white" value={buildingCoverageFilter} onChange={(e) => setBuildingCoverageFilter(e.target.value)}><option value="all">جميع حالات التغطية</option>{Object.entries(buildingCoverageStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>
+                  <Button variant="outline" className="h-11 border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => { setBuildingCoverageSearch(''); setBuildingCoverageFilter('all'); }}><X className="ml-1 h-4 w-4" />مسح</Button>
+                </div>
               </div>
             </CardContent>
           </Card>
-          {!officialBuildings.length ? <Empty text="لم تتم إضافة مبانٍ معتمدة إلى سجل تغطية المصليات بعد" /> : <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{officialBuildings.map((building) => {
+
+          {!filteredCoverageBuildings.length ? <Empty text="لا توجد مبانٍ مطابقة للبحث والتصفية" /> : <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">{filteredCoverageBuildings.map((building) => {
             const men = building.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'men' && site.status !== 'temporarily_closed');
             const women = building.sites?.some((site) => site.siteType === 'prayer_room' && site.prayerRoomGender === 'women' && site.status !== 'temporarily_closed');
             const menPresence = buildingPrayerRoomPresence(building, 'men');
             const womenPresence = buildingPrayerRoomPresence(building, 'women');
             const mosque = building.sites?.some((site) => ['mosque', 'jami'].includes(site.siteType) && site.status !== 'temporarily_closed');
             const hasCoordinates = Number.isFinite(Number(building.latitude)) && Number.isFinite(Number(building.longitude));
-            return <Card key={building.id} className={card3d}>
-              <CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2 border-sky-200 bg-sky-50 text-sky-800">مبنى رقم {building.buildingNumber}</Badge><CardTitle className="text-lg">{building.name || ('مبنى ' + building.buildingNumber)}</CardTitle><CardDescription>{[building.campusLocation, building.city, building.district].filter(Boolean).join(' — ') || 'لم يحدد الموقع'}</CardDescription></div><Badge variant="outline">{buildingCoverageStatusLabels[building.coverageStatus] || building.coverageStatus}</Badge></div></CardHeader>
+            const linkedCount = building._count?.sites ?? building.sites?.length ?? 0;
+
+            return <Card key={building.id} className="group overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_8px_24px_rgba(6,60,51,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_14px_28px_rgba(6,60,51,0.10)]">
+              <div className={`h-1.5 ${building.coverageStatus === 'covered' ? 'bg-emerald-600' : building.coverageStatus === 'needs_prayer_room' ? 'bg-amber-500' : 'bg-[#d6b46a]'}`} />
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><Badge variant="outline" className="mb-2 border-[#d6b46a]/45 bg-[#fffdf8] text-[#7b5b16]">مبنى رقم {building.buildingNumber}</Badge><CardTitle className="truncate text-lg font-black text-[#0b4a3f]">{building.name || ('مبنى ' + building.buildingNumber)}</CardTitle><CardDescription className="mt-1 line-clamp-2">{[building.campusLocation, building.city, building.district].filter(Boolean).join(' — ') || 'لم يحدد الموقع'}</CardDescription></div>
+                  <Badge variant="outline" className={building.coverageStatus === 'covered' ? 'shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700' : building.coverageStatus === 'needs_prayer_room' ? 'shrink-0 border-amber-300 bg-amber-50 text-amber-800' : 'shrink-0 border-slate-300 bg-slate-50 text-slate-700'}>{buildingCoverageStatusLabels[building.coverageStatus] || building.coverageStatus}</Badge>
+                </div>
+              </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-2 text-xs"><div className={'rounded-xl border p-2 text-center ' + prayerRoomPresenceClass(menPresence)}>مصلى رجال: <b>{buildingPrayerRoomPresenceLabels[menPresence]}</b></div><div className={'rounded-xl border p-2 text-center ' + prayerRoomPresenceClass(womenPresence)}>مصلى نساء: <b>{buildingPrayerRoomPresenceLabels[womenPresence]}</b></div></div>
-                {!men && !women && building.coverageStatus === 'needs_prayer_room' && <div className="rounded-xl border border-amber-300 bg-amber-50 p-2 text-center text-xs font-bold text-amber-900">لا يوجد مصلى في هذا المبنى — تم تقييمه ويحتاج مصلى</div>}
-                {mosque && <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-center text-xs font-bold text-red-800">سجل قديم يحتاج مراجعة: يوجد مسجد / جامع مرتبط بالمبنى، بينما المباني الجامعية يسمح بربط المصليات فقط.</div>}
-                <Info label="إمكانية إنشاء مصلى" value={buildingFeasibilityLabels[building.creationFeasibility] || building.creationFeasibility} />
-                {hasCoordinates && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200 bg-sky-50/70 p-2 text-xs"><div><span className="font-bold text-slate-700">إحداثيات المبنى: </span><span dir="ltr" className="font-mono text-sky-800">{Number(building.latitude).toFixed(6)}, {Number(building.longitude).toFixed(6)}</span></div><a className="inline-flex items-center gap-1 font-bold text-sky-700 hover:underline" href={'https://www.google.com/maps?q=' + building.latitude + ',' + building.longitude} target="_blank" rel="noreferrer"><MapPin className="h-3.5 w-3.5" />فتح الموقع</a></div>}
-                {building.unavailableReason && <Info label="سبب عدم الإمكانية" value={building.unavailableReason} />}
-                {building.approvedAlternative && <Info label="البديل المعتمد" value={building.approvedAlternative} />}
-                <div className="rounded-xl border bg-slate-50 p-2 text-xs text-slate-600">المواقع المرتبطة: <b>{building._count?.sites ?? building.sites?.length ?? 0}</b></div>
-                {canEdit && ['head', 'supervisor'].includes(role) && <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" className={button3d} onClick={() => openBuildingDialog(building)}><Pencil className="ml-1 h-4 w-4" />ملف خدمة الصلاة</Button><Button variant="outline" size="sm" className={button3d} onClick={() => navigate('/buildings/registry')}><Building2 className="ml-1 h-4 w-4" />السجل المركزي</Button></div>}
+                <div className="grid grid-cols-2 gap-2 text-xs"><div className={'rounded-xl border p-2.5 text-center ' + prayerRoomPresenceClass(menPresence)}><p className="text-[10px] font-bold opacity-75">مصلى الرجال</p><p className="mt-1 font-black">{buildingPrayerRoomPresenceLabels[menPresence]}</p></div><div className={'rounded-xl border p-2.5 text-center ' + prayerRoomPresenceClass(womenPresence)}><p className="text-[10px] font-bold opacity-75">مصلى النساء</p><p className="mt-1 font-black">{buildingPrayerRoomPresenceLabels[womenPresence]}</p></div></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">إمكانية الإنشاء</p><p className="mt-1 text-xs font-black text-[#0b4a3f]">{buildingFeasibilityLabels[building.creationFeasibility] || building.creationFeasibility}</p></div>
+                  <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">المواقع المرتبطة</p><p className="mt-1 text-xs font-black text-[#0b4a3f]">{linkedCount}</p></div>
+                </div>
+                {!men && !women && building.coverageStatus === 'needs_prayer_room' && <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-center text-xs font-bold text-amber-900">تم التحقق من عدم وجود مصلى — المبنى يحتاج خدمة صلاة</div>}
+                {mosque && <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-xs font-bold text-red-800">سجل قديم يحتاج مراجعة: يوجد مسجد / جامع مرتبط بالمبنى.</div>}
+                {building.unavailableReason && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs"><p className="font-bold text-slate-500">سبب عدم الإمكانية</p><p className="mt-1 leading-6 text-slate-700">{building.unavailableReason}</p></div>}
+                {building.approvedAlternative && <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-xs"><p className="font-bold text-emerald-700">البديل المعتمد</p><p className="mt-1 leading-6 text-emerald-800">{building.approvedAlternative}</p></div>}
+                <div className="flex flex-wrap gap-2 border-t border-[#eee5d2] pt-3">
+                  {canEdit && <Button size="sm" className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => openBuildingDialog(building)}><Pencil className="ml-1 h-3.5 w-3.5" />ملف خدمة الصلاة</Button>}
+                  {hasCoordinates && <Button size="sm" variant="outline" className="border-[#d9c9a5] text-[#0b4a3f]" onClick={() => window.open('https://www.google.com/maps?q=' + building.latitude + ',' + building.longitude, '_blank')}><MapPin className="ml-1 h-3.5 w-3.5" />الموقع</Button>}
+                  <Button size="sm" variant="ghost" className="text-slate-600" onClick={() => navigate('/buildings/registry')}><Building2 className="ml-1 h-3.5 w-3.5" />السجل المركزي</Button>
+                </div>
               </CardContent>
             </Card>;
           })}</div>}
@@ -3090,121 +3320,312 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>}
 
         <TabsContent value="requests" className="space-y-4">
-          {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />الإبلاغ عن مشكلة / طلب صيانة أو احتياج</Button></div>}
-          {requestQuickFilter !== 'all' && <QuickFilterBar label={requestQuickFilter === 'new' ? 'الطلبات الجديدة' : requestQuickFilter === 'under_review' ? 'الطلبات تحت المراجعة' : requestQuickFilter === 'approved' ? 'الطلبات المعتمدة' : 'الطلبات المتأخرة'} onClear={() => setRequestQuickFilter('all')} />}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredRequests.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} statusLabel={quranRequestStatusLabel(item)} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} submitterName={item.applicant?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || 'مقدم الطلب'} onView={() => setViewingWorkflow({ kind: 'request', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedRequestEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('request', item)} />)}</div>
-          {!filteredRequests.length && <Empty text="لا توجد طلبات مطابقة" />}
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">مركز المعاملات</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Wrench className="h-5 w-5" />طلبات الصيانة والاحتياج</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">متابعة الطلب من التقديم والمراجعة والاعتماد حتى التنفيذ والتحقق والإغلاق، مع إبراز الأولوية والإجراء المطلوب لكل معاملة.</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => setActiveTab('requests')}><ClipboardList className="ml-2 h-4 w-4" />الطلبات</Button>
+                  {['head', 'supervisor'].includes(role) && <Button variant="outline" className="border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]" onClick={() => setActiveTab('tickets')}><MessageSquare className="ml-2 h-4 w-4" />البلاغات</Button>}
+                  {role === 'personnel' && <Button variant="outline" className="border-[#d6b46a] bg-[#fff8e8] font-bold text-[#7b5b16]" onClick={openRequestDialog}><Plus className="ml-2 h-4 w-4" />طلب جديد</Button>}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <TransactionMetric label="إجمالي الطلبات" value={requests.filter((item) => item.status !== 'archived').length} icon={ClipboardList} />
+                <TransactionMetric label="قيد المتابعة" value={requests.filter((item) => !['closed', 'rejected', 'archived'].includes(item.status)).length} icon={Clock3} />
+                <TransactionMetric label="عاجلة" value={requests.filter((item) => item.priority === 'urgent' && !['closed', 'rejected', 'archived'].includes(item.status)).length} icon={AlertTriangle} tone="urgent" />
+                <TransactionMetric label="متأخرة +7 أيام" value={requests.filter((item) => ['new', 'under_review', 'approved', 'in_progress'].includes(item.status) && new Date(item.createdAt).getTime() < Date.now() - 7 * 24 * 60 * 60 * 1000).length} icon={CalendarDays} tone="warning" />
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="font-black text-[#0b4a3f]">عرض الطلبات حسب الحالة</p>
+                  <p className="mt-1 text-xs text-slate-500">اختر الحالة لتقليل القائمة والتركيز على المعاملات التي تحتاج إجراء.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    ['all', 'الكل'],
+                    ['new', 'جديد'],
+                    ['under_review', 'تحت المراجعة'],
+                    ['approved', 'معتمد'],
+                    ['late', 'متأخر'],
+                  ] as const).map(([value, label]) => <Button key={value} size="sm" variant={requestQuickFilter === value ? 'default' : 'outline'} className={requestQuickFilter === value ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setRequestQuickFilter(value)}>{label}</Button>)}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-black text-[#0b4a3f]">قائمة المعاملات</p><p className="mt-1 text-xs text-slate-500">كل بطاقة توضح صاحب الطلب، الأولوية، الحالة الحالية، والإجراء التالي المقترح وفق سير العمل.</p></div>
+                <Badge variant="outline" className="border-[#d6b46a]/55 bg-[#fffdf8] px-3 py-1.5 font-black text-[#0b4a3f]">{filteredRequests.filter((item) => item.status !== 'archived').length} طلب</Badge>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">{filteredRequests.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} kind="request" title={item.requestNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} statusLabel={quranRequestStatusLabel(item)} priority={item.priority} createdAt={item.createdAt} meta={[requestTypeLabels[item.requestType] || item.requestType, priorityLabels[item.priority] || item.priority]} submitterName={item.applicant?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || 'مقدم الطلب'} onView={() => setViewingWorkflow({ kind: 'request', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('request', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedRequestEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('request', item)} />)}</div>
+              {!filteredRequests.filter((item) => item.status !== 'archived').length && <Empty text="لا توجد طلبات مطابقة" />}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-4">
-          {ticketQuickFilter !== 'all' && <QuickFilterBar label="البلاغات المفتوحة" onClear={() => setTicketQuickFilter('all')} />}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredTickets.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'بدون وسيلة تواصل']} submitterName={item.reporterName || 'غير محدد'} submitterRole="مقدّم البلاغ" onView={() => setViewingWorkflow({ kind: 'ticket', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={<>{workflowAdminActions('ticket', item)}{['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className={button3d} onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline">مرتبط بطلب صيانة</Badge> : null}</>} />)}</div>
-          {!filteredTickets.length && <Empty text="لا توجد بلاغات مطابقة" />}
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">مركز المعاملات</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><MessageSquare className="h-5 w-5" />البلاغات والملاحظات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">استقبال البلاغ، مراجعته وإسناده ومعالجته، مع إمكانية تحويله إلى طلب صيانة عند الحاجة والمحافظة على الارتباط بين السجلين.</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" className="border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]" onClick={() => setActiveTab('requests')}><ClipboardList className="ml-2 h-4 w-4" />الطلبات</Button>
+                  <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => setActiveTab('tickets')}><MessageSquare className="ml-2 h-4 w-4" />البلاغات</Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <TransactionMetric label="إجمالي البلاغات" value={tickets.filter((item) => item.status !== 'archived').length} icon={MessageSquare} />
+                <TransactionMetric label="مفتوحة" value={tickets.filter((item) => !['closed', 'rejected', 'archived'].includes(item.status)).length} icon={Clock3} />
+                <TransactionMetric label="قيد المعالجة" value={tickets.filter((item) => ['assigned', 'in_progress'].includes(item.status)).length} icon={Wrench} />
+                <TransactionMetric label="محولة إلى صيانة" value={tickets.filter((item) => Boolean(item.convertedRequestId)).length} icon={CheckCircle2} />
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="font-black text-[#0b4a3f]">حالة البلاغات</p>
+                  <p className="mt-1 text-xs text-slate-500">اعرض جميع البلاغات أو ركّز على البلاغات التي ما زالت تحتاج متابعة.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant={ticketQuickFilter === 'all' ? 'default' : 'outline'} className={ticketQuickFilter === 'all' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setTicketQuickFilter('all')}>الكل</Button>
+                  <Button size="sm" variant={ticketQuickFilter === 'open' ? 'default' : 'outline'} className={ticketQuickFilter === 'open' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setTicketQuickFilter('open')}>المفتوحة</Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-black text-[#0b4a3f]">قائمة البلاغات</p><p className="mt-1 text-xs text-slate-500">الحالة الحالية والإجراء التالي ظاهرين مباشرة على البطاقة؛ تفاصيل السجل والتسلسل الزمني داخل «عرض التفاصيل».</p></div>
+                <Badge variant="outline" className="border-[#d6b46a]/55 bg-[#fffdf8] px-3 py-1.5 font-black text-[#0b4a3f]">{filteredTickets.filter((item) => item.status !== 'archived').length} بلاغ</Badge>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">{filteredTickets.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} kind="ticket" title={item.ticketNumber} subtitle={item.site?.name || ''} description={item.description} status={item.status} createdAt={item.createdAt} meta={[ticketTypeLabels[item.ticketType] || item.ticketType, item.reporterPhone || item.reporterEmail || 'بدون وسيلة تواصل']} submitterName={item.reporterName || 'غير محدد'} submitterRole="مقدّم البلاغ" onView={() => setViewingWorkflow({ kind: 'ticket', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('ticket', item) : undefined} extraAction={<>{workflowAdminActions('ticket', item)}{['head', 'supervisor'].includes(role) && !item.convertedRequestId ? <Button variant="outline" size="sm" className="border-[#d6b46a] bg-[#fff8e8] text-[#7b5b16]" onClick={() => convertTicket(item)}><Wrench className="ml-1 h-3.5 w-3.5" />تحويل إلى صيانة</Button> : item.convertedRequestId ? <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">مرتبط بطلب صيانة</Badge> : null}</>} />)}</div>
+              {!filteredTickets.filter((item) => item.status !== 'archived').length && <Empty text="لا توجد بلاغات مطابقة" />}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="leaves" className="space-y-4">
-          {role === 'personnel' && <div className="flex justify-end"><Button className={button3d} onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button></div>}
-          {leaveQuickFilter !== 'all' && <QuickFilterBar label="الإجازات والاعتذارات المعلقة" onClear={() => setLeaveQuickFilter('all')} />}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{filteredLeaves.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} submitterName={item.applicant?.name || item.personnel?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || (item.personnel?.role ? personnelRoleLabels[item.personnel.role] || item.personnel.role : 'مقدم الطلب')} onView={() => setViewingWorkflow({ kind: 'leave', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedLeaveEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('leave', item)} />)}</div>
-          {!filteredLeaves.length && <Empty text="لا توجد طلبات إجازة أو اعتذار مطابقة" />}
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">المناوبات والتغطية</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><CalendarDays className="h-5 w-5" />الإجازات والاعتذارات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">متابعة إجازات واعتذارات منسوبي المساجد والمصليات، البديل المقترح، وحالة الاعتماد لضمان استمرار التغطية التشغيلية.</CardDescription>
+                </div>
+                {role === 'personnel' && <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={openLeaveDialog}><Plus className="ml-2 h-4 w-4" />طلب إجازة / اعتذار</Button>}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <TransactionMetric label="إجمالي الطلبات" value={leaves.filter((item) => item.status !== 'archived').length} icon={CalendarDays} />
+                <TransactionMetric label="قيد المراجعة" value={leaves.filter((item) => ['pending', 'under_review'].includes(item.status)).length} icon={Clock3} tone="warning" />
+                <TransactionMetric label="المعتمدة" value={leaves.filter((item) => item.status === 'approved').length} icon={CheckCircle2} />
+                <TransactionMetric label="معادة للتعديل" value={leaves.filter((item) => item.status === 'returned_for_edit').length} icon={RefreshCw} />
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3 lg:flex-row lg:items-center lg:justify-between">
+                <div><p className="font-black text-[#0b4a3f]">عرض طلبات التغطية</p><p className="mt-1 text-xs text-slate-500">ركّز على المعلّق فقط أو اعرض جميع الإجازات والاعتذارات.</p></div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant={leaveQuickFilter === 'all' ? 'default' : 'outline'} className={leaveQuickFilter === 'all' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setLeaveQuickFilter('all')}>الكل</Button>
+                  <Button size="sm" variant={leaveQuickFilter === 'pending' ? 'default' : 'outline'} className={leaveQuickFilter === 'pending' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setLeaveQuickFilter('pending')}>قيد المراجعة</Button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">{filteredLeaves.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} kind="leave" title={item.leaveNumber} subtitle={item.site?.name || ''} description={`${leaveTypeLabels[item.requestType] || item.requestType} — البديل: ${item.replacementName}`} status={item.status} createdAt={item.createdAt} meta={[new Date(item.startDate).toLocaleDateString('ar-SA'), new Date(item.endDate).toLocaleDateString('ar-SA')]} submitterName={item.applicant?.name || item.personnel?.name || 'غير محدد'} submitterRole={item.applicant?.roleLabel || (item.personnel?.role ? personnelRoleLabels[item.personnel.role] || item.personnel.role : 'مقدم الطلب')} onView={() => setViewingWorkflow({ kind: 'leave', item })} onStatus={['head', 'supervisor'].includes(role) ? () => openStatusDialog('leave', item) : undefined} extraAction={role === 'personnel' && item.status === 'returned_for_edit' ? <Button variant="outline" size="sm" className="border-amber-300 text-amber-700" onClick={() => openReturnedLeaveEdit(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل وإعادة الإرسال</Button> : workflowAdminActions('leave', item)} />)}</div>
+              {!filteredLeaves.filter((item) => item.status !== 'archived').length && <Empty text="لا توجد طلبات إجازة أو اعتذار مطابقة" />}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="jobs" className="space-y-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">بيانات الهوية والجوال والبريد والسيرة الذاتية تظهر فقط للمخولين داخل الوحدة، ولا تظهر في البوابة العامة.</div>
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{jobs.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} title={item.applicationNumber} subtitle={`${item.fullName} — ${item.jobType}`} description={`${item.qualification}${item.preferredLocation ? ` — ${item.preferredLocation}` : ''}`} status={item.status} meta={[item.email, item.phone]} onStatus={canEdit && role === 'head' ? () => openStatusDialog('job', item) : undefined} extraAction={<>{workflowAdminActions('job', item)}{item.cvUrl ? <Button variant="outline" size="sm" className={button3d} onClick={() => window.open(item.cvUrl!, '_blank')}><Eye className="ml-1 h-3.5 w-3.5" />السيرة الذاتية</Button> : null}</>} />)}</div>
-          {!jobs.length && <Empty text="لا توجد طلبات توظيف" />}
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div>
+                <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">طلبات التعاون</Badge>
+                <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Briefcase className="h-5 w-5" />طلبات الوظائف والتعاون</CardTitle>
+                <CardDescription className="mt-1 max-w-3xl leading-6">متابعة المتقدمين لمهام الإمام والمؤذن والخطيب والخطيب المتعاون، من التسجيل والمراجعة حتى المقابلة والقبول.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <TransactionMetric label="إجمالي الطلبات" value={jobs.filter((item) => item.status !== 'archived').length} icon={Briefcase} />
+                <TransactionMetric label="طلبات جديدة" value={jobs.filter((item) => item.status === 'new').length} icon={Plus} />
+                <TransactionMetric label="تحت المراجعة" value={jobs.filter((item) => item.status === 'under_review').length} icon={Clock3} />
+                <TransactionMetric label="المرشحون / المقابلات" value={jobs.filter((item) => ['shortlisted', 'interview'].includes(item.status)).length} icon={Users} />
+              </div>
+
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-7 text-amber-900"><div className="flex items-start gap-3"><Shield className="mt-1 h-5 w-5 shrink-0" /><div><strong>خصوصية البيانات:</strong> بيانات الهوية والجوال والبريد والسيرة الذاتية تظهر فقط للمخولين داخل الوحدة، ولا تظهر في البوابة العامة.</div></div></div>
+
+              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">{jobs.filter((item) => item.status !== 'archived').map((item) => <WorkflowCard key={item.id} kind="job" title={item.applicationNumber} subtitle={`${item.fullName} — ${item.jobType}`} description={`${item.qualification}${item.preferredLocation ? ` — ${item.preferredLocation}` : ''}`} status={item.status} createdAt={item.createdAt} meta={[item.email, item.phone]} onStatus={canEdit && role === 'head' ? () => openStatusDialog('job', item) : undefined} extraAction={<>{workflowAdminActions('job', item)}{item.cvUrl ? <Button variant="outline" size="sm" className="border-[#d9c9a5] text-[#0b4a3f]" onClick={() => window.open(item.cvUrl!, '_blank')}><Eye className="ml-1 h-3.5 w-3.5" />السيرة الذاتية</Button> : null}</>} />)}</div>
+              {!jobs.filter((item) => item.status !== 'archived').length && <Empty text="لا توجد طلبات توظيف" />}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="quran" className="space-y-4">
-          <Card className={`${card3d} overflow-hidden border-amber-200/80`}>
-            <CardHeader className="gap-4 border-b border-amber-100 bg-gradient-to-l from-amber-50 via-white to-emerald-50 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <span className="group relative inline-flex h-12 w-12 shrink-0 items-center justify-center">
-                    <span className="absolute -inset-1 rounded-[18px] bg-gradient-to-br from-amber-300/55 via-emerald-400/40 to-cyan-300/30 blur-md transition duration-300 group-hover:blur-lg" />
-                    <span className="absolute inset-0 rounded-2xl bg-white/45 shadow-[0_10px_24px_rgba(15,118,110,0.24),0_0_18px_rgba(245,158,11,0.2)]" />
-                    <img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="relative h-11 w-11 rounded-2xl object-cover shadow-[0_7px_14px_rgba(15,23,42,0.25),0_0_20px_rgba(245,158,11,0.24)] ring-1 ring-amber-200/90 transition duration-300 group-hover:-translate-y-0.5 group-hover:scale-105" />
+          <section className="grid gap-5 xl:grid-cols-[1.6fr_0.85fr]">
+            <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+              <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+                <div className="flex items-center gap-3">
+                  <span className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-white shadow-sm">
+                    <img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="h-10 w-10 rounded-xl object-cover" />
                   </span>
-                  مكتبة المصاحف
-                </CardTitle>
-                <CardDescription className="mt-2">رصيد داخلي لوحدة العناية بالمساجد والمصليات. عند إضافة مصاحف لأي مسجد أو مصلى تُخصم الكمية تلقائيًا من مكتبة المصاحف مع حفظ سجل الحركة.</CardDescription>
-              </div>
-              {role === 'head' && <div className="flex flex-wrap gap-2">
-                {!quranStockDashboard?.warehouses.length && <Button variant="outline" className={button3d} onClick={openQuranWarehouse}><Plus className="ml-1 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}
-                <Button className="bg-emerald-700 hover:bg-emerald-600" onClick={() => openQuranStockMovement('receipt')} disabled={!quranStockDashboard?.warehouses.length}><Plus className="ml-1 h-4 w-4" />إضافة رصيد للمكتبة</Button>
-                <Button variant="outline" className="border-amber-300 text-amber-800" onClick={() => openQuranStockMovement('return')} disabled={!quranStockDashboard?.warehouses.length}><RefreshCw className="ml-1 h-4 w-4" />إرجاع للمكتبة</Button>
-                <Button variant="outline" className={`${button3d} border-red-300 bg-red-50/60 text-red-700 hover:bg-red-100 hover:text-red-800`} onClick={() => void resetQuranLibrary()} disabled={quranStockSaving || (!quranStockDashboard?.warehouses.length && !quranStockDashboard?.summary.siteSystemTotal && quranSummary.countedSites === 0)}><RefreshCw className="ml-1 h-4 w-4" />تصفير المكتبة</Button>
-              </div>}
-            </CardHeader>
-            <CardContent className="space-y-5 pt-5">
-              <div className="space-y-4">
-                <div>
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-black text-slate-800">الرصيد الحالي</p><p className="mt-1 text-[11px] text-slate-500">يعرض الكميات الموجودة فعليًا الآن في المكتبة والمواقع، وليس مجموع الحركات التاريخية.</p></div><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">رصيد لحظي</Badge></div>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-                    <ReportMetric label="رصيد المكتبة الحالي" value={quranStockDashboard?.summary.warehouseTotal || 0} />
-                    <ReportMetric label="الكبيرة بالمكتبة" value={quranStockDashboard?.summary.warehouseLarge || 0} />
-                    <ReportMetric label="المتوسطة بالمكتبة" value={quranStockDashboard?.summary.warehouseMedium || 0} />
-                    <ReportMetric label="الصغيرة بالمكتبة" value={quranStockDashboard?.summary.warehouseSmall || 0} />
-                    <ReportMetric label="الرصيد الحالي بالمواقع" value={quranStockDashboard?.summary.siteSystemTotal || 0} />
-                    <ReportMetric label="إجمالي الرصيد بالنظام" value={quranStockDashboard?.summary.systemTotal || 0} />
-                    <ReportMetric label="احتياج المواقع" value={quranStockDashboard?.summary.siteNeedTotal || 0} />
-                    <ReportMetric label="تنبيهات الرصيد" value={quranStockDashboard?.summary.lowStockWarehouses || 0} />
+                  <div>
+                    <Badge variant="outline" className="mb-1 border-[#d6b46a]/55 bg-white text-[#8a6a1f]">المخزون المركزي</Badge>
+                    <CardTitle className="text-xl font-black text-[#0b4a3f] md:text-2xl">مكتبة المصاحف</CardTitle>
+                    <CardDescription className="mt-1 max-w-3xl leading-6">إدارة الرصيد المركزي وتوزيعه على المساجد والمصليات مع حفظ كل حركة ومتابعة الاحتياج الفعلي للمواقع.</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-5 p-4 sm:p-5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-2xl border border-[#e2d4b4] bg-white p-4 shadow-sm"><p className="text-[11px] font-bold text-slate-500">رصيد المكتبة</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.warehouseTotal || 0}</p><p className="mt-1 text-[10px] text-slate-400">الرصيد المتاح للتوزيع</p></div>
+                  <div className="rounded-2xl border border-[#e2d4b4] bg-white p-4 shadow-sm"><p className="text-[11px] font-bold text-slate-500">الرصيد بالمواقع</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.siteSystemTotal || 0}</p><p className="mt-1 text-[10px] text-slate-400">الموجود حاليًا في المساجد والمصليات</p></div>
+                  <div className="rounded-2xl border border-[#e2d4b4] bg-white p-4 shadow-sm"><p className="text-[11px] font-bold text-slate-500">إجمالي النظام</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.systemTotal || 0}</p><p className="mt-1 text-[10px] text-slate-400">المكتبة + المواقع</p></div>
+                  <div className={`rounded-2xl border p-4 shadow-sm ${(quranStockDashboard?.summary.siteNeedTotal || 0) > 0 ? 'border-amber-200 bg-amber-50/70' : 'border-emerald-200 bg-emerald-50/60'}`}><p className="text-[11px] font-bold text-slate-500">احتياج المواقع</p><p className={`mt-1 text-3xl font-black ${(quranStockDashboard?.summary.siteNeedTotal || 0) > 0 ? 'text-amber-800' : 'text-emerald-700'}`}>{quranStockDashboard?.summary.siteNeedTotal || 0}</p><p className="mt-1 text-[10px] text-slate-500">وفق المستهدفات المسجلة</p></div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-stretch">
+                  <div className="rounded-2xl border border-[#e5d9bd] bg-[#fbf8f1] p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div><p className="font-black text-[#0b4a3f]">تكوين رصيد المكتبة</p><p className="mt-1 text-xs text-slate-500">توزيع الرصيد الحالي حسب حجم المصحف.</p></div>
+                      <Badge variant="outline" className="border-[#d6b46a]/50 bg-white text-[#8a6a1f]">رصيد لحظي</Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">كبير</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.warehouseLarge || 0}</p></div>
+                      <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">متوسط</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.warehouseMedium || 0}</p></div>
+                      <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">صغير</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{quranStockDashboard?.summary.warehouseSmall || 0}</p></div>
+                    </div>
+                  </div>
+
+                  <div className={`flex min-w-[210px] flex-col justify-center rounded-2xl border p-4 text-center ${(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50/70'}`}>
+                    <div className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl ${(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 ? <AlertTriangle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}</div>
+                    <p className="mt-2 text-xs font-bold text-slate-500">حالة المخزون</p>
+                    <p className={`mt-1 font-black ${(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 ? 'text-red-700' : 'text-emerald-700'}`}>{(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 ? 'يحتاج تزويد' : 'الرصيد ضمن الحد الآمن'}</p>
+                    {(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 && <p className="mt-1 text-[10px] leading-5 text-red-600">الناقص حتى حد الأمان: {quranStockDashboard?.summary.shortageTotal || 0}</p>}
                   </div>
                 </div>
 
-                {quranStockDashboard && <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
-                  <div className="mb-3"><p className="text-sm font-black text-slate-800">ملخص حركة المكتبة</p><p className="mt-1 text-[11px] leading-5 text-slate-500">هذه أرقام تراكمية للحركات المسجلة، لذلك قد تختلف عن الرصيد الحالي. المعادلة أدناه توضح سبب الفرق بصورة مباشرة.</p></div>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-                    <ReportMetric label="إجمالي الوارد للمكتبة" value={quranStockDashboard.summary.warehouseInflowTotal || 0} />
-                    <ReportMetric label="إجمالي الخارج من المكتبة" value={quranStockDashboard.summary.warehouseOutflowTotal || 0} />
-                    <ReportMetric label="المضاف للمواقع" value={quranStockDashboard.summary.distributedTotal || 0} />
-                    <ReportMetric label="المرتجع للمكتبة" value={quranStockDashboard.summary.returnedTotal || 0} />
-                    <ReportMetric label="المستبعد / تسويات النقص" value={(quranStockDashboard.summary.damagedTotal || 0) + (quranStockDashboard.summary.adjustmentOutTotal || 0)} />
-                  </div>
-                  <div className={`mt-3 rounded-xl border px-3 py-2 text-xs font-bold ${quranStockDashboard.summary.warehouseNetMovement === quranStockDashboard.summary.warehouseTotal ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
-                    معادلة الرصيد: {quranStockDashboard.summary.warehouseInflowTotal || 0} وارد − {quranStockDashboard.summary.warehouseOutflowTotal || 0} خارج = {quranStockDashboard.summary.warehouseNetMovement || 0}، والرصيد الحالي للمكتبة = {quranStockDashboard.summary.warehouseTotal || 0}.
-                  </div>
-                </div>}
-              </div>
-
-              {(quranStockDashboard?.summary.lowStockWarehouses || 0) > 0 && <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">تنبيه رصيد منخفض</p><p className="mt-1">رصيد مكتبة المصاحف تحت الحد الأدنى، وإجمالي الكمية المطلوب توفيرها للوصول إلى حدود الأمان هو {quranStockDashboard?.summary.shortageTotal || 0} مصحف.</p></div></div>}
-
-              {!quranStockDashboard?.warehouses.length ? <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/50 p-8 text-center"><span className="relative mx-auto flex h-16 w-16 items-center justify-center">
-                  <span className="absolute -inset-1 rounded-[22px] bg-gradient-to-br from-amber-300/45 via-emerald-400/35 to-cyan-300/25 blur-md" />
-                  <img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="relative h-14 w-14 rounded-[20px] object-cover shadow-[0_8px_18px_rgba(15,23,42,0.24),0_0_18px_rgba(245,158,11,0.22)] ring-1 ring-amber-200/80" />
-                </span><p className="mt-3 font-black text-slate-800">لم يتم إنشاء مكتبة المصاحف بعد</p><p className="mt-1 text-sm text-muted-foreground">ابدأ بإنشاء مكتبة المصاحف ثم أضف رصيدها. بعد ذلك تتم إضافة المصاحف من داخل بطاقة المسجد أو المصلى مع الخصم التلقائي من المكتبة.</p>{role === 'head' && <Button className="mt-4 bg-emerald-700 hover:bg-emerald-600" onClick={openQuranWarehouse}><Plus className="ml-2 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}</div> : <div className="grid gap-4 xl:grid-cols-2">{quranStockDashboard.warehouses.map((warehouse) => (
-                <Card key={warehouse.id} className={`border-2 ${warehouse.lowStock ? 'border-red-200 bg-red-50/20' : 'border-emerald-200 bg-emerald-50/20'}`}>
-                  <CardContent className="p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div><div className="flex items-center gap-2"><h3 className="font-black text-slate-900">{warehouse.name}</h3><Badge variant="outline">{warehouse.code}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{warehouse.location || 'لم يحدد موقع المكتبة'}</p></div>
-                      {warehouse.lowStock ? <Badge className="bg-red-600">رصيد منخفض</Badge> : <Badge className="bg-emerald-600">الرصيد آمن</Badge>}
+                <div>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="font-black text-[#0b4a3f]">المكتبات المسجلة</p><p className="mt-1 text-xs text-slate-500">الرصيد الفعلي لكل مكتبة مع الحدود الدنيا والتنبيهات.</p></div><Badge variant="outline" className="border-[#d6b46a]/50 bg-[#fffdf8] text-[#0b4a3f]">{quranStockDashboard?.warehouses.length || 0} مكتبة</Badge></div>
+                  {!quranStockDashboard?.warehouses.length ? <div className="rounded-2xl border border-dashed border-[#d6b46a] bg-[#fffaf0] p-7 text-center">
+                    <img src={quranLibrary3dIcon} alt="" aria-hidden="true" className="mx-auto h-14 w-14 rounded-2xl object-cover shadow-sm" />
+                    <p className="mt-3 font-black text-[#0b4a3f]">لم يتم إنشاء مكتبة المصاحف بعد</p>
+                    <p className="mt-1 text-sm text-slate-500">أنشئ المكتبة أولًا، ثم أضف الرصيد ليصبح متاحًا للتوزيع على المواقع.</p>
+                    {role === 'head' && <Button className="mt-4 border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={openQuranWarehouse}><Plus className="ml-2 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}
+                  </div> : <div className="grid gap-3 lg:grid-cols-2">{quranStockDashboard.warehouses.map((warehouse) => (
+                    <div key={warehouse.id} className={`rounded-2xl border bg-white p-4 shadow-[0_6px_18px_rgba(6,60,51,0.05)] ${warehouse.lowStock ? 'border-red-200' : 'border-[#e2d4b4]'}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div><div className="flex items-center gap-2"><h3 className="font-black text-[#0b4a3f]">{warehouse.name}</h3><Badge variant="outline" className="border-[#d6b46a]/45">{warehouse.code}</Badge></div><p className="mt-1 text-xs text-slate-500">{warehouse.location || 'لم يحدد موقع المكتبة'}</p></div>
+                        {warehouse.lowStock ? <Badge className="bg-red-600">رصيد منخفض</Badge> : <Badge className="bg-emerald-600">الرصيد آمن</Badge>}
+                      </div>
+                      <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] text-slate-500">الإجمالي</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{warehouse.balance.totalCount}</p></div>
+                        <div className="rounded-xl border bg-white p-2.5"><p className="text-[10px] text-slate-500">كبير</p><p className="mt-1 font-black">{warehouse.balance.largeCount}</p><p className="text-[9px] text-slate-400">حد {warehouse.minLargeCount}</p></div>
+                        <div className="rounded-xl border bg-white p-2.5"><p className="text-[10px] text-slate-500">متوسط</p><p className="mt-1 font-black">{warehouse.balance.mediumCount}</p><p className="text-[9px] text-slate-400">حد {warehouse.minMediumCount}</p></div>
+                        <div className="rounded-xl border bg-white p-2.5"><p className="text-[10px] text-slate-500">صغير</p><p className="mt-1 font-black">{warehouse.balance.smallCount}</p><p className="text-[9px] text-slate-400">حد {warehouse.minSmallCount}</p></div>
+                      </div>
+                      {warehouse.lowStock && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">الناقص حتى حد الأمان: كبير {warehouse.shortage.largeCount} — متوسط {warehouse.shortage.mediumCount} — صغير {warehouse.shortage.smallCount}</p>}
+                      <div className="mt-3 flex flex-wrap gap-2 border-t border-[#eee5d2] pt-3">
+                        <Button size="sm" variant="outline" className="border-[#d9c9a5] text-[#0b4a3f]" onClick={() => setQuranWarehousePreview(warehouse)}><Eye className="ml-1 h-4 w-4" />معاينة</Button>
+                        <Button size="sm" variant="ghost" className="text-slate-600" onClick={() => exportQuranWarehouseExcel(warehouse)}><FileSpreadsheet className="ml-1 h-4 w-4" />Excel</Button>
+                        <Button size="sm" variant="ghost" className="text-slate-600" onClick={() => printQuranWarehouse(warehouse)}><Printer className="ml-1 h-4 w-4" />طباعة</Button>
+                        {role === 'head' && <><Button size="sm" variant="ghost" className="text-[#0b5a49]" onClick={() => openEditQuranWarehouse(warehouse)}><Pencil className="ml-1 h-4 w-4" />تعديل</Button><Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" disabled={quranStockSaving} onClick={() => deleteQuranWarehouse(warehouse)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button></>}
+                      </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                      <Button size="sm" variant="outline" className={button3d} onClick={() => setQuranWarehousePreview(warehouse)}><Eye className="ml-1 h-4 w-4" />معاينة</Button>
-                      <Button size="sm" className={`${button3d} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={() => exportQuranWarehouseExcel(warehouse)}><FileSpreadsheet className="ml-1 h-4 w-4 text-white" />Excel</Button>
-                      <Button size="sm" variant="outline" className={button3d} onClick={() => printQuranWarehouse(warehouse)}><Printer className="ml-1 h-4 w-4" />طباعة</Button>
-                      {role === 'head' && <><Button size="sm" variant="outline" className={`${button3d} border-sky-200 text-sky-700`} onClick={() => openEditQuranWarehouse(warehouse)}><Pencil className="ml-1 h-4 w-4" />تعديل</Button><Button size="sm" variant="outline" className={`${button3d} border-red-200 text-red-700 hover:bg-red-50`} disabled={quranStockSaving} onClick={() => deleteQuranWarehouse(warehouse)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button></>}
+                  ))}</div>}
+                </div>
+
+                {quranStockDashboard && <details className="group overflow-hidden rounded-2xl border border-[#e2d4b4] bg-white">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[#fffdf8] px-4 py-3">
+                    <div><p className="font-black text-[#0b4a3f]">ملخص حركة المكتبة</p><p className="mt-1 text-xs text-slate-500">الوارد والخارج والتوزيع والمرتجع والتسويات المسجلة.</p></div>
+                    <span className="rounded-full border border-[#d6b46a]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6a1f] group-open:hidden">عرض</span>
+                    <span className="hidden rounded-full border border-[#d6b46a]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6a1f] group-open:inline">إخفاء</span>
+                  </summary>
+                  <div className="space-y-3 border-t border-[#eee5d2] p-4">
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                      <ReportMetric label="الوارد للمكتبة" value={quranStockDashboard.summary.warehouseInflowTotal || 0} />
+                      <ReportMetric label="الخارج من المكتبة" value={quranStockDashboard.summary.warehouseOutflowTotal || 0} />
+                      <ReportMetric label="المضاف للمواقع" value={quranStockDashboard.summary.distributedTotal || 0} />
+                      <ReportMetric label="المرتجع للمكتبة" value={quranStockDashboard.summary.returnedTotal || 0} />
+                      <ReportMetric label="المستبعد / التسويات" value={(quranStockDashboard.summary.damagedTotal || 0) + (quranStockDashboard.summary.adjustmentOutTotal || 0)} />
                     </div>
-                    <div className="mt-4 grid grid-cols-4 gap-2 text-center"><div className="rounded-xl border bg-white p-3"><p className="text-xs text-muted-foreground">الإجمالي</p><p className="mt-1 text-2xl font-black text-emerald-700">{warehouse.balance.totalCount}</p></div><div className="rounded-xl border bg-white p-3"><p className="text-xs text-muted-foreground">كبير</p><p className="mt-1 text-xl font-black">{warehouse.balance.largeCount}</p><p className="text-[10px] text-muted-foreground">حد أدنى {warehouse.minLargeCount}</p></div><div className="rounded-xl border bg-white p-3"><p className="text-xs text-muted-foreground">متوسط</p><p className="mt-1 text-xl font-black">{warehouse.balance.mediumCount}</p><p className="text-[10px] text-muted-foreground">حد أدنى {warehouse.minMediumCount}</p></div><div className="rounded-xl border bg-white p-3"><p className="text-xs text-muted-foreground">صغير</p><p className="mt-1 text-xl font-black">{warehouse.balance.smallCount}</p><p className="text-[10px] text-muted-foreground">حد أدنى {warehouse.minSmallCount}</p></div></div>
-                    {warehouse.lowStock && <p className="mt-3 rounded-xl bg-red-100/70 px-3 py-2 text-xs font-bold text-red-800">الناقص حتى حد الأمان: كبير {warehouse.shortage.largeCount} — متوسط {warehouse.shortage.mediumCount} — صغير {warehouse.shortage.smallCount}</p>}
-                  </CardContent>
-                </Card>
-              ))}</div>}
+                    <div className={`rounded-xl border px-3 py-2 text-xs font-bold ${quranStockDashboard.summary.warehouseNetMovement === quranStockDashboard.summary.warehouseTotal ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
+                      معادلة الرصيد: {quranStockDashboard.summary.warehouseInflowTotal || 0} وارد − {quranStockDashboard.summary.warehouseOutflowTotal || 0} خارج = {quranStockDashboard.summary.warehouseNetMovement || 0}، والرصيد الحالي للمكتبة = {quranStockDashboard.summary.warehouseTotal || 0}.
+                    </div>
+                  </div>
+                </details>}
 
-              <div>
-                <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-black text-slate-800">آخر حركات المصاحف</p><p className="text-xs text-muted-foreground">سجل حركات غير قابل للمحو. التراجع عن إضافة المصاحف ينشئ حركة إرجاع عكسية ويحافظ على الحركة الأصلية للتدقيق.</p></div><Badge variant="outline">{quranStockDashboard?.recentMovements.length || 0} حركة ظاهرة</Badge></div>
-                {quranStockDashboard?.recentMovements.length ? <div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[1120px] text-sm"><thead className="bg-slate-50"><tr><th className="p-3">رقم الحركة</th><th className="p-3">النوع</th><th className="p-3">المكتبة</th><th className="p-3">المسجد / المصلى</th><th className="p-3">كبير</th><th className="p-3">متوسط</th><th className="p-3">صغير</th><th className="p-3">الإجمالي</th><th className="p-3">التاريخ</th><th className="p-3">الإجراء</th></tr></thead><tbody>{quranStockDashboard.recentMovements.slice(0, 20).map((movement) => { const reversed = movement.movementType === 'distribution' && isQuranDistributionReversed(movement.movementNumber); return <tr key={movement.id} className="border-t"><td className="p-3 text-center font-mono text-xs">{movement.movementNumber}</td><td className="p-3 text-center"><Badge variant="outline" className={movement.notes?.startsWith('تراجع عن حركة الصرف') ? 'border-amber-300 bg-amber-50 text-amber-800' : ''}>{quranStockMovementDisplayLabel(movement)}</Badge></td><td className="p-3 text-center">{movement.warehouse?.name || '-'}</td><td className="p-3 text-center">{movement.site?.name || '-'}</td><td className="p-3 text-center">{movement.largeCount}</td><td className="p-3 text-center">{movement.mediumCount}</td><td className="p-3 text-center">{movement.smallCount}</td><td className="p-3 text-center font-black text-emerald-700">{movement.totalCount}</td><td className="p-3 text-center text-xs">{new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td><td className="p-3 text-center">{movement.movementType === 'distribution' ? reversed ? <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">تم التراجع</Badge> : role === 'head' ? <Button size="sm" variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" disabled={quranStockSaving} onClick={() => void reverseQuranStockMovement(movement)}><RefreshCw className="ml-1 h-3.5 w-3.5" />تراجع</Button> : '-' : movement.notes?.startsWith('تراجع عن حركة الصرف') ? <span className="text-xs text-muted-foreground">حركة عكسية</span> : '-'}</td></tr>; })}</tbody></table></div> : <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">لا توجد حركات مصاحف مسجلة حتى الآن.</div>}
+                <details className="group overflow-hidden rounded-2xl border border-[#e2d4b4] bg-white">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[#fffdf8] px-4 py-3">
+                    <div><p className="font-black text-[#0b4a3f]">سجل حركات المصاحف</p><p className="mt-1 text-xs text-slate-500">آخر الحركات المسجلة؛ السجل غير قابل للمحو حفاظًا على التدقيق.</p></div>
+                    <Badge variant="outline" className="border-[#d6b46a]/50 bg-white text-[#0b4a3f]">{quranStockDashboard?.recentMovements.length || 0} حركة</Badge>
+                  </summary>
+                  <div className="border-t border-[#eee5d2] p-3">
+                    {quranStockDashboard?.recentMovements.length ? <div className="overflow-x-auto rounded-xl border"><table className="w-full min-w-[1120px] text-sm"><thead className="bg-[#fbf8f1]"><tr><th className="p-3">رقم الحركة</th><th className="p-3">النوع</th><th className="p-3">المكتبة</th><th className="p-3">المسجد / المصلى</th><th className="p-3">كبير</th><th className="p-3">متوسط</th><th className="p-3">صغير</th><th className="p-3">الإجمالي</th><th className="p-3">التاريخ</th><th className="p-3">الإجراء</th></tr></thead><tbody>{quranStockDashboard.recentMovements.slice(0, 20).map((movement) => { const reversed = movement.movementType === 'distribution' && isQuranDistributionReversed(movement.movementNumber); return <tr key={movement.id} className="border-t"><td className="p-3 text-center font-mono text-xs">{movement.movementNumber}</td><td className="p-3 text-center"><Badge variant="outline" className={movement.notes?.startsWith('تراجع عن حركة الصرف') ? 'border-amber-300 bg-amber-50 text-amber-800' : ''}>{quranStockMovementDisplayLabel(movement)}</Badge></td><td className="p-3 text-center">{movement.warehouse?.name || '-'}</td><td className="p-3 text-center">{movement.site?.name || '-'}</td><td className="p-3 text-center">{movement.largeCount}</td><td className="p-3 text-center">{movement.mediumCount}</td><td className="p-3 text-center">{movement.smallCount}</td><td className="p-3 text-center font-black text-[#0b4a3f]">{movement.totalCount}</td><td className="p-3 text-center text-xs">{new Date(movement.movementAt).toLocaleDateString('ar-SA-u-ca-gregory')}</td><td className="p-3 text-center">{movement.movementType === 'distribution' ? reversed ? <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">تم التراجع</Badge> : role === 'head' ? <Button size="sm" variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" disabled={quranStockSaving} onClick={() => void reverseQuranStockMovement(movement)}><RefreshCw className="ml-1 h-3.5 w-3.5" />تراجع</Button> : '-' : movement.notes?.startsWith('تراجع عن حركة الصرف') ? <span className="text-xs text-slate-500">حركة عكسية</span> : '-'}</td></tr>; })}</tbody></table></div> : <div className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500">لا توجد حركات مصاحف مسجلة حتى الآن.</div>}
+                  </div>
+                </details>
+              </CardContent>
+            </Card>
+
+            <aside className="grid content-start gap-4">
+              <Card className="overflow-hidden rounded-[24px] border border-[#ded3b8] bg-white shadow-[0_8px_24px_rgba(6,60,51,0.07)]">
+                <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">إجراءات المخزون</CardTitle><CardDescription>الإجراءات الرئيسية لمكتبة المصاحف.</CardDescription></CardHeader>
+                <CardContent className="grid gap-2">
+                  {role === 'head' && !quranStockDashboard?.warehouses.length && <Button className="h-11 justify-start border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={openQuranWarehouse}><Plus className="ml-2 h-4 w-4" />إنشاء مكتبة المصاحف</Button>}
+                  {role === 'head' && <Button className="h-11 justify-start border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => openQuranStockMovement('receipt')} disabled={!quranStockDashboard?.warehouses.length}><Plus className="ml-2 h-4 w-4" />إضافة رصيد للمكتبة</Button>}
+                  {role === 'head' && <Button variant="outline" className="h-11 justify-start border-[#d9c9a5] bg-[#fffdf8] font-bold text-[#0b4a3f]" onClick={() => openQuranStockMovement('return')} disabled={!quranStockDashboard?.warehouses.length}><RefreshCw className="ml-2 h-4 w-4" />إرجاع للمكتبة</Button>}
+                  {canPrint && <Button variant="outline" className="h-11 justify-start border-[#d9c9a5] bg-white font-bold text-[#0b4a3f]" onClick={openQuranPrintDialog}><Printer className="ml-2 h-4 w-4" />تقرير المصاحف / PDF</Button>}
+                </CardContent>
+              </Card>
+
+              <Card className="overflow-hidden rounded-[24px] border border-[#ded3b8] bg-[#fffdf8] shadow-sm">
+                <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">الجرد التأسيسي</CardTitle><CardDescription>حالة حصر المصاحف الموجودة قبل تشغيل حركة المكتبة.</CardDescription></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">تم الحصر</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{quranOpeningBaselineStatus?.countedSites ?? quranSummary.countedSites}</p></div>
+                    <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">إجمالي المواقع</p><p className="mt-1 text-xl font-black text-[#0b4a3f]">{quranOpeningBaselineStatus?.totalSites ?? quranSummary.sites}</p></div>
+                  </div>
+                  {quranOpeningBaselineStatus && <div className={`rounded-xl border px-3 py-2 text-xs font-bold ${quranOpeningBaselineStatus.closed ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{quranOpeningBaselineStatus.closed ? 'الجرد التأسيسي معتمد ومقفل' : `متبقي ${quranOpeningBaselineStatus.remainingSites} موقع قبل الاعتماد`}</div>}
+                </CardContent>
+              </Card>
+
+              {role === 'head' && <details className="group overflow-hidden rounded-[24px] border border-red-200 bg-white">
+                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-red-700">إجراءات إدارية حساسة</summary>
+                <div className="border-t border-red-100 p-3"><Button variant="outline" className="w-full border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800" onClick={() => void resetQuranLibrary()} disabled={quranStockSaving || (!quranStockDashboard?.warehouses.length && !quranStockDashboard?.summary.siteSystemTotal && quranSummary.countedSites === 0)}><RefreshCw className="ml-2 h-4 w-4" />تصفير المكتبة</Button></div>
+              </details>}
+            </aside>
+          </section>
+
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_12px_32px_rgba(6,60,51,0.07)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/55 bg-white text-[#8a6a1f]">رصيد المواقع والجرد</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]"><BookOpen className="h-5 w-5" />المصاحف في المساجد والمصليات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">متابعة الرصيد والمستهدف ونسبة التغطية والاحتياج لكل موقع، مع الجرد والحركات من بطاقة واحدة.</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="h-9 border-[#d6b46a]/50 bg-white px-3 font-black text-[#0b4a3f]">{filteredQuranInventoryItems.length} موقع ظاهر</Badge>
+                  {canPrint && <Button variant="outline" className={`${button3d} border-[#d9c9a5] bg-white text-[#0b4a3f]`} onClick={openQuranPrintDialog}><Printer className="ml-2 h-4 w-4" />تقرير / PDF</Button>}
+                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className={`${card3d} overflow-hidden`}>
-            <CardHeader className="gap-3 border-b border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-sky-50 md:flex-row md:items-center md:justify-between">
-              <div><CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-emerald-700" />إدارة وحصر المصاحف</CardTitle><CardDescription>متابعة رصيد المصاحف في المساجد والمصليات. تتم إضافة المصاحف من مكتبة المصاحف مباشرة مع الخصم التلقائي من رصيد المكتبة.</CardDescription></div>
-              {canPrint && <Button variant="outline" className={button3d} onClick={openQuranPrintDialog}><Filter className="ml-2 h-4 w-4" />إعداد الطباعة / PDF</Button>}
             </CardHeader>
             <CardContent className="space-y-4 pt-5">
-              {role === 'head' && quranOpeningBaselineStatus && <div className={`rounded-2xl border p-4 ${quranOpeningBaselineStatus.closed ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70'}`}>
+              {role === 'head' && quranOpeningBaselineStatus && <div className={`rounded-2xl border p-4 shadow-sm ${quranOpeningBaselineStatus.closed ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70'}`}>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2"><p className="font-black text-slate-900">الجرد التأسيسي للمصاحف</p><Badge className={quranOpeningBaselineStatus.closed ? 'bg-emerald-600' : 'bg-amber-500'}>{quranOpeningBaselineStatus.closed ? 'معتمد ومقفل' : 'مرحلة الحصر الميداني'}</Badge></div>
@@ -3227,6 +3648,8 @@ ${quranStockMovementForm.notes}` : ''}`
                 {filteredQuranInventoryItems.map((item) => {
                   const site = sites.find((row) => row.id === item.site.id) || item.site as MosqueSite;
                   const latest = item.latest;
+                  const media = normalizeSiteMedia(site.images || null);
+                  const cover = media.photos.find((photo) => photo.category === 'mosque_image') || media.photos[0];
                   const stockRow = quranStockDashboard?.sites.find((row) => row.site.id === item.site.id);
                   const systemStock = stockRow?.systemStock;
                   const withdrawnStock = stockRow?.withdrawnStock;
@@ -3246,13 +3669,11 @@ ${quranStockMovementForm.notes}` : ''}`
                         ? 'border-orange-200 bg-orange-50 text-orange-800'
                         : 'border-red-200 bg-red-50 text-red-700';
 
-                  return <Card key={item.site.id} className={`${card3d} overflow-hidden rounded-2xl`}>
+                  return <Card key={item.site.id} className="group overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_8px_24px_rgba(6,60,51,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_14px_28px_rgba(6,60,51,0.10)]">
                     <CardContent className="p-4 sm:p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-start gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-700">
-                            <Building2 className="h-5 w-5" />
-                          </div>
+                          {cover ? <MosqueMediaImage item={cover} alt={cover.fileName || site.name} className="h-12 w-14 shrink-0 rounded-xl object-cover shadow-sm" /> : <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-xl border border-[#e2d4b4] bg-[#fff8e8] text-[#0b5a49]"><Building2 className="h-5 w-5" /></div>}
                           <div className="min-w-0">
                             <p className="truncate text-base font-black text-slate-900 sm:text-lg">{item.site.name}</p>
                             <p className="mt-1 flex items-start gap-1 text-xs leading-5 text-slate-500">
@@ -3310,10 +3731,10 @@ ${quranStockMovementForm.notes}` : ''}`
 
                       <div className="mt-4 border-t border-slate-100 pt-4">
                         {(canManageTarget || canManageBaseline) && <div className={`grid gap-2 ${canManageTarget && canManageBaseline ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                          {canManageTarget && <Button size="sm" variant="outline" className={`${button3d} h-11 border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100`} onClick={() => openSiteDialog(site)}><Pencil className="ml-1 h-4 w-4" />ضبط المستهدف</Button>}
+                          {canManageTarget && <Button size="sm" variant="outline" className={`${button3d} h-11 border-[#d9c9a5] bg-[#fffdf8] text-[#0b4a3f] hover:bg-[#fff4da]`} onClick={() => openSiteDialog(site)}><Pencil className="ml-1 h-4 w-4" />ضبط المستهدف</Button>}
                           {canManageBaseline && <Button size="sm" className={`${button3d} h-11 border border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200 hover:text-slate-900`} onClick={() => openQuranOpeningBaselineForSite(site)}><ClipboardList className="ml-1 h-4 w-4" />{baselineCounted ? 'تحديث الجرد التأسيسي' : 'الجرد التأسيسي'}</Button>}
                         </div>}
-                        {role === 'head' && <Button size="sm" className={`${button3d} mt-2 h-12 w-full border border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-600`} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-4 w-4" />إضافة مصحف من المكتبة</Button>}
+                        {role === 'head' && <Button size="sm" className={`${button3d} mt-2 h-12 w-full border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]`} onClick={() => openQuranDistributionForSite(site)}><BookOpen className="ml-1 h-4 w-4" />إضافة مصاحف من المكتبة</Button>}
                         <div className={`mt-2 grid gap-2 ${role === 'head' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                           {role === 'head' && <Button size="sm" className={`${button3d} h-11 border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:text-amber-900`} onClick={() => openQuranWithdrawalForSite(site)}><RefreshCw className="ml-1 h-4 w-4" />سحب مصاحف</Button>}
                           <Button size="sm" variant="outline" className={`${button3d} h-11`} onClick={() => openQuranHistory(site)}><Clock3 className="ml-1 h-4 w-4" />السجل</Button>
@@ -3330,8 +3751,101 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>
 
         <TabsContent value="map" className="space-y-4">
-          <Card className={`${card3d} overflow-hidden`}><CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />خريطة المساجد والمصليات</CardTitle><CardDescription>OpenStreetMap / Leaflet — اضغط على أي نقطة لعرض بيانات الموقع.</CardDescription></CardHeader><CardContent><div className="h-[560px] overflow-hidden rounded-2xl border"><MapContainer key={`${mapCenter[0]}-${mapCenter[1]}-${mapSites.length}`} center={mapCenter} zoom={13} className="h-full w-full"><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />{mapSites.map((site) => <CircleMarker key={site.id} center={[Number(site.latitude), Number(site.longitude)]} radius={10} pathOptions={{ fillOpacity: 0.85 }}><Popup><div dir="rtl" className="min-w-[180px]"><strong>{site.name}</strong><div>{siteTypeDisplayLabel(site)} — {siteStatusLabels[site.status]}</div><div>{site.city || ''} {site.district || ''}</div><div>بلاغات: {site._count?.tickets || 0}</div><button onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')} className="mt-2 underline">فتح في Google Maps</button></div></Popup></CircleMarker>)}</MapContainer></div></CardContent></Card>
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">اللوحة المكانية</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><MapPin className="h-5 w-5" />الخريطة وتغطية خدمة الصلاة</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">عرض جغرافي للمساجد والمصليات، ومع صلاحيات الإشراف تظهر أيضًا مباني الجامعة وحالة تغطية خدمة الصلاة والاحتياج.</CardDescription>
+                </div>
+                {['head', 'supervisor'].includes(role) && <Button variant="outline" className="border-[#d6b46a] bg-[#fff8e8] font-bold text-[#7b5b16]" onClick={() => setActiveTab('buildings')}><Building2 className="ml-2 h-4 w-4" />تغطية المباني</Button>}
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <SpatialMetric label="مواقع بإحداثيات" value={spatialMapSites.length} icon={MapPin} />
+                <SpatialMetric label="المباني على الخريطة" value={['head', 'supervisor'].includes(role) ? spatialMapBuildings.length : 0} icon={Building2} />
+                <SpatialMetric label="مبانٍ تحتاج مصلى" value={['head', 'supervisor'].includes(role) ? officialBuildings.filter((x) => x.coverageStatus === 'needs_prayer_room').length : 0} icon={AlertTriangle} tone="warning" />
+                <SpatialMetric label="سجلات بلا إحداثيات" value={sites.filter((site) => !Number.isFinite(Number(site.latitude)) || !Number.isFinite(Number(site.longitude))).length + (['head', 'supervisor'].includes(role) ? officialBuildings.filter((building) => !Number.isFinite(Number(building.latitude)) || !Number.isFinite(Number(building.longitude))).length : 0)} icon={FileText} />
+              </div>
+
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">طبقات الخريطة والتصفية</p><p className="mt-1 text-xs text-slate-500">غيّر الطبقة أو النوع أو الحالة لتحديث النقاط والبطاقات الجانبية مباشرة.</p></div>
+                  <Badge variant="outline" className="border-[#d6b46a]/55 bg-white px-3 py-1.5 font-black text-[#0b4a3f]">{mapSites.length + mapBuildings.length} نقطة ظاهرة</Badge>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="relative xl:col-span-2"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-11 border-[#d9c9a5] bg-white pr-9" value={mapSearch} onChange={(e) => setMapSearch(e.target.value)} placeholder="اسم الموقع، رقم المبنى، المدينة، الحرم..." /></div>
+                  <NativeSelect className="h-11 bg-white" value={mapLayer} onChange={(e) => setMapLayer(e.target.value as 'all' | 'sites' | 'buildings')}>
+                    <option value="all">{['head', 'supervisor'].includes(role) ? 'كل الطبقات' : 'المساجد والمصليات'}</option>
+                    <option value="sites">المساجد والمصليات</option>
+                    {['head', 'supervisor'].includes(role) && <option value="buildings">المباني الجامعية</option>}
+                  </NativeSelect>
+                  <NativeSelect className="h-11 bg-white" value={mapSiteType} disabled={mapLayer === 'buildings'} onChange={(e) => setMapSiteType(e.target.value)}><option value="all">كل أنواع المواقع</option><option value="mosque">مساجد</option><option value="jami">جوامع</option><option value="prayer_room">مصليات</option></NativeSelect>
+                  <NativeSelect className="h-11 bg-white" value={mapSiteStatus} disabled={mapLayer === 'buildings'} onChange={(e) => setMapSiteStatus(e.target.value)}><option value="all">كل حالات المواقع</option>{Object.entries(siteStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>
+                </div>
+                {['head', 'supervisor'].includes(role) && <div className="mt-3 grid gap-3 md:grid-cols-[280px_auto]">
+                  <NativeSelect className="h-11 bg-white" value={mapBuildingCoverage} disabled={mapLayer === 'sites'} onChange={(e) => setMapBuildingCoverage(e.target.value)}><option value="all">كل حالات تغطية المباني</option>{Object.entries(buildingCoverageStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>
+                  <div className="flex justify-end"><Button variant="outline" className="h-11 border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => { setMapSearch(''); setMapLayer('all'); setMapSiteType('all'); setMapSiteStatus('all'); setMapBuildingCoverage('all'); }}><X className="ml-1 h-4 w-4" />مسح مرشحات الخريطة</Button></div>
+                </div>}
+              </div>
+            </CardContent>
+          </Card>
+
+          <section className="grid gap-4 xl:grid-cols-[1.75fr_0.75fr]">
+            <Card className="overflow-hidden rounded-[24px] border border-[#ded3b8] bg-white shadow-[0_10px_28px_rgba(6,60,51,0.06)]">
+              <CardHeader className="border-b border-[#eee5d2] bg-[#fffdf8] pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><CardTitle className="text-base font-black text-[#0b4a3f]">الخريطة التفاعلية</CardTitle><CardDescription className="mt-1">اضغط على أي نقطة لعرض بيانات السجل وفتح الموقع أو الملف المرتبط.</CardDescription></div>
+                  <div className="flex flex-wrap gap-3 text-[11px] font-bold text-slate-600"><span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#0b5a49]" />مسجد / مصلى</span>{['head', 'supervisor'].includes(role) && <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#d6b46a]" />مبنى جامعي</span>}</div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-3">
+                <div className="h-[620px] overflow-hidden rounded-[20px] border border-[#e2d4b4]">
+                  <MapContainer key={`${mapCenter[0]}-${mapCenter[1]}-${mapSites.length}-${mapBuildings.length}-${mapLayer}`} center={mapCenter} zoom={13} className="h-full w-full">
+                    <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    {mapSites.map((site) => <CircleMarker key={`site-${site.id}`} center={[Number(site.latitude), Number(site.longitude)]} radius={9} pathOptions={{ color: '#0b5a49', fillColor: '#0b5a49', fillOpacity: 0.85, weight: 2 }}>
+                      <Popup><div dir="rtl" className="min-w-[210px] space-y-2"><div><strong className="text-sm">{site.name}</strong><div className="mt-1 text-xs">{siteTypeDisplayLabel(site)} — {siteStatusLabels[site.status]}</div><div className="mt-1 text-xs">{[site.campusLocation, site.city, site.district].filter(Boolean).join(' — ') || '-'}</div></div><div className="flex gap-2"><button onClick={() => setPreviewSite(site)} className="rounded border px-2 py-1 text-xs font-bold">فتح السجل</button><button onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')} className="rounded border px-2 py-1 text-xs font-bold">Google Maps</button></div></div></Popup>
+                    </CircleMarker>)}
+                    {mapBuildings.map((building) => <CircleMarker key={`building-${building.id}`} center={[Number(building.latitude), Number(building.longitude)]} radius={8} pathOptions={{ color: '#a67c1e', fillColor: '#d6b46a', fillOpacity: 0.78, weight: 2 }}>
+                      <Popup><div dir="rtl" className="min-w-[220px] space-y-2"><div><strong className="text-sm">{building.name || ('مبنى ' + building.buildingNumber)}</strong><div className="mt-1 text-xs">مبنى رقم {building.buildingNumber}</div><div className="mt-1 text-xs">{buildingCoverageStatusLabels[building.coverageStatus] || building.coverageStatus}</div></div><div className="flex gap-2"><button onClick={() => openBuildingDialog(building)} className="rounded border px-2 py-1 text-xs font-bold">ملف التغطية</button><button onClick={() => window.open('https://www.google.com/maps?q=' + building.latitude + ',' + building.longitude, '_blank')} className="rounded border px-2 py-1 text-xs font-bold">Google Maps</button></div></div></Popup>
+                    </CircleMarker>)}
+                  </MapContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <aside className="grid content-start gap-4">
+              {['head', 'supervisor'].includes(role) && <Card className="overflow-hidden rounded-[22px] border border-amber-200 bg-amber-50/45 shadow-sm">
+                <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base font-black text-amber-900"><AlertTriangle className="h-4 w-4" />أولوية التغطية</CardTitle><CardDescription>مبانٍ مصنفة بأنها تحتاج مصلى.</CardDescription></CardHeader>
+                <CardContent className="space-y-2">
+                  {officialBuildings.filter((building) => building.coverageStatus === 'needs_prayer_room').slice(0, 6).map((building) => <button key={building.id} type="button" onClick={() => openBuildingDialog(building)} className="w-full rounded-xl border border-amber-200 bg-white p-3 text-right transition hover:border-amber-400"><div className="flex items-center justify-between gap-2"><strong className="truncate text-sm text-[#0b4a3f]">{building.name || ('مبنى ' + building.buildingNumber)}</strong><Badge variant="outline" className="shrink-0 border-amber-300 bg-amber-50 text-amber-800">#{building.buildingNumber}</Badge></div><p className="mt-1 truncate text-xs text-slate-500">{building.campusLocation || building.city || 'لم يحدد الموقع'}</p></button>)}
+                  {!officialBuildings.some((building) => building.coverageStatus === 'needs_prayer_room') && <p className="rounded-xl border border-dashed border-emerald-200 bg-white p-4 text-center text-xs text-emerald-700">لا توجد مبانٍ مصنفة حاليًا بأنها تحتاج مصلى.</p>}
+                </CardContent>
+              </Card>}
+
+              <Card className="overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-sm">
+                <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">المواقع الظاهرة</CardTitle><CardDescription>وصول سريع إلى السجلات الموجودة على الخريطة الحالية.</CardDescription></CardHeader>
+                <CardContent className="space-y-2">
+                  {mapSites.slice(0, 7).map((site) => <button key={site.id} type="button" onClick={() => setPreviewSite(site)} className="w-full rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-3 text-right transition hover:border-[#d6b46a]"><div className="flex items-center justify-between gap-2"><strong className="truncate text-sm text-[#0b4a3f]">{site.name}</strong><Badge variant="outline" className="shrink-0 border-[#d6b46a]/45 bg-white text-[#7b5b16]">{siteTypeDisplayLabel(site)}</Badge></div><p className="mt-1 truncate text-xs text-slate-500">{site.campusLocation || site.city || '-'}</p></button>)}
+                  {!mapSites.length && <p className="rounded-xl border border-dashed border-[#d9c9a5] bg-[#fffdf8] p-4 text-center text-xs text-slate-500">لا توجد مساجد أو مصليات مطابقة للمرشحات الحالية.</p>}
+                </CardContent>
+              </Card>
+
+              {['head', 'supervisor'].includes(role) && <Card className="overflow-hidden rounded-[22px] border border-[#ded3b8] bg-[#fffdf8] shadow-sm">
+                <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">تغطية المباني</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between"><span className="text-xs font-bold text-slate-500">نسبة التغطية</span><span className="text-xl font-black text-[#0b4a3f]">{buildingCoveragePercent}%</span></div>
+                  <Progress value={buildingCoveragePercent} className="h-2.5" />
+                  <Button variant="outline" className="w-full border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => setActiveTab('buildings')}><Building2 className="ml-2 h-4 w-4" />فتح سجل التغطية</Button>
+                </CardContent>
+              </Card>}
+            </aside>
+          </section>
         </TabsContent>
+
         <TabsContent value="reports" className="space-y-4">
           <MosqueReportsCenter
             sites={sites}
@@ -3348,74 +3862,288 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>
 
         <TabsContent value="team" className="space-y-4">
-          {canCreateUser && ['head', 'supervisor'].includes(role) && <div className="flex justify-end"><Button className={button3d} onClick={() => openPersonnelDialog()}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب + حساب دخول</Button></div>}
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-            {personnel.map((item) => (
-              <Card key={item.id} className={`${card3d} overflow-hidden`}>
-                <div className="h-1.5 bg-gradient-to-l from-emerald-400 via-sky-500 to-blue-800" />
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div><h3 className="font-black">{item.name}</h3><p className="text-sm text-muted-foreground">{item.site?.name || '-'}</p></div>
-                    <div className="flex flex-col items-end gap-1"><Badge variant="outline">{personnelRoleLabels[item.role] || item.role}</Badge><Badge variant="outline" className={item.active ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-600'}>{item.active ? 'نشط' : 'غير نشط'}</Badge></div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-sm"><Info label="الجوال" value={item.mobile || '-'} /><Info label="البريد" value={item.email || '-'} /></div>
-                  <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                    <Button variant="outline" size="sm" className={button3d} onClick={() => setViewingPersonnel(item)}><Eye className="ml-1 h-3.5 w-3.5" />عرض</Button>
-                    {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" size="sm" className={button3d} onClick={() => openPersonnelDialog(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل</Button>}
-                    {canDelete && role === 'head' && <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => deletePersonnel(item)}><Trash2 className="ml-1 h-3.5 w-3.5" />حذف</Button>}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          {!personnel.length && <Empty text="لا يوجد منسوبون مسجلون" />}
-        </TabsContent>
-
-        <TabsContent value="roles" className="space-y-4">
-          <Card className={card3d}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" />الأدوار التشغيلية وربط منسوبي المساجد</CardTitle>
-              <CardDescription>اربط حساب المستخدم بمسجد أو مصلى وحدد صفته التشغيلية بدقة: إمام، مؤذن، خطيب، أو خطيب متعاون.</CardDescription>
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">الكوادر التشغيلية</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Users className="h-5 w-5" />منسوبو المساجد والمصليات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">سجل موحد للأئمة والمؤذنين والخطباء والخطباء المتعاونين، مرتبط بالموقع والحساب التشغيلي وطلبات الإجازة والاعتذار.</CardDescription>
+                </div>
+                {canCreateUser && ['head', 'supervisor'].includes(role) && <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => openPersonnelDialog()}><UserPlus className="ml-2 h-4 w-4" />إضافة منسوب</Button>}
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {staffUsers.map((user) => {
-                const current = assignments.find((item) => item.userId === user.uid);
-                const draft = assignmentDrafts[user.uid] || { role: current?.role || 'viewer', siteId: current?.siteId || '', personnelRole: current?.personnelRole || 'imam' };
-                return (
-                  <div key={user.uid} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                    <div className="mb-3 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                      <div><p className="font-bold text-slate-900">{user.username}</p><p className="text-xs text-muted-foreground" dir="ltr">{user.email}</p></div>
-                      {current && <Badge variant="outline" className="w-fit">{roleLabels[current.role]}{current.role === 'personnel' && current.personnelRole ? ' — ' + (personnelRoleLabels[current.personnelRole] || current.personnelRole) : ''}</Badge>}
+
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <PersonnelMetric label="إجمالي المنسوبين" value={personnel.length} icon={Users} />
+                <PersonnelMetric label="السجلات النشطة" value={personnel.filter((item) => item.active).length} icon={CheckCircle2} />
+                <PersonnelMetric label="حسابات دخول مرتبطة" value={personnel.filter((item) => Boolean(item.userId)).length} icon={Shield} />
+                <PersonnelMetric label="إجازات / اعتذارات معلقة" value={leaves.filter((item) => ['pending', 'under_review'].includes(item.status)).length} icon={CalendarDays} />
+              </div>
+
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">ابحث بالاسم أو الجوال أو البريد أو المسجد، ثم صفِّ حسب الصفة والحالة.</p></div>
+                  <Badge variant="outline" className="border-[#d6b46a]/55 bg-white px-3 py-1.5 font-black text-[#0b4a3f]">{filteredPersonnel.length} نتيجة</Badge>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_210px_180px_auto]">
+                  <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-11 border-[#d9c9a5] bg-white pr-9" value={personnelSearch} onChange={(e) => setPersonnelSearch(e.target.value)} placeholder="الاسم، الجوال، البريد، المسجد / المصلى..." /></div>
+                  <NativeSelect className="h-11 bg-white" value={personnelRoleFilter} onChange={(e) => setPersonnelRoleFilter(e.target.value)}><option value="all">جميع الصفات</option><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option></NativeSelect>
+                  <NativeSelect className="h-11 bg-white" value={personnelStatusFilter} onChange={(e) => setPersonnelStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}><option value="all">جميع الحالات</option><option value="active">نشط</option><option value="inactive">غير نشط</option></NativeSelect>
+                  <Button variant="outline" className="h-11 border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => { setPersonnelSearch(''); setPersonnelRoleFilter('all'); setPersonnelStatusFilter('all'); }}><X className="ml-1 h-4 w-4" />مسح</Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-black text-[#0b4a3f]">الملفات التشغيلية</p><p className="mt-1 text-xs text-slate-500">كل بطاقة مرتبطة مباشرة بالمسجد أو المصلى وحالة الحساب والتواصل.</p></div>
+                {isAdmin && <Button variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => setActiveTab('roles')}><Shield className="ml-2 h-4 w-4" />إدارة الأدوار والربط</Button>}
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+                {filteredPersonnel.map((item) => {
+                  const site = sites.find((row) => row.id === item.siteId);
+                  const media = normalizeSiteMedia(site?.images || null);
+                  const cover = media.photos.find((photo) => photo.category === 'mosque_image') || media.photos[0];
+                  const personnelLeaves = leaves.filter((leave) => leave.personnelId === item.id);
+                  const pendingLeaves = personnelLeaves.filter((leave) => ['pending', 'under_review'].includes(leave.status)).length;
+                  const initials = item.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('');
+
+                  return <Card key={item.id} className="group overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_9px_26px_rgba(6,60,51,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_14px_30px_rgba(6,60,51,0.10)]">
+                    <div className="relative h-24 overflow-hidden bg-[#f2ecdf]">
+                      {cover ? <MosqueMediaImage item={cover} alt={cover.fileName || site?.name || item.name} className="h-full w-full object-cover opacity-85 transition-transform duration-300 group-hover:scale-[1.03]" /> : <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,#fff8e8,#e9e0cf)]" />}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#073f35]/80 via-[#073f35]/30 to-transparent" />
+                      <div className="absolute inset-x-0 bottom-2 flex items-end justify-between gap-3 px-4">
+                        <div className="min-w-0 text-white"><p className="truncate text-xs font-bold text-emerald-50/85">{site?.name || item.site?.name || 'بدون موقع محدد'}</p><p className="mt-0.5 text-[10px] text-white/70">{site ? siteTypeDisplayLabel(site) : 'موقع تشغيلي'}</p></div>
+                        <Badge variant="outline" className={item.active ? 'border-emerald-200/60 bg-emerald-50/90 text-emerald-800' : 'border-white/40 bg-white/85 text-slate-600'}>{item.active ? 'نشط' : 'غير نشط'}</Badge>
+                      </div>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-4">
-                      <Field label="الدور داخل الوحدة">
-                        <NativeSelect value={draft.role} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, role: e.target.value as MosqueModuleRole } }))}>
-                          <option value="university_member">منسوب الجامعة</option><option value="personnel">منسوب المسجد أو المصلى</option><option value="supervisor">مشرف الوحدة</option><option value="head">رئيس الوحدة</option>
-                        </NativeSelect>
-                      </Field>
-                      <Field label="المسجد / المصلى">
-                        <NativeSelect value={draft.siteId} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, siteId: e.target.value } }))} disabled={draft.role !== 'personnel'}>
-                          <option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
-                        </NativeSelect>
-                      </Field>
-                      <Field label="الصفة التشغيلية">
-                        <NativeSelect value={draft.personnelRole} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, personnelRole: e.target.value } }))} disabled={draft.role !== 'personnel'}>
-                          <option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option>
-                        </NativeSelect>
-                      </Field>
-                      <div className="flex items-end"><Button className={button3d} onClick={() => setUserAssignment(user.uid, draft.role, draft.siteId, draft.personnelRole)}><Save className="ml-2 h-4 w-4" />حفظ الربط</Button></div>
-                    </div>
-                  </div>
-                );
-              })}
-              {!staffUsers.length && <Empty text="لا توجد حسابات مستخدمين للربط" />}
+
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/55 bg-[#fff8e8] text-base font-black text-[#0b4a3f] shadow-sm">{initials || 'م'}</div>
+                        <div className="min-w-0 flex-1"><h3 className="truncate text-lg font-black text-[#0b4a3f]">{item.name}</h3><div className="mt-1 flex flex-wrap gap-1.5"><Badge variant="outline" className="border-[#d6b46a]/45 bg-[#fffdf8] text-[#7b5b16]">{personnelRoleLabels[item.role] || item.role}</Badge>{item.userId ? <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">حساب مرتبط</Badge> : <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">بدون حساب</Badge>}</div></div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">الجوال</p><p dir="ltr" className="mt-1 truncate text-right text-xs font-black text-slate-700">{item.mobile || '-'}</p></div>
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">البريد</p><p dir="ltr" className="mt-1 truncate text-right text-xs font-black text-slate-700">{item.email || '-'}</p></div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                        <div className="rounded-xl border border-[#e4d8bd] bg-white p-2.5"><p className="text-[10px] font-bold text-slate-500">إجمالي الإجازات</p><p className="mt-1 text-lg font-black text-[#0b4a3f]">{personnelLeaves.length}</p></div>
+                        <div className={`rounded-xl border p-2.5 ${pendingLeaves > 0 ? 'border-amber-200 bg-amber-50/70' : 'border-emerald-200 bg-emerald-50/55'}`}><p className="text-[10px] font-bold text-slate-500">قيد المراجعة</p><p className={`mt-1 text-lg font-black ${pendingLeaves > 0 ? 'text-amber-800' : 'text-emerald-700'}`}>{pendingLeaves}</p></div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2 border-t border-[#eee5d2] pt-4">
+                        <Button size="sm" className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => setViewingPersonnel(item)}><Eye className="ml-1 h-3.5 w-3.5" />فتح الملف</Button>
+                        {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" size="sm" className="border-[#d6b46a] bg-[#fff8e8] text-[#7b5b16]" onClick={() => openPersonnelDialog(item)}><Pencil className="ml-1 h-3.5 w-3.5" />تعديل</Button>}
+                        {canDelete && role === 'head' && <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => deletePersonnel(item)}><Trash2 className="ml-1 h-3.5 w-3.5" />حذف</Button>}
+                      </div>
+                    </CardContent>
+                  </Card>;
+                })}
+              </div>
+              {!filteredPersonnel.length && <Empty text="لا يوجد منسوبون مطابقون للبحث والتصفية" />}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-3">
-          {notifications.map((notice) => <button key={notice.id} onClick={async () => { if (!notice.isRead) { await mosqueApi.readNotification(notice.id); setNotifications((current) => current.map((x) => x.id === notice.id ? { ...x, isRead: true } : x)); } }} className={`w-full rounded-2xl border p-4 text-right transition ${notice.isRead ? 'bg-white' : 'border-sky-300 bg-sky-50 shadow-sm'}`}><div className="flex items-start justify-between gap-3"><div><p className="font-bold">{notice.title}</p><p className="mt-1 text-sm text-muted-foreground">{notice.message}</p></div><Bell className={`h-5 w-5 ${notice.isRead ? 'text-slate-400' : 'text-sky-600'}`} /></div><p className="mt-2 text-xs text-muted-foreground">{new Date(notice.createdAt).toLocaleString('ar-SA')}</p></button>)}
-          {!notifications.length && <Empty text="لا توجد إشعارات" />}
+        <TabsContent value="roles" className="space-y-4">
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">التحكم بالوصول</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Shield className="h-5 w-5" />الأدوار التشغيلية وربط الحسابات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">إدارة نطاق وصول حسابات الوحدة وربط منسوبي المساجد والمصليات بالموقع والصفة التشغيلية من شاشة واحدة.</CardDescription>
+                </div>
+                <div className="rounded-2xl border border-[#d6b46a]/45 bg-[#0b4a3f] px-4 py-3 text-white">
+                  <p className="text-[10px] font-bold text-[#efd18a]">إدارة هذه الشاشة</p>
+                  <p className="mt-1 text-sm font-black">متاحة لمسؤول النظام فقط</p>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <RoleMetric label="الحسابات المتاحة" value={staffUsers.length} icon={Users} />
+                <RoleMetric label="الحسابات النشطة" value={staffUsers.filter((user) => user.isActive).length} icon={CheckCircle2} />
+                <RoleMetric label="روابط تشغيلية محفوظة" value={assignments.length} icon={Shield} />
+                <RoleMetric label="منسوبون مرتبطون بموقع" value={assignments.filter((item) => item.role === 'personnel' && Boolean(item.siteId)).length} icon={MapPin} />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <RoleDefinitionCard title="رئيس الوحدة" description="إدارة كاملة للوحدة والاعتمادات والمتابعة الشاملة." count={assignments.filter((item) => item.role === 'head').length} icon={Shield} />
+                <RoleDefinitionCard title="مشرف الوحدة" description="إشراف تشغيلي ومتابعة الأعمال وفق الصلاحيات الممنوحة." count={assignments.filter((item) => item.role === 'supervisor').length} icon={ClipboardList} />
+                <RoleDefinitionCard title="منسوب المسجد / المصلى" description="وصول مقيد بالموقع المرتبط وصفة إمام أو مؤذن أو خطيب." count={assignments.filter((item) => item.role === 'personnel').length} icon={Users} />
+                <RoleDefinitionCard title="منسوب الجامعة" description="وصول خدمات عام دون ارتباط تشغيلي بمسجد أو مصلى." count={assignments.filter((item) => ['university_member', 'viewer'].includes(item.role)).length} icon={Building2} />
+              </div>
+
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">ابحث باسم المستخدم أو البريد أو الموقع، ثم صفِّ حسب الدور الحالي.</p></div>
+                  <Badge variant="outline" className="border-[#d6b46a]/55 bg-white px-3 py-1.5 font-black text-[#0b4a3f]">{filteredStaffUsers.length} حساب</Badge>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_240px_auto]">
+                  <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-11 border-[#d9c9a5] bg-white pr-9" value={roleUserSearch} onChange={(e) => setRoleUserSearch(e.target.value)} placeholder="اسم المستخدم، البريد، المسجد / المصلى..." /></div>
+                  <NativeSelect className="h-11 bg-white" value={roleUserFilter} onChange={(e) => setRoleUserFilter(e.target.value as 'all' | MosqueModuleRole)}><option value="all">جميع الأدوار</option><option value="head">رئيس الوحدة</option><option value="supervisor">مشرف الوحدة</option><option value="personnel">منسوب المسجد أو المصلى</option><option value="university_member">منسوب الجامعة</option></NativeSelect>
+                  <Button variant="outline" className="h-11 border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => { setRoleUserSearch(''); setRoleUserFilter('all'); }}><X className="ml-1 h-4 w-4" />مسح</Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-black text-[#0b4a3f]">الحسابات ونطاقات الوصول</p><p className="mt-1 text-xs text-slate-500">أي تغيير لا يُحفظ إلا عند الضغط على «حفظ الربط» داخل بطاقة الحساب.</p></div>
+                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">تأكد من الموقع والصفة قبل حفظ دور «منسوب المسجد أو المصلى»</Badge>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                {filteredStaffUsers.map((user) => {
+                  const current = assignments.find((item) => item.userId === user.uid);
+                  const baseRole = current?.role || (user.moduleRole === 'viewer' ? 'university_member' : user.moduleRole) || 'university_member';
+                  const draft = assignmentDrafts[user.uid] || { role: baseRole, siteId: current?.siteId || user.siteId || '', personnelRole: current?.personnelRole || user.personnelRole || 'imam' };
+                  const currentSite = current?.site?.name || sites.find((site) => site.id === (current?.siteId || user.siteId))?.name || '';
+                  const initials = user.username.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('');
+                  const changed = draft.role !== baseRole
+                    || (draft.role === 'personnel' && ((draft.siteId || '') !== (current?.siteId || user.siteId || '') || (draft.personnelRole || 'imam') !== (current?.personnelRole || user.personnelRole || 'imam')));
+
+                  return <Card key={user.uid} className="overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_8px_24px_rgba(6,60,51,0.06)]">
+                    <CardContent className="space-y-4 p-4 sm:p-5">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/55 bg-[#fff8e8] text-base font-black text-[#0b4a3f]">{initials || 'م'}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-base font-black text-[#0b4a3f]">{user.username}</h3><Badge variant="outline" className={user.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-600'}>{user.isActive ? 'حساب نشط' : 'حساب غير نشط'}</Badge></div>
+                          <p dir="ltr" className="mt-1 truncate text-right text-xs text-slate-500">{user.email}</p>
+                        </div>
+                        {changed && <Badge variant="outline" className="shrink-0 border-amber-300 bg-amber-50 text-amber-800">تغييرات غير محفوظة</Badge>}
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">الدور الحالي</p><p className="mt-1 text-xs font-black text-[#0b4a3f]">{roleLabels[baseRole]}</p></div>
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">نطاق الوصول</p><p className="mt-1 text-xs font-black text-[#0b4a3f]">{roleScopeLabel(baseRole)}</p></div>
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">الموقع المرتبط</p><p className="mt-1 truncate text-xs font-black text-[#0b4a3f]">{baseRole === 'personnel' ? (currentSite || 'غير محدد') : 'لا يتطلب موقعًا'}</p></div>
+                      </div>
+
+                      <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                        <div className="mb-3 flex items-center justify-between gap-2"><p className="font-black text-[#0b4a3f]">تعديل الربط</p><Badge variant="outline" className="border-[#d6b46a]/45 bg-white text-[#7b5b16]">{roleLabels[draft.role]}</Badge></div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <Field label="الدور داخل الوحدة">
+                            <NativeSelect className="h-11 bg-white" value={draft.role} onChange={(e) => {
+                              const nextRole = e.target.value as MosqueModuleRole;
+                              setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, role: nextRole, siteId: nextRole === 'personnel' ? draft.siteId : '', personnelRole: nextRole === 'personnel' ? draft.personnelRole : 'imam' } }));
+                            }}>
+                              <option value="university_member">منسوب الجامعة</option><option value="personnel">منسوب المسجد أو المصلى</option><option value="supervisor">مشرف الوحدة</option><option value="head">رئيس الوحدة</option>
+                            </NativeSelect>
+                          </Field>
+                          <Field label="المسجد / المصلى">
+                            <NativeSelect className="h-11 bg-white" value={draft.siteId} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, siteId: e.target.value } }))} disabled={draft.role !== 'personnel'}>
+                              <option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
+                            </NativeSelect>
+                          </Field>
+                          <Field label="الصفة التشغيلية">
+                            <NativeSelect className="h-11 bg-white" value={draft.personnelRole} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, personnelRole: e.target.value } }))} disabled={draft.role !== 'personnel'}>
+                              <option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option>
+                            </NativeSelect>
+                          </Field>
+                          <div className="flex items-end"><Button className="h-11 w-full border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" disabled={draft.role === 'personnel' && !draft.siteId} onClick={() => setUserAssignment(user.uid, draft.role, draft.siteId, draft.personnelRole)}><Save className="ml-2 h-4 w-4" />حفظ الربط</Button></div>
+                        </div>
+                        {draft.role === 'personnel' && !draft.siteId && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">يجب تحديد المسجد أو المصلى قبل حفظ هذا الدور.</div>}
+                        {draft.role === 'personnel' && draft.siteId && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800"><MapPin className="h-3.5 w-3.5" /><strong>{sites.find((site) => site.id === draft.siteId)?.name || 'الموقع المحدد'}</strong><span>•</span><span>{personnelRoleLabels[draft.personnelRole] || draft.personnelRole}</span></div>}
+                      </div>
+                    </CardContent>
+                  </Card>;
+                })}
+              </div>
+
+              {!filteredStaffUsers.length && <Empty text="لا توجد حسابات مطابقة للبحث والتصفية" />}
+
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-7 text-amber-900">
+                <div className="flex items-start gap-3"><AlertTriangle className="mt-1 h-5 w-5 shrink-0" /><div><strong>تنبيه صلاحيات:</strong> تغيير الدور هنا يغير نطاق وصول الحساب داخل وحدة المساجد. ربط «منسوب المسجد أو المصلى» يتطلب تحديد الموقع والصفة التشغيلية، بينما أدوار رئيس الوحدة والمشرف ومنسوب الجامعة لا تحتاج ربطًا بموقع محدد.</div></div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-4">
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">مركز التنبيهات</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Bell className="h-5 w-5" />الإشعارات والتنبيهات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">متابعة الإشعارات غير المقروءة وربطها بالطلبات والبلاغات والمواقع والمصاحف، مع انتقال مباشر إلى السجل المرتبط عند توفره.</CardDescription>
+                </div>
+                <Button variant="outline" className="border-[#d6b46a] bg-[#fff8e8] font-bold text-[#7b5b16]" disabled={!notifications.some((notice) => !notice.isRead)} onClick={() => void markAllNotificationsRead()}><CheckCircle2 className="ml-2 h-4 w-4" />تحديد الكل كمقروء</Button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <NotificationMetric label="إجمالي الإشعارات" value={notifications.length} icon={Bell} />
+                <NotificationMetric label="غير مقروء" value={notifications.filter((notice) => !notice.isRead).length} icon={AlertTriangle} tone="warning" />
+                <NotificationMetric label="إشعارات اليوم" value={notifications.filter((notice) => new Date(notice.createdAt).toDateString() === new Date().toDateString()).length} icon={CalendarDays} />
+                <NotificationMetric label="مرتبطة بمعاملة / موقع" value={notifications.filter((notice) => Boolean(notice.entityType || notice.entityId)).length} icon={ExternalLink} />
+              </div>
+
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">صفِّ الإشعارات حسب حالة القراءة أو نوع السجل المرتبط.</p></div>
+                  <Badge variant="outline" className="border-[#d6b46a]/55 bg-white px-3 py-1.5 font-black text-[#0b4a3f]">{filteredNotifications.length} إشعار</Badge>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_190px_230px_auto]">
+                  <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-11 border-[#d9c9a5] bg-white pr-9" value={notificationSearch} onChange={(e) => setNotificationSearch(e.target.value)} placeholder="بحث في عنوان الإشعار أو محتواه..." /></div>
+                  <NativeSelect className="h-11 bg-white" value={notificationReadFilter} onChange={(e) => setNotificationReadFilter(e.target.value as 'all' | 'unread' | 'read')}><option value="all">الكل</option><option value="unread">غير مقروء</option><option value="read">مقروء</option></NativeSelect>
+                  <NativeSelect className="h-11 bg-white" value={notificationTypeFilter} onChange={(e) => setNotificationTypeFilter(e.target.value as 'all' | 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other')}><option value="all">جميع الأنواع</option><option value="request">طلبات الصيانة والاحتياج</option><option value="ticket">البلاغات</option><option value="site">المساجد والمصليات</option><option value="leave">الإجازات والاعتذارات</option><option value="quran">المصاحف</option><option value="other">إشعارات عامة</option></NativeSelect>
+                  <Button variant="outline" className="h-11 border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => { setNotificationSearch(''); setNotificationReadFilter('all'); setNotificationTypeFilter('all'); }}><X className="ml-1 h-4 w-4" />مسح</Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-black text-[#0b4a3f]">سجل الإشعارات</p><p className="mt-1 text-xs text-slate-500">الإشعارات الأحدث تظهر أولًا، والبطاقة غير المقروءة مميزة بصريًا.</p></div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant={notificationReadFilter === 'unread' ? 'default' : 'outline'} className={notificationReadFilter === 'unread' ? 'border border-[#0b4a3f] bg-[#0b4a3f] text-white' : 'border-[#d9c9a5] bg-white text-[#0b4a3f]'} onClick={() => setNotificationReadFilter(notificationReadFilter === 'unread' ? 'all' : 'unread')}><Bell className="ml-1 h-3.5 w-3.5" />غير المقروء فقط</Button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {filteredNotifications.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((notice) => {
+                  const category = notificationCategory(notice);
+                  const urgent = /عاجل|urgent|طارئ/i.test(`${notice.title} ${notice.message}`);
+                  const targetAvailable = Boolean(notice.entityType || notice.entityId) && category !== 'other';
+                  const categoryIcon = category === 'request' ? <Wrench className="h-4 w-4" /> : category === 'ticket' ? <MessageSquare className="h-4 w-4" /> : category === 'site' ? <Building2 className="h-4 w-4" /> : category === 'leave' ? <CalendarDays className="h-4 w-4" /> : category === 'quran' ? <BookOpen className="h-4 w-4" /> : <Bell className="h-4 w-4" />;
+
+                  return <div key={notice.id} className={`relative overflow-hidden rounded-[20px] border p-4 transition-all ${notice.isRead ? 'border-[#e2d4b4] bg-white' : 'border-[#d6b46a] bg-[#fffaf0] shadow-[0_8px_22px_rgba(6,60,51,0.07)]'}`}>
+                    {!notice.isRead && <span className="absolute bottom-0 right-0 top-0 w-1.5 bg-[#0b5a49]" />}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 gap-3">
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border ${notice.isRead ? 'border-[#e2d4b4] bg-[#fffdf8] text-[#0b5a49]' : 'border-[#d6b46a]/55 bg-[#0b4a3f] text-[#f0d18b]'}`}>{categoryIcon}</div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-black text-[#0b4a3f]">{notice.title}</h3>
+                            <Badge variant="outline" className="border-[#d6b46a]/45 bg-white text-[#7b5b16]">{notificationCategoryLabel[category]}</Badge>
+                            {urgent && <Badge className="bg-red-600 text-white">عاجل</Badge>}
+                            {!notice.isRead && <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">جديد</Badge>}
+                          </div>
+                          <p className="mt-2 max-w-4xl text-sm leading-7 text-slate-600">{notice.message}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                            <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" />{new Date(notice.createdAt).toLocaleString('ar-SA')}</span>
+                            {notice.entityType && <span>النوع المرجعي: {notice.entityType}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        {!notice.isRead && <Button size="sm" variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={async () => { try { await mosqueApi.readNotification(notice.id); setNotifications((current) => current.map((item) => item.id === notice.id ? { ...item, isRead: true } : item)); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تحديث الإشعار'); } }}><CheckCircle2 className="ml-1 h-3.5 w-3.5" />مقروء</Button>}
+                        {targetAvailable && <Button size="sm" className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => void openNotificationTarget(notice)}><ExternalLink className="ml-1 h-3.5 w-3.5" />فتح السجل</Button>}
+                      </div>
+                    </div>
+                  </div>;
+                })}
+              </div>
+
+              {!filteredNotifications.length && <Empty text="لا توجد إشعارات مطابقة للبحث والتصفية" />}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
@@ -3891,38 +4619,98 @@ ${quranStockMovementForm.notes}` : ''}`
       </Dialog>
 
       <Dialog open={Boolean(viewingPersonnel)} onOpenChange={(open) => !open && setViewingPersonnel(null)}>
-        <DialogContent className="sm:max-w-[720px]" dir="rtl">
-          <DialogHeader className="text-right">
-            <DialogTitle className="flex items-center gap-2 text-xl font-black"><Eye className="h-5 w-5 text-sky-700" />عرض بيانات منسوب المسجد</DialogTitle>
-            <DialogDescription>بيانات الارتباط التشغيلي والحساب المسجل للمنسوب.</DialogDescription>
-          </DialogHeader>
-          {viewingPersonnel && <div className="space-y-4">
-            <div className="grid gap-3 rounded-2xl border bg-slate-50/80 p-4 sm:grid-cols-2">
-              <Info label="الاسم الكامل" value={viewingPersonnel.name} />
-              <Info label="الصفة التشغيلية" value={personnelRoleLabels[viewingPersonnel.role] || viewingPersonnel.role} />
-              <Info label="المسجد / المصلى" value={viewingPersonnel.site?.name || sites.find((site) => site.id === viewingPersonnel.siteId)?.name || '-'} />
-              <Info label="حالة السجل" value={viewingPersonnel.active ? 'نشط' : 'غير نشط'} />
-              <Info label="رقم الجوال" value={viewingPersonnel.mobile || '-'} />
-              <Info label="البريد الإلكتروني" value={viewingPersonnel.email || '-'} />
-              <Info label="حساب مستخدم مرتبط" value={viewingPersonnel.userId ? 'نعم' : 'لا'} />
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              {canEdit && ['head', 'supervisor'].includes(role) && <Button variant="outline" className={button3d} onClick={() => { const item = viewingPersonnel; setViewingPersonnel(null); openPersonnelDialog(item); }}><Pencil className="ml-2 h-4 w-4" />تعديل</Button>}
-              {canDelete && role === 'head' && <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => deletePersonnel(viewingPersonnel)}><Trash2 className="ml-2 h-4 w-4" />حذف</Button>}
-            </div>
-          </div>}
+        <DialogContent className="max-h-[92vh] overflow-y-auto border-[#ded3b8] bg-[#fffdf8] sm:max-w-[860px]" dir="rtl">
+          {viewingPersonnel && (() => {
+            const site = sites.find((row) => row.id === viewingPersonnel.siteId);
+            const media = normalizeSiteMedia(site?.images || null);
+            const cover = media.photos.find((photo) => photo.category === 'mosque_image') || media.photos[0];
+            const personnelLeaves = leaves.filter((leave) => leave.personnelId === viewingPersonnel.id).slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            const initials = viewingPersonnel.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('');
+
+            return <div className="space-y-4">
+              <div className="relative overflow-hidden rounded-[22px] border border-[#d6b46a]/45 bg-[#0b4a3f]">
+                <div className="h-36">{cover ? <MosqueMediaImage item={cover} alt={cover.fileName || site?.name || viewingPersonnel.name} className="h-full w-full object-cover opacity-70" /> : <div className="h-full bg-[radial-gradient(circle_at_top_left,#167060,#073f35)]" />}</div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#073f35] via-[#073f35]/55 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 flex items-end gap-4 p-5 text-white">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/30 bg-white/15 text-xl font-black backdrop-blur-sm">{initials || 'م'}</div>
+                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-xl font-black md:text-2xl">{viewingPersonnel.name}</h2><Badge variant="outline" className="border-[#e6c878]/70 bg-[#d6b46a]/20 text-[#ffe9b5]">{personnelRoleLabels[viewingPersonnel.role] || viewingPersonnel.role}</Badge></div><p className="mt-1 truncate text-sm text-emerald-50/85">{site?.name || viewingPersonnel.site?.name || 'بدون موقع محدد'}</p></div>
+                  <Badge variant="outline" className={viewingPersonnel.active ? 'border-emerald-200/60 bg-emerald-50/90 text-emerald-800' : 'border-white/40 bg-white/85 text-slate-600'}>{viewingPersonnel.active ? 'نشط' : 'غير نشط'}</Badge>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[1.35fr_0.9fr]">
+                <Card className="border-[#e2d4b4] bg-white">
+                  <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">بيانات الملف التشغيلي</CardTitle></CardHeader>
+                  <CardContent className="grid gap-3 sm:grid-cols-2">
+                    <Info label="الاسم الكامل" value={viewingPersonnel.name} />
+                    <Info label="الصفة التشغيلية" value={personnelRoleLabels[viewingPersonnel.role] || viewingPersonnel.role} />
+                    <Info label="المسجد / المصلى" value={site?.name || viewingPersonnel.site?.name || '-'} />
+                    <Info label="حالة السجل" value={viewingPersonnel.active ? 'نشط' : 'غير نشط'} />
+                    <Info label="رقم الجوال" value={viewingPersonnel.mobile || '-'} />
+                    <Info label="البريد الإلكتروني" value={viewingPersonnel.email || '-'} />
+                    <Info label="حساب مستخدم مرتبط" value={viewingPersonnel.userId ? 'نعم' : 'لا'} />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-[#e2d4b4] bg-[#fffdf8]">
+                  <CardHeader className="pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">ملخص الإجازات والاعتذارات</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-[#e4d8bd] bg-white p-3 text-center"><p className="text-[10px] font-bold text-slate-500">الإجمالي</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{personnelLeaves.length}</p></div>
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-center"><p className="text-[10px] font-bold text-amber-700">قيد المراجعة</p><p className="mt-1 text-2xl font-black text-amber-800">{personnelLeaves.filter((leave) => ['pending', 'under_review'].includes(leave.status)).length}</p></div>
+                    </div>
+                    {personnelLeaves.slice(0, 3).map((leave) => <div key={leave.id} className="rounded-xl border border-[#e4d8bd] bg-white p-3"><div className="flex items-center justify-between gap-2"><span className="text-xs font-black text-[#0b4a3f]">{leaveTypeLabels[leave.requestType] || leave.requestType}</span><Badge variant="outline" className={statusBadgeClass(leave.status)}>{statusLabels[leave.status] || leave.status}</Badge></div><p className="mt-1 text-[11px] text-slate-500">{new Date(leave.startDate).toLocaleDateString('ar-SA-u-ca-gregory')} — {new Date(leave.endDate).toLocaleDateString('ar-SA-u-ca-gregory')}</p></div>)}
+                    {!personnelLeaves.length && <p className="rounded-xl border border-dashed border-[#d9c9a5] bg-white p-4 text-center text-xs text-slate-500">لا توجد إجازات أو اعتذارات مسجلة.</p>}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-2 border-t border-[#e8ddc3] pt-4">
+                {canEdit && ['head', 'supervisor'].includes(role) && <Button className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => { const item = viewingPersonnel; setViewingPersonnel(null); openPersonnelDialog(item); }}><Pencil className="ml-2 h-4 w-4" />تعديل الملف</Button>}
+                {canDelete && role === 'head' && <Button variant="outline" className="border-red-300 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700" onClick={() => deletePersonnel(viewingPersonnel)}><Trash2 className="ml-2 h-4 w-4" />حذف</Button>}
+              </div>
+            </div>;
+          })()}
         </DialogContent>
       </Dialog>
 
       <Dialog open={personnelDialog} onOpenChange={(open) => { setPersonnelDialog(open); if (!open) setEditingPersonnel(null); }}>
-        <DialogContent className="max-h-[92vh] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/30 to-emerald-50/20 sm:max-w-[900px]" dir="rtl">
-          <DialogHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50 via-white to-emerald-50/60 p-5 text-right md:p-6"><DialogTitle className="flex items-center gap-2 text-xl font-black md:text-2xl">{editingPersonnel ? <Pencil className="h-5 w-5 text-sky-700" /> : <UserPlus className="h-5 w-5 text-sky-700" />}{editingPersonnel ? 'تعديل بيانات منسوب المسجد / الجامع / المصلى' : 'إضافة منسوب مسجد / جامع / مصلى'}</DialogTitle><DialogDescription>{editingPersonnel ? 'يمكن للمسؤول تحديث بيانات المنسوب والموقع والصفة التشغيلية، وتنعكس التغييرات على ربط حسابه.' : 'إجراء موحد: إضافة المنسوب وتحديد المسجد والصفة، ثم إنشاء حساب دخول جديد تلقائيًا أو ربط الحساب الموجود وإرسال بيانات التفعيل بالبريد.'}</DialogDescription></DialogHeader>
-          <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-4 md:p-6">
-            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-violet-50/40 pb-4"><CardTitle className="text-base md:text-lg">الارتباط والصفة</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><Field label="المسجد / المصلى *"><NativeSelect className="h-11" value={personnelForm.siteId} onChange={(e) => setPersonnelForm({ ...personnelForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field><Field label="الصفة *"><NativeSelect className="h-11" value={personnelForm.role} onChange={(e) => setPersonnelForm({ ...personnelForm, role: e.target.value })}><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option></NativeSelect></Field></CardContent></Card>
-            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/90 via-white to-emerald-50/40 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><Users className="h-5 w-5" />بيانات المنسوب</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2"><div className="md:col-span-2"><Field label="الاسم الكامل *"><Input className="h-11" autoFocus value={personnelForm.name} onChange={(e) => setPersonnelForm({ ...personnelForm, name: e.target.value })} placeholder="الاسم الرباعي" /></Field></div><Field label="رقم الجوال"><Input className="h-11" type="tel" inputMode="tel" value={personnelForm.mobile} onChange={(e) => setPersonnelForm({ ...personnelForm, mobile: e.target.value })} placeholder="05xxxxxxxx" /></Field><Field label="البريد الإلكتروني *"><Input className="h-11" type="email" inputMode="email" value={personnelForm.email} onChange={(e) => setPersonnelForm({ ...personnelForm, email: e.target.value })} placeholder="name@iau.edu.sa" /></Field></CardContent></Card>
-            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-6 text-slate-700"><strong>{editingPersonnel ? 'تعديل حساب منسوب المسجد:' : 'حساب منسوب المسجد:'}</strong> {editingPersonnel ? 'يتم تحديث بيانات السجل والربط التشغيلي وحساب المستخدم المرتبط دون إنشاء حساب جديد أو إعادة إرسال دعوة التفعيل.' : 'عند الحفظ يتم إنشاء حساب دخول جديد إذا لم يكن البريد مسجلًا، أو ربط الحساب الموجود. الحساب يمنح المنسوب الدخول إلى موقعه فقط لتقديم طلب صيانة/احتياج، إجازة أو اعتذار، متابعة طلباته واستقبال الإشعارات. ويستلم الحساب الجديد رابط التفعيل وبيانات الدخول عبر البريد الإلكتروني.'}</div>
+        <DialogContent className="max-h-[92vh] overflow-hidden gap-0 border-[#ded3b8] bg-[#fffdf8] p-0 sm:max-w-[900px]" dir="rtl">
+          <DialogHeader className="border-b border-[#e8ddc3] bg-white p-5 text-right md:p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#fff8e8] text-[#0b5a49]">{editingPersonnel ? <Pencil className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}</div>
+              <div><Badge variant="outline" className="mb-2 border-[#d6b46a]/55 bg-[#fff8e8] text-[#8a6a1f]">{editingPersonnel ? 'تحديث ملف تشغيلي' : 'ملف تشغيلي جديد'}</Badge><DialogTitle className="text-xl font-black text-[#0b4a3f] md:text-2xl">{editingPersonnel ? 'تعديل بيانات منسوب المسجد / المصلى' : 'إضافة منسوب مسجد / مصلى'}</DialogTitle><DialogDescription className="mt-1 leading-6">{editingPersonnel ? 'تحديث الموقع والصفة وبيانات التواصل مع المحافظة على الحساب المرتبط.' : 'تسجيل المنسوب وربطه بالمسجد أو المصلى والصفة التشغيلية، ثم إنشاء أو ربط حساب الدخول.'}</DialogDescription></div>
+            </div>
+          </DialogHeader>
+
+          <div className="max-h-[calc(92vh-170px)] space-y-4 overflow-y-auto p-4 md:p-6">
+            <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
+              <Card className="border-[#e2d4b4] bg-white shadow-sm">
+                <CardHeader className="border-b border-[#eee5d2] bg-[#fffdf8] pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">البيانات الأساسية</CardTitle><CardDescription>الاسم وبيانات التواصل المستخدمة في الملف والحساب.</CardDescription></CardHeader>
+                <CardContent className="grid gap-4 pt-5">
+                  <Field label="الاسم الكامل *"><Input className="h-11 border-[#d9c9a5]" autoFocus value={personnelForm.name} onChange={(e) => setPersonnelForm({ ...personnelForm, name: e.target.value })} placeholder="الاسم الرباعي" /></Field>
+                  <div className="grid gap-4 md:grid-cols-2"><Field label="رقم الجوال"><Input className="h-11 border-[#d9c9a5]" type="tel" inputMode="tel" value={personnelForm.mobile} onChange={(e) => setPersonnelForm({ ...personnelForm, mobile: e.target.value })} placeholder="05xxxxxxxx" /></Field><Field label="البريد الإلكتروني *"><Input className="h-11 border-[#d9c9a5]" type="email" inputMode="email" value={personnelForm.email} onChange={(e) => setPersonnelForm({ ...personnelForm, email: e.target.value })} placeholder="name@iau.edu.sa" /></Field></div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-[#e2d4b4] bg-white shadow-sm">
+                <CardHeader className="border-b border-[#eee5d2] bg-[#fffdf8] pb-3"><CardTitle className="text-base font-black text-[#0b4a3f]">الارتباط التشغيلي</CardTitle><CardDescription>الموقع والصفة التي تحدد نطاق عمل المنسوب.</CardDescription></CardHeader>
+                <CardContent className="grid gap-4 pt-5">
+                  <Field label="المسجد / المصلى *"><NativeSelect className="h-11 border-[#d9c9a5] bg-white" value={personnelForm.siteId} onChange={(e) => setPersonnelForm({ ...personnelForm, siteId: e.target.value })}><option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect></Field>
+                  <Field label="الصفة التشغيلية *"><NativeSelect className="h-11 border-[#d9c9a5] bg-white" value={personnelForm.role} onChange={(e) => setPersonnelForm({ ...personnelForm, role: e.target.value })}><option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option></NativeSelect></Field>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="rounded-2xl border border-[#d6b46a]/45 bg-[#fff8e8] p-4 text-sm leading-7 text-slate-700">
+              <div className="flex items-start gap-3"><Shield className="mt-1 h-5 w-5 shrink-0 text-[#0b5a49]" /><div><strong className="text-[#0b4a3f]">{editingPersonnel ? 'الحساب المرتبط:' : 'إنشاء وربط الحساب:'}</strong> {editingPersonnel ? 'يتم تحديث بيانات الملف والربط التشغيلي فقط، مع الإبقاء على حساب المستخدم الحالي.' : 'عند الحفظ يتم إنشاء حساب جديد إذا لم يكن البريد مسجلًا، أو ربط الحساب الموجود. ويكون وصول المنسوب مقصورًا على موقعه والطلبات والإجازات والإشعارات المرتبطة به.'}</div></div>
+            </div>
           </div>
-          <DialogFooter className="border-t border-sky-100 bg-white/95 p-4 md:px-6"><Button variant="outline" className={button3d} onClick={() => { setPersonnelDialog(false); setEditingPersonnel(null); }}>إلغاء</Button><Button className={'min-w-32 ' + button3d} onClick={savePersonnel} disabled={saving}><Save className="ml-2 h-4 w-4" />{saving ? 'جاري الحفظ...' : editingPersonnel ? 'حفظ التعديلات' : 'حفظ المنسوب'}</Button></DialogFooter>
+
+          <DialogFooter className="border-t border-[#e8ddc3] bg-white p-4 md:px-6">
+            <Button variant="outline" className="border-[#d9c9a5] text-[#0b4a3f]" onClick={() => { setPersonnelDialog(false); setEditingPersonnel(null); }}>إلغاء</Button>
+            <Button className="min-w-36 border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={savePersonnel} disabled={saving}><Save className="ml-2 h-4 w-4" />{saving ? 'جاري الحفظ...' : editingPersonnel ? 'حفظ التعديلات' : 'حفظ المنسوب'}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -3930,22 +4718,199 @@ ${quranStockMovementForm.notes}` : ''}`
   );
 };
 
+const OverviewMetric = ({ label, value, icon: Icon, onClick }: { label: string; value: number; icon: React.ElementType; onClick?: () => void }) => {
+  const content = <div className="group flex min-h-[106px] items-center justify-between gap-3 rounded-2xl border border-[#e1d4b7] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#d6b46a] hover:shadow-[0_10px_24px_rgba(6,60,51,0.10)]"><div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{value}</p></div><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#0b4a3f] text-[#f0d18b]"><Icon className="h-5 w-5" /></div></div>;
+  return onClick ? <button type="button" className="w-full text-right" onClick={onClick}>{content}</button> : content;
+};
+
+const OverviewSectionCard = ({ title, description, value, icon: Icon, onClick }: { title: string; description: string; value: number; icon: React.ElementType; onClick: () => void }) => (
+  <button type="button" className="group w-full text-right" onClick={onClick}>
+    <div className="relative overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white p-4 shadow-[0_8px_24px_rgba(6,60,51,0.07)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_14px_28px_rgba(6,60,51,0.12)]">
+      <div className="absolute bottom-3 right-0 top-3 w-1 rounded-l-full bg-[#0b5a49] transition-all group-hover:bg-[#d6b46a]" />
+      <div className="flex items-start gap-3 pr-2">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#fdf7e9] text-[#0b5a49]"><Icon className="h-5 w-5" /></div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3"><h3 className="font-black text-[#0b4a3f]">{title}</h3><span className="rounded-full border border-[#dfcfaa] bg-[#fffaf0] px-2.5 py-1 text-xs font-black text-[#8a6a1f]">{value}</span></div>
+          <p className="mt-1 text-xs leading-6 text-slate-500">{description}</p>
+        </div>
+      </div>
+    </div>
+  </button>
+);
+
+const EmptyCompact = ({ text }: { text: string }) => <div className="rounded-2xl border border-dashed border-[#d9c9a5] bg-white/75 px-4 py-6 text-center text-xs text-slate-500">{text}</div>;
+
 const Stat = ({ title, value, icon: Icon, onClick }: { title: string; value: number; icon: React.ElementType; onClick?: () => void }) => {
-  const card = <Card className={`${card3d} h-full ${onClick ? 'transition-transform duration-150 hover:-translate-y-0.5' : ''}`}><CardContent className="flex h-full items-center justify-between gap-3 p-4"><div><p className="text-xs text-muted-foreground">{title}</p><p className="mt-1 text-2xl font-black text-slate-800">{value}</p></div><div className="rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-sky-700 shadow-sm"><Icon className="h-5 w-5" /></div></CardContent></Card>;
-  return onClick ? <button type="button" className="block h-full w-full text-right focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2" onClick={onClick}>{card}</button> : card;
+  const card = <Card className={`${card3d} group h-full overflow-hidden ${onClick ? 'transition-all duration-200 hover:-translate-y-1 hover:border-[#c6a052] hover:shadow-[0_16px_34px_rgba(6,60,51,0.14)]' : ''}`}><div className="h-1 bg-gradient-to-l from-[#0b5a49] via-[#d6b46a] to-[#0b5a49]" /><CardContent className="flex h-full items-center justify-between gap-3 p-4"><div><p className="text-xs font-bold text-slate-500">{title}</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{value}</p></div><div className="rounded-2xl border border-[#d6b46a]/55 bg-[#0b4a3f] p-2.5 text-[#f2d48d] shadow-[0_7px_18px_rgba(6,60,51,0.18)] transition-transform duration-200 group-hover:scale-105"><Icon className="h-5 w-5" /></div></CardContent></Card>;
+  return onClick ? <button type="button" className="block h-full w-full text-right focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c6a052] focus-visible:ring-offset-2" onClick={onClick}>{card}</button> : card;
 };
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
 const Info = ({ label, value }: { label: string; value: React.ReactNode }) => <div><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 break-words font-semibold">{value}</p></div>;
 const Empty = ({ text }: { text: string }) => <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center text-muted-foreground"><Building2 className="mx-auto mb-3 h-10 w-10 opacity-30" /><p>{text}</p></div>;
-const Rule = ({ title, text }: { title: string; text: string }) => <div className="rounded-2xl border bg-white p-4"><p className="font-bold text-slate-800">{title}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p></div>;
-const ReportMetric = ({ label, value }: { label: string; value: number }) => <div className="rounded-2xl border bg-gradient-to-b from-white to-sky-50 p-5 text-center shadow-sm"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-3xl font-black text-slate-800">{value}</p></div>;
-const MiniRow = ({ title, subtitle, status }: { title: string; subtitle: string; status: string }) => <div className="flex items-start justify-between gap-3 rounded-2xl border bg-white p-3"><div className="min-w-0"><p className="truncate font-bold">{title}</p><p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{subtitle}</p></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>;
+const Rule = ({ title, text }: { title: string; text: string }) => <div className="rounded-2xl border border-[#dfcfaa] bg-gradient-to-br from-white to-[#fbf6ea] p-4 shadow-sm"><div className="mb-2 h-1 w-10 rounded-full bg-[#d6b46a]" /><p className="font-black text-[#0b4a3f]">{title}</p><p className="mt-1 text-sm leading-6 text-slate-600">{text}</p></div>;
+const ReportMetric = ({ label, value }: { label: string; value: number }) => <div className="rounded-2xl border border-[#dfcfaa] bg-gradient-to-b from-white to-[#f9f3e7] p-5 text-center shadow-sm"><p className="text-sm font-bold text-slate-500">{label}</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{value}</p></div>;
+const MiniRow = ({ title, subtitle, status }: { title: string; subtitle: string; status: string }) => <div className="flex items-start justify-between gap-3 rounded-2xl border border-[#e3d5b4] bg-[#fffdf8] p-3 shadow-[0_4px_12px_rgba(6,60,51,0.05)]"><div className="min-w-0"><p className="truncate font-black text-[#0b4a3f]">{title}</p><p className="mt-1 line-clamp-1 text-xs text-slate-500">{subtitle}</p></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>;
 
-const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onExcel, onEdit, onDelete, onQr, quranInventory }: { site: MosqueSite; canEdit: boolean; canDelete: boolean; canPrint: boolean; onPreview: () => void; onPrint: () => void; onExcel: () => void; onEdit: () => void; onDelete: () => void; onQr: () => void; quranInventory?: MosqueQuranInventory | null }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-emerald-400 via-sky-500 to-blue-800" /><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><Badge variant="outline" className="mb-2">{siteTypeDisplayLabel(site)}</Badge><h3 className="text-lg font-black text-slate-800">{site.name}</h3><p className="mt-1 text-sm text-muted-foreground">{site.city || '-'} — {site.district || '-'}</p></div><Badge variant="outline" className={site.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : site.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-50'}>{siteStatusLabels[site.status]}</Badge></div><div className="my-4 grid grid-cols-2 gap-3 rounded-2xl border bg-slate-50/70 p-3 text-sm"><Info label="الموقع داخل الجامعة" value={site.campusLocation || '-'} /><Info label="المساحة" value={site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'} /><Info label="الإمام" value={site.imamName || '-'} /><Info label="المؤذن" value={site.muezzinName || '-'} /><Info label="الطلبات" value={site._count?.requests || 0} /><Info label="البلاغات" value={site._count?.tickets || 0} /></div><div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/55 p-3"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-sm font-black text-emerald-900"><BookOpen className="h-4 w-4" />آخر جرد فعلي للمصاحف</div><Badge variant="outline" className="border-emerald-200 bg-white text-emerald-800">{quranInventory ? `${quranInventory.totalCount} مصحف` : 'لم يتم الجرد'}</Badge></div>{quranInventory && <div className="mt-2 grid grid-cols-4 gap-2 text-center text-xs"><div><span className="text-muted-foreground">كبير</span><b className="mr-1">{quranInventory.largeCount}</b></div><div><span className="text-muted-foreground">متوسط</span><b className="mr-1">{quranInventory.mediumCount}</b></div><div><span className="text-muted-foreground">صغير</span><b className="mr-1">{quranInventory.smallCount}</b></div><div><span className="text-muted-foreground">احتياج</span><b className="mr-1 text-amber-700">{quranInventory.neededCount}</b></div></div>}</div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Button variant="outline" className={siteActionButton} onClick={onQr}><QrCode className="h-4 w-4 shrink-0" />رمز QR</Button>{site.latitude != null && site.longitude != null && <Button variant="outline" className={siteActionButton} onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')}><MapPin className="h-4 w-4 shrink-0" />الخريطة</Button>}<Button variant="outline" className={siteActionButton} onClick={onPreview}><Eye className="h-4 w-4 shrink-0" />معاينة</Button>{canPrint && <Button className={`${siteActionButton} border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white`} onClick={onExcel}><FileSpreadsheet className="h-4 w-4 shrink-0 text-white" />Excel</Button>}{canPrint && <Button variant="outline" className={siteActionButton} onClick={onPrint}><Printer className="h-4 w-4 shrink-0" />طباعة / PDF</Button>}{canEdit && <Button variant="outline" className={siteActionButton} onClick={onEdit}><Pencil className="h-4 w-4 shrink-0" />تعديل</Button>}{canDelete && <Button variant="outline" className={`${siteActionButton} border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700`} onClick={onDelete}><Trash2 className="h-4 w-4 shrink-0" />حذف</Button>}</div></CardContent></Card>;
+const SpatialMetric = ({ label, value, icon: Icon, tone = 'default' }: { label: string; value: number; icon: React.ElementType; tone?: 'default' | 'warning' }) => (
+  <div className={`flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)] ${tone === 'warning' ? 'border-amber-200 bg-amber-50/70 text-amber-800' : 'border-[#e2d4b4] bg-white text-[#0b4a3f]'}`}>
+    <div><p className="text-[11px] font-bold opacity-75">{label}</p><p className="mt-1 text-2xl font-black">{value.toLocaleString('ar-SA')}</p></div>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-current/15 bg-white/75"><Icon className="h-5 w-5" /></div>
+  </div>
+);
 
-const QuickFilterBar = ({ label, onClear }: { label: string; onClear: () => void }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm"><span>العرض الحالي: <strong>{label}</strong></span><Button variant="outline" size="sm" className={button3d} onClick={onClear}>عرض الكل</Button></div>;
+const NotificationMetric = ({ label, value, icon: Icon, tone = 'default' }: { label: string; value: number; icon: React.ElementType; tone?: 'default' | 'warning' }) => (
+  <div className={`flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)] ${tone === 'warning' ? 'border-amber-200 bg-amber-50/70 text-amber-800' : 'border-[#e2d4b4] bg-white text-[#0b4a3f]'}`}>
+    <div><p className="text-[11px] font-bold opacity-75">{label}</p><p className="mt-1 text-2xl font-black">{value.toLocaleString('ar-SA')}</p></div>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-current/15 bg-white/75"><Icon className="h-5 w-5" /></div>
+  </div>
+);
 
-const WorkflowCard = ({ title, subtitle, description, status, statusLabel, meta, submitterName, submitterRole, onView, onStatus, extraAction }: { title: string; subtitle: string; description: string; status: string; statusLabel?: string; meta: string[]; submitterName?: string; submitterRole?: string; onView?: () => void; onStatus?: () => void; extraAction?: React.ReactNode }) => <Card className={`${card3d} overflow-hidden`}><div className="h-1.5 bg-gradient-to-l from-sky-400 via-blue-600 to-slate-800" /><CardContent className="flex min-h-[315px] flex-col p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{title}</p><h3 className="mt-1 font-black text-slate-800">{subtitle}</h3></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabel || statusLabels[status] || status}</Badge></div>{submitterName && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-white/90 p-3"><div><p className="text-[11px] text-muted-foreground">مقدم الإجراء</p><p className="mt-1 font-bold text-slate-800">{submitterName}</p></div>{submitterRole && <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-700">{submitterRole}</Badge>}</div>}<p className="mt-3 line-clamp-3 rounded-2xl border bg-slate-50/80 p-3 text-sm leading-6 text-slate-700">{description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">{meta.map((x, i) => <span key={i} className="rounded-xl border bg-white p-2">{x || '-'}</span>)}</div><div className="mt-auto flex flex-wrap gap-2 border-t pt-4">{onView && <Button variant="outline" size="sm" className={button3d} onClick={onView}><Eye className="ml-1 h-3.5 w-3.5" />عرض التفاصيل</Button>}{onStatus && <Button variant="outline" size="sm" className={button3d} onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />إجراء رسمي</Button>}{extraAction}</div></CardContent></Card>;
+const RoleMetric = ({ label, value, icon: Icon }: { label: string; value: number; icon: React.ElementType }) => (
+  <div className="flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
+    <div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{value.toLocaleString('ar-SA')}</p></div>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#fff8e8] text-[#0b5a49]"><Icon className="h-5 w-5" /></div>
+  </div>
+);
+
+const RoleDefinitionCard = ({ title, description, count, icon: Icon }: { title: string; description: string; count: number; icon: React.ElementType }) => (
+  <div className="rounded-2xl border border-[#e2d4b4] bg-[#fffdf8] p-4 shadow-sm">
+    <div className="flex items-start justify-between gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-white text-[#0b5a49]"><Icon className="h-5 w-5" /></div><span className="rounded-full border border-[#dfcfaa] bg-white px-2.5 py-1 text-xs font-black text-[#8a6a1f]">{count}</span></div>
+    <p className="mt-3 font-black text-[#0b4a3f]">{title}</p>
+    <p className="mt-1 text-xs leading-6 text-slate-500">{description}</p>
+  </div>
+);
+
+const PersonnelMetric = ({ label, value, icon: Icon }: { label: string; value: number; icon: React.ElementType }) => (
+  <div className="flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
+    <div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{value.toLocaleString('ar-SA')}</p></div>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#fff8e8] text-[#0b5a49]"><Icon className="h-5 w-5" /></div>
+  </div>
+);
+
+const SiteRegistryMetric = ({ label, value, suffix }: { label: string; value: number; suffix?: string }) => (
+  <div className="rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
+    <p className="text-[11px] font-bold text-slate-500">{label}</p>
+    <div className="mt-1 flex items-end gap-1"><span className="text-2xl font-black text-[#0b4a3f]">{value.toLocaleString('ar-SA', { maximumFractionDigits: 2 })}</span>{suffix && <span className="pb-0.5 text-[11px] font-bold text-slate-500">{suffix}</span>}</div>
+  </div>
+);
+
+const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onExcel, onEdit, onDelete, onQr, quranInventory }: { site: MosqueSite; canEdit: boolean; canDelete: boolean; canPrint: boolean; onPreview: () => void; onPrint: () => void; onExcel: () => void; onEdit: () => void; onDelete: () => void; onQr: () => void; quranInventory?: MosqueQuranInventory | null }) => {
+  const media = normalizeSiteMedia(site.images || null);
+  const cover = media.photos.find((item) => item.category === 'mosque_image') || media.photos[0];
+  const requests = site._count?.requests || 0;
+  const tickets = site._count?.tickets || 0;
+  const personnel = site._count?.personnel || 0;
+
+  return <Card className="group overflow-hidden rounded-[24px] border border-[#ded3b8] bg-white shadow-[0_10px_28px_rgba(6,60,51,0.07)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_16px_34px_rgba(6,60,51,0.12)]">
+    <div className="grid min-h-[190px] sm:grid-cols-[180px_1fr]">
+      <button type="button" onClick={onPreview} className="relative min-h-[165px] overflow-hidden bg-[#f4efe4] text-right sm:min-h-full">
+        {cover ? <MosqueMediaImage item={cover} alt={cover.fileName || site.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" /> : <div className="flex h-full min-h-[165px] flex-col items-center justify-center bg-[radial-gradient(circle_at_top,#fff8e8,#eee6d7)] text-[#0b4a3f]"><Building2 className="h-12 w-12 opacity-60" /><span className="mt-2 text-xs font-bold text-slate-500">لا توجد صورة مسجلة</span></div>}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent px-3 pb-3 pt-9 text-white">
+          <span className="rounded-full border border-white/25 bg-black/25 px-2 py-1 text-[10px] font-bold backdrop-blur-sm">{siteTypeDisplayLabel(site)}</span>
+        </div>
+      </button>
+
+      <div className="flex min-w-0 flex-col p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-lg font-black text-[#0b4a3f]">{site.name}</h3>
+            <p className="mt-1 flex items-start gap-1 text-xs leading-5 text-slate-500"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span>{site.campusLocation || site.city || '-'}{site.building?.buildingNumber ? ` — مبنى ${site.building.buildingNumber}` : ''}</span></p>
+          </div>
+          <Badge variant="outline" className={site.status === 'active' ? 'shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700' : site.status === 'maintenance' ? 'shrink-0 border-amber-300 bg-amber-50 text-amber-700' : 'shrink-0 border-slate-300 bg-slate-50 text-slate-700'}>{siteStatusLabels[site.status]}</Badge>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-xl border border-[#e8ddc4] bg-[#fffdf8] p-2"><p className="text-[10px] font-bold text-slate-500">المساحة</p><p className="mt-1 text-sm font-black text-[#0b4a3f]">{site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'}</p></div>
+          <div className="rounded-xl border border-[#e8ddc4] bg-[#fffdf8] p-2"><p className="text-[10px] font-bold text-slate-500">السعة</p><p className="mt-1 text-sm font-black text-[#0b4a3f]">{site.capacity ? site.capacity.toLocaleString('ar-SA') : '-'}</p></div>
+          <div className="rounded-xl border border-[#e8ddc4] bg-[#fffdf8] p-2"><p className="text-[10px] font-bold text-slate-500">المنسوبون</p><p className="mt-1 text-sm font-black text-[#0b4a3f]">{personnel}</p></div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <div><span className="text-slate-500">الإمام</span><p className="mt-0.5 truncate font-bold text-slate-800">{site.imamName || '-'}</p></div>
+          <div><span className="text-slate-500">المؤذن</span><p className="mt-0.5 truncate font-bold text-slate-800">{site.muezzinName || '-'}</p></div>
+          <div><span className="text-slate-500">الخطيب</span><p className="mt-0.5 truncate font-bold text-slate-800">{site.khateebName || '-'}</p></div>
+          <div><span className="text-slate-500">المنسق</span><p className="mt-0.5 truncate font-bold text-slate-800">{site.coordinatorName || '-'}</p></div>
+        </div>
+      </div>
+    </div>
+
+    <CardContent className="space-y-3 border-t border-[#eee5d2] p-4">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-[#e4d8bd] bg-white p-2.5 text-center"><p className="text-[10px] font-bold text-slate-500">الطلبات</p><p className="mt-1 text-lg font-black text-[#0b4a3f]">{requests}</p></div>
+        <div className="rounded-xl border border-[#e4d8bd] bg-white p-2.5 text-center"><p className="text-[10px] font-bold text-slate-500">البلاغات</p><p className="mt-1 text-lg font-black text-[#0b4a3f]">{tickets}</p></div>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/55 p-2.5 text-center"><p className="text-[10px] font-bold text-emerald-700">المصاحف</p><p className="mt-1 text-lg font-black text-emerald-800">{quranInventory ? quranInventory.totalCount : '-'}</p></div>
+      </div>
+
+      {quranInventory && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/55 px-3 py-2 text-xs">
+        <div className="flex items-center gap-2 font-black text-emerald-900"><BookOpen className="h-4 w-4" />آخر جرد فعلي</div>
+        <div className="flex flex-wrap gap-2 text-emerald-800"><span>كبير {quranInventory.largeCount}</span><span>متوسط {quranInventory.mediumCount}</span><span>صغير {quranInventory.smallCount}</span>{quranInventory.neededCount > 0 && <span className="font-black text-amber-700">احتياج {quranInventory.neededCount}</span>}</div>
+      </div>}
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Button className={`${siteActionButton} border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152] hover:text-white`} onClick={onPreview}><Eye className="h-4 w-4 shrink-0" />فتح السجل</Button>
+        <Button variant="outline" className={`${siteActionButton} border-[#d9c9a5] text-[#0b4a3f]`} onClick={onQr}><QrCode className="h-4 w-4 shrink-0" />QR</Button>
+        {site.latitude != null && site.longitude != null ? <Button variant="outline" className={`${siteActionButton} border-[#d9c9a5] text-[#0b4a3f]`} onClick={() => window.open(`https://www.google.com/maps?q=${site.latitude},${site.longitude}`, '_blank')}><MapPin className="h-4 w-4 shrink-0" />الخريطة</Button> : <Button variant="outline" disabled className={siteActionButton}><MapPin className="h-4 w-4 shrink-0" />الخريطة</Button>}
+        {canEdit ? <Button variant="outline" className={`${siteActionButton} border-[#d6b46a] bg-[#fff8e8] text-[#7b5b16]`} onClick={onEdit}><Pencil className="h-4 w-4 shrink-0" />تعديل</Button> : <Button variant="outline" disabled className={siteActionButton}><Pencil className="h-4 w-4 shrink-0" />تعديل</Button>}
+      </div>
+
+      {(canPrint || canDelete) && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[#eee5d2] pt-3">
+        {canPrint && <Button size="sm" variant="ghost" className="text-slate-600" onClick={onExcel}><FileSpreadsheet className="ml-1 h-3.5 w-3.5" />Excel</Button>}
+        {canPrint && <Button size="sm" variant="ghost" className="text-slate-600" onClick={onPrint}><Printer className="ml-1 h-3.5 w-3.5" />طباعة / PDF</Button>}
+        {canDelete && <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={onDelete}><Trash2 className="ml-1 h-3.5 w-3.5" />حذف</Button>}
+      </div>}
+    </CardContent>
+  </Card>;
+};
+
+const QuickFilterBar = ({ label, onClear }: { label: string; onClear: () => void }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e2d4b4] bg-[#fffdf8] px-4 py-3 text-sm"><span>العرض الحالي: <strong className="text-[#0b4a3f]">{label}</strong></span><Button variant="outline" size="sm" className="border-[#d9c9a5] text-[#0b4a3f]" onClick={onClear}>عرض الكل</Button></div>;
+
+const TransactionMetric = ({ label, value, icon: Icon, tone = 'default' }: { label: string; value: number; icon: React.ElementType; tone?: 'default' | 'warning' | 'urgent' }) => {
+  const toneClass = tone === 'urgent'
+    ? 'border-red-200 bg-red-50/70 text-red-700'
+    : tone === 'warning'
+      ? 'border-amber-200 bg-amber-50/70 text-amber-800'
+      : 'border-[#e2d4b4] bg-white text-[#0b4a3f]';
+  return <div className={`flex min-h-[92px] items-center justify-between gap-3 rounded-2xl border p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)] ${toneClass}`}><div><p className="text-[11px] font-bold opacity-75">{label}</p><p className="mt-1 text-2xl font-black">{value.toLocaleString('ar-SA')}</p></div><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-current/15 bg-white/75"><Icon className="h-5 w-5" /></div></div>;
+};
+
+const WorkflowCard = ({ kind, title, subtitle, description, status, statusLabel, priority, createdAt, meta, submitterName, submitterRole, onView, onStatus, extraAction }: { kind?: 'request' | 'ticket' | 'leave' | 'job'; title: string; subtitle: string; description: string; status: string; statusLabel?: string; priority?: string; createdAt?: string; meta: string[]; submitterName?: string; submitterRole?: string; onView?: () => void; onStatus?: () => void; extraAction?: React.ReactNode }) => {
+  const isOpen = !['closed', 'rejected', 'archived'].includes(status);
+  const createdTime = createdAt ? new Date(createdAt).getTime() : NaN;
+  const ageDays = Number.isFinite(createdTime) ? Math.max(0, Math.floor((Date.now() - createdTime) / (24 * 60 * 60 * 1000))) : null;
+  const isLate = kind === 'request' && isOpen && ageDays != null && ageDays >= 7;
+  const icon = kind === 'ticket' ? <MessageSquare className="h-4 w-4" /> : kind === 'request' ? <Wrench className="h-4 w-4" /> : kind === 'leave' ? <CalendarDays className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />;
+
+  return <Card className="group overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_9px_26px_rgba(6,60,51,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_14px_30px_rgba(6,60,51,0.10)]">
+    <CardContent className="flex min-h-[350px] flex-col p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500"><span className="inline-flex items-center gap-1 font-bold text-[#0b5a49]">{icon}{title}</span>{createdAt && <span>• {new Date(createdAt).toLocaleDateString('ar-SA-u-ca-gregory')}</span>}{isLate && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">متأخر</Badge>}</div>
+          <h3 className="mt-2 truncate text-lg font-black text-[#0b4a3f]">{subtitle || 'بدون موقع محدد'}</h3>
+        </div>
+        <Badge variant="outline" className={`shrink-0 ${statusBadgeClass(status)}`}>{statusLabel || statusLabels[status] || status}</Badge>
+      </div>
+
+      {submitterName && <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#e7dcc4] bg-[#fffdf8] px-3 py-2.5"><div className="min-w-0"><p className="text-[10px] font-bold text-slate-500">مقدم المعاملة</p><p className="mt-0.5 truncate text-sm font-black text-slate-800">{submitterName}</p></div>{submitterRole && <Badge variant="outline" className="shrink-0 border-[#d6b46a]/45 bg-white text-[#7b5b16]">{submitterRole}</Badge>}</div>}
+
+      <p className="mt-3 line-clamp-3 min-h-[76px] rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm leading-6 text-slate-700">{description}</p>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        {meta.slice(0,2).map((x, i) => <span key={i} className="rounded-xl border border-[#e4d8bd] bg-white p-2.5 text-center font-bold text-slate-600">{x || '-'}</span>)}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#e3d6b9] bg-[#fbf8f1] px-3 py-2.5">
+        <div><p className="text-[10px] font-bold text-slate-500">الإجراء التالي</p><p className="mt-0.5 text-xs font-black text-[#0b4a3f]">{workflowNextActionLabel(kind, status)}</p></div>
+        <div className="text-left">{priority && <Badge variant="outline" className={priority === 'urgent' ? 'border-red-300 bg-red-50 text-red-700' : priority === 'high' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-600'}>{priorityLabels[priority] || priority}</Badge>}{ageDays != null && <p className="mt-1 text-[10px] text-slate-400">منذ {ageDays} يوم</p>}</div>
+      </div>
+
+      <div className="mt-auto flex flex-wrap gap-2 border-t border-[#eee5d2] pt-4">
+        {onView && <Button size="sm" className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={onView}><Eye className="ml-1 h-3.5 w-3.5" />عرض التفاصيل</Button>}
+        {onStatus && <Button variant="outline" size="sm" className="border-[#d6b46a] bg-[#fff8e8] text-[#7b5b16]" onClick={onStatus}><RefreshCw className="ml-1 h-3.5 w-3.5" />إجراء رسمي</Button>}
+        {extraAction}
+      </div>
+    </CardContent>
+  </Card>;
+};
 
 const WorkflowDetailsDialog = ({ target, onOpenChange }: { target: { kind: 'request' | 'ticket' | 'leave'; item: any } | null; onOpenChange: (open: boolean) => void }) => {
   const [history, setHistory] = useState<MosqueWorkflowHistoryEntry[]>([]);
@@ -3972,10 +4937,12 @@ const WorkflowDetailsDialog = ({ target, onOpenChange }: { target: { kind: 'requ
 
   return (
     <Dialog open={Boolean(target)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[900px]" dir="rtl">
-        <DialogHeader className="text-right">
-          <DialogTitle className="flex items-center gap-2 text-xl font-black"><Eye className="h-5 w-5 text-sky-700" />{isRequest ? 'تفاصيل طلب الصيانة / الاحتياج' : isTicket ? 'تفاصيل البلاغ' : 'تفاصيل الإجازة / الاعتذار'}</DialogTitle>
-          <DialogDescription>{recordNumber}</DialogDescription>
+      <DialogContent className="max-h-[92vh] overflow-y-auto border-[#ded3b8] bg-[#fffdf8] sm:max-w-[980px]" dir="rtl">
+        <DialogHeader className="rounded-2xl border border-[#e3d6b9] bg-white p-4 text-right">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><Badge variant="outline" className="mb-2 border-[#d6b46a]/55 bg-[#fff8e8] text-[#8a6a1f]">{isRequest ? 'طلب صيانة / احتياج' : isTicket ? 'بلاغ' : 'إجازة / اعتذار'}</Badge><DialogTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]"><Eye className="h-5 w-5" />{recordNumber}</DialogTitle><DialogDescription className="mt-1">{item.site?.name || 'بدون موقع محدد'}</DialogDescription></div>
+            <Badge variant="outline" className={statusBadgeClass(item.status)}>{statusLabels[item.status] || item.status}</Badge>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -3994,7 +4961,7 @@ const WorkflowDetailsDialog = ({ target, onOpenChange }: { target: { kind: 'requ
 
           {!isRequest && !isTicket && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">بيانات الإجازة / الاعتذار</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Info label="نوع الطلب" value={leaveTypeLabels[item.requestType] || item.requestType} /><Info label="من" value={item.startDate ? new Date(item.startDate).toLocaleDateString('ar-SA') : '-'} /><Info label="إلى" value={item.endDate ? new Date(item.endDate).toLocaleDateString('ar-SA') : '-'} /><Info label="البديل" value={item.replacementName || '-'} /></div><div><p className="text-[11px] text-muted-foreground">السبب</p><p className="mt-1 rounded-xl border bg-slate-50 p-3 text-sm leading-7">{item.reason || '-'}</p></div>{item.notes && <Info label="الملاحظات" value={item.notes} />}{item.reviewerNote && <Info label="ملاحظة المراجع" value={item.reviewerNote} />}{item.returnReason && <Info label="ملاحظة الإعادة" value={item.returnReason} />}{item.rejectionReason && <Info label="سبب الرفض" value={item.rejectionReason} />}</CardContent></Card>}
 
-          <Card className="border-indigo-200 bg-indigo-50/30"><CardHeader className="pb-3"><CardTitle className="text-base">سجل الإجراءات الرسمي</CardTitle><CardDescription>تسلسل زمني للتعديلات والقرارات المسجلة على المعاملة.</CardDescription></CardHeader><CardContent className="space-y-2">{history.length ? history.map((entry) => <div key={entry.id} className="rounded-xl border bg-white p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{entry.action === 'administrative_edit' ? 'تعديل إداري' : entry.action === 'archive' ? 'حذف / أرشفة' : entry.action === 'resubmitted_after_return' ? 'إعادة إرسال بعد التعديل' : 'تغيير حالة'}</strong><span className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString('ar-SA')}</span></div><p className="mt-1 text-xs text-muted-foreground">{entry.username || entry.userEmail || 'النظام'}{entry.details?.fromStatus || entry.details?.toStatus ? ` — ${statusLabels[entry.details?.fromStatus || ''] || entry.details?.fromStatus || '-'} ← ${statusLabels[entry.details?.toStatus || ''] || entry.details?.toStatus || '-'}` : ''}</p>{entry.details?.note && <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs leading-6">{entry.details.note}</p>}</div>) : <p className="text-sm text-muted-foreground">لا توجد إجراءات مسجلة بعد.</p>}</CardContent></Card>
+          <Card className="border-[#d6b46a]/45 bg-white"><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base font-black text-[#0b4a3f]"><Clock3 className="h-4 w-4" />التسلسل الزمني للمعاملة</CardTitle><CardDescription>كل تغيير حالة أو تعديل إداري محفوظ بترتيبه الزمني.</CardDescription></CardHeader><CardContent>{history.length ? <div className="space-y-0">{history.map((entry, index) => <div key={entry.id} className="relative pr-7 pb-5 last:pb-0"><span className="absolute right-[7px] top-2 h-full w-px bg-[#e4d8bd] last:hidden" /><span className="absolute right-0 top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#d6b46a] bg-white"><span className="h-1.5 w-1.5 rounded-full bg-[#0b5a49]" /></span><div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-[#0b4a3f]">{entry.action === 'administrative_edit' ? 'تعديل إداري' : entry.action === 'archive' ? 'حذف / أرشفة' : entry.action === 'resubmitted_after_return' ? 'إعادة إرسال بعد التعديل' : 'تغيير حالة'}</strong><span className="text-xs text-slate-500">{new Date(entry.createdAt).toLocaleString('ar-SA')}</span></div><p className="mt-1 text-xs text-slate-500">{entry.username || entry.userEmail || 'النظام'}{entry.details?.fromStatus || entry.details?.toStatus ? ` — ${statusLabels[entry.details?.fromStatus || ''] || entry.details?.fromStatus || '-'} ← ${statusLabels[entry.details?.toStatus || ''] || entry.details?.toStatus || '-'}` : ''}</p>{entry.details?.note && <p className="mt-2 rounded-lg border border-slate-100 bg-white p-2 text-xs leading-6 text-slate-700">{entry.details.note}</p>}</div></div>)}</div> : <p className="rounded-xl border border-dashed border-[#d9c9a5] bg-[#fffdf8] p-5 text-center text-sm text-slate-500">لا توجد إجراءات مسجلة بعد.</p>}</CardContent></Card>
 
           {(attachmentUrls.length > 0 || item.completionEvidenceUrl) && <Card className="border-slate-200"><CardHeader className="pb-3"><CardTitle className="text-base">المرفقات</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">{attachmentUrls.map((url: string, index: number) => <Button key={`${url}-${index}`} variant="outline" size="sm" className={button3d} onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}><ExternalLink className="ml-1 h-3.5 w-3.5" />مرفق {index + 1}</Button>)}{item.completionEvidenceUrl && <Button variant="outline" size="sm" className={button3d} onClick={() => window.open(item.completionEvidenceUrl, '_blank', 'noopener,noreferrer')}><CheckCircle2 className="ml-1 h-3.5 w-3.5" />إثبات الإنجاز</Button>}</CardContent></Card>}
         </div>
