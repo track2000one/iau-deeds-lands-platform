@@ -2550,7 +2550,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
           </div>
         </CardHeader>
         <CardContent className="space-y-5 p-4 sm:p-5">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <FieldVisitOverviewMetric label="إجمالي المواقع" value={summary.totalSites} icon={MapPin} />
             <FieldVisitOverviewMetric label="تمت زيارتها" value={summary.visitedSites} icon={CheckCircle2} />
             <FieldVisitOverviewMetric label="المتبقية" value={summary.remainingSites} icon={CalendarDays} />
