@@ -111,8 +111,8 @@ const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' 
   if (type.includes('request') || text.includes('طلب صيانة') || text.includes('طلب احتياج')) return 'request';
   if (type.includes('ticket') || text.includes('بلاغ')) return 'ticket';
   if (type.includes('leave') || text.includes('إجاز') || text.includes('اعتذار')) return 'leave';
-  if (type.includes('site') || type.includes('mosque') || text.includes('مسجد') || text.includes('مصلى')) return 'site';
   if (type.includes('quran') || text.includes('مصحف') || text.includes('مصاحف')) return 'quran';
+  if (type.includes('site') || type.includes('mosque') || text.includes('مسجد') || text.includes('مصلى')) return 'site';
   return 'other';
 };
 
