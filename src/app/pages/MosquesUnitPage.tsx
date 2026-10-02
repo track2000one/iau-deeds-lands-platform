@@ -2889,42 +2889,41 @@ ${quranStockMovementForm.notes}` : ''}`
 
   return (
     <div className="mx-auto w-full max-w-[1780px] rounded-[30px] bg-[#edf3f7] p-2 sm:p-4 md:p-5" dir="rtl">
-      <section className="mb-5 overflow-hidden rounded-[26px] border border-slate-200/90 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.07)]">
-        <div className="flex flex-col gap-4 px-4 py-4 md:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="mb-5 overflow-hidden rounded-[22px] border border-slate-200/90 bg-white shadow-[0_10px_26px_rgba(15,23,42,0.06)]">
+        <div dir="ltr" className="grid gap-4 px-4 py-4 md:px-6 lg:grid-cols-[220px_minmax(0,1fr)_360px] lg:items-center">
+          <div className="flex items-center gap-3">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <img src="/platform-logo.png" alt="جامعة الإمام عبدالرحمن بن فيصل" className="h-11 w-11 object-contain" />
             </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-black tracking-wide text-[#006b63]">جامعة الإمام عبدالرحمن بن فيصل</p>
-              <h1 className="mt-0.5 truncate text-xl font-black text-slate-900 md:text-2xl">وحدة العناية بالمساجد والمصليات الجامعية</h1>
-              <p className="mt-1 hidden text-xs text-slate-500 md:block">لوحة تشغيل موحدة للمواقع والجولات والطلبات والمصاحف والتقارير.</p>
+            <div dir="rtl" className="min-w-0 text-right">
+              <p className="text-[10px] font-black text-[#006b63]">جامعة الإمام عبدالرحمن بن فيصل</p>
+              <p className="mt-1 text-[10px] leading-5 text-slate-400">وحدة العناية بالمساجد والمصليات الجامعية</p>
             </div>
           </div>
-
-          <div className="flex flex-1 flex-col gap-2 lg:max-w-[720px] lg:flex-row lg:items-center lg:justify-end">
-            <div className="relative min-w-0 flex-1 lg:max-w-[340px]">
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                className="h-11 rounded-xl border-slate-200 bg-[#f7f9fb] pr-9 text-sm focus-visible:border-[#006b63] focus-visible:ring-[#006b63]/15"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') goToDashboardSection('sites'); }}
-                placeholder="ابحث عن مسجد أو مصلى..."
-              />
+          <div dir="rtl" className="min-w-0 text-center">
+            <div className="flex items-center justify-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8f5f2] text-[#006b63]"><Building2 className="h-4 w-4" /></span>
+              <h1 className="truncate text-xl font-black text-slate-900 md:text-2xl">وحدة العناية بالمساجد والمصليات الجامعية</h1>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="h-11 border-slate-200 bg-white text-slate-600 hover:text-[#006b63]" onClick={loadAll}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button>
-              <Button variant="outline" className="h-11 border-slate-200 bg-white text-slate-600 hover:text-[#006b63]" onClick={() => navigate('/mosques/public')}><ExternalLink className="ml-2 h-4 w-4" />البوابة العامة</Button>
-              {canAdd && ['head', 'supervisor'].includes(role) && <Button className="h-11 bg-[#006b63] px-5 font-black text-white hover:bg-[#005a53]" onClick={() => openSiteDialog()}><Plus className="ml-2 h-4 w-4" />إضافة موقع</Button>}
+            <p className="mt-1 hidden text-xs text-slate-500 md:block">لوحة تشغيل وإدارة موحدة للمساجد والمصليات والخدمات المرتبطة بها.</p>
+          </div>
+          <div dir="rtl" className="flex flex-col gap-2">
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input className="h-10 rounded-xl border-slate-200 bg-[#f7f9fb] pr-9 text-sm focus-visible:border-[#006b63] focus-visible:ring-[#006b63]/15" value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') goToDashboardSection('sites'); }} placeholder="ابحث عن مسجد أو مصلى..." />
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button size="sm" variant="ghost" className="h-8 text-slate-500 hover:text-[#006b63]" onClick={loadAll}><RefreshCw className="ml-1 h-3.5 w-3.5" />تحديث</Button>
+              <Button size="sm" variant="ghost" className="h-8 text-slate-500 hover:text-[#006b63]" onClick={() => navigate('/mosques/public')}><ExternalLink className="ml-1 h-3.5 w-3.5" />البوابة العامة</Button>
+              {canAdd && ['head', 'supervisor'].includes(role) && <Button size="sm" className="h-8 bg-[#006b63] px-3 font-black text-white hover:bg-[#005a53]" onClick={() => openSiteDialog()}><Plus className="ml-1 h-3.5 w-3.5" />إضافة موقع</Button>}
             </div>
           </div>
         </div>
       </section>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[285px_minmax(0,1fr)]">
-          <aside className="hidden lg:block">
+        <div dir="ltr" className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[285px_minmax(0,1fr)]">
+          <aside dir="rtl" className="hidden lg:block">
             <div className="sticky top-4 overflow-hidden rounded-[24px] border border-slate-200 bg-[#e7edf2] shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
               <div className="border-b border-slate-200/80 bg-white px-4 py-4">
                 <div className="flex items-center gap-3">
@@ -2962,7 +2961,7 @@ ${quranStockMovementForm.notes}` : ''}`
             </div>
           </aside>
 
-          <main className="min-w-0 space-y-4">
+          <main dir="rtl" className="min-w-0 space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:hidden">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div><p className="text-[11px] font-bold text-[#006b63]">التنقل بين أقسام الوحدة</p><p className="mt-0.5 text-xs text-slate-500">اختر القسم المطلوب</p></div>
@@ -3037,22 +3036,11 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <button type="button" onClick={() => goToDashboardSection('sites')} className="rounded-2xl border border-slate-200 bg-white p-4 text-right shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md">
-                  <div className="flex items-center justify-between"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eaf6f4] text-[#006b63]"><Building2 className="h-5 w-5" /></span><span className="text-3xl font-black text-slate-900">{referenceMosqueCount}</span></div>
-                  <p className="mt-4 text-sm font-black text-slate-700">عدد المساجد والجوامع</p>
-                </button>
-                <button type="button" onClick={() => goToDashboardSection('sites')} className="rounded-2xl border border-slate-200 bg-white p-4 text-right shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md">
-                  <div className="flex items-center justify-between"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eaf6f4] text-[#006b63]"><MapPin className="h-5 w-5" /></span><span className="text-3xl font-black text-slate-900">{referencePrayerRoomCount}</span></div>
-                  <p className="mt-4 text-sm font-black text-slate-700">عدد المصليات</p>
-                </button>
-                <button type="button" onClick={() => { setSiteFilterType('prayer_room'); setSiteFilterPrayerRoomGender('men'); goToDashboardSection('sites'); }} className="rounded-2xl border border-slate-200 bg-white p-4 text-right shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md">
-                  <div className="flex items-center justify-between"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#edf7f1] text-[#16704c]"><Users className="h-5 w-5" /></span><span className="text-3xl font-black text-slate-900">{referenceMenPrayerRooms}</span></div>
-                  <p className="mt-4 text-sm font-black text-slate-700">المصليات الرجالية</p>
-                </button>
-                <button type="button" onClick={() => { setSiteFilterType('prayer_room'); setSiteFilterPrayerRoomGender('women'); goToDashboardSection('sites'); }} className="rounded-2xl border border-slate-200 bg-white p-4 text-right shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md">
-                  <div className="flex items-center justify-between"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f3f0fb] text-[#7561a8]"><Users className="h-5 w-5" /></span><span className="text-3xl font-black text-slate-900">{referenceWomenPrayerRooms}</span></div>
-                  <p className="mt-4 text-sm font-black text-slate-700">المصليات النسائية</p>
-                </button>
+                <button type="button" onClick={() => goToDashboardSection('sites')} className="flex min-h-[178px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf6f4] text-[#006b63]"><Building2 className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">عدد المساجد والجوامع</p><span className="mt-2 text-4xl font-black text-slate-900">{referenceMosqueCount}</span></button>
+                <button type="button" onClick={() => goToDashboardSection('sites')} className="flex min-h-[178px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf6f4] text-[#006b63]"><MapPin className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">عدد المصليات</p><span className="mt-2 text-4xl font-black text-slate-900">{referencePrayerRoomCount}</span></button>
+                <button type="button" onClick={() => { setSiteFilterType('prayer_room'); setSiteFilterPrayerRoomGender('men'); goToDashboardSection('sites'); }} className="flex min-h-[178px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#edf7f1] text-[#16704c]"><Users className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">المصليات الرجالية</p><span className="mt-2 text-4xl font-black text-slate-900">{referenceMenPrayerRooms}</span></button>
+                <button type="button" onClick={() => { setSiteFilterType('prayer_room'); setSiteFilterPrayerRoomGender('women'); goToDashboardSection('sites'); }} className="flex min-h-[178px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f3f0fb] text-[#7561a8]"><Users className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">المصليات النسائية</p><span className="mt-2 text-4xl font-black text-slate-900">{referenceWomenPrayerRooms}</span></button>
+              </div>
               </div>
             </div>
 
