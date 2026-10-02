@@ -97,6 +97,13 @@ const roleLabels: Record<MosqueModuleRole, string> = {
 };
 
 const personnelRoleLabels: Record<string, string> = { imam: 'إمام', muezzin: 'مؤذن', khateeb: 'خطيب', collaborating_khateeb: 'خطيب متعاون', collaborator: 'خطيب متعاون' };
+const roleScopeLabel = (role: MosqueModuleRole) => role === 'head'
+  ? 'إدارة كاملة للوحدة'
+  : role === 'supervisor'
+    ? 'إشراف تشغيلي على الوحدة'
+    : role === 'personnel'
+      ? 'وصول مقيد بالموقع المرتبط'
+      : 'وصول خدمات منسوب الجامعة';
 const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', jami: 'جامع', prayer_room: 'مصلى' };
 const siteStatusLabels: Record<string, string> = { active: 'نشط', maintenance: 'تحت الصيانة', temporarily_closed: 'مغلق مؤقتًا' };
 const prayerRoomGenderLabels: Record<string, string> = { men: 'رجال', women: 'نساء' };
@@ -582,6 +589,8 @@ export const MosquesUnitPage: React.FC = () => {
   const [personnelSearch, setPersonnelSearch] = useState('');
   const [personnelRoleFilter, setPersonnelRoleFilter] = useState('all');
   const [personnelStatusFilter, setPersonnelStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [roleUserSearch, setRoleUserSearch] = useState('');
+  const [roleUserFilter, setRoleUserFilter] = useState<'all' | MosqueModuleRole>('all');
 
   const [buildingDialog, setBuildingDialog] = useState(false);
   const [buildingCoverageReportOpen, setBuildingCoverageReportOpen] = useState(false);
@@ -2678,6 +2687,20 @@ ${quranStockMovementForm.notes}` : ''}`
     });
   }, [personnel, personnelSearch, personnelRoleFilter, personnelStatusFilter, sites]);
 
+  const filteredStaffUsers = useMemo(() => {
+    const q = roleUserSearch.trim().toLowerCase();
+    return staffUsers.filter((user) => {
+      const current = assignments.find((item) => item.userId === user.uid);
+      const effectiveRole = current?.role || user.moduleRole || 'viewer';
+      const siteName = current?.site?.name || sites.find((site) => site.id === (current?.siteId || user.siteId))?.name || '';
+      const matchesSearch = !q || [user.username, user.email, siteName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesRole = roleUserFilter === 'all' || effectiveRole === roleUserFilter || (roleUserFilter === 'university_member' && effectiveRole === 'viewer');
+      return matchesSearch && matchesRole;
+    });
+  }, [staffUsers, assignments, sites, roleUserSearch, roleUserFilter]);
+
   const goToDashboardSection = (tab: string, filters: { request?: 'all' | 'new' | 'under_review' | 'approved' | 'late'; ticket?: 'all' | 'open'; leave?: 'all' | 'pending' } = {}) => {
     setRequestQuickFilter(filters.request || 'all');
     setTicketQuickFilter(filters.ticket || 'all');
@@ -3601,43 +3624,116 @@ ${quranStockMovementForm.notes}` : ''}`
         </TabsContent>
 
         <TabsContent value="roles" className="space-y-4">
-          <Card className={card3d}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" />الأدوار التشغيلية وربط منسوبي المساجد</CardTitle>
-              <CardDescription>اربط حساب المستخدم بمسجد أو مصلى وحدد صفته التشغيلية بدقة: إمام، مؤذن، خطيب، أو خطيب متعاون.</CardDescription>
+          <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
+            <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8] pb-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">التحكم بالوصول</Badge>
+                  <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl"><Shield className="h-5 w-5" />الأدوار التشغيلية وربط الحسابات</CardTitle>
+                  <CardDescription className="mt-1 max-w-3xl leading-6">إدارة نطاق وصول حسابات الوحدة وربط منسوبي المساجد والمصليات بالموقع والصفة التشغيلية من شاشة واحدة.</CardDescription>
+                </div>
+                <div className="rounded-2xl border border-[#d6b46a]/45 bg-[#0b4a3f] px-4 py-3 text-white">
+                  <p className="text-[10px] font-bold text-[#efd18a]">إدارة هذه الشاشة</p>
+                  <p className="mt-1 text-sm font-black">متاحة لمسؤول النظام فقط</p>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {staffUsers.map((user) => {
-                const current = assignments.find((item) => item.userId === user.uid);
-                const draft = assignmentDrafts[user.uid] || { role: current?.role || 'viewer', siteId: current?.siteId || '', personnelRole: current?.personnelRole || 'imam' };
-                return (
-                  <div key={user.uid} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                    <div className="mb-3 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                      <div><p className="font-bold text-slate-900">{user.username}</p><p className="text-xs text-muted-foreground" dir="ltr">{user.email}</p></div>
-                      {current && <Badge variant="outline" className="w-fit">{roleLabels[current.role]}{current.role === 'personnel' && current.personnelRole ? ' — ' + (personnelRoleLabels[current.personnelRole] || current.personnelRole) : ''}</Badge>}
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-4">
-                      <Field label="الدور داخل الوحدة">
-                        <NativeSelect value={draft.role} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, role: e.target.value as MosqueModuleRole } }))}>
-                          <option value="university_member">منسوب الجامعة</option><option value="personnel">منسوب المسجد أو المصلى</option><option value="supervisor">مشرف الوحدة</option><option value="head">رئيس الوحدة</option>
-                        </NativeSelect>
-                      </Field>
-                      <Field label="المسجد / المصلى">
-                        <NativeSelect value={draft.siteId} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, siteId: e.target.value } }))} disabled={draft.role !== 'personnel'}>
-                          <option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
-                        </NativeSelect>
-                      </Field>
-                      <Field label="الصفة التشغيلية">
-                        <NativeSelect value={draft.personnelRole} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, personnelRole: e.target.value } }))} disabled={draft.role !== 'personnel'}>
-                          <option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option>
-                        </NativeSelect>
-                      </Field>
-                      <div className="flex items-end"><Button className={button3d} onClick={() => setUserAssignment(user.uid, draft.role, draft.siteId, draft.personnelRole)}><Save className="ml-2 h-4 w-4" />حفظ الربط</Button></div>
-                    </div>
-                  </div>
-                );
-              })}
-              {!staffUsers.length && <Empty text="لا توجد حسابات مستخدمين للربط" />}
+
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <RoleMetric label="الحسابات المتاحة" value={staffUsers.length} icon={Users} />
+                <RoleMetric label="الحسابات النشطة" value={staffUsers.filter((user) => user.isActive).length} icon={CheckCircle2} />
+                <RoleMetric label="روابط تشغيلية محفوظة" value={assignments.length} icon={Shield} />
+                <RoleMetric label="منسوبون مرتبطون بموقع" value={assignments.filter((item) => item.role === 'personnel' && Boolean(item.siteId)).length} icon={MapPin} />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <RoleDefinitionCard title="رئيس الوحدة" description="إدارة كاملة للوحدة والاعتمادات والمتابعة الشاملة." count={assignments.filter((item) => item.role === 'head').length} icon={Shield} />
+                <RoleDefinitionCard title="مشرف الوحدة" description="إشراف تشغيلي ومتابعة الأعمال وفق الصلاحيات الممنوحة." count={assignments.filter((item) => item.role === 'supervisor').length} icon={ClipboardList} />
+                <RoleDefinitionCard title="منسوب المسجد / المصلى" description="وصول مقيد بالموقع المرتبط وصفة إمام أو مؤذن أو خطيب." count={assignments.filter((item) => item.role === 'personnel').length} icon={Users} />
+                <RoleDefinitionCard title="منسوب الجامعة" description="وصول خدمات عام دون ارتباط تشغيلي بمسجد أو مصلى." count={assignments.filter((item) => ['university_member', 'viewer'].includes(item.role)).length} icon={Building2} />
+              </div>
+
+              <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">ابحث باسم المستخدم أو البريد أو الموقع، ثم صفِّ حسب الدور الحالي.</p></div>
+                  <Badge variant="outline" className="border-[#d6b46a]/55 bg-white px-3 py-1.5 font-black text-[#0b4a3f]">{filteredStaffUsers.length} حساب</Badge>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_240px_auto]">
+                  <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-11 border-[#d9c9a5] bg-white pr-9" value={roleUserSearch} onChange={(e) => setRoleUserSearch(e.target.value)} placeholder="اسم المستخدم، البريد، المسجد / المصلى..." /></div>
+                  <NativeSelect className="h-11 bg-white" value={roleUserFilter} onChange={(e) => setRoleUserFilter(e.target.value as 'all' | MosqueModuleRole)}><option value="all">جميع الأدوار</option><option value="head">رئيس الوحدة</option><option value="supervisor">مشرف الوحدة</option><option value="personnel">منسوب المسجد أو المصلى</option><option value="university_member">منسوب الجامعة</option></NativeSelect>
+                  <Button variant="outline" className="h-11 border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => { setRoleUserSearch(''); setRoleUserFilter('all'); }}><X className="ml-1 h-4 w-4" />مسح</Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-black text-[#0b4a3f]">الحسابات ونطاقات الوصول</p><p className="mt-1 text-xs text-slate-500">أي تغيير لا يُحفظ إلا عند الضغط على «حفظ الربط» داخل بطاقة الحساب.</p></div>
+                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">تأكد من الموقع والصفة قبل حفظ دور «منسوب المسجد أو المصلى»</Badge>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                {filteredStaffUsers.map((user) => {
+                  const current = assignments.find((item) => item.userId === user.uid);
+                  const baseRole = current?.role || (user.moduleRole === 'viewer' ? 'university_member' : user.moduleRole) || 'university_member';
+                  const draft = assignmentDrafts[user.uid] || { role: baseRole, siteId: current?.siteId || user.siteId || '', personnelRole: current?.personnelRole || user.personnelRole || 'imam' };
+                  const currentSite = current?.site?.name || sites.find((site) => site.id === (current?.siteId || user.siteId))?.name || '';
+                  const initials = user.username.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('');
+                  const changed = draft.role !== baseRole
+                    || (draft.role === 'personnel' && ((draft.siteId || '') !== (current?.siteId || user.siteId || '') || (draft.personnelRole || 'imam') !== (current?.personnelRole || user.personnelRole || 'imam')));
+
+                  return <Card key={user.uid} className="overflow-hidden rounded-[22px] border border-[#ded3b8] bg-white shadow-[0_8px_24px_rgba(6,60,51,0.06)]">
+                    <CardContent className="space-y-4 p-4 sm:p-5">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/55 bg-[#fff8e8] text-base font-black text-[#0b4a3f]">{initials || 'م'}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-base font-black text-[#0b4a3f]">{user.username}</h3><Badge variant="outline" className={user.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-600'}>{user.isActive ? 'حساب نشط' : 'حساب غير نشط'}</Badge></div>
+                          <p dir="ltr" className="mt-1 truncate text-right text-xs text-slate-500">{user.email}</p>
+                        </div>
+                        {changed && <Badge variant="outline" className="shrink-0 border-amber-300 bg-amber-50 text-amber-800">تغييرات غير محفوظة</Badge>}
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">الدور الحالي</p><p className="mt-1 text-xs font-black text-[#0b4a3f]">{roleLabels[baseRole]}</p></div>
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">نطاق الوصول</p><p className="mt-1 text-xs font-black text-[#0b4a3f]">{roleScopeLabel(baseRole)}</p></div>
+                        <div className="rounded-xl border border-[#e4d8bd] bg-[#fffdf8] p-2.5"><p className="text-[10px] font-bold text-slate-500">الموقع المرتبط</p><p className="mt-1 truncate text-xs font-black text-[#0b4a3f]">{baseRole === 'personnel' ? (currentSite || 'غير محدد') : 'لا يتطلب موقعًا'}</p></div>
+                      </div>
+
+                      <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
+                        <div className="mb-3 flex items-center justify-between gap-2"><p className="font-black text-[#0b4a3f]">تعديل الربط</p><Badge variant="outline" className="border-[#d6b46a]/45 bg-white text-[#7b5b16]">{roleLabels[draft.role]}</Badge></div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <Field label="الدور داخل الوحدة">
+                            <NativeSelect className="h-11 bg-white" value={draft.role} onChange={(e) => {
+                              const nextRole = e.target.value as MosqueModuleRole;
+                              setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, role: nextRole, siteId: nextRole === 'personnel' ? draft.siteId : '', personnelRole: nextRole === 'personnel' ? draft.personnelRole : 'imam' } }));
+                            }}>
+                              <option value="university_member">منسوب الجامعة</option><option value="personnel">منسوب المسجد أو المصلى</option><option value="supervisor">مشرف الوحدة</option><option value="head">رئيس الوحدة</option>
+                            </NativeSelect>
+                          </Field>
+                          <Field label="المسجد / المصلى">
+                            <NativeSelect className="h-11 bg-white" value={draft.siteId} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, siteId: e.target.value } }))} disabled={draft.role !== 'personnel'}>
+                              <option value="">اختر الموقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
+                            </NativeSelect>
+                          </Field>
+                          <Field label="الصفة التشغيلية">
+                            <NativeSelect className="h-11 bg-white" value={draft.personnelRole} onChange={(e) => setAssignmentDrafts((prev) => ({ ...prev, [user.uid]: { ...draft, personnelRole: e.target.value } }))} disabled={draft.role !== 'personnel'}>
+                              <option value="imam">إمام</option><option value="muezzin">مؤذن</option><option value="khateeb">خطيب</option><option value="collaborating_khateeb">خطيب متعاون</option>
+                            </NativeSelect>
+                          </Field>
+                          <div className="flex items-end"><Button className="h-11 w-full border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" disabled={draft.role === 'personnel' && !draft.siteId} onClick={() => setUserAssignment(user.uid, draft.role, draft.siteId, draft.personnelRole)}><Save className="ml-2 h-4 w-4" />حفظ الربط</Button></div>
+                        </div>
+                        {draft.role === 'personnel' && !draft.siteId && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">يجب تحديد المسجد أو المصلى قبل حفظ هذا الدور.</div>}
+                        {draft.role === 'personnel' && draft.siteId && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800"><MapPin className="h-3.5 w-3.5" /><strong>{sites.find((site) => site.id === draft.siteId)?.name || 'الموقع المحدد'}</strong><span>•</span><span>{personnelRoleLabels[draft.personnelRole] || draft.personnelRole}</span></div>}
+                      </div>
+                    </CardContent>
+                  </Card>;
+                })}
+              </div>
+
+              {!filteredStaffUsers.length && <Empty text="لا توجد حسابات مطابقة للبحث والتصفية" />}
+
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-7 text-amber-900">
+                <div className="flex items-start gap-3"><AlertTriangle className="mt-1 h-5 w-5 shrink-0" /><div><strong>تنبيه صلاحيات:</strong> تغيير الدور هنا يغير نطاق وصول الحساب داخل وحدة المساجد. ربط «منسوب المسجد أو المصلى» يتطلب تحديد الموقع والصفة التشغيلية، بينما أدوار رئيس الوحدة والمشرف ومنسوب الجامعة لا تحتاج ربطًا بموقع محدد.</div></div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -4251,6 +4347,21 @@ const Empty = ({ text }: { text: string }) => <div className="rounded-2xl border
 const Rule = ({ title, text }: { title: string; text: string }) => <div className="rounded-2xl border border-[#dfcfaa] bg-gradient-to-br from-white to-[#fbf6ea] p-4 shadow-sm"><div className="mb-2 h-1 w-10 rounded-full bg-[#d6b46a]" /><p className="font-black text-[#0b4a3f]">{title}</p><p className="mt-1 text-sm leading-6 text-slate-600">{text}</p></div>;
 const ReportMetric = ({ label, value }: { label: string; value: number }) => <div className="rounded-2xl border border-[#dfcfaa] bg-gradient-to-b from-white to-[#f9f3e7] p-5 text-center shadow-sm"><p className="text-sm font-bold text-slate-500">{label}</p><p className="mt-1 text-3xl font-black text-[#0b4a3f]">{value}</p></div>;
 const MiniRow = ({ title, subtitle, status }: { title: string; subtitle: string; status: string }) => <div className="flex items-start justify-between gap-3 rounded-2xl border border-[#e3d5b4] bg-[#fffdf8] p-3 shadow-[0_4px_12px_rgba(6,60,51,0.05)]"><div className="min-w-0"><p className="truncate font-black text-[#0b4a3f]">{title}</p><p className="mt-1 line-clamp-1 text-xs text-slate-500">{subtitle}</p></div><Badge variant="outline" className={statusBadgeClass(status)}>{statusLabels[status] || status}</Badge></div>;
+
+const RoleMetric = ({ label, value, icon: Icon }: { label: string; value: number; icon: React.ElementType }) => (
+  <div className="flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
+    <div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{value.toLocaleString('ar-SA')}</p></div>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-[#fff8e8] text-[#0b5a49]"><Icon className="h-5 w-5" /></div>
+  </div>
+);
+
+const RoleDefinitionCard = ({ title, description, count, icon: Icon }: { title: string; description: string; count: number; icon: React.ElementType }) => (
+  <div className="rounded-2xl border border-[#e2d4b4] bg-[#fffdf8] p-4 shadow-sm">
+    <div className="flex items-start justify-between gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#d6b46a]/45 bg-white text-[#0b5a49]"><Icon className="h-5 w-5" /></div><span className="rounded-full border border-[#dfcfaa] bg-white px-2.5 py-1 text-xs font-black text-[#8a6a1f]">{count}</span></div>
+    <p className="mt-3 font-black text-[#0b4a3f]">{title}</p>
+    <p className="mt-1 text-xs leading-6 text-slate-500">{description}</p>
+  </div>
+);
 
 const PersonnelMetric = ({ label, value, icon: Icon }: { label: string; value: number; icon: React.ElementType }) => (
   <div className="flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
