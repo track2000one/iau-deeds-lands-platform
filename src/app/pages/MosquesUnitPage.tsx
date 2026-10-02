@@ -102,9 +102,9 @@ const MosqueSideNavButton = ({ label, icon: Icon, active, onClick, badge }: { la
   <button
     type="button"
     onClick={onClick}
-    className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm font-bold transition-all ${active ? 'bg-[#006b63] text-white shadow-[0_8px_18px_rgba(0,107,99,0.18)]' : 'text-slate-600 hover:bg-white hover:text-[#006b63]'}`}
+    className={`group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-[13px] font-extrabold leading-5 transition-all ${active ? 'bg-[#006b63] text-white shadow-[0_8px_18px_rgba(0,107,99,0.18)]' : 'text-slate-600 hover:bg-white hover:text-[#006b63]'}`}
   >
-    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${active ? 'border-white/20 bg-white/10 text-white' : 'border-slate-200 bg-white text-[#006b63]'}`}><Icon className="h-4 w-4" /></span>
+    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${active ? 'border-white/20 bg-white/10 text-white' : 'border-slate-200 bg-white text-[#006b63]'}`}><Icon className="h-[18px] w-[18px]" /></span>
     <span className="min-w-0 flex-1 truncate">{label}</span>
     {badge != null && badge > 0 && <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${active ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'}`}>{badge}</span>}
   </button>
@@ -551,6 +551,7 @@ export const MosquesUnitPage: React.FC = () => {
   const canCreateUser = isAdmin || hasPermission('mosques', 'canCreateUser');
 
   const [loading, setLoading] = useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [role, setRole] = useState<MosqueModuleRole>('viewer');
   const [currentUsername, setCurrentUsername] = useState('مستخدم');
   const [linkedSiteId, setLinkedSiteId] = useState<string | null>(null);
@@ -762,6 +763,7 @@ export const MosquesUnitPage: React.FC = () => {
         setAssignments([]);
         setStaffUsers([]);
       }
+      setLastUpdatedAt(new Date());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل بيانات وحدة المساجد');
     } finally {
@@ -2888,7 +2890,7 @@ ${quranStockMovementForm.notes}` : ''}`
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1780px] rounded-[30px] bg-[#edf3f7] p-2 sm:p-4 md:p-5" dir="rtl">
+    <div className="mx-auto w-full max-w-[1880px] rounded-[30px] bg-[#eef3f6] p-2 sm:p-3 md:p-4" dir="rtl">
       <section className="mb-5 overflow-hidden rounded-[22px] border border-slate-200/90 bg-white shadow-[0_10px_26px_rgba(15,23,42,0.06)]">
         <div dir="ltr" className="grid gap-4 px-4 py-4 md:px-6 lg:grid-cols-[220px_minmax(0,1fr)_360px] lg:items-center">
           <div className="flex items-center gap-3">
@@ -2912,10 +2914,11 @@ ${quranStockMovementForm.notes}` : ''}`
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input className="h-10 rounded-xl border-slate-200 bg-[#f7f9fb] pr-9 text-sm focus-visible:border-[#006b63] focus-visible:ring-[#006b63]/15" value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') goToDashboardSection('sites'); }} placeholder="ابحث عن مسجد أو مصلى..." />
             </div>
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {lastUpdatedAt && <span className="ml-auto inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-400"><Clock3 className="h-3 w-3" />آخر تحديث {lastUpdatedAt.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</span>}
               <Button size="sm" variant="ghost" className="h-8 text-slate-500 hover:text-[#006b63]" onClick={loadAll}><RefreshCw className="ml-1 h-3.5 w-3.5" />تحديث</Button>
               <Button size="sm" variant="ghost" className="h-8 text-slate-500 hover:text-[#006b63]" onClick={() => navigate('/mosques/public')}><ExternalLink className="ml-1 h-3.5 w-3.5" />البوابة العامة</Button>
-              {canAdd && ['head', 'supervisor'].includes(role) && <Button size="sm" className="h-8 bg-[#006b63] px-3 font-black text-white hover:bg-[#005a53]" onClick={() => openSiteDialog()}><Plus className="ml-1 h-3.5 w-3.5" />إضافة موقع</Button>}
+              {canAdd && ['head', 'supervisor'].includes(role) && <Button size="sm" className="h-8 bg-[#006b63] px-3 font-black text-white shadow-sm hover:bg-[#005a53]" onClick={() => openSiteDialog()}><Plus className="ml-1 h-3.5 w-3.5" />إضافة موقع</Button>}
             </div>
           </div>
         </div>
@@ -2932,21 +2935,32 @@ ${quranStockMovementForm.notes}` : ''}`
                 </div>
               </div>
 
-              <nav className="space-y-1 p-3">
-                <MosqueSideNavButton label="الرئيسية" icon={BarChart3} active={activeTab === 'overview'} onClick={() => goToDashboardSection('overview')} />
-                <MosqueSideNavButton label="المساجد والمصليات" icon={Building2} active={activeTab === 'sites'} onClick={() => goToDashboardSection('sites')} />
-                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="تغطية المباني" icon={MapPin} active={activeTab === 'buildings'} onClick={() => goToDashboardSection('buildings')} />}
-                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="الجولات والزيارات" icon={ClipboardList} active={activeTab === 'field-visits'} onClick={() => goToDashboardSection('field-visits')} />}
-                {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="المصاحف" icon={BookOpen} active={activeTab === 'quran'} onClick={() => goToDashboardSection('quran')} />}
-                {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="الطلبات والصيانة" icon={Wrench} active={activeTab === 'requests'} onClick={() => goToDashboardSection('requests')} badge={dashboard?.stats.newRequests || 0} />}
-                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="البلاغات" icon={MessageSquare} active={activeTab === 'tickets'} onClick={() => goToDashboardSection('tickets')} badge={dashboard?.stats.openTickets || 0} />}
-                {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="الإجازات والاعتذارات" icon={CalendarDays} active={activeTab === 'leaves'} onClick={() => goToDashboardSection('leaves')} />}
-                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="التقارير" icon={FileText} active={activeTab === 'reports'} onClick={() => goToDashboardSection('reports')} />}
-                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="منسوبو المساجد" icon={Users} active={activeTab === 'team'} onClick={() => goToDashboardSection('team')} />}
-                <MosqueSideNavButton label="الخريطة" icon={MapPin} active={activeTab === 'map'} onClick={() => goToDashboardSection('map')} />
-                {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="طلبات التعاون" icon={Briefcase} active={activeTab === 'jobs'} onClick={() => goToDashboardSection('jobs')} />}
-                {isAdmin && <MosqueSideNavButton label="الأدوار التشغيلية" icon={Shield} active={activeTab === 'roles'} onClick={() => goToDashboardSection('roles')} />}
-                {role !== 'university_member' && role !== 'viewer' && <MosqueSideNavButton label="الإشعارات" icon={Bell} active={activeTab === 'notifications'} onClick={() => goToDashboardSection('notifications')} badge={unreadNotifications} />}
+              <nav className="space-y-4 p-3">
+                <div className="space-y-1">
+                  <p className="px-2 pb-1 text-[10px] font-black tracking-wide text-slate-400">التشغيل اليومي</p>
+                  <MosqueSideNavButton label="الرئيسية" icon={BarChart3} active={activeTab === 'overview'} onClick={() => goToDashboardSection('overview')} />
+                  <MosqueSideNavButton label="المساجد والمصليات" icon={Building2} active={activeTab === 'sites'} onClick={() => goToDashboardSection('sites')} />
+                  {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="الجولات والزيارات" icon={ClipboardList} active={activeTab === 'field-visits'} onClick={() => goToDashboardSection('field-visits')} />}
+                  {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="الطلبات والصيانة" icon={Wrench} active={activeTab === 'requests'} onClick={() => goToDashboardSection('requests')} badge={dashboard?.stats.newRequests || 0} />}
+                  {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="البلاغات" icon={MessageSquare} active={activeTab === 'tickets'} onClick={() => goToDashboardSection('tickets')} badge={dashboard?.stats.openTickets || 0} />}
+                  {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="الإجازات والاعتذارات" icon={CalendarDays} active={activeTab === 'leaves'} onClick={() => goToDashboardSection('leaves')} />}
+                </div>
+
+                <div className="space-y-1 border-t border-slate-200 pt-3">
+                  <p className="px-2 pb-1 text-[10px] font-black tracking-wide text-slate-400">المحتوى والمتابعة</p>
+                  {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="المصاحف" icon={BookOpen} active={activeTab === 'quran'} onClick={() => goToDashboardSection('quran')} />}
+                  {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="التقارير" icon={FileText} active={activeTab === 'reports'} onClick={() => goToDashboardSection('reports')} />}
+                  <MosqueSideNavButton label="الخريطة" icon={MapPin} active={activeTab === 'map'} onClick={() => goToDashboardSection('map')} />
+                  {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="تغطية المباني" icon={MapPin} active={activeTab === 'buildings'} onClick={() => goToDashboardSection('buildings')} />}
+                </div>
+
+                <div className="space-y-1 border-t border-slate-200 pt-3">
+                  <p className="px-2 pb-1 text-[10px] font-black tracking-wide text-slate-400">الإدارة</p>
+                  {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="منسوبو المساجد" icon={Users} active={activeTab === 'team'} onClick={() => goToDashboardSection('team')} />}
+                  {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="طلبات التعاون" icon={Briefcase} active={activeTab === 'jobs'} onClick={() => goToDashboardSection('jobs')} />}
+                  {isAdmin && <MosqueSideNavButton label="الأدوار التشغيلية" icon={Shield} active={activeTab === 'roles'} onClick={() => goToDashboardSection('roles')} />}
+                  {role !== 'university_member' && role !== 'viewer' && <MosqueSideNavButton label="الإشعارات" icon={Bell} active={activeTab === 'notifications'} onClick={() => goToDashboardSection('notifications')} badge={unreadNotifications} />}
+                </div>
               </nav>
 
               <div className="border-t border-slate-200 p-3">
@@ -3036,33 +3050,38 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <button type="button" onClick={() => goToDashboardSection('sites')} className="flex min-h-[178px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf6f4] text-[#006b63]"><Building2 className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">عدد المساجد والجوامع</p><span className="mt-2 text-4xl font-black text-slate-900">{referenceMosqueCount}</span></button>
-                <button type="button" onClick={() => goToDashboardSection('sites')} className="flex min-h-[178px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf6f4] text-[#006b63]"><MapPin className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">عدد المصليات</p><span className="mt-2 text-4xl font-black text-slate-900">{referencePrayerRoomCount}</span></button>
-                <button type="button" onClick={() => { setSiteFilterType('prayer_room'); setSiteFilterPrayerRoomGender('men'); goToDashboardSection('sites'); }} className="flex min-h-[178px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#edf7f1] text-[#16704c]"><Users className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">المصليات الرجالية</p><span className="mt-2 text-4xl font-black text-slate-900">{referenceMenPrayerRooms}</span></button>
-                <button type="button" onClick={() => { setSiteFilterType('prayer_room'); setSiteFilterPrayerRoomGender('women'); goToDashboardSection('sites'); }} className="flex min-h-[178px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f3f0fb] text-[#7561a8]"><Users className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">المصليات النسائية</p><span className="mt-2 text-4xl font-black text-slate-900">{referenceWomenPrayerRooms}</span></button>
+                <button type="button" onClick={() => goToDashboardSection('sites')} className="flex min-h-[166px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf6f4] text-[#006b63]"><Building2 className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">عدد المساجد والجوامع</p><span className="mt-2 text-[2.6rem] font-black leading-none text-slate-900">{referenceMosqueCount}</span></button>
+                <button type="button" onClick={() => goToDashboardSection('sites')} className="flex min-h-[166px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf6f4] text-[#006b63]"><MapPin className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">عدد المصليات</p><span className="mt-2 text-[2.6rem] font-black leading-none text-slate-900">{referencePrayerRoomCount}</span></button>
+                <button type="button" onClick={() => { setSiteFilterType('prayer_room'); setSiteFilterPrayerRoomGender('men'); goToDashboardSection('sites'); }} className="flex min-h-[166px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#edf7f1] text-[#16704c]"><Users className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">المصليات الرجالية</p><span className="mt-2 text-[2.6rem] font-black leading-none text-slate-900">{referenceMenPrayerRooms}</span></button>
+                <button type="button" onClick={() => { setSiteFilterType('prayer_room'); setSiteFilterPrayerRoomGender('women'); goToDashboardSection('sites'); }} className="flex min-h-[166px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-[0_5px_16px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#006b63]/35 hover:shadow-md"><span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f3f0fb] text-[#7561a8]"><Users className="h-7 w-7" /></span><p className="mt-3 text-sm font-black text-slate-700">المصليات النسائية</p><span className="mt-2 text-[2.6rem] font-black leading-none text-slate-900">{referenceWomenPrayerRooms}</span></button>
               </div>
             </div>
 
             <div className="grid gap-4 xl:grid-cols-2">
               <Card className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-                <CardHeader className="border-b border-slate-100 pb-3"><CardTitle className="text-base font-black text-slate-800">ملخص التغطية التشغيلية</CardTitle><CardDescription>عرض بصري مختصر للمؤشرات الرئيسية.</CardDescription></CardHeader>
+                <CardHeader className="border-b border-slate-100 pb-3"><CardTitle className="text-base font-black text-slate-800">ملخص التغطية التشغيلية</CardTitle><CardDescription>مقارنة نسبية للمؤشرات الرئيسية.</CardDescription></CardHeader>
                 <CardContent className="p-5">
-                  <div className="flex h-[235px] items-end justify-around gap-3 border-b border-slate-200 px-2 pb-3">
-                    {[
-                      ['المواقع', referenceActiveSites, Math.max(sites.length, 1), '#006b63'],
-                      ['المباني', referenceCoveredBuildings, Math.max(officialBuildings.length, 1), '#2e8b57'],
-                      ['الجرد', quranSummary.countedSites, Math.max(quranSummary.sites, 1), '#d4a72c'],
-                      ['المنسوبون', referenceActivePersonnel, Math.max(personnel.length, 1), '#7aa984'],
-                    ].map(([label, value, total, color]) => {
-                      const percent = Math.max(10, Math.min(100, Math.round((Number(value) / Number(total)) * 100)));
-                      return <div key={String(label)} className="flex h-full flex-1 flex-col items-center justify-end">
-                        <span className="mb-2 text-xs font-black text-slate-700">{Number(value).toLocaleString('ar-SA')}</span>
-                        <div className="flex h-[160px] w-full max-w-[52px] items-end overflow-hidden rounded-t-xl bg-slate-100">
-                          <div className="w-full rounded-t-xl transition-all" style={{ height: `${percent}%`, backgroundColor: String(color) }} />
-                        </div>
-                        <span className="mt-2 text-[10px] font-bold text-slate-500">{label}</span>
-                      </div>;
-                    })}
+                  <div className="relative h-[250px] overflow-hidden rounded-2xl bg-[#fbfcfd] px-4 pb-4 pt-6">
+                    <div className="pointer-events-none absolute inset-x-4 top-6 bottom-10 flex flex-col justify-between">
+                      {[100, 75, 50, 25, 0].map((tick) => <div key={tick} className="flex items-center gap-2"><span className="w-7 text-[9px] font-bold text-slate-300">{tick}%</span><span className="h-px flex-1 bg-slate-100" /></div>)}
+                    </div>
+                    <div className="relative z-10 flex h-full items-end justify-around gap-4 pr-8">
+                      {[
+                        ['المواقع', referenceActiveSites, Math.max(sites.length, 1), '#006b63'],
+                        ['المباني', referenceCoveredBuildings, Math.max(officialBuildings.length, 1), '#2e8b57'],
+                        ['الجرد', quranSummary.countedSites, Math.max(quranSummary.sites, 1), '#d4a72c'],
+                        ['المنسوبون', referenceActivePersonnel, Math.max(personnel.length, 1), '#7aa984'],
+                      ].map(([label, value, total, color]) => {
+                        const percent = Math.max(4, Math.min(100, Math.round((Number(value) / Number(total)) * 100)));
+                        return <div key={String(label)} title={`${label}: ${Number(value).toLocaleString('ar-SA')} من ${Number(total).toLocaleString('ar-SA')} (${percent}%)`} className="flex h-full flex-1 flex-col items-center justify-end">
+                          <span className="mb-2 text-xs font-black text-slate-700">{Number(value).toLocaleString('ar-SA')}</span>
+                          <div className="flex h-[165px] w-full max-w-[50px] items-end overflow-hidden rounded-t-xl bg-slate-100">
+                            <div className="w-full rounded-t-xl transition-all duration-300" style={{ height: `${percent}%`, backgroundColor: String(color) }} />
+                          </div>
+                          <span className="mt-2 text-[10px] font-bold text-slate-500">{label}</span>
+                        </div>;
+                      })}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -3070,9 +3089,9 @@ ${quranStockMovementForm.notes}` : ''}`
               <Card className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
                 <CardHeader className="border-b border-slate-100 pb-3"><CardTitle className="text-base font-black text-slate-800">حالة الطلبات</CardTitle><CardDescription>نسبة الإنجاز وتوزيع الطلبات الحالية.</CardDescription></CardHeader>
                 <CardContent className="grid gap-5 p-5 sm:grid-cols-[180px_1fr] sm:items-center">
-                  <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full" style={{ background: `conic-gradient(#006b63 0 ${referenceCompletionPercent}%, #d9a400 ${referenceCompletionPercent}% ${Math.min(100, referenceCompletionPercent + (referenceTrackedRequests.length ? Math.round((referenceInProgressRequests / referenceTrackedRequests.length) * 100) : 0))}%, #e5534b 0)` }}>
+                  {referenceTrackedRequests.length ? <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full" style={{ background: `conic-gradient(#006b63 0 ${referenceCompletionPercent}%, #d9a400 ${referenceCompletionPercent}% ${Math.min(100, referenceCompletionPercent + Math.round((referenceInProgressRequests / referenceTrackedRequests.length) * 100))}%, #e5534b 0)` }}>
                     <div className="flex h-28 w-28 flex-col items-center justify-center rounded-full bg-white shadow-inner"><span className="text-3xl font-black text-slate-900">{referenceCompletionPercent}%</span><span className="mt-1 text-[10px] font-bold text-slate-500">نسبة الإنجاز</span></div>
-                  </div>
+                  </div> : <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full border-[14px] border-slate-100 bg-white"><div className="text-center"><CheckCircle2 className="mx-auto h-7 w-7 text-emerald-500" /><span className="mt-2 block text-xs font-black text-slate-600">لا توجد طلبات حالية</span></div></div>}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-[#f8fafb] px-3 py-2.5"><span className="flex items-center gap-2 text-sm font-bold text-slate-600"><span className="h-3 w-3 rounded-full bg-[#006b63]" />مكتملة</span><strong className="text-slate-900">{referenceCompletedRequests}</strong></div>
                     <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-[#f8fafb] px-3 py-2.5"><span className="flex items-center gap-2 text-sm font-bold text-slate-600"><span className="h-3 w-3 rounded-full bg-[#d9a400]" />قيد المتابعة</span><strong className="text-slate-900">{referenceInProgressRequests}</strong></div>
