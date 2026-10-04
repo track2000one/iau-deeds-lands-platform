@@ -339,39 +339,53 @@ export const generateDeedImagesPdf = async (
 
   if (!deeds.length) throw new Error('لا توجد صكوك ضمن النطاق المحدد');
 
-  const collected: Array<{ deed: Deed; attachment: BatchAttachment; deedImageIndex: number; deedImageCount: number }> = [];
+  const collectedByDeed = new Map<number, BatchAttachment[]>();
   let skippedDeeds = 0;
+  let nextDeedIndex = 0;
+  let completedDeeds = 0;
+  const workerCount = Math.min(6, deeds.length);
 
-  for (let index = 0; index < deeds.length; index += 1) {
-    if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
-    const deed = deeds[index];
-    options.onProgress?.({
-      phase: 'collecting',
-      current: index + 1,
-      total: deeds.length,
-      label: `قراءة مرفقات الصك ${deed.deedNumber || ''}`,
-    });
+  const collectWorker = async () => {
+    while (true) {
+      if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+      const index = nextDeedIndex;
+      nextDeedIndex += 1;
+      if (index >= deeds.length) return;
 
-    try {
-      const attachments = (await getDeedAttachments(deed, signal)).filter(isDeedImageAttachment);
-      if (!attachments.length) {
+      const deed = deeds[index];
+      try {
+        const attachments = (await getDeedAttachments(deed, signal)).filter(isDeedImageAttachment);
+        if (attachments.length) collectedByDeed.set(index, attachments);
+        else skippedDeeds += 1;
+      } catch (error) {
+        if (signal?.aborted) throw error;
         skippedDeeds += 1;
-        continue;
-      }
-
-      attachments.forEach((attachment, imageIndex) => {
-        collected.push({
-          deed,
-          attachment,
-          deedImageIndex: imageIndex + 1,
-          deedImageCount: attachments.length,
+      } finally {
+        completedDeeds += 1;
+        options.onProgress?.({
+          phase: 'collecting',
+          current: completedDeeds,
+          total: deeds.length,
+          label: `قراءة مرفقات الصك ${deed.deedNumber || ''}`,
         });
-      });
-    } catch (error) {
-      if (signal?.aborted) throw error;
-      skippedDeeds += 1;
+      }
     }
-  }
+  };
+
+  await Promise.all(Array.from({ length: workerCount }, () => collectWorker()));
+
+  const collected: Array<{ deed: Deed; attachment: BatchAttachment; deedImageIndex: number; deedImageCount: number }> = [];
+  deeds.forEach((deed, deedIndex) => {
+    const attachments = collectedByDeed.get(deedIndex) || [];
+    attachments.forEach((attachment, imageIndex) => {
+      collected.push({
+        deed,
+        attachment,
+        deedImageIndex: imageIndex + 1,
+        deedImageCount: attachments.length,
+      });
+    });
+  });
 
   if (!collected.length) {
     throw new Error('لا توجد صور صكوك قابلة للتجميع ضمن النطاق المحدد');
