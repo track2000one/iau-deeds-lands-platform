@@ -1,0 +1,41 @@
+name: Verify Deed Batch PDF
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/app/pages/AllDeedsPage.tsx'
+      - 'src/app/utils/deedBatchPdf.ts'
+      - 'backend/src/routes/attachments.routes.js'
+      - '.github/workflows/verify-deed-batch-pdf.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  backend-syntax:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: node --check src/routes/attachments.routes.js
