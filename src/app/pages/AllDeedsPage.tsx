@@ -186,7 +186,7 @@ export const AllDeedsPage: React.FC = () => {
       phase: 'collecting',
       current: 0,
       total: rows.length,
-      label: 'جاري تجهيز صور الصكوك...',
+      label: 'جاري تجهيز مستندات الصكوك...',
     });
 
     try {
@@ -200,12 +200,12 @@ export const AllDeedsPage: React.FC = () => {
       });
 
       toast.success(
-        `تم إنشاء ملف PDF واحد يحتوي على ${result.imageCount.toLocaleString('ar-SA')} صورة لـ ${result.deedCount.toLocaleString('ar-SA')} صك`
+        `تم إنشاء ملف PDF واحد يحتوي على ${result.documentCount.toLocaleString('ar-SA')} مستند (${result.pageCount.toLocaleString('ar-SA')} صفحة) لـ ${result.deedCount.toLocaleString('ar-SA')} صك`
       );
 
-      if (result.skippedImages || result.skippedDeeds) {
+      if (result.skippedDocuments || result.skippedDeeds) {
         toast.warning(
-          `تم تجاوز ${result.skippedImages.toLocaleString('ar-SA')} صورة و${result.skippedDeeds.toLocaleString('ar-SA')} صك دون صور قابلة للطباعة`
+          `تم تجاوز ${result.skippedDocuments.toLocaleString('ar-SA')} مستند و${result.skippedDeeds.toLocaleString('ar-SA')} صك دون مستندات قابلة للتجميع`
         );
       }
 
@@ -265,7 +265,7 @@ export const AllDeedsPage: React.FC = () => {
               className="h-11 w-full border border-[#0b4a3f] bg-[#0b4a3f] text-white shadow-[0_12px_30px_rgba(11,74,63,0.18)] hover:bg-[#126152] sm:w-auto"
             >
               {pdfGenerating ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileDown className="ml-2 h-4 w-4" />}
-              {pdfGenerating ? 'جاري إنشاء PDF...' : 'PDF جميع الصكوك'}
+              {pdfGenerating ? 'جاري إنشاء PDF...' : 'تجميع مستندات الصكوك PDF'}
             </Button>
           )}
 
@@ -472,10 +472,10 @@ export const AllDeedsPage: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <FileDown className="h-5 w-5 text-[#0b4a3f]" />
-              إنشاء ملف PDF موحد لصور الصكوك
+              إنشاء ملف PDF موحد لمستندات الصكوك
             </DialogTitle>
             <DialogDescription className="leading-6">
-              يجمع النظام صور الصك فقط في ملف واحد، مع صفحة مستقلة لكل صورة والمحافظة على كامل الصورة دون قص.
+              يجمع النظام مستندات الصك في ملف واحد؛ ملفات PDF تُدمج بكامل صفحاتها الأصلية، والصور تُضاف في صفحات مستقلة دون قص.
             </DialogDescription>
           </DialogHeader>
 
@@ -516,7 +516,7 @@ export const AllDeedsPage: React.FC = () => {
               />
               <span>
                 <span className="block text-sm font-bold text-slate-800">إضافة غلاف رسمي</span>
-                <span className="mt-1 block text-xs leading-5 text-slate-500">يتضمن اسم الجامعة والإدارة وعدد الصكوك والصور وتاريخ إنشاء الملف.</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">يتضمن اسم الجامعة والإدارة وعدد الصكوك والمستندات وتاريخ إنشاء الملف.</span>
               </span>
             </label>
 
@@ -528,14 +528,14 @@ export const AllDeedsPage: React.FC = () => {
                 className="mt-1 h-4 w-4"
               />
               <span>
-                <span className="block text-sm font-bold text-slate-800">إظهار بيانات الصك أعلى كل صورة</span>
-                <span className="mt-1 block text-xs leading-5 text-slate-500">رقم الصك، المدينة والحي، وترتيب الصورة داخل الصك.</span>
+                <span className="block text-sm font-bold text-slate-800">إضافة صفحة تعريف قبل كل صك</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">تتضمن رقم الصك وبيان العقار والمدينة والحي ورقم المخطط والقطعة قبل مستنداته.</span>
               </span>
             </label>
           </div>
 
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-900">
-            يتم إدراج مرفقات «صورة الصك» فقط. المرفقات من نوع المخطط أو صور الموقع أو المرفقات الإضافية لا تدخل في هذا الملف.
+            يتم إدراج مرفقات «صورة الصك» سواء كانت PDF أو صورًا. ملفات PDF تُدمج بجميع صفحاتها مع الحفاظ على جودتها الأصلية، بينما لا تدخل صور المخطط أو الموقع أو العقود في الملف.
           </div>
 
           <DialogFooter className="gap-2 sm:justify-start">
