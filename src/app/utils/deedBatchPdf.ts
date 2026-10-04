@@ -122,6 +122,64 @@ const dedupeAttachments = (attachments: BatchAttachment[]) => {
   });
 };
 
+const getLegacyStoredAttachments = (deed: Deed): BatchAttachment[] => {
+  try {
+    const raw = window.localStorage.getItem('deeds_data');
+    if (!raw) return [];
+    const records = JSON.parse(raw);
+    if (!Array.isArray(records)) return [];
+
+    const normalizedNumber = String(deed.deedNumber || '').replace(/\s+/g, '');
+    const match = records.find((record: any) =>
+      String(record?.id || '') === String(deed.id)
+      || (
+        normalizedNumber
+        && String(record?.deedNumber || '').replace(/\s+/g, '') === normalizedNumber
+      )
+    );
+
+    return Array.isArray(match?.attachments)
+      ? (match.attachments as BatchAttachment[])
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const getBatchAttachmentManifest = async (
+  deeds: Deed[],
+  signal?: AbortSignal
+): Promise<Map<string, BatchAttachment[]> | null> => {
+  if (!isApiEnabled || !deeds.length) return null;
+
+  try {
+    const response = await authenticatedFetch('/api/attachments/deed-batch-manifest', {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, max-age=0',
+        Pragma: 'no-cache',
+      },
+      body: JSON.stringify({ deedIds: deeds.map((deed) => deed.id) }),
+      signal,
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || !body?.grouped || typeof body.grouped !== 'object') return null;
+
+    const manifest = new Map<string, BatchAttachment[]>();
+    for (const deed of deeds) {
+      const items = Array.isArray(body.grouped[deed.id])
+        ? (body.grouped[deed.id] as BatchAttachment[])
+        : [];
+      manifest.set(deed.id, items);
+    }
+    return manifest;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return null;
+  }
+};
+
 const getDeedAttachments = async (deed: Deed, signal?: AbortSignal): Promise<BatchAttachment[]> => {
   if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
 
@@ -386,7 +444,12 @@ export const generateDeedImagesPdf = async (
   let skippedDeeds = 0;
   let nextDeedIndex = 0;
   let completedDeeds = 0;
+  let totalAttachmentRecords = 0;
   const workerCount = Math.min(6, deeds.length);
+
+  // Prefer one server-side manifest query. It is faster, avoids HTTP cache edge
+  // cases, and lets the exporter work from a single authoritative snapshot.
+  const batchManifest = await getBatchAttachmentManifest(deeds, signal);
 
   const collectWorker = async () => {
     while (true) {
@@ -397,7 +460,17 @@ export const generateDeedImagesPdf = async (
 
       const deed = deeds[index];
       try {
-        const allAttachments = await getDeedAttachments(deed, signal);
+        const inline = Array.isArray(deed.attachments)
+          ? (deed.attachments as unknown as BatchAttachment[])
+          : [];
+        const legacyStored = getLegacyStoredAttachments(deed);
+        const remote = batchManifest
+          ? (batchManifest.get(deed.id) || [])
+          : await getDeedAttachments(deed, signal);
+
+        const allAttachments = dedupeAttachments([...remote, ...inline, ...legacyStored]);
+        totalAttachmentRecords += allAttachments.length;
+
         const attachments = getPrintableDeedImages(allAttachments);
         if (attachments.length) collectedByDeed.set(index, attachments);
         else skippedDeeds += 1;
@@ -432,7 +505,15 @@ export const generateDeedImagesPdf = async (
   });
 
   if (!collected.length) {
-    throw new Error('لا توجد صور صكوك قابلة للتجميع ضمن النطاق المحدد');
+    if (totalAttachmentRecords === 0) {
+      throw new Error(
+        `تم فحص ${deeds.length.toLocaleString('ar-SA')} صك، ولم يعثر النظام على أي مرفقات مرتبطة بها في قاعدة البيانات أو الحفظ المحلي. يلزم ربط صور الصكوك بالسجلات أولًا.`
+      );
+    }
+
+    throw new Error(
+      `تم العثور على ${totalAttachmentRecords.toLocaleString('ar-SA')} مرفق، لكن لم يتم التعرف على أي منها كصورة صك قابلة للطباعة. استخدم «فحص المرفقات» أو حدّث نوع المرفق إلى صورة صك.`
+    );
   }
 
   const pdf = new jsPDF({
