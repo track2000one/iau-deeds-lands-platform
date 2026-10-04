@@ -70,10 +70,7 @@ const getDriveFileId = (attachment: BatchAttachment) => {
   return match?.[1] || '';
 };
 
-const isDeedImageAttachment = (attachment: BatchAttachment) => {
-  const type = String(attachment.attachmentType || '').toLowerCase();
-  if (!['deed_image', 'deed'].includes(type)) return false;
-
+const isProbablyImageAttachment = (attachment: BatchAttachment) => {
   const mime = getAttachmentMime(attachment);
   if (mime === 'application/pdf' || mime.includes('pdf')) return false;
   if (mime.startsWith('image/')) return true;
@@ -84,8 +81,35 @@ const isDeedImageAttachment = (attachment: BatchAttachment) => {
     return true;
   }
 
-  // Legacy deed-image links often have no MIME type or extension, especially Google Drive links.
+  // Google Drive image links in older records often have no MIME type or file extension.
   return Boolean(getDriveFileId(attachment) || url);
+};
+
+const isDeedImageAttachment = (attachment: BatchAttachment) => {
+  const type = String(attachment.attachmentType || '').toLowerCase();
+  if (!['deed_image', 'deed'].includes(type)) return false;
+  return isProbablyImageAttachment(attachment);
+};
+
+const getPrintableDeedImages = (attachments: BatchAttachment[]) => {
+  const explicit = attachments.filter(isDeedImageAttachment);
+  if (explicit.length) return explicit;
+
+  // Backward compatibility: older deed records were sometimes saved as "other"
+  // even though they are the deed scan. Only use this fallback when no explicit
+  // deed-image record exists, and never pull plan/location/contract attachments.
+  const legacy = attachments.filter((attachment) => {
+    const type = String(attachment.attachmentType || '').toLowerCase();
+    if (['plan_image', 'location_image', 'contract_image', 'delivery_minutes'].includes(type)) return false;
+    if (!isProbablyImageAttachment(attachment)) return false;
+
+    const title = getAttachmentName(attachment).trim();
+    return type === 'other'
+      || !type
+      || /صك|deed|وثيقة\s*الملكية|ملكية/i.test(title);
+  });
+
+  return legacy;
 };
 
 const dedupeAttachments = (attachments: BatchAttachment[]) => {
@@ -373,7 +397,8 @@ export const generateDeedImagesPdf = async (
 
       const deed = deeds[index];
       try {
-        const attachments = (await getDeedAttachments(deed, signal)).filter(isDeedImageAttachment);
+        const allAttachments = await getDeedAttachments(deed, signal);
+        const attachments = getPrintableDeedImages(allAttachments);
         if (attachments.length) collectedByDeed.set(index, attachments);
         else skippedDeeds += 1;
       } catch (error) {
