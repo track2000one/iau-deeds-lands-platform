@@ -39,6 +39,25 @@ const statusLabels: Record<string, string> = {
   returned_for_edit: 'معاد للتعديل', rejected: 'مرفوض', shortlisted: 'مرشح مبدئيًا', interview: 'مقابلة', accepted: 'مقبول', archived: 'مؤرشف',
 };
 
+// IAU_NON_APPROVED_PUBLICATIONS_REPORTING_V1
+const NON_APPROVED_PUBLICATIONS_ITEM_TITLE = 'خلو الموقع من الكتب والنشرات غير المعتمدة';
+const nonApprovedPublicationTypeLabels: Record<string, string> = {
+  books: 'كتب',
+  booklets: 'كتيبات',
+  leaflets: 'مطويات',
+  publications: 'منشورات / نشرات',
+  other: 'أخرى',
+};
+const getNonApprovedPublicationsSummary = (visit: MosqueFieldVisit) => {
+  const item = (visit.items || []).find((entry) => entry.title === NON_APPROVED_PUBLICATIONS_ITEM_TITLE);
+  const raw = (item?.details?.nonApprovedPublications || {}) as { observedCount?: number | null; withdrawnCount?: number | null; materialTypes?: string[] };
+  const observed = Math.max(0, Number(raw.observedCount || 0));
+  const withdrawn = Math.max(0, Number(raw.withdrawnCount || 0));
+  const remaining = Math.max(0, observed - withdrawn);
+  const types = Array.isArray(raw.materialTypes) ? raw.materialTypes.map((value) => nonApprovedPublicationTypeLabels[value] || value).join('، ') : '';
+  return { observed, withdrawn, remaining, types };
+};
+
 const reportLabels = {
   comprehensive: 'التقرير الشامل للوحدة', sites: 'المساجد والمصليات', buildings: 'تغطية المباني بخدمة الصلاة', visits: 'الجولات والزيارات',
   requests: 'الطلبات والصيانة', tickets: 'البلاغات', quran: 'المصاحف والاحتياج', personnel: 'منسوبو المساجد', leaves: 'الإجازات والاعتذارات', jobs: 'التوظيف',
@@ -146,13 +165,20 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
       'حالة التغطية': buildingCoverageLabels[building.coverageStatus] || building.coverageStatus, 'عدد المواقع المرتبطة': building._count?.sites ?? building.sites?.length ?? 0,
       'مستفيدون متوقعون': building.expectedUsers || '-', 'الإحداثيات': building.latitude != null && building.longitude != null ? `${building.latitude}, ${building.longitude}` : '-',
     }, meta: { search: [building.buildingNumber, building.name, building.city, building.district, building.campusLocation].filter(Boolean).join(' '), city: building.city || '', campus: building.campusLocation || '', status: building.coverageStatus } })),
-    visits: visits.map((visit, index) => ({ data: {
-      'م': index + 1, 'رقم الزيارة': visit.visitNumber, 'الموقع': visit.site?.name || '-', 'التاريخ': displayDate(visit.visitDate), 'النوع': visit.visitType,
-      'الحالة': statusLabels[visit.workflowStatus] || visit.workflowStatus, 'التقييم': visit.overallStatus, 'الأولوية': priorityLabels[visit.priority] || visit.priority,
-      'الملاحظات المفتوحة': visit.items?.filter((item) => !['resolved', 'closed'].includes(item.resolutionStatus)).length || 0,
-      'العاجلة': visit.items?.filter((item) => item.priority === 'urgent' && !['resolved', 'closed'].includes(item.resolutionStatus)).length || 0,
-      'التوصيات': visit.recommendations || '-',
-    }, meta: { search: [visit.visitNumber, visit.site?.name, visit.generalNotes, visit.recommendations].filter(Boolean).join(' '), date: dateOnly(visit.visitDate), city: visit.site?.city || '', campus: visit.site?.campusLocation || '', type: visit.site?.siteType || '', status: visit.workflowStatus, priority: visit.priority } })),
+    visits: visits.map((visit, index) => {
+      const publications = getNonApprovedPublicationsSummary(visit);
+      return ({ data: {
+        'م': index + 1, 'رقم الزيارة': visit.visitNumber, 'الموقع': visit.site?.name || '-', 'التاريخ': displayDate(visit.visitDate), 'النوع': visit.visitType,
+        'الحالة': statusLabels[visit.workflowStatus] || visit.workflowStatus, 'التقييم': visit.overallStatus, 'الأولوية': priorityLabels[visit.priority] || visit.priority,
+        'الملاحظات المفتوحة': visit.items?.filter((item) => !['resolved', 'closed'].includes(item.resolutionStatus)).length || 0,
+        'العاجلة': visit.items?.filter((item) => item.priority === 'urgent' && !['resolved', 'closed'].includes(item.resolutionStatus)).length || 0,
+        'المواد المخالفة المرصودة': publications.observed,
+        'المواد المخالفة المسحوبة': publications.withdrawn,
+        'المواد المخالفة المتبقية': publications.remaining,
+        'أنواع الكتب والمطبوعات المخالفة': publications.types || '-',
+        'التوصيات': visit.recommendations || '-',
+      }, meta: { search: [visit.visitNumber, visit.site?.name, visit.generalNotes, visit.recommendations, publications.types].filter(Boolean).join(' '), date: dateOnly(visit.visitDate), city: visit.site?.city || '', campus: visit.site?.campusLocation || '', type: visit.site?.siteType || '', status: visit.workflowStatus, priority: visit.priority } });
+    }),
     requests: requests.map((request, index) => { const site = siteById.get(request.siteId); return ({ data: {
       'م': index + 1, 'رقم الطلب': request.requestNumber, 'الموقع': request.site?.name || site?.name || '-', 'النوع': request.requestType, 'الأولوية': priorityLabels[request.priority] || request.priority,
       'الحالة': statusLabels[request.status] || request.status, 'الوصف': request.description, 'المسند إلى': request.assignedTo || '-', 'تاريخ الإنشاء': displayDate(request.createdAt), 'إثبات الإنجاز': request.completionEvidenceUrl ? 'متوفر' : 'غير متوفر',
@@ -209,6 +235,10 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
   const openTickets = tickets.filter((item) => !['resolved', 'closed', 'rejected', 'archived'].includes(item.status)).length;
   const buildingsNeedPrayerRoom = buildings.filter((item) => item.coverageStatus === 'needs_prayer_room').length;
   const openVisitItems = visits.reduce((sum, visit) => sum + (visit.items?.filter((item) => !['resolved', 'closed'].includes(item.resolutionStatus)).length || 0), 0);
+  const filteredVisitRowsForMetrics = filterRows(datasets.visits);
+  const nonApprovedPublicationsObserved = filteredVisitRowsForMetrics.reduce((sum, row) => sum + Number(row.data['المواد المخالفة المرصودة'] || 0), 0);
+  const nonApprovedPublicationsWithdrawn = filteredVisitRowsForMetrics.reduce((sum, row) => sum + Number(row.data['المواد المخالفة المسحوبة'] || 0), 0);
+  const nonApprovedPublicationsRemaining = filteredVisitRowsForMetrics.reduce((sum, row) => sum + Number(row.data['المواد المخالفة المتبقية'] || 0), 0);
   const quranNeed = quranStockDashboard?.summary.siteNeedTotal || 0;
   const quranAddedInPeriod = quranPeriodMovements.filter((movement) => movement.movementType === 'distribution').reduce((sum, movement) => sum + Number(movement.totalCount || 0), 0);
   const quranWithdrawnInPeriod = quranPeriodMovements.filter((movement) => movement.movementType === 'site_withdrawal').reduce((sum, movement) => sum + Number(movement.totalCount || 0), 0);
@@ -239,6 +269,7 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
     appendExcelReportSheet(workbook, 'الملخص التنفيذي', [{
       'نوع التقرير': reportLabels[settings.reportType], 'النتائج المطابقة': activeRows, 'المساجد والمصليات': sites.length, 'المباني التي تحتاج مصلى': buildingsNeedPrayerRoom,
       'الطلبات المفتوحة': openRequests, 'البلاغات المفتوحة': openTickets, 'ملاحظات الزيارات المفتوحة': openVisitItems, 'احتياج المصاحف': quranNeed,
+      'المواد المخالفة المرصودة': nonApprovedPublicationsObserved, 'المواد المخالفة المسحوبة': nonApprovedPublicationsWithdrawn, 'المواد المخالفة المتبقية': nonApprovedPublicationsRemaining,
       'المصاحف المضافة خلال الفترة': quranAddedInPeriod, 'المصاحف المسحوبة خلال الفترة': quranWithdrawnInPeriod, 'المصاحف المرتجعة خلال الفترة': quranReturnedInPeriod,
       'معايير التقرير': filterSummary(), 'تاريخ الاستخراج': new Date().toLocaleString('ar-SA-u-ca-gregory'),
     }]);
@@ -246,6 +277,7 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
       title: reportLabels[settings.reportType], subtitle: filterSummary(), orientation: 'landscape', metrics: [
         { label: 'النتائج', value: activeRows, tone: 'blue' }, { label: 'طلبات مفتوحة', value: openRequests, tone: 'amber' },
         { label: 'بلاغات مفتوحة', value: openTickets, tone: 'red' }, { label: 'احتياج المصاحف', value: quranNeed, tone: 'green' },
+        { label: 'مخالفات مرصودة', value: nonApprovedPublicationsObserved, tone: 'amber' }, { label: 'مخالفات مسحوبة', value: nonApprovedPublicationsWithdrawn, tone: 'green' },
         { label: 'مصاحف مضافة', value: quranAddedInPeriod, tone: 'green' }, { label: 'مصاحف مسحوبة', value: quranWithdrawnInPeriod, tone: 'red' },
       ],
     });
@@ -265,8 +297,8 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
     }).join('');
     const generatedAt = new Date().toLocaleString('ar-SA-u-ca-gregory');
     win.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(reportLabels[settings.reportType])}</title><style>
-      @page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0;font-size:9px;direction:rtl}.header{border:1.5px solid #94a3b8;border-radius:14px;padding:14px;background:linear-gradient(110deg,#eff6ff,#fff,#ecfdf5)}.kicker{font-size:8px;color:#64748b}.head-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}.head-row h1{margin:4px 0;font-size:21px}.badge{border:1px solid #93c5fd;background:#eff6ff;border-radius:999px;padding:5px 10px;font-weight:800}.meta{color:#64748b}.filters{margin-top:8px;border-top:1px solid #dbeafe;padding-top:7px}.metrics{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:10px 0}.metric{border:1px solid #cbd5e1;border-radius:9px;padding:7px;text-align:center;background:#f8fafc}.metric span{display:block;color:#64748b;font-size:7px}.metric b{display:block;font-size:15px;margin-top:2px}.section-title{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px}.section-title h2{font-size:14px;margin:0}.section-title span{color:#64748b}.table-wrap{overflow:hidden;border-radius:8px}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:4px 3px;text-align:center;vertical-align:middle;line-height:1.45;word-break:break-word}th{background:#e0f2fe;font-weight:900;font-size:7.5px}td{font-size:7.2px}.footer{margin-top:10px;border-top:1px solid #e2e8f0;padding-top:6px;color:#64748b;display:flex;justify-content:space-between}section{break-inside:auto}thead{display:table-header-group}@media print{.no-print{display:none!important}}
-    </style></head><body><header class="header"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><div class="head-row"><div><h1>${escapeHtml(reportLabels[settings.reportType])}</h1><div class="meta">تاريخ الاستخراج: ${escapeHtml(generatedAt)}</div></div><span class="badge">${activeRows} نتيجة</span></div><div class="filters"><b>معايير التقرير:</b> ${escapeHtml(filterSummary())}</div></header><div class="metrics"><div class="metric"><span>المساجد والمصليات</span><b>${sites.length}</b></div><div class="metric"><span>مبانٍ تحتاج مصلى</span><b>${buildingsNeedPrayerRoom}</b></div><div class="metric"><span>طلبات مفتوحة</span><b>${openRequests}</b></div><div class="metric"><span>بلاغات مفتوحة</span><b>${openTickets}</b></div><div class="metric"><span>ملاحظات زيارة مفتوحة</span><b>${openVisitItems}</b></div><div class="metric"><span>احتياج المصاحف</span><b>${quranNeed}</b></div><div class="metric"><span>مصاحف مضافة</span><b>${quranAddedInPeriod}</b></div><div class="metric"><span>مصاحف مسحوبة</span><b>${quranWithdrawnInPeriod}</b></div></div>${sectionsHtml}<div class="footer"><span>منصة إدارة الأملاك والأراضي — وحدة العناية بالمساجد والمصليات الجامعية</span><span>${escapeHtml(generatedAt)}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+      @page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0;font-size:9px;direction:rtl}.header{border:1.5px solid #94a3b8;border-radius:14px;padding:14px;background:linear-gradient(110deg,#eff6ff,#fff,#ecfdf5)}.kicker{font-size:8px;color:#64748b}.head-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}.head-row h1{margin:4px 0;font-size:21px}.badge{border:1px solid #93c5fd;background:#eff6ff;border-radius:999px;padding:5px 10px;font-weight:800}.meta{color:#64748b}.filters{margin-top:8px;border-top:1px solid #dbeafe;padding-top:7px}.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:10px 0}.metric{border:1px solid #cbd5e1;border-radius:9px;padding:7px;text-align:center;background:#f8fafc}.metric span{display:block;color:#64748b;font-size:7px}.metric b{display:block;font-size:15px;margin-top:2px}.section-title{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px}.section-title h2{font-size:14px;margin:0}.section-title span{color:#64748b}.table-wrap{overflow:hidden;border-radius:8px}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:4px 3px;text-align:center;vertical-align:middle;line-height:1.45;word-break:break-word}th{background:#e0f2fe;font-weight:900;font-size:7.5px}td{font-size:7.2px}.footer{margin-top:10px;border-top:1px solid #e2e8f0;padding-top:6px;color:#64748b;display:flex;justify-content:space-between}section{break-inside:auto}thead{display:table-header-group}@media print{.no-print{display:none!important}}
+    </style></head><body><header class="header"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><div class="head-row"><div><h1>${escapeHtml(reportLabels[settings.reportType])}</h1><div class="meta">تاريخ الاستخراج: ${escapeHtml(generatedAt)}</div></div><span class="badge">${activeRows} نتيجة</span></div><div class="filters"><b>معايير التقرير:</b> ${escapeHtml(filterSummary())}</div></header><div class="metrics"><div class="metric"><span>المساجد والمصليات</span><b>${sites.length}</b></div><div class="metric"><span>مبانٍ تحتاج مصلى</span><b>${buildingsNeedPrayerRoom}</b></div><div class="metric"><span>طلبات مفتوحة</span><b>${openRequests}</b></div><div class="metric"><span>بلاغات مفتوحة</span><b>${openTickets}</b></div><div class="metric"><span>ملاحظات زيارة مفتوحة</span><b>${openVisitItems}</b></div><div class="metric"><span>احتياج المصاحف</span><b>${quranNeed}</b></div><div class="metric"><span>مخالفات مرصودة</span><b>${nonApprovedPublicationsObserved}</b></div><div class="metric"><span>مخالفات مسحوبة</span><b>${nonApprovedPublicationsWithdrawn}</b></div><div class="metric"><span>مصاحف مضافة</span><b>${quranAddedInPeriod}</b></div><div class="metric"><span>مصاحف مسحوبة</span><b>${quranWithdrawnInPeriod}</b></div></div>${sectionsHtml}<div class="footer"><span>منصة إدارة الأملاك والأراضي — وحدة العناية بالمساجد والمصليات الجامعية</span><span>${escapeHtml(generatedAt)}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
     win.document.close();
   };
 
@@ -345,6 +377,8 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
             <ReportSideMetric label="بلاغات مفتوحة" value={openTickets} />
             <ReportSideMetric label="ملاحظات زيارات" value={openVisitItems} />
             <ReportSideMetric label="احتياج المصاحف" value={quranNeed} />
+            <ReportSideMetric label="مخالفات مرصودة" value={nonApprovedPublicationsObserved} />
+            <ReportSideMetric label="مخالفات مسحوبة" value={nonApprovedPublicationsWithdrawn} />
           </CardContent>
         </Card>
 
