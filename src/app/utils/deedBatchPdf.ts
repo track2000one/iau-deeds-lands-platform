@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import type { Deed } from '../../types/deed';
-import { api, isApiEnabled } from '../../lib/api';
+import { isApiEnabled } from '../../lib/api';
 import { authenticatedFetch } from '../../lib/http';
 
 type BatchAttachment = {
@@ -107,7 +107,26 @@ const getDeedAttachments = async (deed: Deed, signal?: AbortSignal): Promise<Bat
 
   if (!isApiEnabled) return dedupeAttachments(inline);
 
-  const remote = await api.getAttachments<BatchAttachment>('deed', deed.id);
+  // Batch export must bypass browser/HTTP conditional caching. A 304 response has
+  // no JSON body and would otherwise be interpreted as a failed attachment read,
+  // causing every deed to look as if it has no printable images.
+  const response = await authenticatedFetch(
+    `/api/attachments/deed/${encodeURIComponent(deed.id)}?batchPdf=1&ts=${Date.now()}`,
+    {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, max-age=0',
+        Pragma: 'no-cache',
+      },
+      signal,
+    }
+  );
+  const body = await response.json().catch(() => []);
+  if (!response.ok) {
+    throw new Error((body as any)?.message || `تعذر قراءة صور الصك ${deed.deedNumber || ''}`);
+  }
+  const remote = Array.isArray(body) ? (body as BatchAttachment[]) : [];
   return dedupeAttachments([...remote, ...inline]);
 };
 
