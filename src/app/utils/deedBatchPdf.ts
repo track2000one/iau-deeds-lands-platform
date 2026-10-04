@@ -510,61 +510,305 @@ const createDeedSeparator = (
   const context = canvas.getContext('2d');
   if (!context) throw new Error('تعذر تجهيز صفحة بيانات الصك');
 
-  context.fillStyle = '#ffffff';
+  const roundedRect = (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+  ) => {
+    const r = Math.min(radius, width / 2, height / 2);
+    context.beginPath();
+    context.moveTo(x + r, y);
+    context.arcTo(x + width, y, x + width, y + height, r);
+    context.arcTo(x + width, y + height, x, y + height, r);
+    context.arcTo(x, y + height, x, y, r);
+    context.arcTo(x, y, x + width, y, r);
+    context.closePath();
+  };
+
+  const drawFittedText = (
+    value: string,
+    x: number,
+    y: number,
+    maxWidth: number,
+    startSize: number,
+    minSize: number,
+    weight = 700,
+    color = '#123d73'
+  ) => {
+    let size = startSize;
+    context.fillStyle = color;
+    context.textAlign = 'right';
+    context.direction = 'rtl';
+
+    while (size > minSize) {
+      context.font = `${weight} ${size}px Tahoma, Arial, sans-serif`;
+      if (context.measureText(value).width <= maxWidth) break;
+      size -= 2;
+    }
+
+    context.fillText(value, x, y);
+  };
+
+  const pageGradient = context.createLinearGradient(0, 0, 1400, 1980);
+  pageGradient.addColorStop(0, '#f7fbfd');
+  pageGradient.addColorStop(0.48, '#ffffff');
+  pageGradient.addColorStop(1, '#f4f8f7');
+  context.fillStyle = pageGradient;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Very subtle institutional watermark.
+  context.save();
+  context.globalAlpha = 0.035;
+  context.fillStyle = '#0b6b57';
+  context.beginPath();
+  context.arc(175, 1010, 360, 0, Math.PI * 2);
+  context.fill();
   context.fillStyle = '#123d73';
-  context.fillRect(0, 0, canvas.width, 34);
+  context.beginPath();
+  context.arc(1225, 350, 250, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+
+  // Institutional top identity.
+  context.fillStyle = '#0b6b57';
+  context.fillRect(0, 0, 1400, 18);
+  context.fillStyle = '#123d73';
+  context.fillRect(0, 18, 1400, 56);
 
   context.direction = 'rtl';
   context.textAlign = 'right';
 
-  context.fillStyle = '#64798b';
-  context.font = '600 36px Tahoma, Arial, sans-serif';
-  context.fillText('جامعة الإمام عبدالرحمن بن فيصل — إدارة أوقاف وأملاك الجامعة', 1240, 180);
+  context.fillStyle = '#ffffff';
+  context.font = '700 28px Tahoma, Arial, sans-serif';
+  context.fillText('إدارة أوقاف وأملاك الجامعة', 1260, 57);
+
+  context.textAlign = 'left';
+  context.fillStyle = '#dbe8f4';
+  context.font = '600 24px Tahoma, Arial, sans-serif';
+  context.fillText('IAU • DEEDS ARCHIVE', 138, 56);
+
+  // Header block.
+  context.textAlign = 'right';
+  context.direction = 'rtl';
+  context.fillStyle = '#123d73';
+  context.font = '800 40px Tahoma, Arial, sans-serif';
+  context.fillText('جامعة الإمام عبدالرحمن بن فيصل', 1240, 154);
+
+  context.fillStyle = '#758899';
+  context.font = '600 27px Tahoma, Arial, sans-serif';
+  context.fillText('ملف الصكوك والأملاك الجامعية', 1240, 205);
+
+  // Small document badge.
+  roundedRect(1012, 250, 228, 58, 29);
+  context.fillStyle = '#eaf5f1';
+  context.fill();
+  context.strokeStyle = '#c6e2d9';
+  context.lineWidth = 2;
+  context.stroke();
+
+  context.fillStyle = '#0b6b57';
+  context.font = '700 25px Tahoma, Arial, sans-serif';
+  context.textAlign = 'center';
+  context.fillText('بطاقة تعريف الصك', 1126, 288);
+
+  // Main title.
+  context.textAlign = 'right';
+  drawFittedText(
+    `الصك رقم ${deed.deedNumber || '-'}`,
+    1240,
+    425,
+    1080,
+    86,
+    54,
+    800,
+    '#123d73'
+  );
+
+  // Decorative underline.
+  const titleLineGradient = context.createLinearGradient(650, 0, 1240, 0);
+  titleLineGradient.addColorStop(0, '#d8e5ed');
+  titleLineGradient.addColorStop(0.75, '#0b6b57');
+  titleLineGradient.addColorStop(1, '#123d73');
+  context.fillStyle = titleLineGradient;
+  roundedRect(650, 463, 590, 8, 4);
+  context.fill();
+
+  const propertyTitle = deed.propertyDescription || 'بيان العقار غير محدد';
+  drawFittedText(
+    propertyTitle,
+    1240,
+    548,
+    1080,
+    48,
+    30,
+    700,
+    '#0b6b57'
+  );
+
+  context.fillStyle = '#7a8b99';
+  context.font = '500 25px Tahoma, Arial, sans-serif';
+  context.fillText('بيان العقار', 1240, 593);
+
+  // Main information panel.
+  roundedRect(120, 690, 1160, 790, 34);
+  context.fillStyle = 'rgba(255,255,255,0.96)';
+  context.fill();
+  context.strokeStyle = '#d8e4eb';
+  context.lineWidth = 2;
+  context.stroke();
 
   context.fillStyle = '#123d73';
-  context.font = '800 92px Tahoma, Arial, sans-serif';
-  context.fillText(`الصك رقم ${deed.deedNumber || '-'}`, 1240, 410);
+  context.font = '800 32px Tahoma, Arial, sans-serif';
+  context.fillText('بيانات الصك الأساسية', 1210, 750);
 
-  context.fillStyle = '#0b4a3f';
-  context.font = '700 50px Tahoma, Arial, sans-serif';
-  context.fillText(deed.propertyDescription || 'بيان العقار غير محدد', 1240, 520);
+  context.fillStyle = '#8a99a6';
+  context.font = '500 22px Tahoma, Arial, sans-serif';
+  context.fillText('بيانات تعريفية مرتبطة بالسجل في منصة إدارة الصكوك والأراضي', 1210, 790);
 
-  const rows = [
-    ['المدينة', deed.city || '-'],
-    ['الحي', deed.district || '-'],
-    ['رقم المخطط', deed.planNumber || '-'],
-    ['رقم القطعة', deed.plotNumber || '-'],
-    ['المساحة', deed.area ? `${Number(deed.area).toLocaleString('ar-SA')} م²` : '-'],
-    ['عدد مستندات الصك', documentCount.toLocaleString('ar-SA')],
+  const cards = [
+    {
+      label: 'المدينة',
+      value: deed.city || '-',
+      accent: '#123d73',
+      background: '#f4f8fc',
+    },
+    {
+      label: 'الحي',
+      value: deed.district || '-',
+      accent: '#0b6b57',
+      background: '#f2f9f6',
+    },
+    {
+      label: 'رقم المخطط',
+      value: deed.planNumber || '-',
+      accent: '#123d73',
+      background: '#f4f8fc',
+    },
+    {
+      label: 'رقم القطعة',
+      value: deed.plotNumber || '-',
+      accent: '#0b6b57',
+      background: '#f2f9f6',
+    },
+    {
+      label: 'المساحة',
+      value: deed.area
+        ? `${Number(deed.area).toLocaleString('ar-SA')} م²`
+        : '-',
+      accent: '#123d73',
+      background: '#eef5fb',
+      emphasis: true,
+    },
+    {
+      label: 'عدد مستندات الصك',
+      value: documentCount.toLocaleString('ar-SA'),
+      accent: '#0b6b57',
+      background: '#edf8f4',
+      emphasis: true,
+    },
   ];
 
-  let y = 750;
-  for (const [label, value] of rows) {
-    context.fillStyle = '#f6f9fb';
-    context.strokeStyle = '#d6e0e8';
-    context.lineWidth = 2;
-    context.fillRect(170, y, 1060, 140);
-    context.strokeRect(170, y, 1060, 140);
+  const cardWidth = 500;
+  const cardHeight = 176;
+  const horizontalGap = 42;
+  const startX = 180;
+  const startY = 850;
+  const verticalGap = 34;
 
-    context.fillStyle = '#718395';
-    context.font = '600 31px Tahoma, Arial, sans-serif';
-    context.fillText(label, 1160, y + 50);
+  cards.forEach((card, index) => {
+    const column = index % 2;
+    const row = Math.floor(index / 2);
+    const x = startX + column * (cardWidth + horizontalGap);
+    const y = startY + row * (cardHeight + verticalGap);
 
-    context.fillStyle = '#1e3e59';
-    context.font = '700 39px Tahoma, Arial, sans-serif';
-    context.fillText(String(value), 1160, y + 104);
+    roundedRect(x, y, cardWidth, cardHeight, 24);
+    context.fillStyle = card.background;
+    context.fill();
+    context.strokeStyle = card.emphasis ? card.accent : '#dce6ed';
+    context.lineWidth = card.emphasis ? 3 : 2;
+    context.stroke();
 
-    y += 162;
-  }
+    // Accent rail.
+    roundedRect(x + cardWidth - 10, y + 18, 6, cardHeight - 36, 3);
+    context.fillStyle = card.accent;
+    context.fill();
+
+    context.textAlign = 'right';
+    context.direction = 'rtl';
+    context.fillStyle = '#7b8c9a';
+    context.font = '600 24px Tahoma, Arial, sans-serif';
+    context.fillText(card.label, x + cardWidth - 35, y + 58);
+
+    drawFittedText(
+      String(card.value),
+      x + cardWidth - 35,
+      y + 125,
+      cardWidth - 72,
+      card.emphasis ? 42 : 36,
+      25,
+      card.emphasis ? 800 : 700,
+      card.emphasis ? card.accent : '#1e3e59'
+    );
+  });
+
+  // Transition card.
+  roundedRect(210, 1560, 980, 132, 28);
+  const transitionGradient = context.createLinearGradient(210, 0, 1190, 0);
+  transitionGradient.addColorStop(0, '#f0f7f5');
+  transitionGradient.addColorStop(1, '#f4f8fc');
+  context.fillStyle = transitionGradient;
+  context.fill();
+  context.strokeStyle = '#d5e3e7';
+  context.lineWidth = 2;
+  context.stroke();
 
   context.textAlign = 'center';
-  context.fillStyle = '#8a99a7';
-  context.font = '500 27px Tahoma, Arial, sans-serif';
-  context.fillText('تبدأ مستندات هذا الصك في الصفحة التالية', 700, 1810);
+  context.direction = 'rtl';
+  context.fillStyle = '#123d73';
+  context.font = '800 29px Tahoma, Arial, sans-serif';
+  context.fillText('تبدأ مستندات هذا الصك في الصفحة التالية', 700, 1613);
 
-  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.95));
+  context.fillStyle = '#718493';
+  context.font = '500 22px Tahoma, Arial, sans-serif';
+  context.fillText('تم ترتيب المستندات وإدراجها تلقائيًا بعد هذه الصفحة', 700, 1654);
+
+  // Footer metadata.
+  context.strokeStyle = '#dce5ea';
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(120, 1785);
+  context.lineTo(1280, 1785);
+  context.stroke();
+
+  context.textAlign = 'right';
+  context.direction = 'rtl';
+  context.fillStyle = '#81909c';
+  context.font = '500 22px Tahoma, Arial, sans-serif';
+  context.fillText(
+    `تاريخ إنشاء الملف: ${new Date().toLocaleDateString('ar-SA-u-ca-gregory')}`,
+    1240,
+    1837
+  );
+
+  context.textAlign = 'left';
+  context.direction = 'ltr';
+  context.fillStyle = '#8b99a5';
+  context.font = '600 20px Tahoma, Arial, sans-serif';
+  context.fillText('IAU Deeds Platform', 160, 1837);
+
+  context.textAlign = 'center';
+  context.direction = 'rtl';
+  context.fillStyle = '#9ba7b1';
+  context.font = '500 19px Tahoma, Arial, sans-serif';
+  context.fillText(
+    'هذه الصفحة التعريفية منشأة آليًا من بيانات السجل ولا تستبدل وثيقة الصك الأصلية',
+    700,
+    1905
+  );
+
+  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.97));
 };
 
 const addFullPageJpeg = async (
