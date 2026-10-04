@@ -1,4 +1,4 @@
-import { jsPDF } from 'jspdf';
+import { PDFDocument } from 'pdf-lib';
 import type { Deed } from '../../types/deed';
 import { isApiEnabled } from '../../lib/api';
 import { authenticatedFetch } from '../../lib/http';
@@ -38,10 +38,17 @@ export type DeedBatchPdfOptions = {
 export type DeedBatchPdfResult = {
   fileName: string;
   deedCount: number;
+  documentCount: number;
+  pageCount: number;
+  pdfCount: number;
   imageCount: number;
   skippedDeeds: number;
+  skippedDocuments: number;
   skippedImages: number;
 };
+
+const A4_WIDTH = 595.28;
+const A4_HEIGHT = 841.89;
 
 const getAttachmentUrl = (attachment: BatchAttachment) =>
   attachment.driveUrl || attachment.fileUrl || '';
@@ -50,7 +57,12 @@ const getAttachmentMime = (attachment: BatchAttachment) =>
   String(attachment.mimeType || attachment.fileType || '').toLowerCase();
 
 const getAttachmentName = (attachment: BatchAttachment) =>
-  String(attachment.title || attachment.originalName || attachment.fileName || 'صورة صك');
+  String(
+    attachment.title
+      || attachment.originalName
+      || attachment.fileName
+      || 'مستند صك'
+  );
 
 const getDriveFileId = (attachment: BatchAttachment) => {
   if (attachment.driveFileId) return String(attachment.driveFileId);
@@ -63,59 +75,87 @@ const getDriveFileId = (attachment: BatchAttachment) => {
     const queryId = parsed.searchParams.get('id');
     if (queryId) return queryId;
   } catch {
-    // Fall through to path matching.
+    // Continue to path matching.
   }
 
-  const match = String(url).match(/\/(?:file\/d|d)\/([^/?#]+)/);
-  return match?.[1] || '';
+  return String(url).match(/\/(?:file\/d|d)\/([^/?#]+)/)?.[1] || '';
+};
+
+const isProbablyPdfAttachment = (attachment: BatchAttachment) => {
+  const mime = getAttachmentMime(attachment);
+  const name = getAttachmentName(attachment);
+  const url = getAttachmentUrl(attachment);
+
+  return (
+    mime.includes('pdf')
+    || /\.pdf(?:$|[?#])/i.test(name)
+    || /\.pdf(?:$|[?#])/i.test(url)
+  );
 };
 
 const isProbablyImageAttachment = (attachment: BatchAttachment) => {
+  if (isProbablyPdfAttachment(attachment)) return false;
+
   const mime = getAttachmentMime(attachment);
-  if (mime === 'application/pdf' || mime.includes('pdf')) return false;
   if (mime.startsWith('image/')) return true;
 
   const name = getAttachmentName(attachment);
   const url = getAttachmentUrl(attachment);
-  if (/\.(png|jpe?g|webp|gif|bmp)(?:$|[?#])/i.test(name) || /\.(png|jpe?g|webp|gif|bmp)(?:$|[?#])/i.test(url)) {
+  if (
+    /\.(png|jpe?g|webp|gif|bmp)(?:$|[?#])/i.test(name)
+    || /\.(png|jpe?g|webp|gif|bmp)(?:$|[?#])/i.test(url)
+  ) {
     return true;
   }
 
-  // Google Drive image links in older records often have no MIME type or file extension.
   return Boolean(getDriveFileId(attachment) || url);
 };
 
-const isDeedImageAttachment = (attachment: BatchAttachment) => {
+const isExcludedDeedAttachmentType = (attachment: BatchAttachment) => {
   const type = String(attachment.attachmentType || '').toLowerCase();
-  if (!['deed_image', 'deed'].includes(type)) return false;
-  return isProbablyImageAttachment(attachment);
+  return [
+    'plan_image',
+    'location_image',
+    'contract_image',
+    'delivery_minutes',
+    'inspection_image',
+  ].includes(type);
 };
 
-const getPrintableDeedImages = (attachments: BatchAttachment[]) => {
-  const explicit = attachments.filter(isDeedImageAttachment);
+const getPrintableDeedDocuments = (attachments: BatchAttachment[]) => {
+  const explicit = attachments.filter((attachment) => {
+    const type = String(attachment.attachmentType || '').toLowerCase();
+    return ['deed_image', 'deed'].includes(type) && Boolean(getAttachmentUrl(attachment));
+  });
   if (explicit.length) return explicit;
 
-  // Backward compatibility: older deed records were sometimes saved as "other"
-  // even though they are the deed scan. Only use this fallback when no explicit
-  // deed-image record exists, and never pull plan/location/contract attachments.
-  const legacy = attachments.filter((attachment) => {
+  // Compatibility with old records whose deed document was saved as "other".
+  return attachments.filter((attachment) => {
+    if (isExcludedDeedAttachmentType(attachment)) return false;
+    if (!getAttachmentUrl(attachment)) return false;
+
     const type = String(attachment.attachmentType || '').toLowerCase();
-    if (['plan_image', 'location_image', 'contract_image', 'delivery_minutes'].includes(type)) return false;
-    if (!isProbablyImageAttachment(attachment)) return false;
-
     const title = getAttachmentName(attachment).trim();
-    return type === 'other'
-      || !type
-      || /صك|deed|وثيقة\s*الملكية|ملكية/i.test(title);
-  });
 
-  return legacy;
+    return (
+      type === 'other'
+      || !type
+      || isProbablyPdfAttachment(attachment)
+      || isProbablyImageAttachment(attachment)
+      || /صك|deed|وثيقة\s*الملكية|ملكية/i.test(title)
+    );
+  });
 };
 
 const dedupeAttachments = (attachments: BatchAttachment[]) => {
   const seen = new Set<string>();
   return attachments.filter((attachment) => {
-    const key = String(attachment.id || getAttachmentUrl(attachment) || `${attachment.attachmentType || ''}:${getAttachmentName(attachment)}`);
+    const key = String(
+      attachment.id
+      || getAttachmentUrl(attachment)
+      || `${attachment.attachmentType || ''}:${getAttachmentName(attachment)}`
+    );
+
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -126,6 +166,7 @@ const getLegacyStoredAttachments = (deed: Deed): BatchAttachment[] => {
   try {
     const raw = window.localStorage.getItem('deeds_data');
     if (!raw) return [];
+
     const records = JSON.parse(raw);
     if (!Array.isArray(records)) return [];
 
@@ -163,8 +204,11 @@ const getBatchAttachmentManifest = async (
       body: JSON.stringify({ deedIds: deeds.map((deed) => deed.id) }),
       signal,
     });
+
     const body = await response.json().catch(() => ({}));
-    if (!response.ok || !body?.grouped || typeof body.grouped !== 'object') return null;
+    if (!response.ok || !body?.grouped || typeof body.grouped !== 'object') {
+      return null;
+    }
 
     const manifest = new Map<string, BatchAttachment[]>();
     for (const deed of deeds) {
@@ -173,6 +217,7 @@ const getBatchAttachmentManifest = async (
         : [];
       manifest.set(deed.id, items);
     }
+
     return manifest;
   } catch (error) {
     if (signal?.aborted) throw error;
@@ -180,8 +225,13 @@ const getBatchAttachmentManifest = async (
   }
 };
 
-const getDeedAttachments = async (deed: Deed, signal?: AbortSignal): Promise<BatchAttachment[]> => {
-  if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+const getDeedAttachments = async (
+  deed: Deed,
+  signal?: AbortSignal
+): Promise<BatchAttachment[]> => {
+  if (signal?.aborted) {
+    throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+  }
 
   const inline = Array.isArray(deed.attachments)
     ? (deed.attachments as unknown as BatchAttachment[])
@@ -189,9 +239,6 @@ const getDeedAttachments = async (deed: Deed, signal?: AbortSignal): Promise<Bat
 
   if (!isApiEnabled) return dedupeAttachments(inline);
 
-  // Batch export must bypass browser/HTTP conditional caching. A 304 response has
-  // no JSON body and would otherwise be interpreted as a failed attachment read,
-  // causing every deed to look as if it has no printable images.
   const response = await authenticatedFetch(
     `/api/attachments/deed/${encodeURIComponent(deed.id)}?batchPdf=1&ts=${Date.now()}`,
     {
@@ -204,38 +251,69 @@ const getDeedAttachments = async (deed: Deed, signal?: AbortSignal): Promise<Bat
       signal,
     }
   );
+
   const body = await response.json().catch(() => []);
   if (!response.ok) {
-    throw new Error((body as any)?.message || `تعذر قراءة صور الصك ${deed.deedNumber || ''}`);
+    throw new Error(
+      (body as any)?.message
+      || `تعذر قراءة مستندات الصك ${deed.deedNumber || ''}`
+    );
   }
+
   const remote = Array.isArray(body) ? (body as BatchAttachment[]) : [];
   return dedupeAttachments([...remote, ...inline]);
 };
 
 const fetchDirectBlob = async (url: string, signal?: AbortSignal) => {
-  const response = await fetch(url, { signal, mode: 'cors' });
-  if (!response.ok) throw new Error(`تعذر تحميل الصورة (HTTP ${response.status})`);
+  const response = await fetch(url, {
+    signal,
+    mode: 'cors',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error(`تعذر تحميل المستند (HTTP ${response.status})`);
+  }
+
   return response.blob();
 };
 
 const googleDriveThumbnailUrl = (attachment: BatchAttachment) => {
   const fileId = getDriveFileId(attachment);
-  return fileId ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w4000` : '';
+  return fileId
+    ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w4000`
+    : '';
 };
 
-const fetchAttachmentBlob = async (attachment: BatchAttachment, signal?: AbortSignal) => {
-  if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+const fetchAttachmentBlob = async (
+  attachment: BatchAttachment,
+  signal?: AbortSignal
+) => {
+  if (signal?.aborted) {
+    throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+  }
 
   if (isApiEnabled && attachment.id) {
     try {
-      const response = await authenticatedFetch(`/api/attachments/file/${encodeURIComponent(attachment.id)}/content`, { signal });
+      const response = await authenticatedFetch(
+        `/api/attachments/file/${encodeURIComponent(attachment.id)}/content?ts=${Date.now()}`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, max-age=0',
+            Pragma: 'no-cache',
+          },
+          signal,
+        }
+      );
+
       if (response.ok) {
         const blob = await response.blob();
         if (blob.size > 0) return blob;
       }
     } catch (error) {
       if (signal?.aborted) throw error;
-      // Continue with browser-accessible fallbacks.
     }
   }
 
@@ -248,8 +326,12 @@ const fetchAttachmentBlob = async (attachment: BatchAttachment, signal?: AbortSi
     }
   }
 
-  const thumbnail = googleDriveThumbnailUrl(attachment);
-  if (thumbnail) return fetchDirectBlob(thumbnail, signal);
+  // Image-only last resort. This is intentionally not used for known PDFs
+  // because a thumbnail would lose the remaining PDF pages.
+  if (!isProbablyPdfAttachment(attachment)) {
+    const thumbnail = googleDriveThumbnailUrl(attachment);
+    if (thumbnail) return fetchDirectBlob(thumbnail, signal);
+  }
 
   throw new Error(`تعذر الوصول إلى ${getAttachmentName(attachment)}`);
 };
@@ -268,6 +350,7 @@ const loadImageFromBlob = (blob: Blob, signal?: AbortSignal) =>
       URL.revokeObjectURL(objectUrl);
       signal?.removeEventListener('abort', onAbort);
     };
+
     const onAbort = () => {
       cleanup();
       reject(new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError'));
@@ -279,20 +362,37 @@ const loadImageFromBlob = (blob: Blob, signal?: AbortSignal) =>
       cleanup();
       resolve(image);
     };
+
     image.onerror = () => {
       cleanup();
       reject(new Error('صيغة الصورة غير مدعومة أو تعذر قراءتها'));
     };
+
     image.src = objectUrl;
   });
+
+const dataUrlToBytes = (dataUrl: string) => {
+  const base64 = dataUrl.split(',')[1] || '';
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+};
 
 const blobToOptimizedJpeg = async (blob: Blob, signal?: AbortSignal) => {
   const image = await loadImageFromBlob(blob, signal);
   const sourceWidth = image.naturalWidth || image.width;
   const sourceHeight = image.naturalHeight || image.height;
-  if (!sourceWidth || !sourceHeight) throw new Error('أبعاد الصورة غير صالحة');
 
-  const maxDimension = 3000;
+  if (!sourceWidth || !sourceHeight) {
+    throw new Error('أبعاد الصورة غير صالحة');
+  }
+
+  const maxDimension = 3200;
   const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
   const width = Math.max(1, Math.round(sourceWidth * scale));
   const height = Math.max(1, Math.round(sourceHeight * scale));
@@ -300,6 +400,7 @@ const blobToOptimizedJpeg = async (blob: Blob, signal?: AbortSignal) => {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
+
   const context = canvas.getContext('2d');
   if (!context) throw new Error('تعذر تجهيز الصورة للطباعة');
 
@@ -310,55 +411,21 @@ const blobToOptimizedJpeg = async (blob: Blob, signal?: AbortSignal) => {
   context.drawImage(image, 0, 0, width, height);
 
   return {
-    dataUrl: canvas.toDataURL('image/jpeg', 0.94),
+    bytes: dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.95)),
     width,
     height,
   };
 };
 
-const createArabicHeader = (deed: Deed, imageNumber: number, deedImageCount: number) => {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1800;
-  canvas.height = 230;
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('تعذر تجهيز ترويسة الصك');
-
-  context.fillStyle = '#ffffff';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = '#123d73';
-  context.fillRect(0, 0, 16, canvas.height);
-  context.direction = 'rtl';
-  context.textAlign = 'right';
-
-  context.fillStyle = '#142f49';
-  context.font = '700 54px Tahoma, Arial, sans-serif';
-  context.fillText(`صك رقم: ${deed.deedNumber || '-'}`, 1720, 78);
-
-  context.fillStyle = '#60758a';
-  context.font = '600 31px Tahoma, Arial, sans-serif';
-  const location = [deed.city, deed.district].filter(Boolean).join(' — ') || 'الموقع غير محدد';
-  context.fillText(location, 1720, 132);
-
-  context.textAlign = 'left';
-  context.direction = 'rtl';
-  context.fillStyle = '#526d84';
-  context.font = '600 28px Tahoma, Arial, sans-serif';
-  context.fillText(`الصورة ${imageNumber.toLocaleString('ar-SA')} من ${deedImageCount.toLocaleString('ar-SA')}`, 80, 82);
-
-  context.strokeStyle = '#c9d7e4';
-  context.lineWidth = 3;
-  context.beginPath();
-  context.moveTo(70, 188);
-  context.lineTo(1730, 188);
-  context.stroke();
-
-  return canvas.toDataURL('image/png');
-};
-
-const createCover = (deedCount: number, imageCount: number, scopeLabel: string) => {
+const createCover = (
+  deedCount: number,
+  documentCount: number,
+  scopeLabel: string
+) => {
   const canvas = document.createElement('canvas');
   canvas.width = 1400;
   canvas.height = 1980;
+
   const context = canvas.getContext('2d');
   if (!context) throw new Error('تعذر تجهيز غلاف الملف');
 
@@ -366,6 +433,7 @@ const createCover = (deedCount: number, imageCount: number, scopeLabel: string) 
   gradient.addColorStop(0, '#f8fbfe');
   gradient.addColorStop(0.56, '#ffffff');
   gradient.addColorStop(1, '#eef7f5');
+
   context.fillStyle = gradient;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -376,6 +444,7 @@ const createCover = (deedCount: number, imageCount: number, scopeLabel: string) 
 
   context.direction = 'rtl';
   context.textAlign = 'right';
+
   context.fillStyle = '#123d73';
   context.font = '700 58px Tahoma, Arial, sans-serif';
   context.fillText('جامعة الإمام عبدالرحمن بن فيصل', 1260, 205);
@@ -385,8 +454,8 @@ const createCover = (deedCount: number, imageCount: number, scopeLabel: string) 
   context.fillText('إدارة أوقاف وأملاك الجامعة', 1260, 270);
 
   context.fillStyle = '#0b4a3f';
-  context.font = '800 92px Tahoma, Arial, sans-serif';
-  context.fillText('ملف صور الصكوك', 1260, 525);
+  context.font = '800 88px Tahoma, Arial, sans-serif';
+  context.fillText('ملف مستندات الصكوك', 1260, 525);
 
   context.fillStyle = '#6a7d8f';
   context.font = '600 34px Tahoma, Arial, sans-serif';
@@ -394,7 +463,7 @@ const createCover = (deedCount: number, imageCount: number, scopeLabel: string) 
 
   const cards = [
     ['عدد الصكوك', deedCount.toLocaleString('ar-SA')],
-    ['عدد صور الصكوك', imageCount.toLocaleString('ar-SA')],
+    ['عدد مستندات الصكوك', documentCount.toLocaleString('ar-SA')],
     ['تاريخ إنشاء الملف', new Date().toLocaleDateString('ar-SA-u-ca-gregory')],
   ];
 
@@ -414,20 +483,185 @@ const createCover = (deedCount: number, imageCount: number, scopeLabel: string) 
     context.fillStyle = '#173f66';
     context.font = '800 62px Tahoma, Arial, sans-serif';
     context.fillText(value, 1150, y + 145);
+
     y += 235;
   }
 
   context.textAlign = 'center';
   context.fillStyle = '#8192a2';
   context.font = '500 28px Tahoma, Arial, sans-serif';
-  context.fillText('تم إنشاء الملف آليًا من منصة إدارة الصكوك والأراضي', 700, 1835);
+  context.fillText(
+    'تم إنشاء الملف آليًا من منصة إدارة الصكوك والأراضي',
+    700,
+    1835
+  );
 
-  return canvas.toDataURL('image/jpeg', 0.95);
+  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.96));
+};
+
+const createDeedSeparator = (
+  deed: Deed,
+  documentCount: number
+) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1400;
+  canvas.height = 1980;
+
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('تعذر تجهيز صفحة بيانات الصك');
+
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = '#123d73';
+  context.fillRect(0, 0, canvas.width, 34);
+
+  context.direction = 'rtl';
+  context.textAlign = 'right';
+
+  context.fillStyle = '#64798b';
+  context.font = '600 36px Tahoma, Arial, sans-serif';
+  context.fillText('جامعة الإمام عبدالرحمن بن فيصل — إدارة أوقاف وأملاك الجامعة', 1240, 180);
+
+  context.fillStyle = '#123d73';
+  context.font = '800 92px Tahoma, Arial, sans-serif';
+  context.fillText(`الصك رقم ${deed.deedNumber || '-'}`, 1240, 410);
+
+  context.fillStyle = '#0b4a3f';
+  context.font = '700 50px Tahoma, Arial, sans-serif';
+  context.fillText(deed.propertyDescription || 'بيان العقار غير محدد', 1240, 520);
+
+  const rows = [
+    ['المدينة', deed.city || '-'],
+    ['الحي', deed.district || '-'],
+    ['رقم المخطط', deed.planNumber || '-'],
+    ['رقم القطعة', deed.plotNumber || '-'],
+    ['المساحة', deed.area ? `${Number(deed.area).toLocaleString('ar-SA')} م²` : '-'],
+    ['عدد مستندات الصك', documentCount.toLocaleString('ar-SA')],
+  ];
+
+  let y = 750;
+  for (const [label, value] of rows) {
+    context.fillStyle = '#f6f9fb';
+    context.strokeStyle = '#d6e0e8';
+    context.lineWidth = 2;
+    context.fillRect(170, y, 1060, 140);
+    context.strokeRect(170, y, 1060, 140);
+
+    context.fillStyle = '#718395';
+    context.font = '600 31px Tahoma, Arial, sans-serif';
+    context.fillText(label, 1160, y + 50);
+
+    context.fillStyle = '#1e3e59';
+    context.font = '700 39px Tahoma, Arial, sans-serif';
+    context.fillText(String(value), 1160, y + 104);
+
+    y += 162;
+  }
+
+  context.textAlign = 'center';
+  context.fillStyle = '#8a99a7';
+  context.font = '500 27px Tahoma, Arial, sans-serif';
+  context.fillText('تبدأ مستندات هذا الصك في الصفحة التالية', 700, 1810);
+
+  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.95));
+};
+
+const addFullPageJpeg = async (
+  pdf: PDFDocument,
+  bytes: Uint8Array
+) => {
+  const image = await pdf.embedJpg(bytes);
+  const page = pdf.addPage([A4_WIDTH, A4_HEIGHT]);
+
+  page.drawImage(image, {
+    x: 0,
+    y: 0,
+    width: A4_WIDTH,
+    height: A4_HEIGHT,
+  });
+};
+
+const addImageDocument = async (
+  pdf: PDFDocument,
+  blob: Blob,
+  signal?: AbortSignal
+) => {
+  const image = await blobToOptimizedJpeg(blob, signal);
+  const embedded = await pdf.embedJpg(image.bytes);
+  const page = pdf.addPage([A4_WIDTH, A4_HEIGHT]);
+
+  const margin = 26;
+  const maxWidth = A4_WIDTH - margin * 2;
+  const maxHeight = A4_HEIGHT - margin * 2;
+  const scale = Math.min(
+    maxWidth / embedded.width,
+    maxHeight / embedded.height
+  );
+
+  const width = embedded.width * scale;
+  const height = embedded.height * scale;
+
+  page.drawImage(embedded, {
+    x: (A4_WIDTH - width) / 2,
+    y: (A4_HEIGHT - height) / 2,
+    width,
+    height,
+  });
+
+  return 1;
+};
+
+const hasPdfSignature = async (blob: Blob) => {
+  try {
+    const prefix = await blob.slice(0, 5).text();
+    return prefix === '%PDF-';
+  } catch {
+    return false;
+  }
+};
+
+const addPdfDocument = async (
+  target: PDFDocument,
+  blob: Blob
+) => {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const source = await PDFDocument.load(bytes, {
+    ignoreEncryption: false,
+    updateMetadata: false,
+  });
+
+  const pageIndices = source.getPageIndices();
+  const pages = await target.copyPages(source, pageIndices);
+
+  for (const page of pages) {
+    target.addPage(page);
+  }
+
+  return pages.length;
 };
 
 const sanitizeFileName = (value: string) => {
-  const clean = value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
-  return clean || 'ملف صور الصكوك';
+  const clean = value
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, ' ');
+
+  return clean || 'ملف مستندات الصكوك';
+};
+
+const savePdfBytes = (bytes: Uint8Array, fileName: string) => {
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 15_000);
 };
 
 export const generateDeedImagesPdf = async (
@@ -438,27 +672,31 @@ export const generateDeedImagesPdf = async (
   const includeHeaders = options.includeHeaders !== false;
   const signal = options.signal;
 
-  if (!deeds.length) throw new Error('لا توجد صكوك ضمن النطاق المحدد');
+  if (!deeds.length) {
+    throw new Error('لا توجد صكوك ضمن النطاق المحدد');
+  }
 
   const collectedByDeed = new Map<number, BatchAttachment[]>();
   let skippedDeeds = 0;
   let nextDeedIndex = 0;
   let completedDeeds = 0;
   let totalAttachmentRecords = 0;
-  const workerCount = Math.min(6, deeds.length);
 
-  // Prefer one server-side manifest query. It is faster, avoids HTTP cache edge
-  // cases, and lets the exporter work from a single authoritative snapshot.
+  const workerCount = Math.min(6, deeds.length);
   const batchManifest = await getBatchAttachmentManifest(deeds, signal);
 
   const collectWorker = async () => {
     while (true) {
-      if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+      if (signal?.aborted) {
+        throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+      }
+
       const index = nextDeedIndex;
       nextDeedIndex += 1;
       if (index >= deeds.length) return;
 
       const deed = deeds[index];
+
       try {
         const inline = Array.isArray(deed.attachments)
           ? (deed.attachments as unknown as BatchAttachment[])
@@ -468,12 +706,20 @@ export const generateDeedImagesPdf = async (
           ? (batchManifest.get(deed.id) || [])
           : await getDeedAttachments(deed, signal);
 
-        const allAttachments = dedupeAttachments([...remote, ...inline, ...legacyStored]);
+        const allAttachments = dedupeAttachments([
+          ...remote,
+          ...inline,
+          ...legacyStored,
+        ]);
+
         totalAttachmentRecords += allAttachments.length;
 
-        const attachments = getPrintableDeedImages(allAttachments);
-        if (attachments.length) collectedByDeed.set(index, attachments);
-        else skippedDeeds += 1;
+        const documents = getPrintableDeedDocuments(allAttachments);
+        if (documents.length) {
+          collectedByDeed.set(index, documents);
+        } else {
+          skippedDeeds += 1;
+        }
       } catch (error) {
         if (signal?.aborted) throw error;
         skippedDeeds += 1;
@@ -483,128 +729,156 @@ export const generateDeedImagesPdf = async (
           phase: 'collecting',
           current: completedDeeds,
           total: deeds.length,
-          label: `قراءة مرفقات الصك ${deed.deedNumber || ''}`,
+          label: `قراءة مستندات الصك ${deed.deedNumber || ''}`,
         });
       }
     }
   };
 
-  await Promise.all(Array.from({ length: workerCount }, () => collectWorker()));
+  await Promise.all(
+    Array.from({ length: workerCount }, () => collectWorker())
+  );
 
-  const collected: Array<{ deed: Deed; attachment: BatchAttachment; deedImageIndex: number; deedImageCount: number }> = [];
+  const collected: Array<{
+    deed: Deed;
+    attachments: BatchAttachment[];
+  }> = [];
+
   deeds.forEach((deed, deedIndex) => {
     const attachments = collectedByDeed.get(deedIndex) || [];
-    attachments.forEach((attachment, imageIndex) => {
-      collected.push({
-        deed,
-        attachment,
-        deedImageIndex: imageIndex + 1,
-        deedImageCount: attachments.length,
-      });
-    });
+    if (attachments.length) {
+      collected.push({ deed, attachments });
+    }
   });
 
   if (!collected.length) {
     if (totalAttachmentRecords === 0) {
       throw new Error(
-        `تم فحص ${deeds.length.toLocaleString('ar-SA')} صك، ولم يعثر النظام على أي مرفقات مرتبطة بها في قاعدة البيانات أو الحفظ المحلي. يلزم ربط صور الصكوك بالسجلات أولًا.`
+        `تم فحص ${deeds.length.toLocaleString('ar-SA')} صك، ولم يعثر النظام على أي مرفقات مرتبطة بها في قاعدة البيانات أو الحفظ المحلي.`
       );
     }
 
     throw new Error(
-      `تم العثور على ${totalAttachmentRecords.toLocaleString('ar-SA')} مرفق، لكن لم يتم التعرف على أي منها كصورة صك قابلة للطباعة. استخدم «فحص المرفقات» أو حدّث نوع المرفق إلى صورة صك.`
+      `تم العثور على ${totalAttachmentRecords.toLocaleString('ar-SA')} مرفق، لكن لم يتم التعرف على أي منها كمستند صك قابل للتجميع.`
     );
   }
 
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-    compress: true,
-    putOnlyUsedFonts: true,
-  });
+  const documentCount = collected.reduce(
+    (sum, item) => sum + item.attachments.length,
+    0
+  );
 
-  pdf.setProperties({
-    title: 'IAU Deeds Images',
-    subject: 'Combined deed images',
-    author: 'Imam Abdulrahman Bin Faisal University',
-    creator: 'IAU Deeds Platform',
-  });
+  const pdf = await PDFDocument.create();
+  pdf.setTitle('IAU Deeds Documents');
+  pdf.setSubject('Combined deed documents');
+  pdf.setAuthor('Imam Abdulrahman Bin Faisal University');
+  pdf.setCreator('IAU Deeds Platform');
 
   if (includeCover) {
-    const cover = createCover(
-      new Set(collected.map((item) => item.deed.id)).size,
-      collected.length,
-      options.scopeLabel || 'جميع الصكوك'
+    await addFullPageJpeg(
+      pdf,
+      createCover(
+        collected.length,
+        documentCount,
+        options.scopeLabel || 'جميع الصكوك'
+      )
     );
-    pdf.addImage(cover, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
   }
 
-  let successfulImages = 0;
-  let skippedImages = 0;
+  let successfulDocuments = 0;
+  let successfulPdfDocuments = 0;
+  let successfulImageDocuments = 0;
+  let copiedDocumentPages = 0;
+  let skippedDocuments = 0;
   const successfulDeeds = new Set<string>();
 
-  for (let index = 0; index < collected.length; index += 1) {
-    if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
-    const item = collected[index];
+  let renderIndex = 0;
 
-    options.onProgress?.({
-      phase: 'rendering',
-      current: index + 1,
-      total: collected.length,
-      label: `تجهيز صورة الصك ${item.deed.deedNumber || ''}`,
-    });
+  for (const item of collected) {
+    if (signal?.aborted) {
+      throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+    }
 
-    try {
-      const blob = await fetchAttachmentBlob(item.attachment, signal);
-      const image = await blobToOptimizedJpeg(blob, signal);
+    let separatorAdded = false;
 
-      if (includeCover || successfulImages > 0) pdf.addPage('a4', 'portrait');
+    for (const attachment of item.attachments) {
+      renderIndex += 1;
 
-      const margin = 8;
-      let imageTop = margin;
-      if (includeHeaders) {
-        const header = createArabicHeader(item.deed, item.deedImageIndex, item.deedImageCount);
-        pdf.addImage(header, 'PNG', margin, margin, 210 - margin * 2, 21, undefined, 'FAST');
-        imageTop = 33;
+      options.onProgress?.({
+        phase: 'rendering',
+        current: renderIndex,
+        total: documentCount,
+        label: `تجهيز ${getAttachmentName(attachment)} — الصك ${item.deed.deedNumber || ''}`,
+      });
+
+      try {
+        const blob = await fetchAttachmentBlob(attachment, signal);
+        const isPdf = (
+          isProbablyPdfAttachment(attachment)
+          || blob.type.toLowerCase().includes('pdf')
+          || await hasPdfSignature(blob)
+        );
+
+        if (includeHeaders && !separatorAdded) {
+          await addFullPageJpeg(
+            pdf,
+            createDeedSeparator(item.deed, item.attachments.length)
+          );
+          separatorAdded = true;
+        }
+
+        let pagesAdded = 0;
+
+        if (isPdf) {
+          pagesAdded = await addPdfDocument(pdf, blob);
+          successfulPdfDocuments += 1;
+        } else {
+          pagesAdded = await addImageDocument(pdf, blob, signal);
+          successfulImageDocuments += 1;
+        }
+
+        successfulDocuments += 1;
+        copiedDocumentPages += pagesAdded;
+        successfulDeeds.add(item.deed.id);
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        console.error(
+          'Failed to merge deed document:',
+          item.deed.deedNumber,
+          getAttachmentName(attachment),
+          error
+        );
+        skippedDocuments += 1;
       }
-
-      const footerReserve = 9;
-      const maxWidth = 210 - margin * 2;
-      const maxHeight = 297 - imageTop - footerReserve;
-      const scale = Math.min(maxWidth / image.width, maxHeight / image.height);
-      const drawWidth = image.width * scale;
-      const drawHeight = image.height * scale;
-      const x = (210 - drawWidth) / 2;
-      const y = imageTop + Math.max(0, (maxHeight - drawHeight) / 2);
-
-      pdf.addImage(image.dataUrl, 'JPEG', x, y, drawWidth, drawHeight, undefined, 'FAST');
-
-      pdf.setTextColor(125, 139, 151);
-      pdf.setFontSize(7);
-      pdf.text(String(successfulImages + 1), 105, 293, { align: 'center' });
-
-      successfulImages += 1;
-      successfulDeeds.add(item.deed.id);
-    } catch (error) {
-      if (signal?.aborted) throw error;
-      skippedImages += 1;
     }
   }
 
-  if (!successfulImages) {
-    throw new Error('تعذر تحميل صور الصكوك. تحقق من صلاحيات روابط المرفقات ثم حاول مرة أخرى.');
+  if (!successfulDocuments) {
+    throw new Error(
+      'تم العثور على مستندات للصكوك، لكن تعذر تحميلها أو دمجها. تحقق من صلاحيات ملفات Google Drive ثم حاول مرة أخرى.'
+    );
   }
 
-  const rawName = options.fileName || `ملف صور الصكوك - ${new Date().toISOString().slice(0, 10)}`;
+  const rawName = options.fileName
+    || `ملف مستندات الصكوك - ${new Date().toISOString().slice(0, 10)}`;
   const fileName = `${sanitizeFileName(rawName).replace(/\.pdf$/i, '')}.pdf`;
-  pdf.save(fileName);
+
+  const outputBytes = await pdf.save({
+    useObjectStreams: true,
+    addDefaultPage: false,
+  });
+
+  savePdfBytes(outputBytes, fileName);
 
   return {
     fileName,
     deedCount: successfulDeeds.size,
-    imageCount: successfulImages,
+    documentCount: successfulDocuments,
+    pageCount: copiedDocumentPages,
+    pdfCount: successfulPdfDocuments,
+    imageCount: successfulImageDocuments,
     skippedDeeds,
-    skippedImages,
+    skippedDocuments,
+    skippedImages: skippedDocuments,
   };
 };
