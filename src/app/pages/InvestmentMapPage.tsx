@@ -2,6 +2,7 @@ import React from 'react';
 import {
   ArrowRight,
   Eye,
+  FileUp,
   Layers,
   ListFilter,
   MapPin,
@@ -20,6 +21,7 @@ import 'leaflet/dist/leaflet.css';
 import { useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { investmentsApi } from '../../features/investments/api';
+import { usePermissions } from '../../context/PermissionsContext';
 import type {
   InvestmentArea,
   InvestmentAreaStatus,
@@ -117,6 +119,8 @@ const FocusSelectedArea: React.FC<{ area?: InvestmentArea }> = ({ area }) => {
 export const InvestmentMapPage: React.FC = () => {
   const navigate = useNavigate();
   const [queryParams] = useSearchParams();
+  const { isAdmin, hasPermission } = usePermissions();
+  const canEdit = isAdmin || hasPermission('investments', 'canEdit');
 
   const [areas, setAreas] = React.useState<InvestmentArea[]>([]);
   const [sites, setSites] = React.useState<InvestmentSite[]>([]);
@@ -242,6 +246,16 @@ export const InvestmentMapPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate('/investments/geometry-import')}
+            >
+              <FileUp className="me-2 h-4 w-4" />
+              استيراد GIS جماعي
+            </Button>
+          )}
           <Button
             size="sm"
             variant={mapLayer === 'street' ? 'default' : 'outline'}
