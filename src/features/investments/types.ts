@@ -111,3 +111,25 @@ export interface InvestmentAreaInput {
   proposedUse?: string | null;
   notes?: string | null;
 }
+
+export interface InvestmentSiteInput {
+  code: string;
+  name: string;
+  description?: string | null;
+  deedId?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  region?: string | null;
+  city?: string | null;
+  district?: string | null;
+}
+
+export interface InvestmentDeedOption {
+  id: string;
+  deedNumber: string;
+  propertyDescription: string;
+  city?: string | null;
+  region?: string | null;
+  district?: string | null;
+  area?: number | null;
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { Eye, LandPlot, MapPin, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -40,13 +40,14 @@ const readinessLabels: Record<string, string> = {
 
 export const InvestmentsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [queryParams] = useSearchParams();
   const { hasPermission, isAdmin } = usePermissions();
 
   const [areas, setAreas] = React.useState<InvestmentArea[]>([]);
   const [sites, setSites] = React.useState<InvestmentSite[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState('');
-  const [siteId, setSiteId] = React.useState('');
+  const [siteId, setSiteId] = React.useState(() => queryParams.get('siteId') || '');
   const [status, setStatus] = React.useState<InvestmentAreaStatus | ''>('');
 
   const canAdd = isAdmin || hasPermission('investments', 'canAdd');
@@ -97,6 +98,9 @@ export const InvestmentsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => navigate('/investments/sites')}>
+            المواقع الرئيسية
+          </Button>
           <Button variant="outline" onClick={() => navigate('/maps')}>
             <MapPin className="me-2 h-4 w-4" />
             خريطة الصكوك
