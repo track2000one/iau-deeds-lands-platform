@@ -74,7 +74,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     'deeds',
     'allocated_lands',
     'delivered_lands',
-    'investments',
     'leased_lands_out',
     'leased_lands_in',
     'leased_buildings_out',
@@ -82,6 +81,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   ] as const;
 
   const scopedLandingRoutes = [
+    ['investments', '/investments'],
     ['assets', '/assets'],
     ['accounting_transformation', '/accounting-transformation'],
     ['mosques', '/mosques'],
