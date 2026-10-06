@@ -366,6 +366,11 @@ export const InvestmentAreaFormPage: React.FC = () => {
         <Card className="border-amber-300 bg-amber-50/70">
           <CardContent className="pt-6 text-sm leading-7 text-amber-950">
             لا توجد مواقع استثمارية رئيسية مسجلة حتى الآن. يجب إنشاء الموقع الرئيسي وربطه بالصك قبل إضافة المساحات التابعة له.
+            <div className="mt-3">
+              <Button type="button" variant="outline" onClick={() => navigate('/investments/sites/new')}>
+                إضافة موقع رئيسي أولًا
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
