@@ -19,6 +19,7 @@ import {
   Save,
   Loader2,
   Printer,
+  Ruler,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -92,8 +93,8 @@ const escapePrintHtml = (value: unknown) =>
     .replace(/\"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
-type UiAttachmentType = 'deed' | 'site' | 'plan' | 'additional';
-type ApiAttachmentType = 'deed_image' | 'location_image' | 'plan_image' | 'other';
+type UiAttachmentType = 'deed' | 'survey' | 'site' | 'plan' | 'additional';
+type ApiAttachmentType = 'deed_image' | 'survey_document' | 'location_image' | 'plan_image' | 'other';
 
 type BackendAttachment = {
   id: string;
@@ -116,6 +117,8 @@ const toApiAttachmentType = (type: UiAttachmentType): ApiAttachmentType => {
   switch (type) {
     case 'deed':
       return 'deed_image';
+    case 'survey':
+      return 'survey_document';
     case 'site':
       return 'location_image';
     case 'plan':
@@ -131,6 +134,9 @@ const fromApiAttachmentType = (type: string): UiAttachmentType => {
     case 'deed_image':
     case 'deed':
       return 'deed';
+    case 'survey_document':
+    case 'survey':
+      return 'survey';
     case 'location_image':
     case 'site':
       return 'site';
@@ -730,6 +736,7 @@ export const ViewDeedPage: React.FC = () => {
     const coordinates = parseCoordinates((deed as any).coordinates);
     const allAttachments = ([
       ['صورة الصك', getAttachmentsByType('deed')],
+      ['الرفع المساحي', getAttachmentsByType('survey')],
       ['صور الموقع', getAttachmentsByType('site')],
       ['المخطط', getAttachmentsByType('plan')],
       ['مرفقات إضافية', getAttachmentsByType('additional')],
@@ -1748,11 +1755,17 @@ export const ViewDeedPage: React.FC = () => {
 
         <CardContent>
           <Tabs defaultValue="deed" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
               <TabsTrigger value="deed" className="text-xs md:text-sm py-2 md:py-2.5">
                 <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
                 <span className="hidden sm:inline">{t('attachments.deed')}</span>
                 <span className="sm:hidden">الصك</span>
+              </TabsTrigger>
+
+              <TabsTrigger value="survey" className="text-xs md:text-sm py-2 md:py-2.5">
+                <Ruler className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+                <span className="hidden sm:inline">الرفع المساحي</span>
+                <span className="sm:hidden">الرفع</span>
               </TabsTrigger>
 
               <TabsTrigger value="site" className="text-xs md:text-sm py-2 md:py-2.5">
@@ -1776,6 +1789,10 @@ export const ViewDeedPage: React.FC = () => {
 
             <TabsContent value="deed" className="mt-4 md:mt-6">
               <AttachmentList type="deed" title={t('attachments.deed')} icon={FileText} />
+            </TabsContent>
+
+            <TabsContent value="survey" className="mt-4 md:mt-6">
+              <AttachmentList type="survey" title="الرفع المساحي" icon={Ruler} />
             </TabsContent>
 
             <TabsContent value="site" className="mt-4 md:mt-6">
