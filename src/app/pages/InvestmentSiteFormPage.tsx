@@ -172,9 +172,11 @@ export const InvestmentSiteFormPage: React.FC = () => {
 
     try {
       setSaving(true);
-      const saved = siteId
-        ? await investmentsApi.updateSite(siteId, input)
-        : await investmentsApi.createSite(input);
+      if (siteId) {
+        await investmentsApi.updateSite(siteId, input);
+      } else {
+        await investmentsApi.createSite(input);
+      }
       toast.success(siteId ? 'تم تحديث الموقع الرئيسي.' : 'تم تسجيل الموقع الرئيسي.');
       navigate('/investments/sites', { replace: true });
     } catch (reason) {
