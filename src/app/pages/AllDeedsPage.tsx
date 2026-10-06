@@ -70,7 +70,6 @@ export const AllDeedsPage: React.FC = () => {
   const [pdfSort, setPdfSort] = useState<'deedNumber' | 'city' | 'updatedAt'>('deedNumber');
   const [pdfIncludeCover, setPdfIncludeCover] = useState(true);
   const [pdfIncludeHeaders, setPdfIncludeHeaders] = useState(true);
-  const [pdfIncludeSurvey, setPdfIncludeSurvey] = useState(false);
   const [pdfFileName, setPdfFileName] = useState('');
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<DeedBatchPdfProgress | null>(null);
@@ -162,7 +161,6 @@ export const AllDeedsPage: React.FC = () => {
     sort?: 'deedNumber' | 'city' | 'updatedAt';
     includeCover?: boolean;
     includeHeaders?: boolean;
-    includeSurvey?: boolean;
     fileName?: string;
     closeOptionsOnSuccess?: boolean;
   }) => {
@@ -172,7 +170,6 @@ export const AllDeedsPage: React.FC = () => {
     const sort = config?.sort ?? pdfSort;
     const includeCover = config?.includeCover ?? pdfIncludeCover;
     const includeHeaders = config?.includeHeaders ?? pdfIncludeHeaders;
-    const includeSurvey = config?.includeSurvey ?? pdfIncludeSurvey;
     const fileName = config?.fileName ?? pdfFileName;
     const source = scope === 'all' ? deeds : filteredDeeds;
     const rows = sortPdfDeeds(source, sort);
@@ -196,7 +193,6 @@ export const AllDeedsPage: React.FC = () => {
       const result = await generateDeedImagesPdf(rows, {
         includeCover,
         includeHeaders,
-        includeSurvey,
         fileName: fileName.trim() || undefined,
         scopeLabel: scope === 'all' ? 'جميع الصكوك' : 'نتائج التصفية الحالية',
         signal: controller.signal,
@@ -233,7 +229,6 @@ export const AllDeedsPage: React.FC = () => {
     pdfSort,
     pdfIncludeCover,
     pdfIncludeHeaders,
-    pdfIncludeSurvey,
     pdfFileName,
     deeds,
     filteredDeeds,
@@ -264,7 +259,6 @@ export const AllDeedsPage: React.FC = () => {
                 sort: 'deedNumber',
                 includeCover: true,
                 includeHeaders: true,
-                includeSurvey: false,
                 closeOptionsOnSuccess: false,
               })}
               disabled={pdfGenerating || deeds.length === 0}
@@ -556,7 +550,7 @@ export const AllDeedsPage: React.FC = () => {
           </div>
 
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-900">
-            يتم إدراج مرفقات «صورة الصك» سواء كانت PDF أو صورًا. الرفع المساحي لا يضاف إلا عند تفعيل خيار «إضافة الرفع المساحي لكل صك». وتبقى صور الموقع والمخططات العامة والعقود خارج الملف.
+            يتم إدراج مرفقات «صورة الصك» سواء كانت PDF أو صورًا. ولا يتم دمج الرفع المساحي أو صور الموقع أو المخططات أو العقود ضمن هذا التقرير.
           </div>
 
           <DialogFooter className="gap-2 sm:justify-start">
