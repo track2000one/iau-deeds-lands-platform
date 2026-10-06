@@ -1,6 +1,7 @@
 import { apiJson } from '../../lib/http';
 import type {
   InvestmentArea,
+  InvestmentAreaInput,
   InvestmentAreaQuery,
   InvestmentSite,
   PaginatedResponse,
@@ -48,13 +49,13 @@ export const investmentsApi = {
       body: JSON.stringify(data),
     }),
 
-  createArea: (data: Partial<InvestmentArea>) =>
+  createArea: (data: InvestmentAreaInput) =>
     apiJson<InvestmentArea>('/api/investment-areas', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateArea: (id: string, data: Partial<InvestmentArea>) =>
+  updateArea: (id: string, data: Partial<InvestmentAreaInput>) =>
     apiJson<InvestmentArea>(`/api/investment-areas/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
