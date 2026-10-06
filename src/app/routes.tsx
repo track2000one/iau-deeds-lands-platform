@@ -73,7 +73,6 @@ const CORE_HOME_MODULES = [
   'deeds',
   'allocated_lands',
   'delivered_lands',
-  'investments',
   'leased_lands_out',
   'leased_lands_in',
   'leased_buildings_out',
@@ -81,6 +80,7 @@ const CORE_HOME_MODULES = [
 ] as const;
 
 const SCOPED_LANDING_ROUTES = [
+  ['investments', '/investments'],
   ['assets', '/assets'],
   ['accounting_transformation', '/accounting-transformation'],
   ['mosques', '/mosques'],
