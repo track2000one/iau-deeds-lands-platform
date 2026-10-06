@@ -6,7 +6,7 @@ import { usePermissions } from '../../context/PermissionsContext';
 import { investmentsApi } from '../../features/investments/api';
 import { INVESTMENT_SITE_PRESETS } from '../../features/investments/sitePresets';
 import { getInvestmentAreaPresets } from '../../features/investments/areaPresets';
-import type { InvestmentSite } from '../../features/investments/types';
+import type { InvestmentDeedOption, InvestmentSite } from '../../features/investments/types';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -39,6 +39,11 @@ export const InvestmentSitesPage: React.FC = () => {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
   const [importingCode, setImportingCode] = React.useState<string | null>(null);
+  const [registeringCode, setRegisteringCode] = React.useState<string | null>(null);
+  const [registeringAll, setRegisteringAll] = React.useState(false);
+  const [matchingDeeds, setMatchingDeeds] = React.useState(true);
+  const [matchError, setMatchError] = React.useState('');
+  const [deedMatches, setDeedMatches] = React.useState<Record<string, InvestmentDeedOption | null>>({});
 
   React.useEffect(() => {
     let cancelled = false;
@@ -61,6 +66,52 @@ export const InvestmentSitesPage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const matchReferenceDeeds = async () => {
+      const referenceNumbers = Array.from(
+        new Set(INVESTMENT_SITE_PRESETS.flatMap((preset) => preset.deedNumbers))
+      );
+
+      try {
+        setMatchingDeeds(true);
+        setMatchError('');
+
+        const entries = await Promise.all(
+          referenceNumbers.map(async (deedNumber) => {
+            const { items } = await investmentsApi.getDeedOptions(deedNumber);
+            const exact =
+              items.find(
+                (item) =>
+                  String(item.deedNumber || '').trim() === deedNumber
+              ) || null;
+
+            return [deedNumber, exact] as const;
+          })
+        );
+
+        if (!cancelled) {
+          setDeedMatches(Object.fromEntries(entries));
+        }
+      } catch (reason) {
+        if (!cancelled) {
+          setMatchError(
+            reason instanceof Error ? reason.message : 'تعذر مطابقة الصكوك المرجعية'
+          );
+        }
+      } finally {
+        if (!cancelled) setMatchingDeeds(false);
+      }
+    };
+
+    matchReferenceDeeds();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const visibleSites = sites.filter((site) => {
     const deedNumbers = getSiteDeeds(site).map((deed) => deed.deedNumber);
     return [site.name, site.code, ...deedNumbers]
@@ -70,6 +121,111 @@ export const InvestmentSitesPage: React.FC = () => {
   const areasCount = sites.reduce((sum, site) => sum + (site._count?.areas || 0), 0);
   const knownCodes = new Set(sites.map((site) => site.code.toUpperCase()));
   const sitesByCode = new Map(sites.map((site) => [site.code.toUpperCase(), site]));
+
+  const getPresetMatches = (deedNumbers: string[]) =>
+    deedNumbers
+      .map((deedNumber) => deedMatches[deedNumber])
+      .filter((deed): deed is InvestmentDeedOption => Boolean(deed));
+
+  const refreshSites = async () => {
+    const response = await investmentsApi.getSites({ limit: 100 });
+    setSites(response.items);
+  };
+
+  const registerPreset = async (preset: typeof INVESTMENT_SITE_PRESETS[number]) => {
+    const matchedDeeds = getPresetMatches(preset.deedNumbers);
+
+    if (matchedDeeds.length !== preset.deedNumbers.length) {
+      toast.error('لم تكتمل مطابقة جميع الصكوك المرجعية لهذا الموقع.');
+      return false;
+    }
+
+    try {
+      setRegisteringCode(preset.code);
+
+      await investmentsApi.createSite({
+        code: preset.code,
+        name: preset.name,
+        description:
+          'موقع رئيسي جرى تجهيزه استنادًا إلى بيان الأراضي الشاغرة، بعد مطابقة أرقام الصكوك المرجعية مع سجل الصكوك في المنصة.',
+        region: 'المنطقة الشرقية',
+        city: 'الدمام',
+        district: null,
+        latitude: preset.latitude ?? null,
+        longitude: preset.longitude ?? null,
+        deedId: matchedDeeds[0]?.id || null,
+        deedIds: matchedDeeds.map((deed) => deed.id),
+      });
+
+      toast.success(`تم تسجيل ${preset.name} وربطه بالصكوك المطابقة.`);
+      await refreshSites();
+      return true;
+    } catch (reason) {
+      toast.error(
+        reason instanceof Error ? reason.message : 'تعذر تسجيل الموقع المرجعي'
+      );
+      return false;
+    } finally {
+      setRegisteringCode(null);
+    }
+  };
+
+  const handleRegisterAllMatched = async () => {
+    const pending = INVESTMENT_SITE_PRESETS.filter(
+      (preset) =>
+        !knownCodes.has(preset.code) &&
+        getPresetMatches(preset.deedNumbers).length === preset.deedNumbers.length
+    );
+
+    if (!pending.length) {
+      toast.info('لا توجد مواقع مكتملة المطابقة بانتظار التسجيل.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `سيتم تسجيل ${pending.length} مواقع رئيسية وربطها بالصكوك المطابقة فقط. لن يتم استيراد المساحات في هذه الخطوة. هل تريد المتابعة؟`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setRegisteringAll(true);
+      let created = 0;
+
+      for (const preset of pending) {
+        const matchedDeeds = getPresetMatches(preset.deedNumbers);
+
+        try {
+          await investmentsApi.createSite({
+            code: preset.code,
+            name: preset.name,
+            description:
+              'موقع رئيسي جرى تجهيزه استنادًا إلى بيان الأراضي الشاغرة، بعد مطابقة أرقام الصكوك المرجعية مع سجل الصكوك في المنصة.',
+            region: 'المنطقة الشرقية',
+            city: 'الدمام',
+            district: null,
+            latitude: preset.latitude ?? null,
+            longitude: preset.longitude ?? null,
+            deedId: matchedDeeds[0]?.id || null,
+            deedIds: matchedDeeds.map((deed) => deed.id),
+          });
+          created += 1;
+        } catch (reason) {
+          console.error('Reference site registration failed:', preset.code, reason);
+        }
+      }
+
+      await refreshSites();
+
+      if (created === pending.length) {
+        toast.success(`تم تسجيل وربط ${created} مواقع رئيسية بنجاح.`);
+      } else {
+        toast.info(`تم تسجيل ${created} من أصل ${pending.length} مواقع. راجع المواقع غير المسجلة.`);
+      }
+    } finally {
+      setRegisteringAll(false);
+    }
+  };
 
   const handleImportAreas = async (site: InvestmentSite) => {
     const presets = getInvestmentAreaPresets(site.code);
@@ -122,12 +278,24 @@ export const InvestmentSitesPage: React.FC = () => {
             إدارة الأراضي الرئيسية وربط كل أرض بالصك المسجل قبل إضافة المساحات التابعة لها.
           </p>
         </div>
-        {canAdd && (
-          <Button onClick={() => navigate('/investments/sites/new')}>
-            <FolderPlus className="me-2 h-4 w-4" />
-            إضافة موقع رئيسي
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {canAdd && !matchingDeeds && !matchError && (
+            <Button
+              variant="outline"
+              onClick={handleRegisterAllMatched}
+              disabled={registeringAll}
+            >
+              <FileText className="me-2 h-4 w-4" />
+              {registeringAll ? 'جارٍ تسجيل المواقع...' : 'تسجيل المواقع المطابقة'}
+            </Button>
+          )}
+          {canAdd && (
+            <Button onClick={() => navigate('/investments/sites/new')}>
+              <FolderPlus className="me-2 h-4 w-4" />
+              إضافة موقع رئيسي
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -149,12 +317,29 @@ export const InvestmentSitesPage: React.FC = () => {
         <CardHeader>
           <CardTitle className="text-base">المواقع الواردة في بيان الأراضي الشاغرة</CardTitle>
           <p className="text-xs leading-6 text-muted-foreground">
-            هذه بطاقات مرجعية مبنية على بيان الأراضي الشاغرة. يتم تسجيل الموقع وربطه بالصك أولًا، ثم يمكن استيراد مساحاته التقريبية دون استبدال أي سجل موجود.
+            تتم مطابقة أرقام الصكوك المرجعية مباشرة مع سجل الصكوك في المنصة. لا يتم إنشاء الموقع إلا عند وجود مطابقة رقمية تامة لكل صك مرجعي.
           </p>
+          <div className="mt-2">
+            {matchingDeeds ? (
+              <Badge variant="outline">جارٍ مطابقة الصكوك المرجعية...</Badge>
+            ) : matchError ? (
+              <Badge variant="destructive">تعذر تنفيذ المطابقة</Badge>
+            ) : (
+              <Badge variant="secondary">
+                تم العثور على {Object.values(deedMatches).filter(Boolean).length} من {Object.keys(deedMatches).length} صكوك مرجعية
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {INVESTMENT_SITE_PRESETS.map((preset) => {
             const registered = knownCodes.has(preset.code);
+            const matchedDeeds = getPresetMatches(preset.deedNumbers);
+            const matchComplete =
+              !matchingDeeds &&
+              !matchError &&
+              matchedDeeds.length === preset.deedNumbers.length;
+
             return (
               <div key={preset.code} className="rounded-xl border bg-muted/20 p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -172,15 +357,35 @@ export const InvestmentSitesPage: React.FC = () => {
                     <span className="mt-1 block text-xs text-muted-foreground" dir="ltr">
                       الصكوك المرجعية: {preset.deedNumbers.join(' / ')}
                     </span>
+                    <span className="mt-1 block text-xs">
+                      {matchingDeeds
+                        ? 'جارٍ التحقق من السجل...'
+                        : matchError
+                          ? 'تعذر التحقق'
+                          : matchComplete
+                            ? `مطابقة مكتملة (${matchedDeeds.length}/${preset.deedNumbers.length})`
+                            : `مطابقة غير مكتملة (${matchedDeeds.length}/${preset.deedNumbers.length})`}
+                    </span>
                   </div>
                   {canAdd && !registered && !loading && !error && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(`/investments/sites/new?preset=${preset.code}`)}
-                    >
-                      تسجيل الموقع
-                    </Button>
+                    matchComplete ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={registeringCode === preset.code || registeringAll}
+                        onClick={() => registerPreset(preset)}
+                      >
+                        {registeringCode === preset.code ? 'جارٍ التسجيل...' : 'تسجيل وربط'}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`/investments/sites/new?preset=${preset.code}`)}
+                      >
+                        مراجعة يدويًا
+                      </Button>
+                    )
                   )}
 
                   {canAdd && registered && !loading && !error && (() => {
