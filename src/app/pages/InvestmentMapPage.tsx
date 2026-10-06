@@ -8,6 +8,7 @@ import {
   MapPin,
   Navigation,
   Search,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   CircleMarker,
@@ -246,6 +247,14 @@ export const InvestmentMapPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate('/investments/gis-audit')}
+          >
+            <ShieldCheck className="me-2 h-4 w-4" />
+            تدقيق جودة GIS
+          </Button>
           {canEdit && (
             <Button
               size="sm"
