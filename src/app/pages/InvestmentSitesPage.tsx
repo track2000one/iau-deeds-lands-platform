@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Building2, FileText, FolderPlus, Pencil, Search, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Building2, FileText, FolderPlus, MapPin, Pencil, Search, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -279,6 +279,13 @@ export const InvestmentSitesPage: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/investments/map')}
+          >
+            <MapPin className="me-2 h-4 w-4" />
+            الخريطة الاستثمارية
+          </Button>
           {canAdd && (
             <Button
               variant="outline"
