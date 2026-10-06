@@ -49,6 +49,9 @@ export const investmentsApi = {
       body: JSON.stringify(data),
     }),
 
+  archiveSite: (id: string) =>
+    apiJson<void>(`/api/investment-sites/${id}`, { method: 'DELETE' }),
+
   createArea: (data: InvestmentAreaInput) =>
     apiJson<InvestmentArea>('/api/investment-areas', {
       method: 'POST',
