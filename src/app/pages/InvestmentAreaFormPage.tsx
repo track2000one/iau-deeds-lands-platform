@@ -114,7 +114,7 @@ export const InvestmentAreaFormPage: React.FC = () => {
   const [saving, setSaving] = React.useState(false);
   const [areaCodeTouched, setAreaCodeTouched] = React.useState(false);
 
-  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+  const setField = <K extends keyof FormState,>(key: K, value: FormState[K]) => {
     setForm((previous) => ({ ...previous, [key]: value }));
   };
 
