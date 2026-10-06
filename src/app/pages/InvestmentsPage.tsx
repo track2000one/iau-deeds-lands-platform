@@ -101,9 +101,9 @@ export const InvestmentsPage: React.FC = () => {
           <Button variant="outline" onClick={() => navigate('/investments/sites')}>
             المواقع الرئيسية
           </Button>
-          <Button variant="outline" onClick={() => navigate('/maps')}>
+          <Button variant="outline" onClick={() => navigate('/investments/map')}>
             <MapPin className="me-2 h-4 w-4" />
-            خريطة الصكوك
+            الخريطة الاستثمارية
           </Button>
           {canAdd && (
             <Button onClick={() => navigate('/investments/areas/new')}>
@@ -206,7 +206,7 @@ export const InvestmentsPage: React.FC = () => {
                 <TableHead>المساحة التقريبية</TableHead>
                 <TableHead>الحالة</TableHead>
                 <TableHead>جاهزية الاستثمار</TableHead>
-                <TableHead className="w-[90px]">الإجراء</TableHead>
+                <TableHead className="w-[180px]">الإجراءات</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -225,14 +225,24 @@ export const InvestmentsPage: React.FC = () => {
                   </TableCell>
                   <TableCell>{readinessLabels[area.investmentReadiness] || area.investmentReadiness}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate(`/investments/areas/${area.id}`)}
-                    >
-                      <Eye className="me-1 h-4 w-4" />
-                      عرض
-                    </Button>
+                    <div className="flex flex-wrap gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigate(`/investments/areas/${area.id}`)}
+                      >
+                        <Eye className="me-1 h-4 w-4" />
+                        عرض
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigate(`/investments/map?areaId=${encodeURIComponent(area.id)}`)}
+                      >
+                        <MapPin className="me-1 h-4 w-4" />
+                        خريطة
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
