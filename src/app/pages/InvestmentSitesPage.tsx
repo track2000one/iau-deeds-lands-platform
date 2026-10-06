@@ -15,6 +15,20 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../components/ui/table';
 
+const getSiteDeeds = (site: InvestmentSite) => {
+  const deeds = [
+    ...(site.deed ? [site.deed] : []),
+    ...(site.deedLinks || []).map((link) => link.deed),
+  ];
+
+  const seen = new Set<string>();
+  return deeds.filter((deed) => {
+    if (!deed || seen.has(deed.id)) return false;
+    seen.add(deed.id);
+    return true;
+  });
+};
+
 export const InvestmentSitesPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, hasPermission } = usePermissions();
@@ -47,11 +61,12 @@ export const InvestmentSitesPage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const visibleSites = sites.filter((site) =>
-    [site.name, site.code, site.deed?.deedNumber || '']
-      .some((value) => value.toLowerCase().includes(search.trim().toLowerCase()))
-  );
-  const linked = sites.filter((site) => site.deedId).length;
+  const visibleSites = sites.filter((site) => {
+    const deedNumbers = getSiteDeeds(site).map((deed) => deed.deedNumber);
+    return [site.name, site.code, ...deedNumbers]
+      .some((value) => value.toLowerCase().includes(search.trim().toLowerCase()));
+  });
+  const linked = sites.filter((site) => getSiteDeeds(site).length > 0).length;
   const areasCount = sites.reduce((sum, site) => sum + (site._count?.areas || 0), 0);
   const knownCodes = new Set(sites.map((site) => site.code.toUpperCase()));
   const sitesByCode = new Map(sites.map((site) => [site.code.toUpperCase(), site]));
@@ -150,9 +165,14 @@ export const InvestmentSitesPage: React.FC = () => {
                   <Badge variant="outline">{registered ? 'مسجل' : 'غير مسجل'}</Badge>
                 </div>
                 <div className="mt-4 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    {preset.expectedAreas} مساحات وفق البيان
-                  </span>
+                  <div>
+                    <span className="block text-sm text-muted-foreground">
+                      {preset.expectedAreas} مساحات وفق البيان
+                    </span>
+                    <span className="mt-1 block text-xs text-muted-foreground" dir="ltr">
+                      الصكوك المرجعية: {preset.deedNumbers.join(' / ')}
+                    </span>
+                  </div>
                   {canAdd && !registered && !loading && !error && (
                     <Button
                       size="sm"
@@ -224,9 +244,21 @@ export const InvestmentSitesPage: React.FC = () => {
                   <TableCell className="font-semibold" dir="ltr">{site.code}</TableCell>
                   <TableCell>{site.name}</TableCell>
                   <TableCell>
-                    {site.deed?.deedNumber
-                      ? <span className="inline-flex items-center gap-2"><FileText className="h-4 w-4" />{site.deed.deedNumber}</span>
-                      : <Badge variant="outline">بانتظار الربط</Badge>}
+                    {getSiteDeeds(site).length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {getSiteDeeds(site).map((deed, index) => (
+                          <span key={deed.id} className="inline-flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            <span dir="ltr">{deed.deedNumber}</span>
+                            {index === 0 && getSiteDeeds(site).length > 1 && (
+                              <Badge variant="outline">رئيسي</Badge>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <Badge variant="outline">بانتظار الربط</Badge>
+                    )}
                   </TableCell>
                   <TableCell>{site._count?.areas ?? 0}</TableCell>
                   <TableCell>
