@@ -49,6 +49,9 @@ type InvestmentPolygonEditorProps = {
   approximateArea?: number | null;
   surveyedArea?: number | null;
   fileBaseName?: string;
+  title?: string;
+  helperText?: string;
+  showAreaComparisons?: boolean;
   onGeometryChange: (
     geoJson: InvestmentPolygonFeature | null,
     metrics: {
@@ -169,6 +172,9 @@ export const InvestmentPolygonEditor: React.FC<
   approximateArea,
   surveyedArea,
   fileBaseName = 'investment-area',
+  title = 'رسم حدود المساحة Polygon',
+  helperText = 'فعّل وضع الرسم ثم انقر على زوايا الأرض بالترتيب. يمكن سحب كل نقطة لتعديلها، أو حذفها من قائمة النقاط.',
+  showAreaComparisons = true,
   onGeometryChange,
 }) => {
   const [points, setPoints] = React.useState<PolygonCoordinate[]>(() =>
@@ -294,10 +300,9 @@ export const InvestmentPolygonEditor: React.FC<
       <CardHeader className="space-y-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="text-base">رسم حدود المساحة Polygon</CardTitle>
+            <CardTitle className="text-base">{title}</CardTitle>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">
-              فعّل وضع الرسم ثم انقر على زوايا الأرض بالترتيب. يمكن سحب كل نقطة
-              لتعديلها، أو حذفها من قائمة النقاط.
+              {helperText}
             </p>
           </div>
 
@@ -362,7 +367,7 @@ export const InvestmentPolygonEditor: React.FC<
           <Badge variant={points.length >= 3 ? 'secondary' : 'outline'}>
             المساحة المحسوبة: {points.length >= 3 ? `${formatArea(areaSqm)} م²` : 'تحتاج 3 نقاط'}
           </Badge>
-          {points.length >= 3 && (
+          {points.length >= 3 && showAreaComparisons && (
             <>
               <DifferenceBadge
                 label="الفرق عن التقريبية"

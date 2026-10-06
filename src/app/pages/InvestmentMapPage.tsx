@@ -202,6 +202,14 @@ export const InvestmentMapPage: React.FC = () => {
     [filteredAreas, selectedAreaId]
   );
 
+  const visibleSiteBoundaries = React.useMemo(
+    () =>
+      sites.filter(
+        (site) => Boolean(site.geoJson) && (!siteId || site.id === siteId)
+      ),
+    [siteId, sites]
+  );
+
   React.useEffect(() => {
     if (selectedAreaId && !filteredAreas.some((area) => area.id === selectedAreaId)) {
       setSelectedAreaId('');
@@ -405,6 +413,38 @@ export const InvestmentMapPage: React.FC = () => {
                 <FitVisibleAreas areas={filteredAreas} />
                 <FocusSelectedArea area={selectedArea} />
 
+                {visibleSiteBoundaries.map((site) => (
+                  <GeoJSON
+                    key={`site-boundary-${site.id}`}
+                    data={site.geoJson as any}
+                    style={{
+                      color: '#0f4c81',
+                      weight: 3,
+                      dashArray: '8 6',
+                      fillColor: '#0ea5e9',
+                      fillOpacity: 0.035,
+                    }}
+                  >
+                    <Popup>
+                      <div dir="rtl" className="min-w-[220px] text-right">
+                        <div className="font-bold">{site.name}</div>
+                        <div className="mt-1 text-xs">
+                          حدود الموقع الرئيسي — {site.code}
+                        </div>
+                        <button
+                          type="button"
+                          className="mt-3 rounded border px-2 py-1 text-xs"
+                          onClick={() =>
+                            navigate(`/investments/sites/${site.id}/edit`)
+                          }
+                        >
+                          فتح حدود الموقع
+                        </button>
+                      </div>
+                    </Popup>
+                  </GeoJSON>
+                ))}
+
                 {filteredAreas.map((area) => {
                   const point = getPoint(area);
                   const color = statusColors[area.occupancyStatus];
@@ -479,6 +519,10 @@ export const InvestmentMapPage: React.FC = () => {
               <CardTitle className="text-base">دليل الحالات</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-2">
+              <div className="col-span-2 mb-1 flex items-center gap-2 rounded-lg border bg-sky-50/50 p-2 text-xs">
+                <span className="w-6 border-t-2 border-dashed border-sky-800" />
+                <span>خط أزرق متقطع: حدود الموقع الرئيسي</span>
+              </div>
               {Object.entries(statusLabels).map(([value, label]) => (
                 <div key={value} className="flex items-center gap-2 text-xs">
                   <span

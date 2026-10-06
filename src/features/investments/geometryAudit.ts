@@ -3,7 +3,7 @@ import {
   getPolygonMetrics,
   type PolygonCoordinate,
 } from './geometry';
-import type { InvestmentArea } from './types';
+import type { InvestmentArea, InvestmentSite } from './types';
 
 export type GisAuditSeverity = 'CRITICAL' | 'WARNING' | 'INFO';
 
@@ -14,7 +14,11 @@ export type GisAuditIssueCode =
   | 'AREA_VARIANCE'
   | 'MISSING_SURVEYED_AREA'
   | 'MISSING_REFERENCE_POINT'
-  | 'POLYGON_OVERLAP';
+  | 'POLYGON_OVERLAP'
+  | 'MISSING_SITE_BOUNDARY'
+  | 'INVALID_SITE_BOUNDARY'
+  | 'SITE_BOUNDARY_SELF_INTERSECTION'
+  | 'OUTSIDE_SITE_BOUNDARY';
 
 export interface GisAuditIssue {
   id: string;
@@ -53,6 +57,10 @@ export interface GisAuditResult {
   passedAreaCount: number;
   polygonAreaCount: number;
   polygonCoveragePercent: number;
+  siteBoundaryCount: number;
+  siteBoundaryCoveragePercent: number;
+  invalidSiteBoundaryCount: number;
+  outsideSiteAreaCount: number;
 }
 
 type Box = {
@@ -137,6 +145,23 @@ const boxesOverlap = (first: Box, second: Box) =>
   first.minY <= second.maxY + EPSILON &&
   first.maxY + EPSILON >= second.minY;
 
+const pointOnBoundary = (
+  point: PolygonCoordinate,
+  polygon: PolygonCoordinate[]
+) => {
+  for (let index = 0; index < polygon.length; index += 1) {
+    const next = (index + 1) % polygon.length;
+    if (
+      orientation(polygon[index], point, polygon[next]) === 0 &&
+      onSegment(polygon[index], point, polygon[next])
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 const pointInPolygon = (
   point: PolygonCoordinate,
   polygon: PolygonCoordinate[]
@@ -162,6 +187,57 @@ const pointInPolygon = (
   }
 
   return inside;
+};
+
+const pointInPolygonInclusive = (
+  point: PolygonCoordinate,
+  polygon: PolygonCoordinate[]
+) => pointOnBoundary(point, polygon) || pointInPolygon(point, polygon);
+
+const properSegmentsIntersect = (
+  p1: PolygonCoordinate,
+  q1: PolygonCoordinate,
+  p2: PolygonCoordinate,
+  q2: PolygonCoordinate
+) => {
+  const o1 = orientation(p1, q1, p2);
+  const o2 = orientation(p1, q1, q2);
+  const o3 = orientation(p2, q2, p1);
+  const o4 = orientation(p2, q2, q1);
+
+  return o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0 && o1 !== o2 && o3 !== o4;
+};
+
+export const polygonContainedBy = (
+  inner: PolygonCoordinate[],
+  outer: PolygonCoordinate[]
+) => {
+  if (inner.length < 3 || outer.length < 3) return false;
+
+  if (!inner.every((point) => pointInPolygonInclusive(point, outer))) {
+    return false;
+  }
+
+  for (let innerIndex = 0; innerIndex < inner.length; innerIndex += 1) {
+    const innerNext = (innerIndex + 1) % inner.length;
+
+    for (let outerIndex = 0; outerIndex < outer.length; outerIndex += 1) {
+      const outerNext = (outerIndex + 1) % outer.length;
+
+      if (
+        properSegmentsIntersect(
+          inner[innerIndex],
+          inner[innerNext],
+          outer[outerIndex],
+          outer[outerNext]
+        )
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 };
 
 export const polygonSelfIntersects = (points: PolygonCoordinate[]) => {
@@ -256,12 +332,18 @@ export const runGisQualityAudit = (
   thresholds: {
     warningPercent: number;
     criticalPercent: number;
-  }
+  },
+  sites: InvestmentSite[] = []
 ): GisAuditResult => {
   const warningPercent = Math.max(0, thresholds.warningPercent);
   const criticalPercent = Math.max(
     warningPercent,
     thresholds.criticalPercent
+  );
+
+  const sitesById = new Map(sites.map((site) => [site.id, site]));
+  const siteBoundaryMetrics = new Map(
+    sites.map((site) => [site.id, getPolygonMetrics(site.geoJson)] as const)
   );
 
   const audits: GisAreaAudit[] = areas.map((area) => {
@@ -391,6 +473,69 @@ export const runGisQualityAudit = (
       });
     }
 
+    const parentSite = sitesById.get(area.siteId) || area.site;
+    const parentMetrics = parentSite
+      ? (siteBoundaryMetrics.get(parentSite.id) || getPolygonMetrics(parentSite.geoJson))
+      : null;
+
+    if (!parentSite?.geoJson) {
+      issues.push({
+        id: issueId(area.id, 'MISSING_SITE_BOUNDARY'),
+        areaId: area.id,
+        areaCode: area.areaCode,
+        siteId: area.siteId,
+        siteName,
+        severity: 'WARNING',
+        code: 'MISSING_SITE_BOUNDARY',
+        title: 'حدود الموقع الرئيسي غير موجودة',
+        description:
+          'لا يمكن التحقق من احتواء المساحة داخل موقعها الرئيسي حتى يتم رسم أو استيراد Polygon للموقع.',
+      });
+    } else if (!parentMetrics?.isValid) {
+      issues.push({
+        id: issueId(area.id, 'INVALID_SITE_BOUNDARY'),
+        areaId: area.id,
+        areaCode: area.areaCode,
+        siteId: area.siteId,
+        siteName,
+        severity: 'CRITICAL',
+        code: 'INVALID_SITE_BOUNDARY',
+        title: 'حدود الموقع الرئيسي غير صالحة',
+        description:
+          'Polygon الموقع الرئيسي لا يحتوي على ثلاث نقاط صالحة على الأقل.',
+      });
+    } else if (polygonSelfIntersects(parentMetrics.points)) {
+      issues.push({
+        id: issueId(area.id, 'SITE_BOUNDARY_SELF_INTERSECTION'),
+        areaId: area.id,
+        areaCode: area.areaCode,
+        siteId: area.siteId,
+        siteName,
+        severity: 'CRITICAL',
+        code: 'SITE_BOUNDARY_SELF_INTERSECTION',
+        title: 'تقاطع ذاتي في حدود الموقع الرئيسي',
+        description:
+          'حدود الموقع الرئيسي تتقاطع مع نفسها، لذلك لا يمكن الاعتماد عليها لفحص الاحتواء.',
+      });
+    } else if (
+      metrics.isValid &&
+      !polygonSelfIntersects(metrics.points) &&
+      !polygonContainedBy(metrics.points, parentMetrics.points)
+    ) {
+      issues.push({
+        id: issueId(area.id, 'OUTSIDE_SITE_BOUNDARY'),
+        areaId: area.id,
+        areaCode: area.areaCode,
+        siteId: area.siteId,
+        siteName,
+        severity: 'CRITICAL',
+        code: 'OUTSIDE_SITE_BOUNDARY',
+        title: 'المساحة خارج حدود الموقع الرئيسي',
+        description:
+          'جزء من Polygon المساحة يقع خارج Polygon الموقع الرئيسي أو يعبر حدوده، ويجب مراجعة الرسم أو الربط.',
+      });
+    }
+
     return {
       area,
       polygonAreaSqm: metrics.isValid ? metrics.calculatedAreaSqm : null,
@@ -480,6 +625,25 @@ export const runGisQualityAudit = (
     (audit) => audit.polygonAreaSqm != null
   ).length;
 
+  const validSiteBoundaries = sites.filter((site) => {
+    const metrics = siteBoundaryMetrics.get(site.id);
+    return Boolean(
+      site.geoJson &&
+      metrics?.isValid &&
+      !polygonSelfIntersects(metrics.points)
+    );
+  });
+
+  const invalidSiteBoundaryCount = sites.filter((site) => {
+    if (!site.geoJson) return false;
+    const metrics = siteBoundaryMetrics.get(site.id);
+    return !metrics?.isValid || polygonSelfIntersects(metrics.points);
+  }).length;
+
+  const outsideSiteAreaCount = audits.filter((audit) =>
+    audit.issues.some((issue) => issue.code === 'OUTSIDE_SITE_BOUNDARY')
+  ).length;
+
   return {
     areas: audits,
     overlapPairs,
@@ -495,5 +659,12 @@ export const runGisQualityAudit = (
       audits.length === 0
         ? 0
         : (polygonAreaCount / audits.length) * 100,
+    siteBoundaryCount: validSiteBoundaries.length,
+    siteBoundaryCoveragePercent:
+      sites.length === 0
+        ? 0
+        : (validSiteBoundaries.length / sites.length) * 100,
+    invalidSiteBoundaryCount,
+    outsideSiteAreaCount,
   };
 };
