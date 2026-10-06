@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
-import { Eye, LandPlot, MapPin, Search } from 'lucide-react';
+import { Building2, Eye, LandPlot, MapPin, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
 import { investmentsApi } from '../../features/investments/api';
@@ -97,6 +97,10 @@ export const InvestmentsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => navigate('/investments/sites')}>
+            <Building2 className="me-2 h-4 w-4" />
+            إدارة المواقع الرئيسية
+          </Button>
           <Button variant="outline" onClick={() => navigate('/maps')}>
             <MapPin className="me-2 h-4 w-4" />
             خريطة الصكوك
