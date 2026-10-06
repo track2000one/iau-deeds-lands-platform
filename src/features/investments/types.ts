@@ -91,3 +91,23 @@ export interface InvestmentAreaQuery {
   page?: number;
   limit?: number;
 }
+
+
+export interface InvestmentAreaInput {
+  siteId: string;
+  areaNumber: number;
+  areaCode: string;
+  name?: string | null;
+  description?: string | null;
+  approximateArea?: number | null;
+  surveyedArea?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  geoJson?: unknown;
+  geometryAccuracy: GeometryAccuracy;
+  occupancyStatus: InvestmentAreaStatus;
+  investmentReadiness: InvestmentReadiness;
+  currentUse?: string | null;
+  proposedUse?: string | null;
+  notes?: string | null;
+}
