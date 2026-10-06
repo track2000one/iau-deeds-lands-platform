@@ -620,6 +620,7 @@ export const InvestmentAreaFormPage: React.FC = () => {
               referenceCoordinates={coordinateValue}
               approximateArea={optionalNumber(form.approximateArea) ?? null}
               surveyedArea={optionalNumber(form.surveyedArea) ?? null}
+              fileBaseName={form.areaCode || form.name || 'investment-area'}
               onGeometryChange={(geoJson, metrics) => {
                 setField('geoJson', geoJson);
 

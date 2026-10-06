@@ -1,10 +1,16 @@
 import React from 'react';
-import { ArrowRight, FileText, MapPin, Pencil } from 'lucide-react';
+import { ArrowRight, Download, FileJson, FileText, Globe2, MapPin, Pencil } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
 import { investmentsApi } from '../../features/investments/api';
 import type { InvestmentArea } from '../../features/investments/types';
+import { buildPolygonFeature, getPolygonMetrics } from '../../features/investments/geometry';
+import {
+  downloadGeoJson,
+  downloadKml,
+  downloadKmz,
+} from '../../features/investments/geometryFiles';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -58,6 +64,18 @@ export const InvestmentAreaDetailsPage: React.FC = () => {
   }
 
   const deed = area.site?.deed;
+  const polygonMetrics = getPolygonMetrics(area.geoJson);
+  const exportFeature = buildPolygonFeature(polygonMetrics.points);
+
+  const exportKmz = async () => {
+    if (!exportFeature) return;
+
+    try {
+      await downloadKmz(exportFeature, area.areaCode);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تصدير ملف KMZ');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -79,12 +97,37 @@ export const InvestmentAreaDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        {canEdit && (
-          <Button onClick={() => navigate(`/investments/areas/${area.id}/edit`)}>
-            <Pencil className="me-2 h-4 w-4" />
-            تعديل البيانات
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {exportFeature && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => downloadGeoJson(exportFeature, area.areaCode)}
+              >
+                <FileJson className="me-2 h-4 w-4" />
+                GeoJSON
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => downloadKml(exportFeature, area.areaCode)}
+              >
+                <Globe2 className="me-2 h-4 w-4" />
+                KML
+              </Button>
+              <Button variant="outline" onClick={exportKmz}>
+                <Download className="me-2 h-4 w-4" />
+                KMZ
+              </Button>
+            </>
+          )}
+
+          {canEdit && (
+            <Button onClick={() => navigate(`/investments/areas/${area.id}/edit`)}>
+              <Pencil className="me-2 h-4 w-4" />
+              تعديل البيانات
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -129,9 +172,25 @@ export const InvestmentAreaDetailsPage: React.FC = () => {
               <p className="text-xs text-muted-foreground">خط الطول</p>
               <p className="font-semibold">{area.longitude ?? '-'}</p>
             </div>
-            <p className="text-xs leading-6 text-muted-foreground">
-              حدود الموقع الجغرافية (Polygon) ستظهر هنا عند توافرها واعتمادها.
-            </p>
+            {polygonMetrics.isValid ? (
+              <div className="rounded-xl border bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">حدود Polygon</p>
+                <p className="mt-1 font-semibold">
+                  {polygonMetrics.vertexCount} نقاط — مساحة محسوبة{' '}
+                  {polygonMetrics.calculatedAreaSqm.toLocaleString('ar-SA', {
+                    maximumFractionDigits: 2,
+                  })}{' '}
+                  م²
+                </p>
+                <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                  يمكن تصدير الحدود من أعلى الصفحة بصيغ GeoJSON أو KML أو KMZ.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs leading-6 text-muted-foreground">
+                لا توجد حدود Polygon محفوظة لهذه المساحة حتى الآن.
+              </p>
+            )}
           </CardContent>
         </Card>
 
