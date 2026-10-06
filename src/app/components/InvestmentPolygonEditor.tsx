@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'sonner';
 import L from 'leaflet';
 import {
   MapContainer,
@@ -18,10 +19,20 @@ import {
   type InvestmentPolygonFeature,
   type PolygonCoordinate,
 } from '../../features/investments/geometry';
+import {
+  downloadGeoJson,
+  downloadKml,
+  downloadKmz,
+  parseGeometryFile,
+} from '../../features/investments/geometryFiles';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import {
+  Download,
+  FileJson,
+  FileUp,
+  Globe2,
   Layers,
   MousePointer2,
   RotateCcw,
@@ -37,6 +48,7 @@ type InvestmentPolygonEditorProps = {
   };
   approximateArea?: number | null;
   surveyedArea?: number | null;
+  fileBaseName?: string;
   onGeometryChange: (
     geoJson: InvestmentPolygonFeature | null,
     metrics: {
@@ -156,6 +168,7 @@ export const InvestmentPolygonEditor: React.FC<
   referenceCoordinates,
   approximateArea,
   surveyedArea,
+  fileBaseName = 'investment-area',
   onGeometryChange,
 }) => {
   const [points, setPoints] = React.useState<PolygonCoordinate[]>(() =>
@@ -163,6 +176,8 @@ export const InvestmentPolygonEditor: React.FC<
   );
   const [drawing, setDrawing] = React.useState(false);
   const [layer, setLayer] = React.useState<'street' | 'satellite'>('satellite');
+  const [importingFile, setImportingFile] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const externalKey = React.useMemo(() => JSON.stringify(geoJson ?? null), [geoJson]);
 
@@ -215,6 +230,54 @@ export const InvestmentPolygonEditor: React.FC<
     setDrawing(false);
   };
 
+  const importGeometryFile = async (file?: File) => {
+    if (!file) return;
+
+    try {
+      setImportingFile(true);
+      const feature = await parseGeometryFile(file);
+      const importedPoints = extractOuterRing(feature);
+
+      publish(importedPoints);
+      setDrawing(false);
+      toast.success(
+        `تم استيراد حدود Polygon من ${file.name} بعدد ${importedPoints.length} نقاط.`
+      );
+    } catch (reason) {
+      toast.error(
+        reason instanceof Error ? reason.message : 'تعذر استيراد ملف الحدود'
+      );
+    } finally {
+      setImportingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const exportGeoJson = () => {
+    const feature = buildPolygonFeature(points);
+    if (!feature) return;
+    downloadGeoJson(feature, fileBaseName);
+  };
+
+  const exportKml = () => {
+    const feature = buildPolygonFeature(points);
+    if (!feature) return;
+    downloadKml(feature, fileBaseName);
+  };
+
+  const exportKmz = async () => {
+    const feature = buildPolygonFeature(points);
+    if (!feature) return;
+
+    try {
+      await downloadKmz(feature, fileBaseName);
+    } catch (reason) {
+      toast.error(
+        reason instanceof Error ? reason.message : 'تعذر تصدير ملف KMZ'
+      );
+    }
+  };
+
   const undo = () => {
     if (points.length === 0) return;
     publish(points.slice(0, -1));
@@ -239,6 +302,25 @@ export const InvestmentPolygonEditor: React.FC<
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept=".geojson,.json,.kml,.kmz,application/geo+json,application/json,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz"
+              onChange={(event) => importGeometryFile(event.target.files?.[0])}
+            />
+
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={importingFile}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <FileUp className="me-2 h-4 w-4" />
+              {importingFile ? 'جارٍ الاستيراد...' : 'استيراد KML / KMZ / GeoJSON'}
+            </Button>
+
             <Button
               type="button"
               size="sm"
@@ -294,6 +376,39 @@ export const InvestmentPolygonEditor: React.FC<
               />
             </>
           )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={points.length < 3}
+            onClick={exportGeoJson}
+          >
+            <FileJson className="me-2 h-4 w-4" />
+            تصدير GeoJSON
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={points.length < 3}
+            onClick={exportKml}
+          >
+            <Globe2 className="me-2 h-4 w-4" />
+            تصدير KML
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={points.length < 3}
+            onClick={exportKmz}
+          >
+            <Download className="me-2 h-4 w-4" />
+            تصدير KMZ
+          </Button>
         </div>
       </CardHeader>
 
