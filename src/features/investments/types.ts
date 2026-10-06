@@ -47,6 +47,8 @@ export interface InvestmentSite {
   deedLinks?: InvestmentSiteDeedLink[];
   latitude?: number | string | null;
   longitude?: number | string | null;
+  geoJson?: InvestmentPolygonFeature | null;
+  geometryAccuracy: GeometryAccuracy;
   region?: string | null;
   city?: string | null;
   district?: string | null;
@@ -130,6 +132,8 @@ export interface InvestmentSiteInput {
   deedIds?: string[];
   latitude?: number | null;
   longitude?: number | null;
+  geoJson?: InvestmentPolygonFeature | null;
+  geometryAccuracy?: GeometryAccuracy;
   region?: string | null;
   city?: string | null;
   district?: string | null;
