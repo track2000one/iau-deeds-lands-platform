@@ -4,6 +4,7 @@ export type ModuleName =
   | 'deeds'
   | 'allocated_lands'
   | 'delivered_lands'
+  | 'investments'
   | 'leased_lands_out'
   | 'leased_lands_in'
   | 'leased_buildings_out'
@@ -52,6 +53,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   deeds: 'الصكوك',
   allocated_lands: 'الأراضي المخصصة',
   delivered_lands: 'الأراضي المستلمة',
+  investments: 'المساحات والفرص الاستثمارية',
   leased_lands_out: 'الأراضي المؤجرة',
   leased_lands_in: 'الأراضي المستأجرة',
   leased_buildings_out: 'المباني المؤجرة',
@@ -72,6 +74,7 @@ export const MODULE_LABELS_EN: Record<ModuleName, string> = {
   deeds: 'Deeds',
   allocated_lands: 'Allocated Lands',
   delivered_lands: 'Delivered Lands',
+  investments: 'Investment Areas & Opportunities',
   leased_lands_out: 'Leased Lands (Out)',
   leased_lands_in: 'Leased Lands (In)',
   leased_buildings_out: 'Leased Buildings (Out)',
@@ -114,6 +117,7 @@ export const createEmptyPermissions = (): UserPermissions => ({
   deeds: { ...NONE },
   allocated_lands: { ...NONE },
   delivered_lands: { ...NONE },
+  investments: { ...NONE },
   leased_lands_out: { ...NONE },
   leased_lands_in: { ...NONE },
   leased_buildings_out: { ...NONE },
@@ -134,6 +138,7 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   deeds: { ...FULL },
   allocated_lands: { ...FULL },
   delivered_lands: { ...FULL },
+  investments: { ...FULL },
   leased_lands_out: { ...FULL },
   leased_lands_in: { ...FULL },
   leased_buildings_out: { ...FULL },
