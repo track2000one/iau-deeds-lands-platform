@@ -14,15 +14,19 @@ import { toast } from 'sonner';
 import { investmentsApi } from '../../features/investments/api';
 import { findSitePreset } from '../../features/investments/sitePresets';
 import type {
+  GeometryAccuracy,
   InvestmentDeedOption,
   InvestmentSiteInput,
 } from '../../features/investments/types';
+import { getPolygonMetrics } from '../../features/investments/geometry';
+import { InvestmentPolygonEditor } from '../components/InvestmentPolygonEditor';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { NativeSelect } from '../components/ui/native-select';
 import { Textarea } from '../components/ui/textarea';
 
 type FormState = {
@@ -34,6 +38,8 @@ type FormState = {
   district: string;
   latitude: string;
   longitude: string;
+  geoJson: InvestmentSiteInput['geoJson'];
+  geometryAccuracy: GeometryAccuracy;
   deedIds: string[];
 };
 
@@ -46,6 +52,8 @@ const EMPTY: FormState = {
   district: '',
   latitude: '',
   longitude: '',
+  geoJson: null,
+  geometryAccuracy: 'APPROXIMATE',
   deedIds: [],
 };
 
@@ -118,6 +126,8 @@ export const InvestmentSiteFormPage: React.FC = () => {
         district: site.district || '',
         latitude: site.latitude == null ? '' : String(site.latitude),
         longitude: site.longitude == null ? '' : String(site.longitude),
+        geoJson: site.geoJson || null,
+        geometryAccuracy: site.geometryAccuracy || 'APPROXIMATE',
         deedIds: allDeeds.map((deed) => deed.id),
       });
     }).catch((reason) => {
@@ -180,6 +190,11 @@ export const InvestmentSiteFormPage: React.FC = () => {
     return { latitude, longitude };
   }, [form.latitude, form.longitude]);
 
+  const siteBoundaryMetrics = React.useMemo(
+    () => getPolygonMetrics(form.geoJson),
+    [form.geoJson]
+  );
+
   const addDeed = (deed: InvestmentDeedOption) => {
     if (form.deedIds.includes(deed.id)) {
       toast.info('هذا الصك مرتبط بالموقع بالفعل.');
@@ -231,6 +246,11 @@ export const InvestmentSiteFormPage: React.FC = () => {
       return;
     }
 
+    if (form.geoJson && !siteBoundaryMetrics.isValid) {
+      toast.error('حدود الموقع الرئيسي غير مكتملة. يجب أن يحتوي Polygon على ثلاث نقاط على الأقل.');
+      return;
+    }
+
     const input: InvestmentSiteInput = {
       code,
       name,
@@ -240,6 +260,8 @@ export const InvestmentSiteFormPage: React.FC = () => {
       district: form.district.trim() || null,
       latitude: lat,
       longitude: long,
+      geoJson: form.geoJson ?? null,
+      geometryAccuracy: form.geometryAccuracy,
       deedId: form.deedIds[0] || null,
       deedIds: form.deedIds,
     };
@@ -533,15 +555,15 @@ export const InvestmentSiteFormPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <MapPin className="h-5 w-5" />
-              ثالثًا: الإحداثية المرجعية للموقع
+              ثالثًا: الموقع الجغرافي وحدود الموقع الرئيسي
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              الإحداثية مرجعية فقط، ولا تمثل حدود الصك أو الرفع المساحي.
+              الإحداثية تمثل نقطة مرجعية، بينما Polygon يمثل النطاق الجغرافي للموقع الرئيسي المستخدم لاحقًا في تدقيق احتواء المساحات الاستثمارية.
             </p>
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="latitude">Latitude — خط العرض</Label>
                 <Input
@@ -565,6 +587,25 @@ export const InvestmentSiteFormPage: React.FC = () => {
                   onChange={(event) => setField('longitude', event.target.value)}
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="geometryAccuracy">دقة حدود الموقع</Label>
+                <NativeSelect
+                  id="geometryAccuracy"
+                  value={form.geometryAccuracy}
+                  onChange={(event) =>
+                    setField(
+                      'geometryAccuracy',
+                      event.target.value as GeometryAccuracy
+                    )
+                  }
+                >
+                  <option value="APPROXIMATE">تقريبية</option>
+                  <option value="FIELD_VERIFIED">متحقق منها ميدانيًا</option>
+                  <option value="SURVEYED">رفع مساحي</option>
+                  <option value="OFFICIAL">رسمية/معتمدة</option>
+                </NativeSelect>
+              </div>
             </div>
 
             <Button
@@ -573,7 +614,7 @@ export const InvestmentSiteFormPage: React.FC = () => {
               onClick={() => setShowMap((value) => !value)}
             >
               <MapPin className="me-2 h-4 w-4" />
-              {showMap ? 'إخفاء الخريطة' : 'تحديد الإحداثية من الخريطة'}
+              {showMap ? 'إخفاء محدد النقطة' : 'تحديد نقطة مرجعية فقط'}
             </Button>
 
             {showMap && (
@@ -584,6 +625,34 @@ export const InvestmentSiteFormPage: React.FC = () => {
                   setField('longitude', String(value.longitude));
                 }}
               />
+            )}
+
+            <InvestmentPolygonEditor
+              geoJson={form.geoJson}
+              referenceCoordinates={coordinates}
+              fileBaseName={form.code || form.name || 'investment-site'}
+              title="رسم حدود الموقع الرئيسي Polygon"
+              helperText="ارسم أو استورد الحدود الخارجية للموقع الرئيسي. تستخدم هذه الحدود لتدقيق وقوع المساحات الاستثمارية التابعة داخله، ويمكن تعديل النقاط بالسحب قبل الحفظ."
+              showAreaComparisons={false}
+              onGeometryChange={(geoJson, metrics) => {
+                setField('geoJson', geoJson);
+
+                if (metrics.centroid) {
+                  setField('latitude', String(metrics.centroid.latitude));
+                  setField('longitude', String(metrics.centroid.longitude));
+                }
+              }}
+            />
+
+            {siteBoundaryMetrics.isValid && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 text-sm">
+                <p className="font-semibold">
+                  حدود الموقع جاهزة للحفظ — {siteBoundaryMetrics.vertexCount} نقاط
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  المساحة الهندسية المحسوبة من Polygon: {siteBoundaryMetrics.calculatedAreaSqm.toLocaleString('ar-SA', { maximumFractionDigits: 2 })} م². هذه القيمة مرجعية ولا تستبدل مساحة الصك.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
