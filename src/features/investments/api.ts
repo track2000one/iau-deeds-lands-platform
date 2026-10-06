@@ -59,6 +59,21 @@ export const investmentsApi = {
       body: JSON.stringify(data),
     }),
 
+  bulkImportAreas: (
+    siteId: string,
+    areas: Array<Omit<InvestmentAreaInput, 'siteId'>>
+  ) =>
+    apiJson<{
+      siteId: string;
+      requested: number;
+      created: number;
+      skipped: number;
+      items: InvestmentArea[];
+    }>('/api/investment-areas/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ siteId, areas }),
+    }),
+
   createArea: (data: InvestmentAreaInput) =>
     apiJson<InvestmentArea>('/api/investment-areas', {
       method: 'POST',

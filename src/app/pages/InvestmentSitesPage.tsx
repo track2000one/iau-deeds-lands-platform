@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
 import { investmentsApi } from '../../features/investments/api';
 import { INVESTMENT_SITE_PRESETS } from '../../features/investments/sitePresets';
+import { getInvestmentAreaPresets } from '../../features/investments/areaPresets';
 import type { InvestmentSite } from '../../features/investments/types';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -23,6 +24,7 @@ export const InvestmentSitesPage: React.FC = () => {
   const [sites, setSites] = React.useState<InvestmentSite[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
+  const [importingCode, setImportingCode] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -52,6 +54,45 @@ export const InvestmentSitesPage: React.FC = () => {
   const linked = sites.filter((site) => site.deedId).length;
   const areasCount = sites.reduce((sum, site) => sum + (site._count?.areas || 0), 0);
   const knownCodes = new Set(sites.map((site) => site.code.toUpperCase()));
+  const sitesByCode = new Map(sites.map((site) => [site.code.toUpperCase(), site]));
+
+  const handleImportAreas = async (site: InvestmentSite) => {
+    const presets = getInvestmentAreaPresets(site.code);
+
+    if (!presets.length) {
+      toast.error('لا توجد مساحات مرجعية مرتبطة بهذا الموقع.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `سيتم استيراد ${presets.length} مساحة مرجعية إلى "${site.name}". لن يتم استبدال أي مساحة موجودة مسبقًا. هل تريد المتابعة؟`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setImportingCode(site.code);
+
+      const result = await investmentsApi.bulkImportAreas(site.id, presets);
+
+      if (result.created > 0) {
+        toast.success(
+          `تم إنشاء ${result.created} مساحة، وتم تجاوز ${result.skipped} مساحة موجودة مسبقًا.`
+        );
+      } else {
+        toast.info('جميع مساحات البيان لهذا الموقع مسجلة مسبقًا.');
+      }
+
+      const response = await investmentsApi.getSites({ limit: 100 });
+      setSites(response.items);
+    } catch (reason) {
+      toast.error(
+        reason instanceof Error ? reason.message : 'تعذر استيراد مساحات البيان'
+      );
+    } finally {
+      setImportingCode(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -93,7 +134,7 @@ export const InvestmentSitesPage: React.FC = () => {
         <CardHeader>
           <CardTitle className="text-base">المواقع الواردة في بيان الأراضي الشاغرة</CardTitle>
           <p className="text-xs leading-6 text-muted-foreground">
-            هذه بطاقات مرجعية للتجهيز والإدخال وليست سجلات منشأة تلقائيًا. يجب مطابقة الصك قبل اعتبار بيانات الموقع مكتملة.
+            هذه بطاقات مرجعية مبنية على بيان الأراضي الشاغرة. يتم تسجيل الموقع وربطه بالصك أولًا، ثم يمكن استيراد مساحاته التقريبية دون استبدال أي سجل موجود.
           </p>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -121,6 +162,29 @@ export const InvestmentSitesPage: React.FC = () => {
                       تسجيل الموقع
                     </Button>
                   )}
+
+                  {canAdd && registered && !loading && !error && (() => {
+                    const site = sitesByCode.get(preset.code);
+                    if (!site) return null;
+
+                    const currentAreas = site._count?.areas || 0;
+                    const complete = currentAreas >= preset.expectedAreas;
+
+                    return (
+                      <Button
+                        size="sm"
+                        variant={complete ? 'ghost' : 'outline'}
+                        disabled={complete || importingCode === preset.code}
+                        onClick={() => handleImportAreas(site)}
+                      >
+                        {complete
+                          ? 'المساحات مكتملة'
+                          : importingCode === preset.code
+                            ? 'جارٍ الاستيراد...'
+                            : `استيراد ${preset.expectedAreas} مساحة`}
+                      </Button>
+                    );
+                  })()}
                 </div>
               </div>
             );
