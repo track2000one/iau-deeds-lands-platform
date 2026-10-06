@@ -1,5 +1,14 @@
 import React from 'react';
-import { ArrowRight, Check, FileText, MapPin, Save, Search, X } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  FileText,
+  Link2,
+  MapPin,
+  Save,
+  Search,
+  X,
+} from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { investmentsApi } from '../../features/investments/api';
@@ -25,7 +34,7 @@ type FormState = {
   district: string;
   latitude: string;
   longitude: string;
-  deedId: string | null;
+  deedIds: string[];
 };
 
 const EMPTY: FormState = {
@@ -37,10 +46,26 @@ const EMPTY: FormState = {
   district: '',
   latitude: '',
   longitude: '',
-  deedId: null,
+  deedIds: [],
 };
 
 const coordinateOrNull = (value: string) => value.trim() ? Number(value) : null;
+
+const mergeDeeds = (
+  primary: InvestmentDeedOption | null | undefined,
+  linked: InvestmentDeedOption[]
+) => {
+  const result: InvestmentDeedOption[] = [];
+  const seen = new Set<string>();
+
+  for (const deed of [primary, ...linked]) {
+    if (!deed || seen.has(deed.id)) continue;
+    seen.add(deed.id);
+    result.push(deed);
+  }
+
+  return result;
+};
 
 export const InvestmentSiteFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -53,8 +78,10 @@ export const InvestmentSiteFormPage: React.FC = () => {
     ...EMPTY,
     code: preset?.code || '',
     name: preset?.name || '',
+    latitude: preset?.latitude == null ? '' : String(preset.latitude),
+    longitude: preset?.longitude == null ? '' : String(preset.longitude),
   }));
-  const [selectedDeed, setSelectedDeed] = React.useState<InvestmentDeedOption | null>(null);
+  const [selectedDeeds, setSelectedDeeds] = React.useState<InvestmentDeedOption[]>([]);
   const [deedSearch, setDeedSearch] = React.useState('');
   const [deedResults, setDeedResults] = React.useState<InvestmentDeedOption[]>([]);
   const [loadingDeeds, setLoadingDeeds] = React.useState(false);
@@ -69,9 +96,19 @@ export const InvestmentSiteFormPage: React.FC = () => {
 
   React.useEffect(() => {
     if (!siteId) return;
+
     let cancelled = false;
+
     investmentsApi.getSite(siteId).then((site) => {
       if (cancelled) return;
+
+      const linkedDeeds = (site.deedLinks || []).map((link) => link.deed);
+      const allDeeds = mergeDeeds(
+        site.deed ? site.deed as InvestmentDeedOption : null,
+        linkedDeeds as InvestmentDeedOption[]
+      );
+
+      setSelectedDeeds(allDeeds);
       setForm({
         code: site.code,
         name: site.name,
@@ -81,15 +118,19 @@ export const InvestmentSiteFormPage: React.FC = () => {
         district: site.district || '',
         latitude: site.latitude == null ? '' : String(site.latitude),
         longitude: site.longitude == null ? '' : String(site.longitude),
-        deedId: site.deedId || null,
+        deedIds: allDeeds.map((deed) => deed.id),
       });
-      if (site.deed) setSelectedDeed(site.deed as InvestmentDeedOption);
     }).catch((reason) => {
-      if (!cancelled) toast.error(reason instanceof Error ? reason.message : 'تعذر فتح الموقع');
+      if (!cancelled) {
+        toast.error(reason instanceof Error ? reason.message : 'تعذر فتح الموقع');
+      }
     }).finally(() => {
       if (!cancelled) setLoading(false);
     });
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [siteId]);
 
   React.useEffect(() => {
@@ -99,13 +140,19 @@ export const InvestmentSiteFormPage: React.FC = () => {
       setLoadingDeeds(false);
       return;
     }
+
     let cancelled = false;
+
     const timer = window.setTimeout(async () => {
       try {
         setLoadingDeeds(true);
         setSearchError('');
+
         const { items } = await investmentsApi.getDeedOptions(deedSearch.trim());
-        if (!cancelled) setDeedResults(items);
+
+        if (!cancelled) {
+          setDeedResults(items);
+        }
       } catch (reason) {
         if (!cancelled) {
           setDeedResults([]);
@@ -115,6 +162,7 @@ export const InvestmentSiteFormPage: React.FC = () => {
         if (!cancelled) setLoadingDeeds(false);
       }
     }, 300);
+
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
@@ -123,11 +171,31 @@ export const InvestmentSiteFormPage: React.FC = () => {
 
   const coordinates = React.useMemo(() => {
     if (form.latitude.trim() === '' || form.longitude.trim() === '') return undefined;
+
     const latitude = Number(form.latitude);
     const longitude = Number(form.longitude);
+
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
+
     return { latitude, longitude };
   }, [form.latitude, form.longitude]);
+
+  const addDeed = (deed: InvestmentDeedOption) => {
+    if (form.deedIds.includes(deed.id)) {
+      toast.info('هذا الصك مرتبط بالموقع بالفعل.');
+      return;
+    }
+
+    setSelectedDeeds((current) => [...current, deed]);
+    setField('deedIds', [...form.deedIds, deed.id]);
+    setDeedSearch('');
+    setDeedResults([]);
+  };
+
+  const removeDeed = (deedId: string) => {
+    setSelectedDeeds((current) => current.filter((deed) => deed.id !== deedId));
+    setField('deedIds', form.deedIds.filter((id) => id !== deedId));
+  };
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -139,6 +207,7 @@ export const InvestmentSiteFormPage: React.FC = () => {
       toast.error('رمز الموقع يجب أن يتكون من أحرف إنجليزية كبيرة وأرقام أو شرطات (2–30).');
       return;
     }
+
     if (name.length < 2 || name.length > 250) {
       toast.error('أدخل اسم موقع صحيحًا من حرفين على الأقل.');
       return;
@@ -153,7 +222,11 @@ export const InvestmentSiteFormPage: React.FC = () => {
       toast.error('أدخل خط العرض وخط الطول معًا، أو اتركهما فارغين.');
       return;
     }
-    if (hasLat && (lat == null || lat < -90 || lat > 90 || long == null || long < -180 || long > 180)) {
+
+    if (
+      hasLat &&
+      (lat == null || lat < -90 || lat > 90 || long == null || long < -180 || long > 180)
+    ) {
       toast.error('الإحداثيات غير صحيحة: خط العرض -90 إلى 90، وخط الطول -180 إلى 180.');
       return;
     }
@@ -167,16 +240,19 @@ export const InvestmentSiteFormPage: React.FC = () => {
       district: form.district.trim() || null,
       latitude: lat,
       longitude: long,
-      deedId: form.deedId,
+      deedId: form.deedIds[0] || null,
+      deedIds: form.deedIds,
     };
 
     try {
       setSaving(true);
+
       if (siteId) {
         await investmentsApi.updateSite(siteId, input);
       } else {
         await investmentsApi.createSite(input);
       }
+
       toast.success(siteId ? 'تم تحديث الموقع الرئيسي.' : 'تم تسجيل الموقع الرئيسي.');
       navigate('/investments/sites', { replace: true });
     } catch (reason) {
@@ -186,30 +262,76 @@ export const InvestmentSiteFormPage: React.FC = () => {
     }
   };
 
-  if (loading) return <p className="p-10 text-center text-muted-foreground">جارٍ تحميل بيانات الموقع...</p>;
+  if (loading) {
+    return (
+      <p className="p-10 text-center text-muted-foreground">
+        جارٍ تحميل بيانات الموقع...
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <Button variant="ghost" className="mb-2 px-0" onClick={() => navigate('/investments/sites')}>
-          <ArrowRight className="me-2 h-4 w-4" /> المواقع الاستثمارية الرئيسية
+        <Button
+          variant="ghost"
+          className="mb-2 px-0"
+          onClick={() => navigate('/investments/sites')}
+        >
+          <ArrowRight className="me-2 h-4 w-4" />
+          المواقع الاستثمارية الرئيسية
         </Button>
-        <h1 className="text-2xl font-bold">{isEdit ? 'تعديل موقع استثماري رئيسي' : 'تسجيل موقع استثماري رئيسي'}</h1>
+
+        <h1 className="text-2xl font-bold">
+          {isEdit ? 'تعديل موقع استثماري رئيسي' : 'تسجيل موقع استثماري رئيسي'}
+        </h1>
+
         <p className="mt-2 text-sm text-muted-foreground">
-          اربط الموقع بأحد الصكوك المسجلة بالجامعة، ثم أضف المساحات التابعة له من شاشة المساحات الاستثمارية.
+          يمكن ربط الموقع بصك واحد أو بعدة صكوك، ثم إضافة المساحات الاستثمارية التابعة له.
         </p>
       </div>
 
       {preset && !isEdit && (
         <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 text-sm leading-7 text-slate-800">
-          <span className="font-semibold">بيانات مرجعية من بيان الأراضي الشاغرة:</span>{' '}
-          {preset.name} — {preset.expectedAreas} مواقع داخلية. لا يجري اختيار الصك تلقائيًا؛ يجب التحقق منه في سجل الجامعة.
+          <div className="font-semibold">بيانات مرجعية من بيان الأراضي الشاغرة</div>
+          <div className="mt-1">
+            {preset.name} — {preset.expectedAreas} مساحات داخلية.
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-600">أرقام الصكوك المرجعية:</span>
+            {preset.deedNumbers.map((deedNumber) => (
+              <Button
+                key={deedNumber}
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setDeedSearch(deedNumber)}
+              >
+                <Search className="me-1 h-3.5 w-3.5" />
+                {deedNumber}
+              </Button>
+            ))}
+          </div>
+
+          {preset.sourceCoordinate && (
+            <div className="mt-2 text-xs text-slate-600" dir="ltr">
+              Source coordinate: {preset.sourceCoordinate}
+            </div>
+          )}
+
+          <p className="mt-2 text-xs text-slate-600">
+            لا يتم ربط أي صك تلقائيًا؛ ابحث بالرقم المرجعي وتحقق من سجل الصك قبل اختياره.
+          </p>
         </div>
       )}
 
       <form onSubmit={handleSave} className="space-y-5">
         <Card>
-          <CardHeader><CardTitle className="text-base">أولًا: تعريف الموقع الرئيسي</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">أولًا: تعريف الموقع الرئيسي</CardTitle>
+          </CardHeader>
+
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="siteCode">رمز الموقع *</Label>
@@ -222,8 +344,11 @@ export const InvestmentSiteFormPage: React.FC = () => {
                 placeholder="WEST"
                 dir="ltr"
               />
-              <p className="text-xs text-muted-foreground">رمز مميز وثابت يستخدم لإنشاء رموز المساحات مثل WEST-01.</p>
+              <p className="text-xs text-muted-foreground">
+                رمز ثابت يستخدم لإنشاء رموز المساحات مثل WEST-01.
+              </p>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="siteName">اسم الموقع *</Label>
               <Input
@@ -235,18 +360,37 @@ export const InvestmentSiteFormPage: React.FC = () => {
                 placeholder="الحرم الجامعي الغربي"
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="region">المنطقة</Label>
-              <Input id="region" value={form.region} maxLength={120} onChange={(event) => setField('region', event.target.value)} />
+              <Input
+                id="region"
+                value={form.region}
+                maxLength={120}
+                onChange={(event) => setField('region', event.target.value)}
+              />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="city">المدينة</Label>
-              <Input id="city" value={form.city} maxLength={120} onChange={(event) => setField('city', event.target.value)} />
+              <Input
+                id="city"
+                value={form.city}
+                maxLength={120}
+                onChange={(event) => setField('city', event.target.value)}
+              />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="district">الحي</Label>
-              <Input id="district" value={form.district} maxLength={120} onChange={(event) => setField('district', event.target.value)} />
+              <Input
+                id="district"
+                value={form.district}
+                maxLength={120}
+                onChange={(event) => setField('district', event.target.value)}
+              />
             </div>
+
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="description">وصف الموقع</Label>
               <Textarea
@@ -264,30 +408,49 @@ export const InvestmentSiteFormPage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="h-5 w-5" /> ثانيًا: ربط الصك
+              <Link2 className="h-5 w-5" />
+              ثانيًا: ربط الصكوك
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              ابحث برقم الصك أو وصف العقار، ثم اختر السجل المطابق. تظهر بيانات تعريفية محدودة للصك.
+              ابحث برقم الصك أو وصف العقار. يمكن ربط أكثر من صك بالموقع الواحد، ويعد أول صك في القائمة الصك الرئيسي.
             </p>
           </CardHeader>
+
           <CardContent className="space-y-4">
-            {selectedDeed && form.deedId && (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
-                <div>
-                  <Badge variant="outline"><Check className="me-1 h-3 w-3" /> صك محدد</Badge>
-                  <p className="mt-2 font-semibold">رقم الصك: {selectedDeed.deedNumber}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{selectedDeed.propertyDescription}</p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setField('deedId', null);
-                    setSelectedDeed(null);
-                  }}
-                >
-                  <X className="me-1 h-4 w-4" /> إلغاء الربط
-                </Button>
+            {selectedDeeds.length > 0 && (
+              <div className="space-y-2">
+                {selectedDeeds.map((deed, index) => (
+                  <div
+                    key={deed.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4"
+                  >
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">
+                          <Check className="me-1 h-3 w-3" />
+                          صك مرتبط
+                        </Badge>
+                        {index === 0 && <Badge>الصك الرئيسي</Badge>}
+                      </div>
+
+                      <p className="mt-2 font-semibold">
+                        رقم الصك: {deed.deedNumber}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {deed.propertyDescription}
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => removeDeed(deed.id)}
+                    >
+                      <X className="me-1 h-4 w-4" />
+                      إلغاء الربط
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -305,41 +468,62 @@ export const InvestmentSiteFormPage: React.FC = () => {
               </div>
             </div>
 
-            {loadingDeeds && <p className="text-xs text-muted-foreground">جارٍ البحث...</p>}
-            {searchError && <p className="text-sm text-destructive">{searchError}</p>}
-            {deedSearch.trim().length >= 2 && !loadingDeeds && !searchError && deedResults.length === 0 && (
-              <p className="text-sm text-muted-foreground">لا توجد صكوك مطابقة للبحث الحالي.</p>
+            {loadingDeeds && (
+              <p className="text-xs text-muted-foreground">جارٍ البحث...</p>
             )}
+
+            {searchError && (
+              <p className="text-sm text-destructive">{searchError}</p>
+            )}
+
+            {deedSearch.trim().length >= 2 &&
+              !loadingDeeds &&
+              !searchError &&
+              deedResults.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  لا توجد صكوك مطابقة للبحث الحالي.
+                </p>
+              )}
+
             {deedResults.length > 0 && (
               <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl border p-2">
-                {deedResults.map((deed) => (
-                  <button
-                    key={deed.id}
-                    type="button"
-                    className={[
-                      'flex w-full items-start justify-between gap-2 rounded-lg border p-3 text-right transition hover:bg-muted/60',
-                      form.deedId === deed.id ? 'border-primary bg-primary/5' : 'border-transparent',
-                    ].join(' ')}
-                    onClick={() => {
-                      setSelectedDeed(deed);
-                      setField('deedId', deed.id);
-                      setDeedSearch('');
-                      setDeedResults([]);
-                    }}
-                  >
-                    <span>
-                      <span className="block font-semibold">{deed.deedNumber}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground">{deed.propertyDescription}</span>
-                    </span>
-                    {form.deedId === deed.id && <Check className="mt-1 h-5 w-5 text-primary" />}
-                  </button>
-                ))}
+                {deedResults.map((deed) => {
+                  const linked = form.deedIds.includes(deed.id);
+
+                  return (
+                    <button
+                      key={deed.id}
+                      type="button"
+                      disabled={linked}
+                      className={[
+                        'flex w-full items-start justify-between gap-2 rounded-lg border p-3 text-right transition',
+                        linked
+                          ? 'cursor-default border-emerald-200 bg-emerald-50/60'
+                          : 'border-transparent hover:bg-muted/60',
+                      ].join(' ')}
+                      onClick={() => addDeed(deed)}
+                    >
+                      <span>
+                        <span className="block font-semibold">{deed.deedNumber}</span>
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          {deed.propertyDescription}
+                        </span>
+                      </span>
+
+                      {linked ? (
+                        <Check className="mt-1 h-5 w-5 text-emerald-600" />
+                      ) : (
+                        <FileText className="mt-1 h-5 w-5 text-muted-foreground" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
-            {!form.deedId && (
+            {form.deedIds.length === 0 && (
               <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-950">
-                يمكن حفظ الموقع دون صك مؤقتًا، لكن سيظهر بحالة «بانتظار الربط» حتى يُختار الصك الصحيح من سجلات الجامعة.
+                يمكن حفظ الموقع دون صك مؤقتًا، لكنه سيظهر بحالة «بانتظار الربط» حتى تتم مطابقة الصك أو الصكوك الصحيحة.
               </p>
             )}
           </CardContent>
@@ -347,23 +531,51 @@ export const InvestmentSiteFormPage: React.FC = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-5 w-5" /> ثالثًا: الإحداثية المرجعية للموقع</CardTitle>
-            <p className="text-sm text-muted-foreground">اختيارية، ولا تمثل حدود الصك أو مساحته المساحية.</p>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MapPin className="h-5 w-5" />
+              ثالثًا: الإحداثية المرجعية للموقع
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              الإحداثية مرجعية فقط، ولا تمثل حدود الصك أو الرفع المساحي.
+            </p>
           </CardHeader>
+
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="latitude">Latitude — خط العرض</Label>
-                <Input id="latitude" type="number" step="0.0000001" dir="ltr" value={form.latitude} onChange={(event) => setField('latitude', event.target.value)} />
+                <Input
+                  id="latitude"
+                  type="number"
+                  step="0.0000001"
+                  dir="ltr"
+                  value={form.latitude}
+                  onChange={(event) => setField('latitude', event.target.value)}
+                />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="longitude">Longitude — خط الطول</Label>
-                <Input id="longitude" type="number" step="0.0000001" dir="ltr" value={form.longitude} onChange={(event) => setField('longitude', event.target.value)} />
+                <Input
+                  id="longitude"
+                  type="number"
+                  step="0.0000001"
+                  dir="ltr"
+                  value={form.longitude}
+                  onChange={(event) => setField('longitude', event.target.value)}
+                />
               </div>
             </div>
-            <Button type="button" variant="outline" onClick={() => setShowMap((value) => !value)}>
-              <MapPin className="me-2 h-4 w-4" />{showMap ? 'إخفاء الخريطة' : 'تحديد الإحداثية من الخريطة'}
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowMap((value) => !value)}
+            >
+              <MapPin className="me-2 h-4 w-4" />
+              {showMap ? 'إخفاء الخريطة' : 'تحديد الإحداثية من الخريطة'}
             </Button>
+
             {showMap && (
               <MapCoordinatePicker
                 coordinates={coordinates}
@@ -377,7 +589,15 @@ export const InvestmentSiteFormPage: React.FC = () => {
         </Card>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate('/investments/sites')} disabled={saving}>إلغاء</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate('/investments/sites')}
+            disabled={saving}
+          >
+            إلغاء
+          </Button>
+
           <Button type="submit" disabled={saving}>
             <Save className="me-2 h-4 w-4" />
             {saving ? 'جارٍ الحفظ...' : isEdit ? 'حفظ التعديلات' : 'تسجيل الموقع'}
