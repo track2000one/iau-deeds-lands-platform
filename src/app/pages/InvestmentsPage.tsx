@@ -102,7 +102,7 @@ export const InvestmentsPage: React.FC = () => {
             خريطة الصكوك
           </Button>
           {canAdd && (
-            <Button variant="outline" disabled title="يتم تفعيل الإدخال في المرحلة التالية">
+            <Button onClick={() => navigate('/investments/areas/new')}>
               إضافة مساحة
             </Button>
           )}

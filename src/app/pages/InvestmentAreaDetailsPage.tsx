@@ -1,7 +1,8 @@
 import React from 'react';
-import { ArrowRight, FileText, MapPin } from 'lucide-react';
+import { ArrowRight, FileText, MapPin, Pencil } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
+import { usePermissions } from '../../context/PermissionsContext';
 import { investmentsApi } from '../../features/investments/api';
 import type { InvestmentArea } from '../../features/investments/types';
 import { Badge } from '../components/ui/badge';
@@ -27,6 +28,8 @@ const readinessLabels: Record<string, string> = {
 export const InvestmentAreaDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { areaId } = useParams();
+  const { hasPermission, isAdmin } = usePermissions();
+  const canEdit = isAdmin || hasPermission('investments', 'canEdit');
   const [area, setArea] = React.useState<InvestmentArea | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -75,6 +78,13 @@ export const InvestmentAreaDetailsPage: React.FC = () => {
             </Badge>
           </div>
         </div>
+
+        {canEdit && (
+          <Button onClick={() => navigate(`/investments/areas/${area.id}/edit`)}>
+            <Pencil className="me-2 h-4 w-4" />
+            تعديل البيانات
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
