@@ -26,14 +26,11 @@ export const InvestmentSitesPage: React.FC = () => {
 
   React.useEffect(() => {
     let cancelled = false;
-    const timer = window.setTimeout(async () => {
+    const load = async () => {
       try {
         setLoading(true);
         setError('');
-        const response = await investmentsApi.getSites({
-          search: search.trim() || undefined,
-          limit: 100,
-        });
+        const response = await investmentsApi.getSites({ limit: 100 });
         if (!cancelled) setSites(response.items);
       } catch (reason) {
         if (cancelled) return;
@@ -43,13 +40,15 @@ export const InvestmentSitesPage: React.FC = () => {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }, 220);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
     };
-  }, [search]);
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
+  const visibleSites = sites.filter((site) =>
+    [site.name, site.code, site.deed?.deedNumber || '']
+      .some((value) => value.toLowerCase().includes(search.trim().toLowerCase()))
+  );
   const linked = sites.filter((site) => site.deedId).length;
   const areasCount = sites.reduce((sum, site) => sum + (site._count?.areas || 0), 0);
   const knownCodes = new Set(sites.map((site) => site.code.toUpperCase()));
@@ -113,7 +112,7 @@ export const InvestmentSitesPage: React.FC = () => {
                   <span className="text-sm text-muted-foreground">
                     {preset.expectedAreas} مساحات وفق البيان
                   </span>
-                  {canAdd && !registered && (
+                  {canAdd && !registered && !loading && !error && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -156,7 +155,7 @@ export const InvestmentSitesPage: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sites.map((site) => (
+              {visibleSites.map((site) => (
                 <TableRow key={site.id}>
                   <TableCell className="font-semibold" dir="ltr">{site.code}</TableCell>
                   <TableCell>{site.name}</TableCell>
@@ -192,7 +191,7 @@ export const InvestmentSitesPage: React.FC = () => {
             </TableBody>
           </Table>
           {loading && <p className="p-8 text-center text-sm text-muted-foreground">جارٍ تحميل المواقع...</p>}
-          {!loading && !error && sites.length === 0 && (
+          {!loading && !error && visibleSites.length === 0 && (
             <div className="p-10 text-center">
               <Building2 className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
               <p className="font-medium">لا توجد مواقع رئيسية مطابقة</p>
