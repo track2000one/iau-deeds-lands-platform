@@ -36,6 +36,8 @@ const ArchivePage = lazy(() => import('./pages/ArchivePage').then((m) => ({ defa
 const AppearanceSettingsPage = lazy(() => import('./pages/AppearanceSettingsPage').then((m) => ({ default: m.AppearanceSettingsPage })));
 const CentralBuildingsRegistryPage = lazy(() => import('./pages/CentralBuildingsRegistryPage').then((m) => ({ default: m.CentralBuildingsRegistryPage })));
 const SiteInspectionsPage = lazy(() => import('./pages/SiteInspectionsPage').then((m) => ({ default: m.SiteInspectionsPage })));
+const InvestmentsPage = lazy(() => import('./pages/InvestmentsPage').then((m) => ({ default: m.InvestmentsPage })));
+const InvestmentAreaDetailsPage = lazy(() => import('./pages/InvestmentAreaDetailsPage').then((m) => ({ default: m.InvestmentAreaDetailsPage })));
 const SiteInspectionFormPage = lazy(() => import('./pages/SiteInspectionFormPage').then((m) => ({ default: m.SiteInspectionFormPage })));
 const ViewSiteInspectionPage = lazy(() => import('./pages/ViewSiteInspectionPage').then((m) => ({ default: m.ViewSiteInspectionPage })));
 const AssetDashboardPage = lazy(() => import('./pages/AssetDashboardPage').then((m) => ({ default: m.AssetDashboardPage })));
@@ -78,6 +80,7 @@ const CORE_HOME_MODULES = [
 ] as const;
 
 const SCOPED_LANDING_ROUTES = [
+  ['investments', '/investments'],
   ['assets', '/assets'],
   ['accounting_transformation', '/accounting-transformation'],
   ['mosques', '/mosques'],
@@ -115,6 +118,9 @@ const HomeLandingPage = () => {
 
 const page = (element: ReactNode) => <Suspense fallback={<LoadingPage />}>{element}</Suspense>;
 const adminOnly = (element: ReactNode) => <RequireAdmin>{page(element)}</RequireAdmin>;
+const investmentPermission = (element: ReactNode, action: 'canView' | 'canAdd' | 'canEdit' | 'canDelete' | 'canPrint') => (
+  <PermissionGuard module="investments" action={action}>{page(element)}</PermissionGuard>
+);
 const assetPermission = (element: ReactNode, action: 'canView' | 'canAdd' | 'canEdit' | 'canDelete' | 'canPrint') => (
   <PermissionGuard module="assets" action={action}>{page(element)}</PermissionGuard>
 );
@@ -156,6 +162,13 @@ export const router = createHashRouter([
           { path: 'reports', element: assetPermission(<AssetReportsPage />, 'canView') },
           { path: ':assetId', element: assetPermission(<ViewAssetPage />, 'canView') },
           { path: ':assetId/edit', element: assetPermission(<EditAssetPage />, 'canEdit') },
+        ],
+      },
+      {
+        path: 'investments',
+        children: [
+          { index: true, element: investmentPermission(<InvestmentsPage />, 'canView') },
+          { path: 'areas/:areaId', element: investmentPermission(<InvestmentAreaDetailsPage />, 'canView') },
         ],
       },
       {
