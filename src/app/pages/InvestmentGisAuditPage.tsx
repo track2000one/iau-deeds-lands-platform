@@ -22,6 +22,7 @@ import 'leaflet/dist/leaflet.css';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { investmentsApi } from '../../features/investments/api';
+import { usePermissions } from '../../context/PermissionsContext';
 import {
   runGisQualityAudit,
   type GisAuditIssueCode,
@@ -132,6 +133,8 @@ const formatPercent = (value: number) =>
 
 export const InvestmentGisAuditPage: React.FC = () => {
   const navigate = useNavigate();
+  const { isAdmin, hasPermission } = usePermissions();
+  const canEdit = isAdmin || hasPermission('investments', 'canEdit');
 
   const [areas, setAreas] = React.useState<InvestmentArea[]>([]);
   const [sites, setSites] = React.useState<InvestmentSite[]>([]);
@@ -189,41 +192,38 @@ export const InvestmentGisAuditPage: React.FC = () => {
     Number(criticalPercent) || normalizedWarning
   );
 
-  const filteredBaseAreas = React.useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    return areas.filter((area) => {
-      if (siteId && area.siteId !== siteId) return false;
-
-      if (term) {
-        const haystack = [
-          area.areaCode,
-          area.name || '',
-          area.site?.name || '',
-          area.site?.deed?.deedNumber || '',
-        ]
-          .join(' ')
-          .toLowerCase();
-
-        if (!haystack.includes(term)) return false;
-      }
-
-      return true;
-    });
-  }, [areas, search, siteId]);
+  const auditBaseAreas = React.useMemo(
+    () => areas.filter((area) => !siteId || area.siteId === siteId),
+    [areas, siteId]
+  );
 
   const audit = React.useMemo(
     () =>
-      runGisQualityAudit(filteredBaseAreas, {
+      runGisQualityAudit(auditBaseAreas, {
         warningPercent: normalizedWarning,
         criticalPercent: normalizedCritical,
       }),
-    [filteredBaseAreas, normalizedCritical, normalizedWarning]
+    [auditBaseAreas, normalizedCritical, normalizedWarning]
   );
 
   const visibleAudits = React.useMemo(
-    () =>
-      audit.areas.filter((entry) => {
+    () => {
+      const term = search.trim().toLowerCase();
+
+      return audit.areas.filter((entry) => {
+        if (term) {
+          const haystack = [
+            entry.area.areaCode,
+            entry.area.name || '',
+            entry.area.site?.name || '',
+            entry.area.site?.deed?.deedNumber || '',
+          ]
+            .join(' ')
+            .toLowerCase();
+
+          if (!haystack.includes(term)) return false;
+        }
+
         if (
           severity &&
           !entry.issues.some((issue) => issue.severity === severity)
@@ -239,8 +239,9 @@ export const InvestmentGisAuditPage: React.FC = () => {
         }
 
         return true;
-      }),
-    [audit.areas, issueCode, severity]
+      });
+    },
+    [audit.areas, issueCode, search, severity]
   );
 
   const visibleAreas = visibleAudits.map((entry) => entry.area);
@@ -757,17 +758,19 @@ export const InvestmentGisAuditPage: React.FC = () => {
                           خريطة
                         </Button>
 
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            navigate(
-                              `/investments/areas/${entry.area.id}/edit`
-                            )
-                          }
-                        >
-                          معالجة
-                        </Button>
+                        {canEdit && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              navigate(
+                                `/investments/areas/${entry.area.id}/edit`
+                              )
+                            }
+                          >
+                            معالجة
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
