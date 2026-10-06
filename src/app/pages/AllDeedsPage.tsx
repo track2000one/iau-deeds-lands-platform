@@ -533,20 +533,7 @@ export const AllDeedsPage: React.FC = () => {
               </span>
             </label>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 md:col-span-2">
-              <input
-                type="checkbox"
-                checked={pdfIncludeSurvey}
-                onChange={(event) => setPdfIncludeSurvey(event.target.checked)}
-                className="mt-1 h-4 w-4"
-              />
-              <span>
-                <span className="block text-sm font-bold text-emerald-950">إضافة الرفع المساحي لكل صك — حسب الطلب</span>
-                <span className="mt-1 block text-xs leading-5 text-emerald-800">
-                  عند التفعيل يضيف النظام ملفات «الرفع المساحي» المرتبطة بكل صك مباشرة بعد مستنداته، مع صفحة فاصلة توضح رقم الصك وبيان العقار. الصكوك التي لا يوجد لها رفع مساحي تستمر في التقرير دون تعطيل.
-                </span>
-              </span>
-            </label>
+
           </div>
 
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-900">
