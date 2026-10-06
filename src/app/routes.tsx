@@ -37,6 +37,7 @@ const AppearanceSettingsPage = lazy(() => import('./pages/AppearanceSettingsPage
 const CentralBuildingsRegistryPage = lazy(() => import('./pages/CentralBuildingsRegistryPage').then((m) => ({ default: m.CentralBuildingsRegistryPage })));
 const SiteInspectionsPage = lazy(() => import('./pages/SiteInspectionsPage').then((m) => ({ default: m.SiteInspectionsPage })));
 const InvestmentsPage = lazy(() => import('./pages/InvestmentsPage').then((m) => ({ default: m.InvestmentsPage })));
+const InvestmentSitesPage = lazy(() => import('./pages/InvestmentSitesPage').then((m) => ({ default: m.InvestmentSitesPage })));
 const InvestmentAreaDetailsPage = lazy(() => import('./pages/InvestmentAreaDetailsPage').then((m) => ({ default: m.InvestmentAreaDetailsPage })));
 const InvestmentAreaFormPage = lazy(() => import('./pages/InvestmentAreaFormPage').then((m) => ({ default: m.InvestmentAreaFormPage })));
 const SiteInspectionFormPage = lazy(() => import('./pages/SiteInspectionFormPage').then((m) => ({ default: m.SiteInspectionFormPage })));
@@ -169,6 +170,7 @@ export const router = createHashRouter([
         path: 'investments',
         children: [
           { index: true, element: investmentPermission(<InvestmentsPage />, 'canView') },
+          { path: 'sites', element: investmentPermission(<InvestmentSitesPage />, 'canView') },
           { path: 'areas/new', element: investmentPermission(<InvestmentAreaFormPage />, 'canAdd') },
           { path: 'areas/:areaId/edit', element: investmentPermission(<InvestmentAreaFormPage />, 'canEdit') },
           { path: 'areas/:areaId', element: investmentPermission(<InvestmentAreaDetailsPage />, 'canView') },
