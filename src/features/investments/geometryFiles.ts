@@ -8,6 +8,12 @@ import {
 
 const MAX_GEOMETRY_FILE_BYTES = 10 * 1024 * 1024;
 
+export interface ImportedGeometryItem {
+  sourceName: string;
+  sourceId?: string;
+  feature: InvestmentPolygonFeature;
+}
+
 const normalizePoints = (coordinates: unknown): PolygonCoordinate[] => {
   if (!Array.isArray(coordinates)) return [];
 
@@ -169,24 +175,188 @@ export const parseKmlText = (text: string): InvestmentPolygonFeature => {
   throw new Error('لم يتم العثور على Polygon صالح داخل ملف KML.');
 };
 
-export const parseGeometryFile = async (
+const readGeoJsonItems = (
+  value: unknown,
+  fallbackName = 'Polygon'
+): ImportedGeometryItem[] => {
+  if (!value || typeof value !== 'object') return [];
+
+  const record = value as Record<string, unknown>;
+  const type = record.type;
+
+  if (type === 'FeatureCollection' && Array.isArray(record.features)) {
+    return record.features.flatMap((feature, index) =>
+      readGeoJsonItems(feature, `Feature ${index + 1}`)
+    );
+  }
+
+  if (type === 'GeometryCollection' && Array.isArray(record.geometries)) {
+    return record.geometries.flatMap((geometry, index) =>
+      readGeoJsonItems(geometry, `Geometry ${index + 1}`)
+    );
+  }
+
+  if (type === 'Feature') {
+    const properties =
+      record.properties && typeof record.properties === 'object'
+        ? record.properties as Record<string, unknown>
+        : {};
+    const name = String(
+      properties.areaCode ||
+      properties.area_code ||
+      properties.code ||
+      properties.name ||
+      record.id ||
+      fallbackName
+    ).trim();
+    const sourceId = record.id == null ? undefined : String(record.id);
+    const geometry = record.geometry;
+
+    if (geometry && typeof geometry === 'object') {
+      const geometryRecord = geometry as Record<string, unknown>;
+
+      if (geometryRecord.type === 'MultiPolygon' && Array.isArray(geometryRecord.coordinates)) {
+        return geometryRecord.coordinates.flatMap((polygon, index) => {
+          if (!Array.isArray(polygon)) return [];
+          const points = normalizePoints(polygon[0]);
+          if (points.length < 3) return [];
+
+          return [{
+            sourceName: geometryRecord.coordinates.length > 1
+              ? `${name} #${index + 1}`
+              : name,
+            sourceId,
+            feature: featureFromPoints(points),
+          }];
+        });
+      }
+
+      const coordinates = findPolygonCoordinates(geometryRecord);
+      const points = normalizePoints(coordinates);
+      if (points.length >= 3) {
+        return [{
+          sourceName: name || fallbackName,
+          sourceId,
+          feature: featureFromPoints(points),
+        }];
+      }
+    }
+
+    return [];
+  }
+
+  if (type === 'MultiPolygon' && Array.isArray(record.coordinates)) {
+    return record.coordinates.flatMap((polygon, index) => {
+      if (!Array.isArray(polygon)) return [];
+      const points = normalizePoints(polygon[0]);
+      if (points.length < 3) return [];
+
+      return [{
+        sourceName: `${fallbackName} #${index + 1}`,
+        feature: featureFromPoints(points),
+      }];
+    });
+  }
+
+  if (type === 'Polygon') {
+    const coordinates = findPolygonCoordinates(record);
+    const points = normalizePoints(coordinates);
+
+    return points.length >= 3
+      ? [{
+          sourceName: fallbackName,
+          feature: featureFromPoints(points),
+        }]
+      : [];
+  }
+
+  return [];
+};
+
+const readKmlItems = (text: string): ImportedGeometryItem[] => {
+  const document = new DOMParser().parseFromString(text, 'application/xml');
+
+  if (document.querySelector('parsererror')) {
+    throw new Error('ملف KML غير صالح.');
+  }
+
+  const placemarks = Array.from(document.getElementsByTagName('Placemark'));
+  const items: ImportedGeometryItem[] = [];
+
+  for (let placemarkIndex = 0; placemarkIndex < placemarks.length; placemarkIndex += 1) {
+    const placemark = placemarks[placemarkIndex];
+    const name =
+      placemark.getElementsByTagName('name')[0]?.textContent?.trim() ||
+      `Placemark ${placemarkIndex + 1}`;
+    const polygons = Array.from(placemark.getElementsByTagName('Polygon'));
+
+    for (let polygonIndex = 0; polygonIndex < polygons.length; polygonIndex += 1) {
+      const polygon = polygons[polygonIndex];
+      const outerBoundary =
+        polygon.getElementsByTagName('outerBoundaryIs')[0] || polygon;
+      const coordinatesElement =
+        outerBoundary.getElementsByTagName('coordinates')[0];
+
+      if (!coordinatesElement?.textContent) continue;
+
+      const points = parseKmlCoordinatesText(coordinatesElement.textContent);
+      if (points.length < 3) continue;
+
+      items.push({
+        sourceName: polygons.length > 1 ? `${name} #${polygonIndex + 1}` : name,
+        feature: featureFromPoints(points),
+      });
+    }
+  }
+
+  if (items.length === 0) {
+    const polygons = Array.from(document.getElementsByTagName('Polygon'));
+
+    for (let index = 0; index < polygons.length; index += 1) {
+      const outerBoundary =
+        polygons[index].getElementsByTagName('outerBoundaryIs')[0] ||
+        polygons[index];
+      const coordinatesElement =
+        outerBoundary.getElementsByTagName('coordinates')[0];
+
+      if (!coordinatesElement?.textContent) continue;
+
+      const points = parseKmlCoordinatesText(coordinatesElement.textContent);
+      if (points.length < 3) continue;
+
+      items.push({
+        sourceName: `Polygon ${index + 1}`,
+        feature: featureFromPoints(points),
+      });
+    }
+  }
+
+  return items;
+};
+
+export const parseGeometryCollectionFile = async (
   file: File
-): Promise<InvestmentPolygonFeature> => {
+): Promise<ImportedGeometryItem[]> => {
   if (file.size > MAX_GEOMETRY_FILE_BYTES) {
     throw new Error('حجم ملف الحدود أكبر من الحد المسموح به (10 MB).');
   }
 
   const extension = file.name.toLowerCase().split('.').pop();
+  let items: ImportedGeometryItem[] = [];
 
   if (extension === 'geojson' || extension === 'json') {
-    return parseGeoJsonText(await file.text());
-  }
+    let value: unknown;
 
-  if (extension === 'kml') {
-    return parseKmlText(await file.text());
-  }
+    try {
+      value = JSON.parse(await file.text());
+    } catch {
+      throw new Error('ملف GeoJSON/JSON غير صالح.');
+    }
 
-  if (extension === 'kmz') {
+    items = readGeoJsonItems(value);
+  } else if (extension === 'kml') {
+    items = readKmlItems(await file.text());
+  } else if (extension === 'kmz') {
     let zip: JSZip;
 
     try {
@@ -195,19 +365,34 @@ export const parseGeometryFile = async (
       throw new Error('ملف KMZ غير صالح أو تالف.');
     }
 
-    const kmlEntry = Object.values(zip.files).find(
+    const kmlEntries = Object.values(zip.files).filter(
       (entry) => !entry.dir && entry.name.toLowerCase().endsWith('.kml')
     );
 
-    if (!kmlEntry) {
-      throw new Error('ملف KMZ لا يحتوي على ملف KML.');
+    for (const entry of kmlEntries) {
+      const text = await entry.async('text');
+      items.push(...readKmlItems(text));
     }
-
-    const text = await kmlEntry.async('text');
-    return parseKmlText(text);
+  } else {
+    throw new Error('الصيغ المدعومة هي GeoJSON وKML وKMZ فقط.');
   }
 
-  throw new Error('الصيغ المدعومة هي GeoJSON وKML وKMZ فقط.');
+  if (items.length === 0) {
+    throw new Error('لم يتم العثور على أي Polygon صالح داخل الملف.');
+  }
+
+  if (items.length > 500) {
+    throw new Error('الملف يحتوي على أكثر من 500 Polygon، وهو أكبر من الحد المسموح.');
+  }
+
+  return items;
+};
+
+export const parseGeometryFile = async (
+  file: File
+): Promise<InvestmentPolygonFeature> => {
+  const items = await parseGeometryCollectionFile(file);
+  return items[0].feature;
 };
 
 const xmlEscape = (value: string) =>
