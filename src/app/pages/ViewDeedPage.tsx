@@ -736,7 +736,6 @@ export const ViewDeedPage: React.FC = () => {
     const coordinates = parseCoordinates((deed as any).coordinates);
     const allAttachments = ([
       ['صورة الصك', getAttachmentsByType('deed')],
-      ['الرفع المساحي', getAttachmentsByType('survey')],
       ['صور الموقع', getAttachmentsByType('site')],
       ['المخطط', getAttachmentsByType('plan')],
       ['مرفقات إضافية', getAttachmentsByType('additional')],
