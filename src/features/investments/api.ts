@@ -74,6 +74,29 @@ export const investmentsApi = {
       body: JSON.stringify({ siteId, areas }),
     }),
 
+  bulkImportAreaBatches: (
+    batches: Array<{
+      siteId: string;
+      areas: Array<Omit<InvestmentAreaInput, 'siteId'>>;
+    }>
+  ) =>
+    apiJson<{
+      requested: number;
+      created: number;
+      skipped: number;
+      batches: Array<{
+        siteId: string;
+        siteCode: string;
+        siteName: string;
+        requested: number;
+        created: number;
+        skipped: number;
+      }>;
+    }>('/api/investment-areas/bulk-batch', {
+      method: 'POST',
+      body: JSON.stringify({ batches }),
+    }),
+
   createArea: (data: InvestmentAreaInput) =>
     apiJson<InvestmentArea>('/api/investment-areas', {
       method: 'POST',
