@@ -28,6 +28,13 @@ export interface InvestmentDeedSummary {
   region?: string | null;
 }
 
+export interface InvestmentSiteDeedLink {
+  id: string;
+  deedId: string;
+  isPrimary: boolean;
+  deed: InvestmentDeedSummary;
+}
+
 export interface InvestmentSite {
   id: string;
   code: string;
@@ -35,6 +42,7 @@ export interface InvestmentSite {
   description?: string | null;
   deedId?: string | null;
   deed?: InvestmentDeedSummary | null;
+  deedLinks?: InvestmentSiteDeedLink[];
   latitude?: number | string | null;
   longitude?: number | string | null;
   region?: string | null;
@@ -117,6 +125,7 @@ export interface InvestmentSiteInput {
   name: string;
   description?: string | null;
   deedId?: string | null;
+  deedIds?: string[];
   latitude?: number | null;
   longitude?: number | null;
   region?: string | null;
