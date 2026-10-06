@@ -20,7 +20,8 @@ import type {
   InvestmentReadiness,
   InvestmentSite,
 } from '../../features/investments/types';
-import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
+import { InvestmentPolygonEditor } from '../components/InvestmentPolygonEditor';
+import { getPolygonMetrics } from '../../features/investments/geometry';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -45,6 +46,7 @@ type FormState = {
   currentUse: string;
   proposedUse: string;
   notes: string;
+  geoJson: InvestmentAreaInput['geoJson'];
 };
 
 const EMPTY_FORM: FormState = {
@@ -63,6 +65,7 @@ const EMPTY_FORM: FormState = {
   currentUse: '',
   proposedUse: '',
   notes: '',
+  geoJson: null,
 };
 
 const stepItems = [
@@ -149,6 +152,7 @@ export const InvestmentAreaFormPage: React.FC = () => {
             currentUse: area.currentUse || '',
             proposedUse: area.proposedUse || '',
             notes: area.notes || '',
+            geoJson: area.geoJson || null,
           });
           setAreaCodeTouched(true);
         }
@@ -192,6 +196,11 @@ export const InvestmentAreaFormPage: React.FC = () => {
     return { latitude, longitude };
   }, [form.latitude, form.longitude]);
 
+  const polygonMetrics = React.useMemo(
+    () => getPolygonMetrics(form.geoJson),
+    [form.geoJson]
+  );
+
   const validateStep = (step: number) => {
     if (step === 0) {
       if (!form.siteId) {
@@ -230,6 +239,11 @@ export const InvestmentAreaFormPage: React.FC = () => {
     }
 
     if (step === 2) {
+      if (form.geoJson && !polygonMetrics.isValid) {
+        toast.error('حدود المساحة غير مكتملة. يجب أن يحتوي المضلع على ثلاث نقاط على الأقل.');
+        return false;
+      }
+
       const hasLatitude = form.latitude.trim() !== '';
       const hasLongitude = form.longitude.trim() !== '';
 
@@ -279,6 +293,7 @@ export const InvestmentAreaFormPage: React.FC = () => {
       surveyedArea: optionalNumber(form.surveyedArea) ?? null,
       latitude: optionalNumber(form.latitude) ?? null,
       longitude: optionalNumber(form.longitude) ?? null,
+      geoJson: form.geoJson ?? null,
       geometryAccuracy: form.geometryAccuracy,
       occupancyStatus: form.occupancyStatus,
       investmentReadiness: form.investmentReadiness,
@@ -594,17 +609,72 @@ export const InvestmentAreaFormPage: React.FC = () => {
               </div>
             </div>
 
-            <MapCoordinatePicker
-              coordinates={coordinateValue}
-              onChange={(coordinates) => {
-                setField('latitude', String(coordinates.latitude));
-                setField('longitude', String(coordinates.longitude));
+            <div className="rounded-xl border bg-muted/20 p-4 text-xs leading-6 text-muted-foreground">
+              الإحداثية أعلاه تمثل نقطة مرجعية للمساحة. عند رسم Polygon يتم تحديث
+              الإحداثية تلقائيًا إلى مركز تقريبي للمضلع، بينما تبقى المساحة النظامية
+              منفصلة عن المساحة المحسوبة من الرسم.
+            </div>
+
+            <InvestmentPolygonEditor
+              geoJson={form.geoJson}
+              referenceCoordinates={coordinateValue}
+              approximateArea={optionalNumber(form.approximateArea) ?? null}
+              surveyedArea={optionalNumber(form.surveyedArea) ?? null}
+              onGeometryChange={(geoJson, metrics) => {
+                setField('geoJson', geoJson);
+
+                if (metrics.centroid) {
+                  setField('latitude', String(metrics.centroid.latitude));
+                  setField('longitude', String(metrics.centroid.longitude));
+                }
               }}
             />
 
-            <p className="rounded-xl border bg-muted/30 p-3 text-xs leading-6 text-muted-foreground">
-              الإحداثية الحالية تمثل نقطة مرجعية للموقع. دعم رسم الحدود الجغرافية Polygon سيضاف في شاشة الخريطة الاستثمارية، ولا ينبغي اعتبار النقطة الحالية حدًا مساحيًا رسميًا.
-            </p>
+            {polygonMetrics.isValid && (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/20 p-4">
+                <div className="me-auto">
+                  <p className="text-sm font-semibold">
+                    المساحة المحسوبة من الرسم:{' '}
+                    {polygonMetrics.calculatedAreaSqm.toLocaleString('ar-SA', {
+                      maximumFractionDigits: 2,
+                    })}{' '}
+                    م²
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    لا يتم استبدال أي مساحة مسجلة تلقائيًا. استخدم الأزرار أدناه فقط إذا
+                    رغبت في نسخ القيمة المحسوبة إلى أحد الحقول.
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setField(
+                      'approximateArea',
+                      polygonMetrics.calculatedAreaSqm.toFixed(2)
+                    )
+                  }
+                >
+                  نسخ إلى التقريبية
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setField(
+                      'surveyedArea',
+                      polygonMetrics.calculatedAreaSqm.toFixed(2)
+                    )
+                  }
+                >
+                  نسخ إلى المساحية
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -625,6 +695,16 @@ export const InvestmentAreaFormPage: React.FC = () => {
               <ReviewItem
                 label="المساحة المساحية المعتمدة"
                 value={form.surveyedArea ? `${Number(form.surveyedArea).toLocaleString('ar-SA')} م²` : 'غير متوفرة'}
+              />
+              <ReviewItem
+                label="المساحة المحسوبة من Polygon"
+                value={polygonMetrics.isValid
+                  ? `${polygonMetrics.calculatedAreaSqm.toLocaleString('ar-SA', { maximumFractionDigits: 2 })} م²`
+                  : 'لا توجد حدود مرسومة'}
+              />
+              <ReviewItem
+                label="عدد نقاط الحدود"
+                value={polygonMetrics.isValid ? String(polygonMetrics.vertexCount) : '-'}
               />
               <ReviewItem label="حالة المساحة" value={statusLabels[form.occupancyStatus]} />
               <ReviewItem label="جاهزية الاستثمار" value={readinessLabels[form.investmentReadiness]} />

@@ -1,3 +1,5 @@
+import type { InvestmentPolygonFeature } from './geometry';
+
 export type InvestmentAreaStatus =
   | 'AVAILABLE'
   | 'OCCUPIED'
@@ -67,7 +69,7 @@ export interface InvestmentArea {
   surveyedArea?: number | string | null;
   latitude?: number | string | null;
   longitude?: number | string | null;
-  geoJson?: unknown;
+  geoJson?: InvestmentPolygonFeature | null;
   geometryAccuracy: GeometryAccuracy;
   occupancyStatus: InvestmentAreaStatus;
   investmentReadiness: InvestmentReadiness;
