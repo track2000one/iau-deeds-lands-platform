@@ -3,7 +3,9 @@ import type {
   InvestmentArea,
   InvestmentAreaInput,
   InvestmentAreaQuery,
+  InvestmentDeedOption,
   InvestmentSite,
+  InvestmentSiteInput,
   PaginatedResponse,
 } from './types';
 
@@ -29,6 +31,14 @@ export const investmentsApi = {
   getSite: (id: string) =>
     apiJson<InvestmentSite>(`/api/investment-sites/${id}`),
 
+  getDeedOptions: (search: string) =>
+    apiJson<{ items: InvestmentDeedOption[] }>(
+      `/api/investment-sites/deed-options${buildQuery({ search, limit: 20 })}`
+    ),
+
+  archiveSite: (id: string) =>
+    apiJson<void>(`/api/investment-sites/${id}`, { method: 'DELETE' }),
+
   getAreas: (params: InvestmentAreaQuery = {}) =>
     apiJson<PaginatedResponse<InvestmentArea>>(
       `/api/investment-areas${buildQuery(params)}`
@@ -37,13 +47,13 @@ export const investmentsApi = {
   getArea: (id: string) =>
     apiJson<InvestmentArea>(`/api/investment-areas/${id}`),
 
-  createSite: (data: Partial<InvestmentSite>) =>
+  createSite: (data: InvestmentSiteInput) =>
     apiJson<InvestmentSite>('/api/investment-sites', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateSite: (id: string, data: Partial<InvestmentSite>) =>
+  updateSite: (id: string, data: Partial<InvestmentSiteInput>) =>
     apiJson<InvestmentSite>(`/api/investment-sites/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
