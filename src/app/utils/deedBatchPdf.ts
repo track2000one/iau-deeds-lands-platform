@@ -29,6 +29,7 @@ export type DeedBatchPdfProgress = {
 export type DeedBatchPdfOptions = {
   includeCover?: boolean;
   includeHeaders?: boolean;
+  includeSurvey?: boolean;
   fileName?: string;
   scopeLabel?: string;
   signal?: AbortSignal;
@@ -42,6 +43,7 @@ export type DeedBatchPdfResult = {
   pageCount: number;
   pdfCount: number;
   imageCount: number;
+  surveyDocumentCount: number;
   skippedDeeds: number;
   skippedDocuments: number;
   skippedImages: number;
@@ -119,6 +121,8 @@ const isExcludedDeedAttachmentType = (attachment: BatchAttachment) => {
     'contract_image',
     'delivery_minutes',
     'inspection_image',
+    'survey_document',
+    'survey',
   ].includes(type);
 };
 
@@ -146,6 +150,13 @@ const getPrintableDeedDocuments = (attachments: BatchAttachment[]) => {
     );
   });
 };
+
+const getPrintableSurveyDocuments = (attachments: BatchAttachment[]) =>
+  attachments.filter((attachment) => {
+    const type = String(attachment.attachmentType || '').toLowerCase();
+    return ['survey_document', 'survey'].includes(type)
+      && Boolean(getAttachmentUrl(attachment));
+  });
 
 const dedupeAttachments = (attachments: BatchAttachment[]) => {
   const seen = new Set<string>();
@@ -811,6 +822,92 @@ const createDeedSeparator = (
   return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.97));
 };
 
+const createSurveySeparator = (
+  deed: Deed,
+  surveyCount: number
+) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1400;
+  canvas.height = 1980;
+
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('تعذر تجهيز صفحة الرفع المساحي');
+
+  const gradient = context.createLinearGradient(0, 0, 1400, 1980);
+  gradient.addColorStop(0, '#f7fbfd');
+  gradient.addColorStop(0.55, '#ffffff');
+  gradient.addColorStop(1, '#eef8f4');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = '#0b6b57';
+  context.fillRect(0, 0, 1400, 24);
+  context.fillStyle = '#123d73';
+  context.fillRect(0, 24, 1400, 52);
+
+  context.direction = 'rtl';
+  context.textAlign = 'right';
+  context.fillStyle = '#ffffff';
+  context.font = '700 28px Tahoma, Arial, sans-serif';
+  context.fillText('إدارة أوقاف وأملاك الجامعة', 1240, 59);
+
+  context.fillStyle = '#123d73';
+  context.font = '800 70px Tahoma, Arial, sans-serif';
+  context.fillText('الرفع المساحي', 1240, 430);
+
+  context.fillStyle = '#0b6b57';
+  context.font = '800 46px Tahoma, Arial, sans-serif';
+  context.fillText(`الصك رقم ${deed.deedNumber || '-'}`, 1240, 525);
+
+  context.fillStyle = '#60778b';
+  context.font = '600 34px Tahoma, Arial, sans-serif';
+  context.fillText(deed.propertyDescription || 'بيان العقار غير محدد', 1240, 590);
+
+  context.fillStyle = '#f5f9fb';
+  context.strokeStyle = '#d6e3ea';
+  context.lineWidth = 3;
+  context.fillRect(190, 790, 1020, 360);
+  context.strokeRect(190, 790, 1020, 360);
+
+  const rows = [
+    ['المدينة', deed.city || '-'],
+    ['الحي', deed.district || '-'],
+    ['رقم المخطط', deed.planNumber || '-'],
+    ['عدد ملفات الرفع المساحي', surveyCount.toLocaleString('ar-SA')],
+  ];
+
+  let y = 865;
+  for (const [label, value] of rows) {
+    context.fillStyle = '#768998';
+    context.font = '600 27px Tahoma, Arial, sans-serif';
+    context.fillText(label, 1130, y);
+
+    context.fillStyle = '#183b5d';
+    context.font = '800 34px Tahoma, Arial, sans-serif';
+    context.fillText(String(value), 700, y);
+    y += 74;
+  }
+
+  context.textAlign = 'center';
+  context.fillStyle = '#123d73';
+  context.font = '800 30px Tahoma, Arial, sans-serif';
+  context.fillText('تبدأ ملفات الرفع المساحي في الصفحة التالية', 700, 1425);
+
+  context.fillStyle = '#7b8c99';
+  context.font = '500 23px Tahoma, Arial, sans-serif';
+  context.fillText(
+    'تم إرفاقها اختيارياً ضمن تقرير الصك حسب خيارات إنشاء التقرير',
+    700,
+    1475
+  );
+
+  context.fillStyle = '#98a4ad';
+  context.font = '500 20px Tahoma, Arial, sans-serif';
+  context.fillText('IAU Deeds Platform', 700, 1870);
+
+  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.96));
+};
+
 const addFullPageJpeg = async (
   pdf: PDFDocument,
   bytes: Uint8Array
@@ -914,13 +1011,17 @@ export const generateDeedImagesPdf = async (
 ): Promise<DeedBatchPdfResult> => {
   const includeCover = options.includeCover !== false;
   const includeHeaders = options.includeHeaders !== false;
+  const includeSurvey = options.includeSurvey === true;
   const signal = options.signal;
 
   if (!deeds.length) {
     throw new Error('لا توجد صكوك ضمن النطاق المحدد');
   }
 
-  const collectedByDeed = new Map<number, BatchAttachment[]>();
+  const collectedByDeed = new Map<number, {
+    deedDocuments: BatchAttachment[];
+    surveyDocuments: BatchAttachment[];
+  }>();
   let skippedDeeds = 0;
   let nextDeedIndex = 0;
   let completedDeeds = 0;
@@ -958,9 +1059,16 @@ export const generateDeedImagesPdf = async (
 
         totalAttachmentRecords += allAttachments.length;
 
-        const documents = getPrintableDeedDocuments(allAttachments);
-        if (documents.length) {
-          collectedByDeed.set(index, documents);
+        const deedDocuments = getPrintableDeedDocuments(allAttachments);
+        const surveyDocuments = includeSurvey
+          ? getPrintableSurveyDocuments(allAttachments)
+          : [];
+
+        if (deedDocuments.length || surveyDocuments.length) {
+          collectedByDeed.set(index, {
+            deedDocuments,
+            surveyDocuments,
+          });
         } else {
           skippedDeeds += 1;
         }
@@ -985,13 +1093,18 @@ export const generateDeedImagesPdf = async (
 
   const collected: Array<{
     deed: Deed;
-    attachments: BatchAttachment[];
+    deedDocuments: BatchAttachment[];
+    surveyDocuments: BatchAttachment[];
   }> = [];
 
   deeds.forEach((deed, deedIndex) => {
-    const attachments = collectedByDeed.get(deedIndex) || [];
-    if (attachments.length) {
-      collected.push({ deed, attachments });
+    const entry = collectedByDeed.get(deedIndex);
+    if (entry && (entry.deedDocuments.length || entry.surveyDocuments.length)) {
+      collected.push({
+        deed,
+        deedDocuments: entry.deedDocuments,
+        surveyDocuments: entry.surveyDocuments,
+      });
     }
   });
 
@@ -1008,7 +1121,8 @@ export const generateDeedImagesPdf = async (
   }
 
   const documentCount = collected.reduce(
-    (sum, item) => sum + item.attachments.length,
+    (sum, item) =>
+      sum + item.deedDocuments.length + item.surveyDocuments.length,
     0
   );
 
@@ -1034,6 +1148,7 @@ export const generateDeedImagesPdf = async (
   let successfulImageDocuments = 0;
   let copiedDocumentPages = 0;
   let skippedDocuments = 0;
+  let successfulSurveyDocuments = 0;
   const successfulDeeds = new Set<string>();
 
   let renderIndex = 0;
@@ -1045,14 +1160,19 @@ export const generateDeedImagesPdf = async (
 
     let separatorAdded = false;
 
-    for (const attachment of item.attachments) {
+    const mergeDocument = async (
+      attachment: BatchAttachment,
+      category: 'deed' | 'survey'
+    ) => {
       renderIndex += 1;
 
       options.onProgress?.({
         phase: 'rendering',
         current: renderIndex,
         total: documentCount,
-        label: `تجهيز ${getAttachmentName(attachment)} — الصك ${item.deed.deedNumber || ''}`,
+        label: category === 'survey'
+          ? `تجهيز الرفع المساحي — الصك ${item.deed.deedNumber || ''}`
+          : `تجهيز ${getAttachmentName(attachment)} — الصك ${item.deed.deedNumber || ''}`,
       });
 
       try {
@@ -1062,14 +1182,6 @@ export const generateDeedImagesPdf = async (
           || blob.type.toLowerCase().includes('pdf')
           || await hasPdfSignature(blob)
         );
-
-        if (includeHeaders && !separatorAdded) {
-          await addFullPageJpeg(
-            pdf,
-            createDeedSeparator(item.deed, item.attachments.length)
-          );
-          separatorAdded = true;
-        }
 
         let pagesAdded = 0;
 
@@ -1084,19 +1196,49 @@ export const generateDeedImagesPdf = async (
         successfulDocuments += 1;
         copiedDocumentPages += pagesAdded;
         successfulDeeds.add(item.deed.id);
+
+        if (category === 'survey') {
+          successfulSurveyDocuments += 1;
+        }
       } catch (error) {
         if (signal?.aborted) throw error;
         console.error(
-          'Failed to merge deed document:',
+          category === 'survey'
+            ? 'Failed to merge deed survey document:'
+            : 'Failed to merge deed document:',
           item.deed.deedNumber,
           getAttachmentName(attachment),
           error
         );
         skippedDocuments += 1;
       }
+    };
+
+    if (item.deedDocuments.length) {
+      if (includeHeaders && !separatorAdded) {
+        await addFullPageJpeg(
+          pdf,
+          createDeedSeparator(item.deed, item.deedDocuments.length)
+        );
+        separatorAdded = true;
+      }
+
+      for (const attachment of item.deedDocuments) {
+        await mergeDocument(attachment, 'deed');
+      }
+    }
+
+    if (includeSurvey && item.surveyDocuments.length) {
+      await addFullPageJpeg(
+        pdf,
+        createSurveySeparator(item.deed, item.surveyDocuments.length)
+      );
+
+      for (const attachment of item.surveyDocuments) {
+        await mergeDocument(attachment, 'survey');
+      }
     }
   }
-
   if (!successfulDocuments) {
     throw new Error(
       'تم العثور على مستندات للصكوك، لكن تعذر تحميلها أو دمجها. تحقق من صلاحيات ملفات Google Drive ثم حاول مرة أخرى.'
@@ -1121,6 +1263,7 @@ export const generateDeedImagesPdf = async (
     pageCount: copiedDocumentPages,
     pdfCount: successfulPdfDocuments,
     imageCount: successfulImageDocuments,
+    surveyDocumentCount: successfulSurveyDocuments,
     skippedDeeds,
     skippedDocuments,
     skippedImages: skippedDocuments,
