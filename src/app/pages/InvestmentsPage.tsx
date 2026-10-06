@@ -49,7 +49,7 @@ export const InvestmentsPage: React.FC = () => {
   const [siteId, setSiteId] = React.useState('');
   const [status, setStatus] = React.useState<InvestmentAreaStatus | ''>('');
 
-  const canEdit = isAdmin || hasPermission('investments', 'canEdit');
+  const canAdd = isAdmin || hasPermission('investments', 'canAdd');
 
   const loadData = React.useCallback(async () => {
     try {
@@ -101,7 +101,7 @@ export const InvestmentsPage: React.FC = () => {
             <MapPin className="me-2 h-4 w-4" />
             خريطة الصكوك
           </Button>
-          {canEdit && (
+          {canAdd && (
             <Button variant="outline" disabled title="يتم تفعيل الإدخال في المرحلة التالية">
               إضافة مساحة
             </Button>
