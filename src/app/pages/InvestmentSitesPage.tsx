@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Building2, FileText, FolderPlus, Pencil, Search } from 'lucide-react';
+import { ArrowRight, Building2, FileText, FolderPlus, Pencil, Search, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -279,6 +279,15 @@ export const InvestmentSitesPage: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canAdd && (
+            <Button
+              variant="outline"
+              onClick={() => navigate('/investments/reference-import-review')}
+            >
+              <ShieldCheck className="me-2 h-4 w-4" />
+              المراجعة النهائية واستيراد الـ28
+            </Button>
+          )}
           {canAdd && !matchingDeeds && !matchError && (
             <Button
               variant="outline"
