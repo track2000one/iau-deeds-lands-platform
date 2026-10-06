@@ -63,6 +63,10 @@ const issueLabels: Record<GisAuditIssueCode, string> = {
   MISSING_SURVEYED_AREA: 'مساحة مساحية ناقصة',
   MISSING_REFERENCE_POINT: 'إحداثية ناقصة',
   POLYGON_OVERLAP: 'تداخل حدود',
+  MISSING_SITE_BOUNDARY: 'حدود الموقع الرئيسي مفقودة',
+  INVALID_SITE_BOUNDARY: 'حدود الموقع الرئيسي غير صالحة',
+  SITE_BOUNDARY_SELF_INTERSECTION: 'تقاطع ذاتي في حدود الموقع',
+  OUTSIDE_SITE_BOUNDARY: 'خارج حدود الموقع الرئيسي',
 };
 
 const severityColors: Record<GisAuditSeverity, string> = {
@@ -91,11 +95,23 @@ const finitePoint = (
   return [latitude, longitude];
 };
 
-const FitAuditMap: React.FC<{ areas: InvestmentArea[] }> = ({ areas }) => {
+const FitAuditMap: React.FC<{
+  areas: InvestmentArea[];
+  sites: InvestmentSite[];
+}> = ({ areas, sites }) => {
   const map = useMap();
 
   React.useEffect(() => {
     const points: [number, number][] = [];
+
+    for (const site of sites) {
+      const metrics = getPolygonMetrics(site.geoJson);
+      if (!metrics.isValid) continue;
+
+      for (const [longitude, latitude] of metrics.points) {
+        points.push([latitude, longitude]);
+      }
+    }
 
     for (const area of areas) {
       const metrics = getPolygonMetrics(area.geoJson);
@@ -121,7 +137,7 @@ const FitAuditMap: React.FC<{ areas: InvestmentArea[] }> = ({ areas }) => {
       padding: [36, 36],
       maxZoom: 17,
     });
-  }, [areas, map]);
+  }, [areas, map, sites]);
 
   return null;
 };
@@ -199,11 +215,15 @@ export const InvestmentGisAuditPage: React.FC = () => {
 
   const audit = React.useMemo(
     () =>
-      runGisQualityAudit(auditBaseAreas, {
-        warningPercent: normalizedWarning,
-        criticalPercent: normalizedCritical,
-      }),
-    [auditBaseAreas, normalizedCritical, normalizedWarning]
+      runGisQualityAudit(
+        auditBaseAreas,
+        {
+          warningPercent: normalizedWarning,
+          criticalPercent: normalizedCritical,
+        },
+        sites
+      ),
+    [auditBaseAreas, normalizedCritical, normalizedWarning, sites]
   );
 
   const visibleAudits = React.useMemo(
@@ -245,6 +265,13 @@ export const InvestmentGisAuditPage: React.FC = () => {
   );
 
   const visibleAreas = visibleAudits.map((entry) => entry.area);
+  const visibleSiteIds = new Set(visibleAreas.map((area) => area.siteId));
+  const visibleSites = sites.filter(
+    (site) =>
+      (!siteId || site.id === siteId) &&
+      (visibleSiteIds.has(site.id) || (visibleAreas.length === 0 && Boolean(siteId)))
+  );
+
   const criticalIssues = audit.areas.reduce(
     (sum, entry) =>
       sum +
@@ -299,17 +326,17 @@ export const InvestmentGisAuditPage: React.FC = () => {
               <p className="font-semibold">ملاحظة منهجية</p>
               <p>
                 عتبات فرق المساحة أدناه قواعد تشغيلية قابلة للتعديل داخل شاشة
-                التدقيق وليست معيارًا نظاميًا أو مساحيًا معتمدًا. كما أن فحص
-                احتواء المساحات داخل حدود الموقع الرئيسي غير مفعّل حاليًا لأن
-                المواقع الرئيسية لا تملك Polygon حدوديًا محفوظًا في نموذج
-                البيانات الحالي.
+                التدقيق وليست معيارًا نظاميًا أو مساحيًا معتمدًا. عند توفر
+                Polygon للموقع الرئيسي يفحص النظام وقوع Polygon كل مساحة داخله
+                ويرصد أي خروج أو عبور للحدود. وإذا لم تكن حدود الموقع محفوظة
+                تظهر ملاحظة تطلب استكمالها قبل اعتماد نتيجة الاحتواء.
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">المساحات المفحوصة</CardTitle>
@@ -335,6 +362,20 @@ export const InvestmentGisAuditPage: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-sm">تغطية حدود المواقع</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {formatPercent(audit.siteBoundaryCoveragePercent)}%
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {audit.siteBoundaryCount} من {sites.length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm">مساحات سليمة</CardTitle>
           </CardHeader>
           <CardContent className="text-3xl font-bold">
@@ -348,6 +389,15 @@ export const InvestmentGisAuditPage: React.FC = () => {
           </CardHeader>
           <CardContent className="text-3xl font-bold">
             {audit.criticalAreaCount}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">خارج نطاق الموقع</CardTitle>
+          </CardHeader>
+          <CardContent className="text-3xl font-bold">
+            {audit.outsideSiteAreaCount}
           </CardContent>
         </Card>
 
@@ -491,7 +541,32 @@ export const InvestmentGisAuditPage: React.FC = () => {
                   url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                 />
 
-                <FitAuditMap areas={visibleAreas} />
+                <FitAuditMap areas={visibleAreas} sites={visibleSites} />
+
+                {visibleSites.map((site) => (
+                  site.geoJson ? (
+                    <GeoJSON
+                      key={`site-boundary-${site.id}`}
+                      data={site.geoJson as any}
+                      style={{
+                        color: '#0f4c81',
+                        weight: 3,
+                        dashArray: '8 6',
+                        fillColor: '#0ea5e9',
+                        fillOpacity: 0.04,
+                      }}
+                    >
+                      <Popup>
+                        <div dir="rtl" className="min-w-[210px] text-right">
+                          <div className="font-bold">{site.name}</div>
+                          <div className="mt-1 text-xs">
+                            حدود الموقع الرئيسي — {site.code}
+                          </div>
+                        </div>
+                      </Popup>
+                    </GeoJSON>
+                  ) : null
+                ))}
 
                 {visibleAudits.map((entry) => {
                   const critical = entry.issues.some(
@@ -590,7 +665,7 @@ export const InvestmentGisAuditPage: React.FC = () => {
               <div>
                 <p className="font-semibold">أحمر — ملاحظة حرجة</p>
                 <p className="text-xs text-muted-foreground">
-                  تداخل، تقاطع ذاتي، Polygon غير صالح، أو فرق يتجاوز العتبة الحرجة.
+                  تداخل، تقاطع ذاتي، Polygon غير صالح، خروج عن حدود الموقع، أو فرق يتجاوز العتبة الحرجة.
                 </p>
               </div>
             </div>
@@ -600,7 +675,7 @@ export const InvestmentGisAuditPage: React.FC = () => {
               <div>
                 <p className="font-semibold">برتقالي — يحتاج مراجعة</p>
                 <p className="text-xs text-muted-foreground">
-                  حدود مفقودة، بيانات مساحية ناقصة، أو فرق ضمن مستوى التنبيه.
+                  حدود مساحة أو موقع رئيسي مفقودة، بيانات مساحية ناقصة، أو فرق ضمن مستوى التنبيه.
                 </p>
               </div>
             </div>
@@ -616,8 +691,9 @@ export const InvestmentGisAuditPage: React.FC = () => {
             </div>
 
             <div className="rounded-xl border bg-muted/20 p-3 text-xs leading-6 text-muted-foreground">
-              الفحص الآلي أداة ضبط جودة مساندة؛ نتيجة «سليم» لا تحول الرسم إلى
-              رفع مساحي رسمي ولا تغني عن اعتماد الجهة المختصة.
+              حدود الموقع الرئيسي مرسومة بخط أزرق متقطع، بينما ألوان المساحات
+              تعكس نتيجة التدقيق. الفحص الآلي أداة ضبط جودة مساندة؛ نتيجة
+              «سليم» لا تحول الرسم إلى رفع مساحي رسمي ولا تغني عن اعتماد الجهة المختصة.
             </div>
           </CardContent>
         </Card>
@@ -654,6 +730,13 @@ export const InvestmentGisAuditPage: React.FC = () => {
               {visibleAudits.map((entry) => {
                 const hasCritical = entry.issues.some(
                   (issue) => issue.severity === 'CRITICAL'
+                );
+                const hasSiteBoundaryIssue = entry.issues.some((issue) =>
+                  [
+                    'MISSING_SITE_BOUNDARY',
+                    'INVALID_SITE_BOUNDARY',
+                    'SITE_BOUNDARY_SELF_INTERSECTION',
+                  ].includes(issue.code)
                 );
 
                 return (
@@ -759,17 +842,33 @@ export const InvestmentGisAuditPage: React.FC = () => {
                         </Button>
 
                         {canEdit && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              navigate(
-                                `/investments/areas/${entry.area.id}/edit`
-                              )
-                            }
-                          >
-                            معالجة
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                navigate(
+                                  `/investments/areas/${entry.area.id}/edit`
+                                )
+                              }
+                            >
+                              معالجة المساحة
+                            </Button>
+
+                            {hasSiteBoundaryIssue && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                  navigate(
+                                    `/investments/sites/${entry.area.siteId}/edit`
+                                  )
+                                }
+                              >
+                                حدود الموقع
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </TableCell>
