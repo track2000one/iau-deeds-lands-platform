@@ -319,6 +319,8 @@ export interface InvestmentExecutiveDashboard {
     availableReferenceArea: number;
     readyAreaCount: number;
     readyReferenceArea: number;
+    availableAndReadyAreaCount: number;
+    availableAndReadyReferenceArea: number;
     opportunityCandidateCount: number;
     opportunityCandidateArea: number;
     blockedAreaCount: number;
