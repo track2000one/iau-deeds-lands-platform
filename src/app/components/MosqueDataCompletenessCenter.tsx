@@ -171,6 +171,20 @@ const taskStatusClass: Record<MosqueCompletionTask['status'], string> = {
   cancelled: 'border-slate-200 bg-slate-50 text-slate-600',
 };
 
+const kpiStatusLabel: Record<'excellent' | 'good' | 'needs_improvement' | 'no_data', string> = {
+  excellent: 'ممتاز',
+  good: 'جيد',
+  needs_improvement: 'يحتاج تحسين',
+  no_data: 'لا توجد بيانات كافية',
+};
+
+const kpiStatusClass: Record<'excellent' | 'good' | 'needs_improvement' | 'no_data', string> = {
+  excellent: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  good: 'border-sky-200 bg-sky-50 text-sky-800',
+  needs_improvement: 'border-rose-200 bg-rose-50 text-rose-800',
+  no_data: 'border-slate-200 bg-slate-50 text-slate-600',
+};
+
 const activeTaskStatuses = new Set<MosqueCompletionTask['status']>(['open', 'in_progress']);
 
 const siteTypeLabel = (site: MosqueSite) => {
@@ -725,20 +739,28 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
       ['التقرير', 'تقرير الأداء الشهري لمهام استكمال بيانات المساجد والمصليات'],
       ['الشهر', analytics.month],
       ['تاريخ الاستخراج', new Date().toLocaleString('ar-SA')],
+      ['معيار KPI', analytics.kpiStandard.code],
+      ['التقييم العام', kpiStatusLabel[analytics.unitKpi.status]],
+      ['درجة KPI', analytics.unitKpi.score == null ? 'لا تتوفر بيانات كافية' : analytics.unitKpi.score + '/100'],
       [],
       ['المؤشر', 'القيمة'],
       ['مهام أنشئت خلال الشهر', analytics.summary.created],
       ['مهام أنجزت خلال الشهر', analytics.summary.completed],
       ['نسبة إنجاز المهام المنشأة', analytics.summary.completionRate + '%'],
+      ['مستهدف نسبة الإنجاز', analytics.kpiStandard.completionRateTarget + '%'],
       ['المهام النشطة حاليًا', analytics.summary.active],
       ['المهام المتأخرة حاليًا', analytics.summary.overdue],
+      ['نسبة المهام المتأخرة', analytics.summary.overdueRate + '%'],
+      ['الحد الأعلى للتأخير', analytics.kpiStandard.overdueRateMax + '%'],
       ['المستحقة اليوم', analytics.summary.dueToday],
       ['المستحقة خلال 3 أيام', analytics.summary.dueSoon],
       ['المهام غير المسندة', analytics.summary.unassigned],
       ['المهام المنجزة ضمن الموعد', analytics.summary.onTimeCompleted],
       ['المهام المنجزة ذات موعد محدد', analytics.summary.completedWithDueDate],
       ['نسبة الالتزام بالمواعيد', analytics.summary.onTimeRate == null ? 'لا تتوفر عينة' : analytics.summary.onTimeRate + '%'],
-      ['متوسط مدة الإنجاز', analytics.summary.avgCompletionHours == null ? 'لا تتوفر بيانات' : (analytics.summary.avgCompletionHours / 24).toFixed(1) + ' يوم'],
+      ['مستهدف الالتزام بالمواعيد', analytics.kpiStandard.onTimeRateTarget + '%'],
+      ['متوسط مدة الإنجاز', analytics.summary.avgCompletionDays == null ? 'لا تتوفر بيانات' : analytics.summary.avgCompletionDays + ' يوم'],
+      ['مستهدف متوسط الإنجاز', '≤ ' + analytics.kpiStandard.avgCompletionDaysTarget + ' أيام'],
     ];
 
     const assigneeRows = analytics.byAssignee.map((row, index) => ({
@@ -746,13 +768,17 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
       'المسؤول': row.assigneeName,
       'مهام أنشئت': row.created,
       'مهام منجزة': row.completed,
+      'نسبة الإنجاز': row.completionRate == null ? '' : row.completionRate + '%',
       'مهام نشطة': row.active,
       'متأخرة': row.overdue,
+      'نسبة التأخير': row.overdueRate + '%',
       'مستحقة اليوم': row.dueToday,
       'منجزة ضمن الموعد': row.onTimeCompleted,
       'مهام منجزة ذات موعد': row.completedWithDueDate,
       'نسبة الالتزام بالمواعيد': row.onTimeRate == null ? '' : row.onTimeRate + '%',
       'متوسط مدة الإنجاز بالأيام': row.avgCompletionHours == null ? '' : Number((row.avgCompletionHours / 24).toFixed(1)),
+      'تقييم KPI': kpiStatusLabel[row.kpi.status],
+      'درجة KPI': row.kpi.score == null ? '' : row.kpi.score,
     }));
 
     const gapRows = analytics.byMissingKey.map((row, index) => ({
@@ -1083,7 +1109,7 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
                     <PerformanceMetric label="مهام منجزة" value={analytics.summary.completed} />
                     <PerformanceMetric label="معدل الإنجاز" value={analytics.summary.completionRate} suffix="%" />
                     <PerformanceMetric label="الالتزام بالموعد" value={analytics.summary.onTimeRate == null ? '—' : analytics.summary.onTimeRate} suffix={analytics.summary.onTimeRate == null ? '' : '%'} />
-                    <PerformanceMetric label="متوسط الإنجاز" value={analytics.summary.avgCompletionHours == null ? '—' : (analytics.summary.avgCompletionHours / 24).toFixed(1)} suffix={analytics.summary.avgCompletionHours == null ? '' : ' يوم'} />
+                    <PerformanceMetric label="متوسط الإنجاز" value={analytics.summary.avgCompletionDays == null ? '—' : analytics.summary.avgCompletionDays} suffix={analytics.summary.avgCompletionDays == null ? '' : ' يوم'} />
                     <PerformanceMetric label="متأخرة حاليًا" value={analytics.summary.overdue} />
                   </div>
 
@@ -1098,6 +1124,7 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
                           <thead className="bg-white text-[10px] font-black text-slate-500">
                             <tr>
                               <th className="px-3 py-3">المسؤول</th>
+                              <th className="px-3 py-3">KPI</th>
                               <th className="px-3 py-3">منجزة</th>
                               <th className="px-3 py-3">نشطة</th>
                               <th className="px-3 py-3">متأخرة</th>
@@ -1109,6 +1136,12 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
                             {analytics.byAssignee.slice(0, 10).map((row) => (
                               <tr key={row.assigneeUserId || row.assigneeName}>
                                 <td className="px-3 py-3 font-black text-slate-800">{row.assigneeName}</td>
+                                <td className="px-3 py-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <Badge variant="outline" className={kpiStatusClass[row.kpi.status]}>{kpiStatusLabel[row.kpi.status]}</Badge>
+                                    <span className="text-[10px] font-black text-slate-400">{row.kpi.score == null ? '—' : row.kpi.score}</span>
+                                  </div>
+                                </td>
                                 <td className="px-3 py-3 text-slate-600">{row.completed}</td>
                                 <td className="px-3 py-3 text-slate-600">{row.active}</td>
                                 <td className="px-3 py-3"><span className={row.overdue ? 'font-black text-rose-700' : 'text-slate-500'}>{row.overdue}</span></td>
