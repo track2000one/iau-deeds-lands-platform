@@ -2317,7 +2317,7 @@ ${quranStockMovementForm.notes}` : ''}`
     setSiteEditFocusKey(focusKey || null);
     setEditingSite(site || null);
     setShowSiteMap(false);
-    setSiteMediaKind('mosque_image');
+    setSiteMediaKind(focusKey === 'media-document' ? 'document' : 'mosque_image');
     setSiteMediaFiles([]);
     setSiteMediaLibrary(normalizeSiteMedia(site?.images || null));
     setSiteForm(site ? {
@@ -2348,7 +2348,8 @@ ${quranStockMovementForm.notes}` : ''}`
   useEffect(() => {
     if (!siteDialog || !siteEditFocusKey) return;
     const timer = window.setTimeout(() => {
-      const target = document.querySelector(`[data-completeness-target="${siteEditFocusKey}"]`) as HTMLElement | null;
+      const selectorKey = siteEditFocusKey.startsWith('media-') ? 'media' : siteEditFocusKey;
+      const target = document.querySelector(`[data-completeness-target="${selectorKey}"]`) as HTMLElement | null;
       if (!target) return;
       const highlight = ['ring-2', 'ring-amber-400', 'ring-offset-2'];
       target.classList.add(...highlight);
@@ -3559,7 +3560,18 @@ ${quranStockMovementForm.notes}` : ''}`
             sites={sites}
             canEdit={canEdit}
             onOpenSite={(site) => { setActiveTab('sites'); setPreviewSite(site); }}
-            onFixMissing={(site, target) => openSiteDialog(site, target)}
+            onFixMissing={(site, target) => {
+              if (target === 'coordinates' && site.spatialRelation === 'inside_building') {
+                const building = officialBuildings.find((item) => item.id === site.buildingId);
+                if (building) {
+                  openBuildingDialog(building);
+                  return;
+                }
+                openSiteDialog(site, 'building');
+                return;
+              }
+              openSiteDialog(site, target);
+            }}
             onGoToVisits={() => setActiveTab('field-visits')}
           />
         </TabsContent>}
