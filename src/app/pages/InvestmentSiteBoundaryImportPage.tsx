@@ -208,6 +208,16 @@ export const InvestmentSiteBoundaryImportPage: React.FC = () => {
     [sites]
   );
 
+  const matchedSiteIds = React.useMemo(
+    () => new Set(matchedRows.map((row) => row.targetSiteId).filter(Boolean)),
+    [matchedRows]
+  );
+
+  const previewAreas = React.useMemo(
+    () => areas.filter((area) => matchedSiteIds.has(area.siteId)),
+    [areas, matchedSiteIds]
+  );
+
   const prospectiveSites = React.useMemo(() => {
     const featureBySiteId = new Map(
       matchedRows.map((row) => [row.targetSiteId, row.feature])
@@ -233,14 +243,14 @@ export const InvestmentSiteBoundaryImportPage: React.FC = () => {
   const previewAudit = React.useMemo(
     () =>
       runGisQualityAudit(
-        areas,
+        previewAreas,
         {
           warningPercent: 5,
           criticalPercent: 10,
         },
         prospectiveSites
       ),
-    [areas, prospectiveSites]
+    [previewAreas, prospectiveSites]
   );
 
   const outsideBySite = React.useMemo(() => {
