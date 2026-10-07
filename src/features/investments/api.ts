@@ -53,6 +53,32 @@ export const investmentsApi = {
       body: JSON.stringify(data),
     }),
 
+  bulkUpdateSiteGeometry: (
+    items: Array<{
+      siteId: string;
+      geoJson: InvestmentSiteInput['geoJson'];
+      latitude: number;
+      longitude: number;
+      geometryAccuracy?: InvestmentSiteInput['geometryAccuracy'];
+    }>
+  ) =>
+    apiJson<{
+      requested: number;
+      updated: number;
+      items: Array<{
+        id: string;
+        code: string;
+        name: string;
+        latitude: number | string | null;
+        longitude: number | string | null;
+        geometryAccuracy: InvestmentSite['geometryAccuracy'];
+        updatedAt: string;
+      }>;
+    }>('/api/investment-sites/geometry-bulk', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+
   updateSite: (id: string, data: Partial<InvestmentSiteInput>) =>
     apiJson<InvestmentSite>(`/api/investment-sites/${id}`, {
       method: 'PATCH',
