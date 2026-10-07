@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Download, FileJson, FileText, Globe2, MapPin, Pencil } from 'lucide-react';
+import { ArrowRight, BriefcaseBusiness, Download, FileJson, FileText, Globe2, MapPin, Pencil, Plus } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -215,6 +215,41 @@ export const InvestmentAreaDetailsPage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BriefcaseBusiness className="h-5 w-5" />
+            الفرص الاستثمارية المرتبطة
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() =>
+              navigate(
+                `/investments/opportunities?areaId=${encodeURIComponent(area.id)}`
+              )
+            }
+          >
+            <BriefcaseBusiness className="me-2 h-4 w-4" />
+            الفرص المرتبطة بهذه المساحة
+          </Button>
+
+          {canAddAttachment && (
+            <Button
+              onClick={() =>
+                navigate(
+                  `/investments/opportunities/new?areaId=${encodeURIComponent(area.id)}`
+                )
+              }
+            >
+              <Plus className="me-2 h-4 w-4" />
+              إنشاء فرصة من هذه المساحة
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <GeometryApprovalPanel
         entityType="investment_area"

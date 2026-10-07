@@ -28,7 +28,7 @@ export type GeometryApprovalStatus =
 
 export interface InvestmentAttachmentSummary {
   id: string;
-  entityType: 'investment_site' | 'investment_area';
+  entityType: 'investment_site' | 'investment_area' | 'investment_opportunity';
   entityId: string;
   attachmentType: string;
   title: string;
@@ -276,6 +276,13 @@ export interface InvestmentExecutiveAreaSummary {
   blockerCount: number;
   completionPercent: number;
   opportunityCandidate: boolean;
+  activeOpportunity?: {
+    id: string;
+    opportunityNumber: string;
+    status: InvestmentOpportunityStatus;
+    estimatedValue?: number | string | null;
+  } | null;
+  availableForOpportunityCreation?: boolean;
   updatedAt: string;
 }
 
@@ -323,6 +330,9 @@ export interface InvestmentExecutiveDashboard {
     availableAndReadyReferenceArea: number;
     opportunityCandidateCount: number;
     opportunityCandidateArea: number;
+    activeOpportunityCount: number;
+    investedOpportunityCount: number;
+    activeOpportunityEstimatedValue: number;
     blockedAreaCount: number;
     deedLinkedSiteCount: number;
     siteBoundaryCount: number;
@@ -351,4 +361,117 @@ export interface InvestmentExecutiveDashboard {
   siteRanking: InvestmentExecutiveSiteSummary[];
   closestToOpportunity: InvestmentExecutiveAreaSummary[];
   candidates: InvestmentExecutiveAreaSummary[];
+}
+
+
+export type InvestmentOpportunityStatus =
+  | 'IDENTIFIED'
+  | 'UNDER_STUDY'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'OFFERED'
+  | 'NEGOTIATION'
+  | 'INVESTED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+export interface InvestmentOpportunityEvent {
+  id: string;
+  opportunityId: string;
+  fromStatus?: InvestmentOpportunityStatus | null;
+  toStatus: InvestmentOpportunityStatus;
+  action: string;
+  note?: string | null;
+  changedById?: string | null;
+  changedByName?: string | null;
+  createdAt: string;
+}
+
+export interface InvestmentOpportunity {
+  id: string;
+  opportunityNumber: string;
+  areaId: string;
+  area?: InvestmentArea;
+  title: string;
+  investmentUse?: string | null;
+  projectDescription?: string | null;
+  allocatedArea?: number | string | null;
+  durationMonths?: number | null;
+  estimatedValue?: number | string | null;
+  currency: string;
+  status: InvestmentOpportunityStatus;
+  statusChangedAt: string;
+  submittedAt?: string | null;
+  approvedAt?: string | null;
+  offeredAt?: string | null;
+  investedAt?: string | null;
+  cancelledAt?: string | null;
+  approvedById?: string | null;
+  approvedByName?: string | null;
+  notes?: string | null;
+  isActive: boolean;
+  createdById?: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  events?: InvestmentOpportunityEvent[];
+  _count?: { events: number };
+}
+
+export interface InvestmentOpportunityInput {
+  areaId: string;
+  title: string;
+  investmentUse?: string | null;
+  projectDescription?: string | null;
+  allocatedArea?: number | null;
+  durationMonths?: number | null;
+  estimatedValue?: number | null;
+  currency?: string;
+  notes?: string | null;
+}
+
+export interface InvestmentOpportunityListResponse {
+  items: InvestmentOpportunity[];
+  stats: {
+    total: number;
+    identified: number;
+    underStudy: number;
+    pendingApproval: number;
+    approved: number;
+    offered: number;
+    negotiation: number;
+    invested: number;
+    rejected: number;
+    cancelled: number;
+    totalEstimatedValue: number;
+    investedEstimatedValue: number;
+    allocatedArea: number;
+  };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface EligibleInvestmentArea {
+  id: string;
+  areaCode: string;
+  name?: string | null;
+  surveyedArea?: number | string | null;
+  approximateArea?: number | string | null;
+  proposedUse?: string | null;
+  site: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  eligible: boolean;
+  blockers: string[];
+  activeOpportunity?: {
+    id: string;
+    opportunityNumber: string;
+    status: InvestmentOpportunityStatus;
+  } | null;
 }

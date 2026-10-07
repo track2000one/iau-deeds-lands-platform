@@ -2,6 +2,7 @@ import React from 'react';
 import {
   AlertTriangle,
   ArrowRight,
+  BriefcaseBusiness,
   CheckCircle2,
   ClipboardCheck,
   FileText,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
+import { usePermissions } from '../../context/PermissionsContext';
 import { investmentsApi } from '../../features/investments/api';
 import type {
   InvestmentExecutiveBlockerCode,
@@ -65,6 +67,9 @@ const EMPTY: InvestmentExecutiveDashboard = {
     availableAndReadyReferenceArea: 0,
     opportunityCandidateCount: 0,
     opportunityCandidateArea: 0,
+    activeOpportunityCount: 0,
+    investedOpportunityCount: 0,
+    activeOpportunityEstimatedValue: 0,
     blockedAreaCount: 0,
     deedLinkedSiteCount: 0,
     siteBoundaryCount: 0,
@@ -141,6 +146,9 @@ const CoverageBar: React.FC<CoverageBarProps> = ({
 
 export const InvestmentExecutiveDashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { hasPermission, isAdmin } = usePermissions();
+  const canAddOpportunity =
+    isAdmin || hasPermission('investments', 'canAdd');
   const [data, setData] =
     React.useState<InvestmentExecutiveDashboard>(EMPTY);
   const [loading, setLoading] = React.useState(true);
@@ -193,6 +201,13 @@ export const InvestmentExecutiveDashboardPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/investments/opportunities')}
+          >
+            <BriefcaseBusiness className="me-2 h-4 w-4" />
+            الفرص الاستثمارية
+          </Button>
           <Button
             variant="outline"
             onClick={() => navigate('/investments/gis-approvals')}
@@ -292,6 +307,9 @@ export const InvestmentExecutiveDashboardPage: React.FC = () => {
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               {formatArea(kpis.opportunityCandidateArea)} م²
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              فرص نشطة حاليًا: {kpis.activeOpportunityCount}
             </p>
           </CardContent>
         </Card>
@@ -644,15 +662,29 @@ export const InvestmentExecutiveDashboardPage: React.FC = () => {
                       {formatArea(area.referenceArea)} م²
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      navigate(`/investments/areas/${area.id}`)
-                    }
-                  >
-                    فتح
-                  </Button>
+                  <div className="flex flex-wrap gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        navigate(`/investments/areas/${area.id}`)
+                      }
+                    >
+                      فتح
+                    </Button>
+                    {canAddOpportunity && (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          navigate(
+                            `/investments/opportunities/new?areaId=${encodeURIComponent(area.id)}`
+                          )
+                        }
+                      >
+                        إنشاء فرصة
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
