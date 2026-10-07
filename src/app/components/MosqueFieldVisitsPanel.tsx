@@ -1345,14 +1345,18 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       return;
     }
     setEditingVisit(null);
-    setVisitForm({ ...emptyVisit(template, currentUsername), siteId: preset?.siteId || '', tourId: preset?.tourId || '' });
+    const site = preset?.siteId ? sites.find((item) => item.id === preset.siteId) : null;
+    const visitScope = defaultVisitScopeForSite(site);
+    setVisitForm({ ...emptyVisit(template, currentUsername), siteId: preset?.siteId || '', tourId: preset?.tourId || '', visitScope });
     setVisitDialog(true);
+    if (preset?.siteId) void loadVisitChecklistForContext(preset.siteId, visitScope, false);
   };
 
   const openVisit = (visit: MosqueFieldVisit) => {
     setEditingVisit(visit);
     setVisitForm({
       tourId: visit.tourId || '', siteId: visit.siteId, visitType: visit.visitType,
+      visitScope: visit.visitScope || defaultVisitScopeForSite(visit.site),
       visitDate: dateTimeLocal(visit.visitDate), departureAt: dateTimeLocal(visit.departureAt),
       representativeName: visit.representativeName || '', teamMembers: (visit.teamMembers || []).join('، '),
       overallStatus: visit.overallStatus, priority: visit.priority, workflowStatus: visit.workflowStatus,
