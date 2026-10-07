@@ -3646,6 +3646,7 @@ ${quranStockMovementForm.notes}` : ''}`
           <MosqueDataCompletenessCenter
             sites={sites}
             canEdit={canEdit}
+            canManageKpiSnapshots={role === 'head'}
             taskTimingFilter={completionTaskTimingFilter}
             onTaskTimingFilterChange={setCompletionTaskTimingFilter}
             onOpenSite={(site) => { setActiveTab('sites'); setPreviewSite(site); }}
