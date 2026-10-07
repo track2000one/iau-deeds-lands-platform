@@ -38,6 +38,13 @@ const readinessLabels: Record<string, string> = {
   NOT_SUITABLE: 'غير مناسبة',
 };
 
+const approvalLabels: Record<string, string> = {
+  DRAFT: 'مسودة',
+  REVIEWED: 'تمت المراجعة',
+  APPROVED: 'معتمدة',
+  CHANGE_REQUESTED: 'طلب تعديل',
+};
+
 export const InvestmentsPage: React.FC = () => {
   const navigate = useNavigate();
   const [queryParams] = useSearchParams();
@@ -206,6 +213,7 @@ export const InvestmentsPage: React.FC = () => {
                 <TableHead>المساحة التقريبية</TableHead>
                 <TableHead>الحالة</TableHead>
                 <TableHead>جاهزية الاستثمار</TableHead>
+                <TableHead>اعتماد الحدود</TableHead>
                 <TableHead className="w-[180px]">الإجراءات</TableHead>
               </TableRow>
             </TableHeader>
@@ -224,6 +232,19 @@ export const InvestmentsPage: React.FC = () => {
                     <Badge variant="outline">{statusLabels[area.occupancyStatus]}</Badge>
                   </TableCell>
                   <TableCell>{readinessLabels[area.investmentReadiness] || area.investmentReadiness}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        area.geometryApprovalStatus === 'APPROVED'
+                          ? 'secondary'
+                          : area.geometryApprovalStatus === 'CHANGE_REQUESTED'
+                            ? 'destructive'
+                            : 'outline'
+                      }
+                    >
+                      {approvalLabels[area.geometryApprovalStatus || 'DRAFT']}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       <Button
