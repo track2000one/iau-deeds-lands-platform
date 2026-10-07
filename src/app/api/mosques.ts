@@ -50,6 +50,17 @@ export type MosqueBuilding = {
   _count?: { sites: number };
 };
 
+export type MosqueWomenPrayerArea = {
+  capacity?: number | null;
+  floor?: string | null;
+  locationDescription?: string | null;
+  separateEntrance?: boolean | null;
+  hasAblution?: boolean | null;
+  hasRestrooms?: boolean | null;
+  status?: 'active' | 'maintenance' | 'temporarily_closed';
+  notes?: string | null;
+};
+
 export type MosqueSite = {
   id: string;
   publicToken: string;
@@ -67,6 +78,8 @@ export type MosqueSite = {
   area?: number | null;
   capacity?: number | null;
   quranTargetCount?: number | null;
+  hasWomenPrayerArea?: boolean;
+  womenPrayerArea?: MosqueWomenPrayerArea | null;
   latitude?: number | null;
   longitude?: number | null;
   mapUrl?: string | null;
@@ -169,6 +182,7 @@ export type MosqueFieldVisit = {
   tourId?: string | null;
   siteId: string;
   visitType: 'initial' | 'follow_up' | 'urgent' | 'closure_verification';
+  visitScope: 'whole_site' | 'men_section' | 'women_section' | 'both_sections';
   visitDate: string;
   departureAt?: string | null;
   representativeName?: string | null;
@@ -186,7 +200,7 @@ export type MosqueFieldVisit = {
   canDelete?: boolean;
   createdAt: string;
   updatedAt: string;
-  site: Pick<MosqueSite, 'id' | 'publicToken' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation' | 'status'>;
+  site: Pick<MosqueSite, 'id' | 'publicToken' | 'name' | 'siteType' | 'prayerRoomGender' | 'hasWomenPrayerArea' | 'womenPrayerArea' | 'city' | 'district' | 'campusLocation' | 'status'>;
   tour?: Pick<MosqueFieldTour, 'id' | 'tourNumber' | 'title' | 'scheduledDate' | 'status'> | null;
   items: MosqueFieldVisitItem[];
 };
@@ -645,7 +659,13 @@ export const mosqueApi = {
   updateSite: (id: string, input: Partial<MosqueSite>) => apiJson<MosqueSite>(`/api/mosques/sites/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteSite: (id: string) => apiJson<void>(`/api/mosques/sites/${id}`, { method: 'DELETE' }),
 
-  fieldVisitChecklist: () => apiJson<MosqueFieldVisitItem[]>('/api/mosques/field-visits/checklist-template'),
+  fieldVisitChecklist: (siteId?: string, visitScope?: MosqueFieldVisit['visitScope']) => {
+    const query = new URLSearchParams();
+    if (siteId) query.set('siteId', siteId);
+    if (visitScope) query.set('visitScope', visitScope);
+    const suffix = query.toString();
+    return apiJson<MosqueFieldVisitItem[]>(`/api/mosques/field-visits/checklist-template${suffix ? `?${suffix}` : ''}`);
+  },
   fieldTours: () => apiJson<MosqueFieldTour[]>('/api/mosques/field-tours'),
   createFieldTour: (input: Record<string, unknown>) => apiJson<MosqueFieldTour>('/api/mosques/field-tours', { method: 'POST', body: JSON.stringify(input) }),
   updateFieldTour: (id: string, input: Record<string, unknown>) => apiJson<MosqueFieldTour>(`/api/mosques/field-tours/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
