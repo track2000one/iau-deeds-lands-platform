@@ -119,23 +119,25 @@ const roleScopeLabel = (role: MosqueModuleRole) => role === 'head'
       ? 'وصول مقيد بالموقع المرتبط'
       : 'وصول خدمات منسوب الجامعة';
 
-const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other' => {
+const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'other' => {
   const type = String(notice.entityType || '').toLowerCase();
   const text = `${notice.title || ''} ${notice.message || ''}`.toLowerCase();
   if (type.includes('request') || text.includes('طلب صيانة') || text.includes('طلب احتياج')) return 'request';
   if (type.includes('ticket') || text.includes('بلاغ')) return 'ticket';
   if (type.includes('leave') || text.includes('إجاز') || text.includes('اعتذار')) return 'leave';
   if (type.includes('quran') || text.includes('مصحف') || text.includes('مصاحف')) return 'quran';
+  if (type.includes('completion_task') || text.includes('مهمة استكمال') || text.includes('استكمال بيانات')) return 'completion';
   if (type.includes('site') || type.includes('mosque') || text.includes('مسجد') || text.includes('مصلى')) return 'site';
   return 'other';
 };
 
-const notificationCategoryLabel: Record<'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other', string> = {
+const notificationCategoryLabel: Record<'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'other', string> = {
   request: 'طلب صيانة / احتياج',
   ticket: 'بلاغ',
   site: 'مسجد / مصلى',
   leave: 'إجازة / اعتذار',
   quran: 'المصاحف',
+  completion: 'متابعة اكتمال البيانات',
   other: 'إشعار عام',
 };
 const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', jami: 'جامع', prayer_room: 'مصلى' };
@@ -648,6 +650,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [assignments, setAssignments] = useState<MosqueAssignment[]>([]);
   const [staffUsers, setStaffUsers] = useState<MosqueStaffUser[]>([]);
   const [notifications, setNotifications] = useState<MosqueNotification[]>([]);
+  const [completionTaskTimingFilter, setCompletionTaskTimingFilter] = useState<'all' | 'overdue' | 'today' | 'soon' | 'unassigned'>('all');
   const [search, setSearch] = useState('');
   const [siteFilterCity, setSiteFilterCity] = useState('');
   const [siteFilterType, setSiteFilterType] = useState('all');
@@ -3002,6 +3005,16 @@ ${quranStockMovementForm.notes}` : ''}`
       setActiveTab('quran');
       return;
     }
+    if (category === 'completion') {
+      setCompletionTaskTimingFilter(
+        String(notice.entityType || '').includes('overdue') ? 'overdue'
+          : String(notice.entityType || '').includes('due_today') ? 'today'
+            : String(notice.entityType || '').includes('due_soon') ? 'soon'
+              : 'all'
+      );
+      setActiveTab('data-completeness');
+      return;
+    }
   };
 
   const markAllNotificationsRead = async () => {
@@ -3021,6 +3034,11 @@ ${quranStockMovementForm.notes}` : ''}`
     setTicketQuickFilter(filters.ticket || 'all');
     setLeaveQuickFilter(filters.leave || 'all');
     setActiveTab(tab);
+  };
+
+  const goToCompletionTasks = (timing: 'all' | 'overdue' | 'today' | 'soon' | 'unassigned' = 'all') => {
+    setCompletionTaskTimingFilter(timing);
+    setActiveTab('data-completeness');
   };
 
   const referenceMosqueCount = sites.filter((site) => ['mosque', 'jami'].includes(site.siteType)).length;
@@ -3197,6 +3215,75 @@ ${quranStockMovementForm.notes}` : ''}`
 
 
         <TabsContent value="overview" className="space-y-4">
+          {['head', 'supervisor'].includes(role) && (
+            <Card className="overflow-hidden rounded-[24px] border border-[#d9c9a5] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+              <CardHeader className="border-b border-[#eadfc8] bg-gradient-to-l from-[#fffaf0] via-white to-[#f1faf7] pb-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-base font-black text-[#0b4a3f]">
+                      <Clock3 className="h-5 w-5" />
+                      متابعة مهام استكمال البيانات
+                    </CardTitle>
+                    <CardDescription className="mt-1">المهام المستحقة والمتأخرة والتنبيهات الزمنية حسب توقيت الرياض.</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" className="w-fit border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => goToCompletionTasks('all')}>
+                    <ClipboardList className="ml-1 h-4 w-4" />
+                    فتح مركز المتابعة
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 p-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  <button type="button" onClick={() => goToCompletionTasks('all')} className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-right transition hover:-translate-y-0.5 hover:shadow-sm">
+                    <span className="text-xs font-black text-sky-800">المهام النشطة</span>
+                    <strong className="mt-2 block text-3xl font-black text-sky-950">{dashboard?.stats.completionTasksActive || 0}</strong>
+                    <span className="mt-1 block text-[10px] text-sky-700">مفتوحة أو قيد التنفيذ</span>
+                  </button>
+                  <button type="button" onClick={() => goToCompletionTasks('overdue')} className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-right transition hover:-translate-y-0.5 hover:shadow-sm">
+                    <span className="text-xs font-black text-rose-800">متأخرة</span>
+                    <strong className="mt-2 block text-3xl font-black text-rose-950">{dashboard?.stats.completionTasksOverdue || 0}</strong>
+                    <span className="mt-1 block text-[10px] text-rose-700">تم تصعيدها لرئيس الوحدة</span>
+                  </button>
+                  <button type="button" onClick={() => goToCompletionTasks('today')} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-right transition hover:-translate-y-0.5 hover:shadow-sm">
+                    <span className="text-xs font-black text-amber-800">مستحقة اليوم</span>
+                    <strong className="mt-2 block text-3xl font-black text-amber-950">{dashboard?.stats.completionTasksDueToday || 0}</strong>
+                    <span className="mt-1 block text-[10px] text-amber-700">تحتاج إجراء اليوم</span>
+                  </button>
+                  <button type="button" onClick={() => goToCompletionTasks('soon')} className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-right transition hover:-translate-y-0.5 hover:shadow-sm">
+                    <span className="text-xs font-black text-orange-800">قريبة الاستحقاق</span>
+                    <strong className="mt-2 block text-3xl font-black text-orange-950">{dashboard?.stats.completionTasksDueSoon || 0}</strong>
+                    <span className="mt-1 block text-[10px] text-orange-700">خلال الأيام الثلاثة القادمة</span>
+                  </button>
+                  <button type="button" onClick={() => goToCompletionTasks('unassigned')} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-right transition hover:-translate-y-0.5 hover:shadow-sm">
+                    <span className="text-xs font-black text-slate-700">غير مسندة</span>
+                    <strong className="mt-2 block text-3xl font-black text-slate-900">{dashboard?.stats.completionTasksUnassigned || 0}</strong>
+                    <span className="mt-1 block text-[10px] text-slate-500">تحتاج تحديد مسؤول</span>
+                  </button>
+                </div>
+
+                {(dashboard?.recentCompletionTasks || []).length > 0 && (
+                  <div className="rounded-2xl border border-slate-200 bg-[#fbfcfd] p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-xs font-black text-slate-700">أقرب مهام الاستكمال</p>
+                      <button type="button" className="text-[11px] font-black text-[#006b63]" onClick={() => goToCompletionTasks('all')}>عرض الكل</button>
+                    </div>
+                    <div className="grid gap-2 lg:grid-cols-2">
+                      {dashboard!.recentCompletionTasks.slice(0, 4).map((task) => (
+                        <button key={task.id} type="button" onClick={() => goToCompletionTasks(task.dueDate && new Date(task.dueDate).getTime() < Date.now() ? 'overdue' : 'all')} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-right transition hover:border-[#d6b46a]">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-black text-slate-800">{task.taskNumber} — {task.site?.name || ''}</p>
+                            <p className="mt-1 truncate text-[10px] text-slate-500">{task.assignedToName || 'غير مسندة'}{task.dueDate ? ` · الاستحقاق ${new Date(task.dueDate).toLocaleDateString('ar-SA-u-ca-gregory')}` : ' · بدون موعد'}</p>
+                          </div>
+                          <Badge variant="outline" className={task.priority === 'urgent' ? 'border-rose-200 bg-rose-50 text-rose-800' : task.priority === 'high' ? 'border-orange-200 bg-orange-50 text-orange-800' : 'border-slate-200 bg-slate-50 text-slate-700'}>{task.priority === 'urgent' ? 'عاجلة' : task.priority === 'high' ? 'عالية' : task.priority === 'medium' ? 'متوسطة' : 'عادية'}</Badge>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {role === 'head' && <>
             <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_10px_26px_rgba(15,23,42,0.05)] sm:p-5">
               <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -3559,6 +3646,8 @@ ${quranStockMovementForm.notes}` : ''}`
           <MosqueDataCompletenessCenter
             sites={sites}
             canEdit={canEdit}
+            taskTimingFilter={completionTaskTimingFilter}
+            onTaskTimingFilterChange={setCompletionTaskTimingFilter}
             onOpenSite={(site) => { setActiveTab('sites'); setPreviewSite(site); }}
             onFixMissing={(site, target) => {
               if (target === 'coordinates' && site.spatialRelation === 'inside_building') {
