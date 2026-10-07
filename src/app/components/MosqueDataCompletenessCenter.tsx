@@ -92,8 +92,8 @@ const focusTargetByMissingKey: Partial<Record<MissingKey, string>> = {
   area: 'area',
   capacity: 'capacity',
   contact: 'contact',
-  photos: 'media',
-  documents: 'media',
+  photos: 'media-photo',
+  documents: 'media-document',
   women_verification: 'women',
   women_details: 'women',
 };
