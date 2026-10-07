@@ -182,8 +182,13 @@ const siteTypeDisplayLabel = (site: Pick<MosqueSite, 'siteType' | 'prayerRoomGen
     ? `مصلى ${prayerRoomGenderLabels[site.prayerRoomGender] || site.prayerRoomGender}`
     : siteTypeLabels[site.siteType] || site.siteType;
 
+const hasAttachedWomenPrayerArea = (site: Pick<MosqueSite, 'siteType' | 'hasWomenPrayerArea'>) =>
+  ['mosque', 'jami'].includes(site.siteType) && Boolean(site.hasWomenPrayerArea);
+const womenPrayerAreaStatusLabel = (site: Pick<MosqueSite, 'hasWomenPrayerArea' | 'womenPrayerArea'>) =>
+  site.hasWomenPrayerArea ? (siteStatusLabels[site.womenPrayerArea?.status || 'active'] || site.womenPrayerArea?.status || 'نشط') : 'غير مسجل';
 
-type SitePrintColumnKey = 'name' | 'type' | 'building' | 'location' | 'cityDistrict' | 'area' | 'capacity' | 'imam' | 'muezzin' | 'khateeb' | 'coordinatorName' | 'contactPhone' | 'coordinates' | 'status' | 'notes';
+
+type SitePrintColumnKey = 'name' | 'type' | 'building' | 'location' | 'cityDistrict' | 'area' | 'capacity' | 'womenPrayerArea' | 'womenCapacity' | 'womenStatus' | 'imam' | 'muezzin' | 'khateeb' | 'coordinatorName' | 'contactPhone' | 'coordinates' | 'status' | 'notes';
 const SITE_PRINT_COLUMNS: Array<{ key: SitePrintColumnKey; label: string }> = [
   { key: 'name', label: 'الاسم' },
   { key: 'type', label: 'النوع' },
@@ -192,6 +197,9 @@ const SITE_PRINT_COLUMNS: Array<{ key: SitePrintColumnKey; label: string }> = [
   { key: 'cityDistrict', label: 'المدينة / الحي' },
   { key: 'area', label: 'المساحة' },
   { key: 'capacity', label: 'الطاقة الاستيعابية' },
+  { key: 'womenPrayerArea', label: 'مصلى النساء' },
+  { key: 'womenCapacity', label: 'سعة مصلى النساء' },
+  { key: 'womenStatus', label: 'حالة مصلى النساء' },
   { key: 'imam', label: 'الإمام' },
   { key: 'muezzin', label: 'المؤذن' },
   { key: 'khateeb', label: 'الخطيب' },
@@ -201,7 +209,7 @@ const SITE_PRINT_COLUMNS: Array<{ key: SitePrintColumnKey; label: string }> = [
   { key: 'status', label: 'الحالة' },
   { key: 'notes', label: 'الملاحظات' },
 ];
-const DEFAULT_SITE_PRINT_COLUMNS: SitePrintColumnKey[] = ['name', 'type', 'building', 'location', 'cityDistrict', 'area', 'imam', 'muezzin', 'status'];
+const DEFAULT_SITE_PRINT_COLUMNS: SitePrintColumnKey[] = ['name', 'type', 'building', 'location', 'cityDistrict', 'area', 'womenPrayerArea', 'imam', 'muezzin', 'status'];
 
 const SITE_PRINT_FONT_MIN = 5;
 const SITE_PRINT_FONT_MAX = 14;
