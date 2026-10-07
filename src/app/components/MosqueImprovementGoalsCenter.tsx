@@ -655,6 +655,14 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       'مراجع الإثبات': goal.evidenceReviewedName || '',
       'تاريخ المراجعة': formatDate(goal.evidenceReviewedAt),
       'ملاحظة المراجعة': goal.evidenceReviewNote || '',
+      'حالة الاستدامة': sustainabilityLabel(goal.sustainabilityStatus),
+      'آخر قيمة بعد الإغلاق': formatMetric(goal.metricKey, goal.sustainabilityValue),
+      'آخر شهر متابعة': goal.sustainabilityMonth || '',
+      'أشهر المتابعة': goal.sustainabilityObservedMonths || 0,
+      'الأشهر المطلوبة لإثبات الاستدامة': goal.sustainabilityTargetMonths || 3,
+      'ملاحظة الاستدامة': goal.sustainabilityNote || '',
+      'تاريخ رصد الانتكاس': formatDate(goal.relapseDetectedAt),
+      'يوجد خطة متابعة تلقائية': goal.followUpGoalId ? 'نعم' : 'لا',
       'ملاحظات': goal.notes || '',
     }));
 
@@ -686,6 +694,22 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       }))
     );
 
+    const sustainabilityRows = goals.flatMap((goal) =>
+      (Array.isArray(goal.sustainabilityChecks) ? goal.sustainabilityChecks : []).map((check, index) => ({
+        'رقم الهدف': goal.goalNumber,
+        'الهدف': goal.title,
+        'المؤشر': metricLabel[goal.metricKey],
+        'م': index + 1,
+        'الشهر': check.month,
+        'القيمة': formatMetric(goal.metricKey, check.value),
+        'المستهدف': formatMetric(goal.metricKey, check.targetValue),
+        'التصنيف': sustainabilityCheckLabel(check.status),
+        'نسبة الاحتفاظ بالتحسن': check.retentionPercent == null ? '' : check.retentionPercent + '%',
+        'الملاحظة': check.note || '',
+        'تاريخ القياس': formatDate(check.evaluatedAt),
+      }))
+    );
+
     const summaryRows = [
       ['التقرير', 'خطة التحسين السنوية لمؤشرات بيانات المساجد والمصليات'],
       ['السنة', year],
@@ -697,6 +721,11 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       ['متحققة وتنتظر الإثبات', summary.achieved],
       ['إثباتات قيد المراجعة', summary.evidenceReview],
       ['مغلقة بعد اعتماد الإثبات', summary.closed],
+      ['استدامة مؤكدة', summary.sustainabilitySustained],
+      ['قيد إثبات الاستدامة', summary.sustainabilityMonitoring],
+      ['تحتاج متابعة بعد الإغلاق', summary.sustainabilityNeedsFollowUp],
+      ['انتكاس بعد الإغلاق', summary.sustainabilityRegressed],
+      ['بانتظار أول قياس استدامة', summary.sustainabilityWaiting],
       ['متوسط تقدم المؤشرات', summary.performanceProgress + '%'],
       ['متوسط تقدم الإجراءات', summary.actionProgress + '%'],
     ];
@@ -706,19 +735,22 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
     const goalsSheet = XLSX.utils.json_to_sheet(goalRows);
     const actionsSheet = XLSX.utils.json_to_sheet(actionRows);
     const evidenceSheet = XLSX.utils.json_to_sheet(evidenceRows);
+    const sustainabilitySheet = XLSX.utils.json_to_sheet(sustainabilityRows);
 
-    for (const sheet of [summarySheet, goalsSheet, actionsSheet, evidenceSheet]) {
+    for (const sheet of [summarySheet, goalsSheet, actionsSheet, evidenceSheet, sustainabilitySheet]) {
       (sheet as any)['!views'] = [{ RTL: true }];
     }
     (summarySheet as any)['!cols'] = [{ wch: 34 }, { wch: 28 }];
-    (goalsSheet as any)['!cols'] = Array.from({ length: 28 }, () => ({ wch: 22 }));
+    (goalsSheet as any)['!cols'] = Array.from({ length: 36 }, () => ({ wch: 22 }));
     (actionsSheet as any)['!cols'] = [{ wch: 18 }, { wch: 36 }, { wch: 6 }, { wch: 48 }, { wch: 18 }, { wch: 18 }, { wch: 36 }];
     (evidenceSheet as any)['!cols'] = [{ wch: 18 }, { wch: 36 }, { wch: 6 }, { wch: 14 }, { wch: 34 }, { wch: 24 }, { wch: 48 }, { wch: 18 }, { wch: 24 }, { wch: 18 }, { wch: 40 }];
+    (sustainabilitySheet as any)['!cols'] = [{ wch: 18 }, { wch: 40 }, { wch: 24 }, { wch: 6 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 24 }, { wch: 52 }, { wch: 18 }];
 
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'الملخص');
     XLSX.utils.book_append_sheet(workbook, goalsSheet, 'الأهداف');
     XLSX.utils.book_append_sheet(workbook, actionsSheet, 'الإجراءات التصحيحية');
     XLSX.utils.book_append_sheet(workbook, evidenceSheet, 'أدلة الإغلاق');
+    XLSX.utils.book_append_sheet(workbook, sustainabilitySheet, 'استدامة التحسين');
     XLSX.writeFile(workbook, `IAU_Mosques_Improvement_Plan_${year}.xlsx`);
   };
 
