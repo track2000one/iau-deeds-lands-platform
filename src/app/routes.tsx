@@ -48,6 +48,9 @@ const InvestmentSiteBoundaryImportPage = lazy(() => import('./pages/InvestmentSi
 const InvestmentGisAuditPage = lazy(() => import('./pages/InvestmentGisAuditPage').then((m) => ({ default: m.InvestmentGisAuditPage })));
 const InvestmentGisApprovalCenterPage = lazy(() => import('./pages/InvestmentGisApprovalCenterPage').then((m) => ({ default: m.InvestmentGisApprovalCenterPage })));
 const InvestmentExecutiveDashboardPage = lazy(() => import('./pages/InvestmentExecutiveDashboardPage').then((m) => ({ default: m.InvestmentExecutiveDashboardPage })));
+const InvestmentOpportunitiesPage = lazy(() => import('./pages/InvestmentOpportunitiesPage').then((m) => ({ default: m.InvestmentOpportunitiesPage })));
+const InvestmentOpportunityFormPage = lazy(() => import('./pages/InvestmentOpportunityFormPage').then((m) => ({ default: m.InvestmentOpportunityFormPage })));
+const InvestmentOpportunityDetailsPage = lazy(() => import('./pages/InvestmentOpportunityDetailsPage').then((m) => ({ default: m.InvestmentOpportunityDetailsPage })));
 const SiteInspectionFormPage = lazy(() => import('./pages/SiteInspectionFormPage').then((m) => ({ default: m.SiteInspectionFormPage })));
 const ViewSiteInspectionPage = lazy(() => import('./pages/ViewSiteInspectionPage').then((m) => ({ default: m.ViewSiteInspectionPage })));
 const AssetDashboardPage = lazy(() => import('./pages/AssetDashboardPage').then((m) => ({ default: m.AssetDashboardPage })));
@@ -188,6 +191,10 @@ export const router = createHashRouter([
           { path: 'gis-audit', element: investmentPermission(<InvestmentGisAuditPage />, 'canView') },
           { path: 'gis-approvals', element: investmentPermission(<InvestmentGisApprovalCenterPage />, 'canView') },
           { path: 'executive', element: investmentPermission(<InvestmentExecutiveDashboardPage />, 'canView') },
+          { path: 'opportunities', element: investmentPermission(<InvestmentOpportunitiesPage />, 'canView') },
+          { path: 'opportunities/new', element: investmentPermission(<InvestmentOpportunityFormPage />, 'canAdd') },
+          { path: 'opportunities/:opportunityId/edit', element: investmentPermission(<InvestmentOpportunityFormPage />, 'canEdit') },
+          { path: 'opportunities/:opportunityId', element: investmentPermission(<InvestmentOpportunityDetailsPage />, 'canView') },
           { path: 'areas/new', element: investmentPermission(<InvestmentAreaFormPage />, 'canAdd') },
           { path: 'areas/:areaId/edit', element: investmentPermission(<InvestmentAreaFormPage />, 'canEdit') },
           { path: 'areas/:areaId', element: investmentPermission(<InvestmentAreaDetailsPage />, 'canView') },
