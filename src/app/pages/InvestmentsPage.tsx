@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Eye, LandPlot, ListChecks, MapPin, Search, TrendingUp } from 'lucide-react';
+import { BriefcaseBusiness, Eye, LandPlot, ListChecks, MapPin, Search, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
 import { investmentsApi } from '../../features/investments/api';
@@ -111,6 +111,13 @@ export const InvestmentsPage: React.FC = () => {
           >
             <TrendingUp className="me-2 h-4 w-4" />
             لوحة المؤشرات التنفيذية
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/investments/opportunities')}
+          >
+            <BriefcaseBusiness className="me-2 h-4 w-4" />
+            إدارة الفرص
           </Button>
           <Button variant="outline" onClick={() => navigate('/investments/sites')}>
             المواقع الرئيسية
