@@ -139,15 +139,44 @@ export type MosqueCompletionTaskAssignee = {
   assignmentSiteId?: string | null;
 };
 
+export type MosqueCompletionKpiMetric = {
+  value: number | null;
+  target: number;
+  met: boolean | null;
+  score: number | null;
+};
+
+export type MosqueCompletionKpiResult = {
+  status: 'excellent' | 'good' | 'needs_improvement' | 'no_data';
+  score: number | null;
+  metCount: number;
+  evaluatedCount: number;
+  metrics: {
+    completionRate: MosqueCompletionKpiMetric;
+    onTimeRate: MosqueCompletionKpiMetric;
+    avgCompletionDays: MosqueCompletionKpiMetric;
+    overdueRate: MosqueCompletionKpiMetric;
+  };
+};
+
 export type MosqueCompletionTaskAnalytics = {
   month: string;
   period: { from: string; toExclusive: string };
+  kpiStandard: {
+    code: string;
+    completionRateTarget: number;
+    onTimeRateTarget: number;
+    avgCompletionDaysTarget: number;
+    overdueRateMax: number;
+  };
+  unitKpi: MosqueCompletionKpiResult;
   summary: {
     created: number;
     completed: number;
     completionRate: number;
     active: number;
     overdue: number;
+    overdueRate: number;
     dueToday: number;
     dueSoon: number;
     unassigned: number;
@@ -155,19 +184,23 @@ export type MosqueCompletionTaskAnalytics = {
     onTimeCompleted: number;
     onTimeRate: number | null;
     avgCompletionHours: number | null;
+    avgCompletionDays: number | null;
   };
   byAssignee: Array<{
     assigneeUserId?: string | null;
     assigneeName: string;
     created: number;
     completed: number;
+    completionRate: number | null;
     active: number;
     overdue: number;
+    overdueRate: number;
     dueToday: number;
     onTimeCompleted: number;
     completedWithDueDate: number;
     onTimeRate: number | null;
     avgCompletionHours: number | null;
+    kpi: MosqueCompletionKpiResult;
   }>;
   byMissingKey: Array<{
     missingKey: string;
