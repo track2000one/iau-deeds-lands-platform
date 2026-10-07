@@ -1,5 +1,6 @@
 import { apiJson } from '../../lib/http';
 import type {
+  GeometryApprovalQueueResponse,
   InvestmentArea,
   InvestmentAreaInput,
   InvestmentAttachmentSummary,
@@ -24,6 +25,20 @@ const buildQuery = (params: Record<string, unknown>) => {
 };
 
 export const investmentsApi = {
+  getGeometryApprovalQueue: (params: {
+    status?: 'ALL' | 'DRAFT' | 'REVIEWED' | 'APPROVED' | 'CHANGE_REQUESTED';
+    entityType?: 'ALL' | 'investment_site' | 'investment_area';
+    siteId?: string;
+    search?: string;
+    geometry?: 'with' | 'without' | 'all';
+    sort?: 'priority' | 'updated_desc' | 'approved_desc';
+    page?: number;
+    limit?: number;
+  } = {}) =>
+    apiJson<GeometryApprovalQueueResponse>(
+      `/api/investment-geometry-approvals${buildQuery(params)}`
+    ),
+
   getGeometryAttachments: (
     entityType: 'investment_site' | 'investment_area',
     entityId: string
