@@ -409,12 +409,20 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
       const updated = await mosqueApi.transitionCompletionKpiSnapshot(kpiSnapshot.id, status, note);
       setKpiSnapshot(updated);
       setAnalytics(['approved', 'archived'].includes(updated.status) ? updated.payload : analytics);
-      toast.success(
-        status === 'review' ? 'تم إرسال نتيجة KPI للمراجعة'
-          : status === 'approved' ? 'تم اعتماد نتيجة KPI وإقفالها'
-            : status === 'archived' ? 'تم أرشفة نتيجة KPI'
-              : 'تمت إعادة نتيجة KPI إلى المسودة'
-      );
+      if (status === 'approved' && updated.automation?.status === 'success') {
+        toast.success(
+          `تم اعتماد KPI وتشغيل دورة التحسين تلقائيًا: قياس ${updated.automation.evaluatedGoals || 0} هدف، تحقق ${updated.automation.newlyAchieved || 0}، تعثر ${updated.automation.newlyAtRisk || 0}، انتكاس ${updated.automation.regressed || 0}، ومسودات متابعة ${updated.automation.followUpDraftsCreated || 0}.`
+        );
+      } else if (status === 'approved' && updated.automation?.status === 'failed') {
+        toast.warning(updated.automation.message || 'تم اعتماد KPI، لكن تعذر استكمال دورة التحسين التلقائية. يمكن تشغيل التحديث اليدوي من خطة التحسين.');
+      } else {
+        toast.success(
+          status === 'review' ? 'تم إرسال نتيجة KPI للمراجعة'
+            : status === 'approved' ? 'تم اعتماد نتيجة KPI وإقفالها'
+              : status === 'archived' ? 'تم أرشفة نتيجة KPI'
+                : 'تمت إعادة نتيجة KPI إلى المسودة'
+        );
+      }
       await loadAnalytics(analyticsMonth);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحديث حالة لقطة KPI');
