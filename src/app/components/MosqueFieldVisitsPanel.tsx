@@ -1092,6 +1092,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [siteFilter, setSiteFilter] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('');
   const [visitTypeFilter, setVisitTypeFilter] = React.useState('');
+  const [visitScopeFilter, setVisitScopeFilter] = React.useState('');
   const [overallFilter, setOverallFilter] = React.useState('');
   const [priorityFilter, setPriorityFilter] = React.useState('');
   const [issueFilter, setIssueFilter] = React.useState('');
@@ -1192,6 +1193,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         && (!siteFilter || visit.siteId === siteFilter)
         && (!statusFilter || visit.workflowStatus === statusFilter)
         && (!visitTypeFilter || visit.visitType === visitTypeFilter)
+        && (!visitScopeFilter || (visit.visitScope || 'whole_site') === visitScopeFilter)
         && (!overallFilter || visit.overallStatus === overallFilter)
         && (!priorityFilter || visit.priority === priorityFilter)
         && matchesIssue
@@ -1210,9 +1212,9 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       else comparison = new Date(a.visitDate).getTime() - new Date(b.visitDate).getTime();
       return comparison * direction;
     });
-  }, [visits, search, siteFilter, statusFilter, visitTypeFilter, overallFilter, priorityFilter, issueFilter, dateFromFilter, dateToFilter, sortBy, sortDirection]);
+  }, [visits, search, siteFilter, statusFilter, visitTypeFilter, visitScopeFilter, overallFilter, priorityFilter, issueFilter, dateFromFilter, dateToFilter, sortBy, sortDirection]);
 
-  const activeFilterCount = [search, siteFilter, statusFilter, visitTypeFilter, overallFilter, priorityFilter, issueFilter, dateFromFilter, dateToFilter]
+  const activeFilterCount = [search, siteFilter, statusFilter, visitTypeFilter, visitScopeFilter, overallFilter, priorityFilter, issueFilter, dateFromFilter, dateToFilter]
     .filter((value) => Boolean(String(value || '').trim())).length;
 
   const resetVisitFilters = () => {
@@ -1220,6 +1222,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     setSiteFilter('');
     setStatusFilter('');
     setVisitTypeFilter('');
+    setVisitScopeFilter('');
     setOverallFilter('');
     setPriorityFilter('');
     setIssueFilter('');
