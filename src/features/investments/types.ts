@@ -185,3 +185,61 @@ export interface InvestmentDeedOption {
   district?: string | null;
   area?: number | null;
 }
+
+
+export interface GeometryApprovalQueueItem {
+  entityType: 'investment_site' | 'investment_area';
+  id: string;
+  code: string;
+  name: string;
+  siteId: string;
+  parentSite?: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
+  childAreaCount?: number | null;
+  hasGeometry: boolean;
+  geometryAccuracy: GeometryAccuracy;
+  geometryApprovalStatus: GeometryApprovalStatus;
+  geometryReviewedById?: string | null;
+  geometryReviewedByName?: string | null;
+  geometryReviewedAt?: string | null;
+  geometryApprovedById?: string | null;
+  geometryApprovedByName?: string | null;
+  geometryApprovedAt?: string | null;
+  geometryReferenceAttachmentId?: string | null;
+  geometryWorkflowNote?: string | null;
+  updatedAt: string;
+  referenceAttachment?: {
+    id: string;
+    title: string;
+    driveUrl: string;
+    attachmentType: string;
+  } | null;
+}
+
+export interface GeometryApprovalQueueStats {
+  total: number;
+  draft: number;
+  reviewed: number;
+  approved: number;
+  changeRequested: number;
+  pendingReview: number;
+  pendingApproval: number;
+  actionRequired: number;
+  sites: number;
+  areas: number;
+  approvedPercent: number;
+}
+
+export interface GeometryApprovalQueueResponse {
+  items: GeometryApprovalQueueItem[];
+  stats: GeometryApprovalQueueStats;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
