@@ -133,6 +133,22 @@ const defaultVisitScopeForSite = (site?: MosqueSite | null): MosqueFieldVisit['v
   if (site.siteType === 'prayer_room') return site.prayerRoomGender === 'women' ? 'women_section' : 'men_section';
   return 'whole_site';
 };
+type WomenPrayerPresence = 'present' | 'verified_absent' | 'unverified';
+const womenPrayerPresence = (site?: MosqueSite | null): WomenPrayerPresence => {
+  if (!site || !['mosque', 'jami'].includes(site.siteType)) return 'unverified';
+  if (site.hasWomenPrayerArea) return 'present';
+  return site.womenPrayerArea?.presenceStatus === 'verified_absent' ? 'verified_absent' : 'unverified';
+};
+const womenPrayerPresenceLabel = (site?: MosqueSite | null) => {
+  const presence = womenPrayerPresence(site);
+  return presence === 'present' ? 'يوجد مصلى نساء' : presence === 'verified_absent' ? 'لا يوجد مصلى نساء — تم التحقق' : 'مصلى النساء — لم يتم التحقق';
+};
+const normalizeVisitScopeForSite = (site: MosqueSite | null | undefined, requested: MosqueFieldVisit['visitScope']): MosqueFieldVisit['visitScope'] => {
+  if (!site) return 'whole_site';
+  if (site.siteType === 'prayer_room') return defaultVisitScopeForSite(site);
+  if (['women_section', 'both_sections'].includes(requested) && womenPrayerPresence(site) !== 'present') return 'whole_site';
+  return requested;
+};
 const visitIncludesWomenSection = (visit: Pick<MosqueFieldVisit, 'visitScope' | 'site'>) =>
   visit.site?.siteType === 'prayer_room'
     ? visit.site.prayerRoomGender === 'women'
@@ -1329,7 +1345,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   ) => {
     if (!siteId) return;
     const site = sites.find((item) => item.id === siteId);
-    const normalizedScope = site?.siteType === 'prayer_room' ? defaultVisitScopeForSite(site) : visitScope;
+    const normalizedScope = normalizeVisitScopeForSite(site, visitScope);
     try {
       const checklist = await mosqueApi.fieldVisitChecklist(siteId, normalizedScope);
       setVisitForm((current) => ({
@@ -2024,6 +2040,13 @@ const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentIt
     const teamMembers = splitMembers(visitForm.teamMembers);
     if (!visitForm.siteId || !visitForm.visitDate || !teamMembers.length) {
       toast.error('اختر المسجد أو المصلى وأدخل تاريخ الزيارة');
+      return;
+    }
+    const targetSite = sites.find((site) => site.id === visitForm.siteId) || null;
+    if (targetSite && ['women_section', 'both_sections'].includes(visitForm.visitScope) && womenPrayerPresence(targetSite) !== 'present') {
+      toast.error(womenPrayerPresence(targetSite) === 'verified_absent'
+        ? 'لا يمكن اختيار نطاق مصلى النساء؛ سجل الموقع مؤكد بأنه لا يوجد به مصلى نساء.'
+        : 'لا يمكن اختيار نطاق مصلى النساء قبل التحقق من وجوده في سجل المسجد أو الجامع.');
       return;
     }
     if (!editingVisit) {
