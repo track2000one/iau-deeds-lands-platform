@@ -1100,6 +1100,25 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
                       </div>
                     )}
 
+                    {goal.status === 'closed' && (
+                      <div className={`mt-3 rounded-2xl border p-3 ${sustainabilityClass(goal.sustainabilityStatus)}`}>
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="flex items-center gap-2 text-[11px] font-black">
+                              <Activity className="h-4 w-4" />
+                              استدامة التحسين: {sustainabilityLabel(goal.sustainabilityStatus)}
+                            </p>
+                            <p className="mt-1 text-[10px] leading-5 opacity-80">{goal.sustainabilityNote || 'بانتظار أول نتيجة KPI رسمية بعد الإغلاق.'}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-[10px] font-black">
+                            <span className="rounded-lg border border-current/20 bg-white/70 px-2 py-1">آخر قياس: {goal.sustainabilityMonth || '—'}</span>
+                            <span className="rounded-lg border border-current/20 bg-white/70 px-2 py-1">القيمة: {formatMetric(goal.metricKey, goal.sustainabilityValue)}</span>
+                            <span className="rounded-lg border border-current/20 bg-white/70 px-2 py-1">الأشهر: {goal.sustainabilityObservedMonths || 0}/{goal.sustainabilityTargetMonths || 3}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {actions.length > 0 && (
                       <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                         {actions.slice(0, 6).map((action) => (
@@ -1526,5 +1545,31 @@ const InfoBox = ({ label, value, icon: Icon }: { label: string; value: string; i
     <p className="mt-2 text-lg font-black text-[#0b4a3f]">{value}</p>
   </div>
 );
+
+const SustainabilityMetric = ({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+}) => {
+  const toneClass = tone === 'success'
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+    : tone === 'warning'
+      ? 'border-amber-200 bg-amber-50 text-amber-800'
+      : tone === 'danger'
+        ? 'border-rose-200 bg-rose-50 text-rose-800'
+        : tone === 'info'
+          ? 'border-sky-200 bg-sky-50 text-sky-800'
+          : 'border-slate-200 bg-slate-50 text-slate-700';
+  return (
+    <div className={`rounded-2xl border p-3 text-center ${toneClass}`}>
+      <p className="text-2xl font-black">{value}</p>
+      <p className="mt-1 text-[10px] font-black">{label}</p>
+    </div>
+  );
+};
 
 export default MosqueImprovementGoalsCenter;
