@@ -5,17 +5,23 @@ import {
   AlertTriangle,
   CheckCircle2,
   ClipboardCheck,
+  FileCheck2,
   FileSpreadsheet,
+  FileText,
   Flag,
   Gauge,
+  Image as ImageIcon,
   Lightbulb,
   ListChecks,
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
+  ShieldCheck,
   Target,
   Trash2,
   TrendingUp,
+  Upload,
   UserRoundCheck,
 } from 'lucide-react';
 import { Badge } from './ui/badge';
@@ -37,6 +43,7 @@ import {
   mosqueApi,
   type MosqueCompletionTaskAssignee,
   type MosqueImprovementAction,
+  type MosqueImprovementEvidenceItem,
   type MosqueImprovementGoal,
   type MosqueImprovementGoalSuggestion,
   type MosqueImprovementGoalSuggestions,
@@ -93,8 +100,9 @@ const statusLabel: Record<MosqueImprovementGoal['status'], string> = {
   draft: 'مسودة',
   active: 'قيد التنفيذ',
   at_risk: 'معرض للتعثر',
-  achieved: 'متحقق',
-  closed: 'مغلق',
+  achieved: 'متحقق — بانتظار الإثبات',
+  evidence_review: 'إثبات قيد المراجعة',
+  closed: 'مغلق ومعتمد',
   cancelled: 'ملغى',
 };
 
@@ -103,6 +111,7 @@ const statusClass: Record<MosqueImprovementGoal['status'], string> = {
   active: 'border-sky-200 bg-sky-50 text-sky-800',
   at_risk: 'border-rose-200 bg-rose-50 text-rose-800',
   achieved: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  evidence_review: 'border-amber-200 bg-amber-50 text-amber-800',
   closed: 'border-violet-200 bg-violet-50 text-violet-800',
   cancelled: 'border-slate-200 bg-slate-100 text-slate-500',
 };
@@ -188,6 +197,18 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
   const [form, setForm] = useState<GoalForm>(() => emptyForm(currentRiyadhYear()));
   const [saving, setSaving] = useState(false);
 
+  const [evidenceDialogOpen, setEvidenceDialogOpen] = useState(false);
+  const [evidenceGoal, setEvidenceGoal] = useState<MosqueImprovementGoal | null>(null);
+  const [evidenceSummary, setEvidenceSummary] = useState('');
+  const [evidenceItems, setEvidenceItems] = useState<MosqueImprovementEvidenceItem[]>([]);
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [evidenceSaving, setEvidenceSaving] = useState(false);
+
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewGoal, setReviewGoal] = useState<MosqueImprovementGoal | null>(null);
+  const [reviewNote, setReviewNote] = useState('');
+  const [reviewSaving, setReviewSaving] = useState(false);
+
   const load = async (selectedYear = year) => {
     setLoading(true);
     try {
@@ -213,7 +234,7 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
   }, [year]);
 
   const summary = useMemo(() => {
-    const measurable = goals.filter((goal) => ['active', 'at_risk', 'achieved'].includes(goal.status));
+    const measurable = goals.filter((goal) => ['active', 'at_risk', 'achieved', 'evidence_review', 'closed'].includes(goal.status));
     const performanceProgress = measurable.length
       ? Math.round(measurable.reduce((sum, goal) => sum + (goal.progressPercent || 0), 0) / measurable.length)
       : 0;
@@ -225,7 +246,9 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       total: goals.length,
       active: goals.filter((goal) => goal.status === 'active').length,
       atRisk: goals.filter((goal) => goal.status === 'at_risk').length,
-      achieved: goals.filter((goal) => goal.status === 'achieved' || goal.status === 'closed').length,
+      achieved: goals.filter((goal) => goal.status === 'achieved').length,
+      evidenceReview: goals.filter((goal) => goal.status === 'evidence_review').length,
+      closed: goals.filter((goal) => goal.status === 'closed').length,
       performanceProgress,
       actionProgress,
     };
