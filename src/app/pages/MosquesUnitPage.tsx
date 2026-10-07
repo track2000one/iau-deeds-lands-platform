@@ -33,6 +33,7 @@ import {
   Save,
   Search,
   Shield,
+  Target,
   Trash2,
   UserPlus,
   Users,
@@ -56,6 +57,7 @@ import { MosqueReportsCenter } from '../components/MosqueReportsCenter';
 import { MosqueDataCompletenessCenter } from '../components/MosqueDataCompletenessCenter';
 import { MosqueKpiArchive } from '../components/MosqueKpiArchive';
 import { MosqueKpiAnnualDashboard } from '../components/MosqueKpiAnnualDashboard';
+import { MosqueImprovementGoalsCenter } from '../components/MosqueImprovementGoalsCenter';
 import { BuildingCoverageReportsDialog } from '../components/BuildingCoverageReportsDialog';
 import { isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
@@ -122,25 +124,27 @@ const roleScopeLabel = (role: MosqueModuleRole) => role === 'head'
       ? 'وصول مقيد بالموقع المرتبط'
       : 'وصول خدمات منسوب الجامعة';
 
-const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'other' => {
+const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'improvement' | 'other' => {
   const type = String(notice.entityType || '').toLowerCase();
   const text = `${notice.title || ''} ${notice.message || ''}`.toLowerCase();
   if (type.includes('request') || text.includes('طلب صيانة') || text.includes('طلب احتياج')) return 'request';
   if (type.includes('ticket') || text.includes('بلاغ')) return 'ticket';
   if (type.includes('leave') || text.includes('إجاز') || text.includes('اعتذار')) return 'leave';
   if (type.includes('quran') || text.includes('مصحف') || text.includes('مصاحف')) return 'quran';
+  if (type.includes('improvement_goal') || text.includes('هدف تحسين') || text.includes('تحقق هدف')) return 'improvement';
   if (type.includes('completion_task') || text.includes('مهمة استكمال') || text.includes('استكمال بيانات')) return 'completion';
   if (type.includes('site') || type.includes('mosque') || text.includes('مسجد') || text.includes('مصلى')) return 'site';
   return 'other';
 };
 
-const notificationCategoryLabel: Record<'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'other', string> = {
+const notificationCategoryLabel: Record<'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'improvement' | 'other', string> = {
   request: 'طلب صيانة / احتياج',
   ticket: 'بلاغ',
   site: 'مسجد / مصلى',
   leave: 'إجازة / اعتذار',
   quran: 'المصاحف',
   completion: 'متابعة اكتمال البيانات',
+  improvement: 'خطة التحسين',
   other: 'إشعار عام',
 };
 const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', jami: 'جامع', prayer_room: 'مصلى' };
@@ -3018,6 +3022,10 @@ ${quranStockMovementForm.notes}` : ''}`
       setActiveTab('data-completeness');
       return;
     }
+    if (category === 'improvement') {
+      setActiveTab('improvement-goals');
+      return;
+    }
   };
 
   const markAllNotificationsRead = async () => {
@@ -3117,6 +3125,7 @@ ${quranStockMovementForm.notes}` : ''}`
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="اكتمال البيانات" icon={CheckCircle2} active={activeTab === 'data-completeness'} onClick={() => goToDashboardSection('data-completeness')} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="أرشيف KPI" icon={Archive} active={activeTab === 'kpi-archive'} onClick={() => goToDashboardSection('kpi-archive')} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="التحليل السنوي KPI" icon={BarChart3} active={activeTab === 'kpi-annual'} onClick={() => goToDashboardSection('kpi-annual')} />}
+                  {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="خطة التحسين" icon={Target} active={activeTab === 'improvement-goals'} onClick={() => goToDashboardSection('improvement-goals')} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="الجولات والزيارات" icon={ClipboardList} active={activeTab === 'field-visits'} onClick={() => goToDashboardSection('field-visits')} />}
                   {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="الطلبات والصيانة" icon={Wrench} active={activeTab === 'requests'} onClick={() => goToDashboardSection('requests')} badge={dashboard?.stats.newRequests || 0} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="البلاغات" icon={MessageSquare} active={activeTab === 'tickets'} onClick={() => goToDashboardSection('tickets')} badge={dashboard?.stats.openTickets || 0} />}
@@ -3164,6 +3173,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 {['head', 'supervisor'].includes(role) && <option value="data-completeness">اكتمال البيانات</option>}
                 {['head', 'supervisor'].includes(role) && <option value="kpi-archive">أرشيف مؤشرات الأداء KPI</option>}
                 {['head', 'supervisor'].includes(role) && <option value="kpi-annual">التحليل السنوي KPI</option>}
+                {['head', 'supervisor'].includes(role) && <option value="improvement-goals">خطة التحسين السنوية</option>}
                 {['head', 'supervisor'].includes(role) && <option value="buildings">تغطية المباني بخدمة الصلاة</option>}
                 {['head', 'supervisor'].includes(role) && <option value="field-visits">الجولات والزيارات</option>}
                 {['head', 'supervisor', 'personnel'].includes(role) && <option value="quran">المصاحف</option>}
@@ -3679,6 +3689,10 @@ ${quranStockMovementForm.notes}` : ''}`
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="kpi-annual" className="space-y-4">
           <MosqueKpiAnnualDashboard />
+        </TabsContent>}
+
+        {['head', 'supervisor'].includes(role) && <TabsContent value="improvement-goals" className="space-y-4">
+          <MosqueImprovementGoalsCenter role={role} currentUsername={currentUsername} />
         </TabsContent>}
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="field-visits" className="space-y-4">
