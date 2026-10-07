@@ -200,6 +200,13 @@ export const InvestmentExecutiveDashboardPage: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
+            onClick={() => navigate('/investments/opportunities')}
+          >
+            <BriefcaseBusiness className="me-2 h-4 w-4" />
+            الفرص الاستثمارية
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => navigate('/investments/gis-approvals')}
           >
             <ListChecks className="me-2 h-4 w-4" />
