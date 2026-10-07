@@ -52,6 +52,7 @@ type InvestmentPolygonEditorProps = {
   title?: string;
   helperText?: string;
   showAreaComparisons?: boolean;
+  readOnly?: boolean;
   onGeometryChange: (
     geoJson: InvestmentPolygonFeature | null,
     metrics: {
@@ -175,6 +176,7 @@ export const InvestmentPolygonEditor: React.FC<
   title = 'رسم حدود المساحة Polygon',
   helperText = 'فعّل وضع الرسم ثم انقر على زوايا الأرض بالترتيب. يمكن سحب كل نقطة لتعديلها، أو حذفها من قائمة النقاط.',
   showAreaComparisons = true,
+  readOnly = false,
   onGeometryChange,
 }) => {
   const [points, setPoints] = React.useState<PolygonCoordinate[]>(() =>
@@ -315,48 +317,52 @@ export const InvestmentPolygonEditor: React.FC<
               onChange={(event) => importGeometryFile(event.target.files?.[0])}
             />
 
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={importingFile}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <FileUp className="me-2 h-4 w-4" />
-              {importingFile ? 'جارٍ الاستيراد...' : 'استيراد KML / KMZ / GeoJSON'}
-            </Button>
+            {!readOnly && (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={importingFile}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <FileUp className="me-2 h-4 w-4" />
+                  {importingFile ? 'جارٍ الاستيراد...' : 'استيراد KML / KMZ / GeoJSON'}
+                </Button>
 
-            <Button
-              type="button"
-              size="sm"
-              variant={drawing ? 'default' : 'outline'}
-              onClick={() => setDrawing((value) => !value)}
-            >
-              <MousePointer2 className="me-2 h-4 w-4" />
-              {drawing ? 'إيقاف الرسم' : 'بدء الرسم'}
-            </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={drawing ? 'default' : 'outline'}
+                  onClick={() => setDrawing((value) => !value)}
+                >
+                  <MousePointer2 className="me-2 h-4 w-4" />
+                  {drawing ? 'إيقاف الرسم' : 'بدء الرسم'}
+                </Button>
 
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={points.length === 0}
-              onClick={undo}
-            >
-              <Undo2 className="me-2 h-4 w-4" />
-              تراجع
-            </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={points.length === 0}
+                  onClick={undo}
+                >
+                  <Undo2 className="me-2 h-4 w-4" />
+                  تراجع
+                </Button>
 
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={points.length === 0}
-              onClick={clear}
-            >
-              <RotateCcw className="me-2 h-4 w-4" />
-              مسح الحدود
-            </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={points.length === 0}
+                  onClick={clear}
+                >
+                  <RotateCcw className="me-2 h-4 w-4" />
+                  مسح الحدود
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -459,7 +465,7 @@ export const InvestmentPolygonEditor: React.FC<
             )}
 
             <MapDraftClickHandler
-              enabled={drawing}
+              enabled={drawing && !readOnly}
               onAdd={(coordinate) => publish([...points, coordinate])}
             />
 
@@ -487,7 +493,7 @@ export const InvestmentPolygonEditor: React.FC<
                 key={`${index}-${longitude}-${latitude}`}
                 position={[latitude, longitude]}
                 icon={vertexIcon(index)}
-                draggable
+                draggable={!readOnly}
                 eventHandlers={{
                   dragend(event) {
                     const marker = event.target as L.Marker;
@@ -504,7 +510,13 @@ export const InvestmentPolygonEditor: React.FC<
         </div>
 
         <div className="space-y-3 px-5 pb-5">
-          {drawing && (
+          {readOnly && (
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-6 text-emerald-950">
+              الحدود في وضع القراءة فقط لأنها معتمدة ومقفلة. يلزم تسجيل «طلب تعديل حدود» من دورة الاعتماد قبل تعديل Polygon.
+            </p>
+          )}
+
+          {drawing && !readOnly && (
             <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-6 text-sky-950">
               وضع الرسم مفعل: اضغط على الخريطة لإضافة نقطة جديدة. بعد ثلاث نقاط
               سيظهر المضلع وتحسب مساحته تلقائيًا.
@@ -524,15 +536,17 @@ export const InvestmentPolygonEditor: React.FC<
                       {latitude.toFixed(7)}, {longitude.toFixed(7)}
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => removePoint(index)}
-                    title="حذف النقطة"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => removePoint(index)}
+                      title="حذف النقطة"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

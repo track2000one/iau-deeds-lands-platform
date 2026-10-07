@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { investmentsApi } from '../../features/investments/api';
 import type {
   GeometryAccuracy,
+  GeometryApprovalStatus,
   InvestmentAreaInput,
   InvestmentAreaStatus,
   InvestmentReadiness,
@@ -116,6 +117,8 @@ export const InvestmentAreaFormPage: React.FC = () => {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [areaCodeTouched, setAreaCodeTouched] = React.useState(false);
+  const [geometryApprovalStatus, setGeometryApprovalStatus] =
+    React.useState<GeometryApprovalStatus>('DRAFT');
 
   const setField = <K extends keyof FormState,>(key: K, value: FormState[K]) => {
     setForm((previous) => ({ ...previous, [key]: value }));
@@ -136,6 +139,7 @@ export const InvestmentAreaFormPage: React.FC = () => {
           const area = await investmentsApi.getArea(areaId);
           if (cancelled) return;
 
+          setGeometryApprovalStatus(area.geometryApprovalStatus || 'DRAFT');
           setForm({
             siteId: area.siteId,
             areaNumber: String(area.areaNumber),
@@ -200,6 +204,9 @@ export const InvestmentAreaFormPage: React.FC = () => {
     () => getPolygonMetrics(form.geoJson),
     [form.geoJson]
   );
+
+  const geometryLocked =
+    isEdit && geometryApprovalStatus === 'APPROVED';
 
   const validateStep = (step: number) => {
     if (step === 0) {
@@ -578,6 +585,7 @@ export const InvestmentAreaFormPage: React.FC = () => {
                   type="number"
                   step="0.000001"
                   value={form.latitude}
+                  disabled={geometryLocked}
                   onChange={(event) => setField('latitude', event.target.value)}
                   dir="ltr"
                 />
@@ -590,6 +598,7 @@ export const InvestmentAreaFormPage: React.FC = () => {
                   type="number"
                   step="0.000001"
                   value={form.longitude}
+                  disabled={geometryLocked}
                   onChange={(event) => setField('longitude', event.target.value)}
                   dir="ltr"
                 />
@@ -600,6 +609,7 @@ export const InvestmentAreaFormPage: React.FC = () => {
                 <NativeSelect
                   id="geometryAccuracy"
                   value={form.geometryAccuracy}
+                  disabled={geometryLocked}
                   onChange={(event) => setField('geometryAccuracy', event.target.value as GeometryAccuracy)}
                 >
                   {Object.entries(accuracyLabels).map(([value, label]) => (
@@ -615,12 +625,21 @@ export const InvestmentAreaFormPage: React.FC = () => {
               منفصلة عن المساحة المحسوبة من الرسم.
             </div>
 
+            {geometryLocked && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-7 text-emerald-950">
+                هذه الحدود معتمدة ومقفلة. يمكن تعديل بقية بيانات المساحة، أما
+                Polygon والإحداثيات ومستوى الدقة فلا يمكن تعديلها إلا بعد تسجيل
+                «طلب تعديل حدود» من بطاقة المساحة.
+              </div>
+            )}
+
             <InvestmentPolygonEditor
               geoJson={form.geoJson}
               referenceCoordinates={coordinateValue}
               approximateArea={optionalNumber(form.approximateArea) ?? null}
               surveyedArea={optionalNumber(form.surveyedArea) ?? null}
               fileBaseName={form.areaCode || form.name || 'investment-area'}
+              readOnly={geometryLocked}
               onGeometryChange={(geoJson, metrics) => {
                 setField('geoJson', geoJson);
 

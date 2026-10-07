@@ -11,14 +11,17 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
+import { usePermissions } from '../../context/PermissionsContext';
 import { investmentsApi } from '../../features/investments/api';
 import { findSitePreset } from '../../features/investments/sitePresets';
 import type {
   GeometryAccuracy,
   InvestmentDeedOption,
+  InvestmentSite,
   InvestmentSiteInput,
 } from '../../features/investments/types';
 import { getPolygonMetrics } from '../../features/investments/geometry';
+import { GeometryApprovalPanel } from '../components/GeometryApprovalPanel';
 import { InvestmentPolygonEditor } from '../components/InvestmentPolygonEditor';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { Badge } from '../components/ui/badge';
@@ -78,6 +81,10 @@ const mergeDeeds = (
 export const InvestmentSiteFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { siteId } = useParams();
+  const { hasPermission, isAdmin } = usePermissions();
+  const canEdit = isAdmin || hasPermission('investments', 'canEdit');
+  const canAddAttachment =
+    isAdmin || hasPermission('investments', 'canAdd');
   const [searchParams] = useSearchParams();
   const isEdit = !!siteId;
   const preset = findSitePreset(searchParams.get('preset') || '');
@@ -97,6 +104,7 @@ export const InvestmentSiteFormPage: React.FC = () => {
   const [loading, setLoading] = React.useState(isEdit);
   const [saving, setSaving] = React.useState(false);
   const [showMap, setShowMap] = React.useState(false);
+  const [siteRecord, setSiteRecord] = React.useState<InvestmentSite | null>(null);
 
   const setField = <K extends keyof FormState,>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -109,6 +117,8 @@ export const InvestmentSiteFormPage: React.FC = () => {
 
     investmentsApi.getSite(siteId).then((site) => {
       if (cancelled) return;
+
+      setSiteRecord(site);
 
       const linkedDeeds = (site.deedLinks || []).map((link) => link.deed);
       const allDeeds = mergeDeeds(
@@ -194,6 +204,9 @@ export const InvestmentSiteFormPage: React.FC = () => {
     () => getPolygonMetrics(form.geoJson),
     [form.geoJson]
   );
+
+  const geometryLocked =
+    siteRecord?.geometryApprovalStatus === 'APPROVED';
 
   const addDeed = (deed: InvestmentDeedOption) => {
     if (form.deedIds.includes(deed.id)) {
@@ -572,6 +585,7 @@ export const InvestmentSiteFormPage: React.FC = () => {
                   step="0.0000001"
                   dir="ltr"
                   value={form.latitude}
+                  disabled={geometryLocked}
                   onChange={(event) => setField('latitude', event.target.value)}
                 />
               </div>
@@ -584,6 +598,7 @@ export const InvestmentSiteFormPage: React.FC = () => {
                   step="0.0000001"
                   dir="ltr"
                   value={form.longitude}
+                  disabled={geometryLocked}
                   onChange={(event) => setField('longitude', event.target.value)}
                 />
               </div>
@@ -593,6 +608,7 @@ export const InvestmentSiteFormPage: React.FC = () => {
                 <NativeSelect
                   id="geometryAccuracy"
                   value={form.geometryAccuracy}
+                  disabled={geometryLocked}
                   onChange={(event) =>
                     setField(
                       'geometryAccuracy',
@@ -612,6 +628,7 @@ export const InvestmentSiteFormPage: React.FC = () => {
               type="button"
               variant="outline"
               onClick={() => setShowMap((value) => !value)}
+              disabled={geometryLocked}
             >
               <MapPin className="me-2 h-4 w-4" />
               {showMap ? 'إخفاء محدد النقطة' : 'تحديد نقطة مرجعية فقط'}
@@ -627,6 +644,14 @@ export const InvestmentSiteFormPage: React.FC = () => {
               />
             )}
 
+            {geometryLocked && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-7 text-emerald-950">
+                حدود الموقع معتمدة ومقفلة. يمكن تعديل البيانات التعريفية وربط
+                الصكوك، أما Polygon والإحداثيات ومستوى الدقة فلا يمكن تعديلها
+                إلا بعد تسجيل «طلب تعديل حدود» أدناه.
+              </div>
+            )}
+
             <InvestmentPolygonEditor
               geoJson={form.geoJson}
               referenceCoordinates={coordinates}
@@ -634,6 +659,7 @@ export const InvestmentSiteFormPage: React.FC = () => {
               title="رسم حدود الموقع الرئيسي Polygon"
               helperText="ارسم أو استورد الحدود الخارجية للموقع الرئيسي. تستخدم هذه الحدود لتدقيق وقوع المساحات الاستثمارية التابعة داخله، ويمكن تعديل النقاط بالسحب قبل الحفظ."
               showAreaComparisons={false}
+              readOnly={geometryLocked}
               onGeometryChange={(geoJson, metrics) => {
                 setField('geoJson', geoJson);
 
@@ -656,6 +682,29 @@ export const InvestmentSiteFormPage: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        {siteRecord && (
+          <GeometryApprovalPanel
+            entityType="investment_site"
+            record={siteRecord}
+            canEdit={canEdit}
+            canAddAttachment={canAddAttachment}
+            isAdmin={isAdmin}
+            onUpdated={(updated) => {
+              setSiteRecord(updated);
+              setForm((current) => ({
+                ...current,
+                geoJson: updated.geoJson || null,
+                latitude:
+                  updated.latitude == null ? '' : String(updated.latitude),
+                longitude:
+                  updated.longitude == null ? '' : String(updated.longitude),
+                geometryAccuracy:
+                  updated.geometryAccuracy || current.geometryAccuracy,
+              }));
+            }}
+          />
+        )}
 
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
