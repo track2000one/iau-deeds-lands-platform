@@ -8,6 +8,8 @@ import {
   FileCheck2,
   FileSpreadsheet,
   Gavel,
+  History,
+  Printer,
   RefreshCw,
   RotateCcw,
   ShieldCheck,
@@ -27,11 +29,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
+import { Input } from './ui/input';
 import { NativeSelect } from './ui/native-select';
 import { Textarea } from './ui/textarea';
 import {
   mosqueApi,
   type MosqueCompletionKpiSnapshot,
+  type MosqueExecutiveDecision,
   type MosqueImprovementGoal,
   type MosqueImprovementGoalSuggestion,
 } from '../api/mosques';
@@ -45,6 +49,11 @@ type DecisionKind =
   | 'sustained';
 
 type QueueFilter = 'all' | 'decisions' | 'monitoring' | 'positive';
+
+type PendingExecutiveAction =
+  | { type: 'extend'; itemId: string; goal: MosqueImprovementGoal }
+  | { type: 'activate_follow_up'; itemId: string; goal: MosqueImprovementGoal }
+  | { type: 'create_suggestion'; itemId: string; suggestion: MosqueImprovementGoalSuggestion };
 
 type ExecutiveItem = {
   id: string;
@@ -68,6 +77,36 @@ const currentRiyadhYear = () => {
     year: 'numeric',
   }).formatToParts(new Date());
   return Number(parts.find((part) => part.type === 'year')?.value || new Date().getFullYear());
+};
+
+const riyadhDateInput = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Riyadh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+};
+
+const firstDayOfRiyadhMonth = () => {
+  const today = riyadhDateInput();
+  return `${today.slice(0, 7)}-01`;
+};
+
+const decisionTypeLabel: Record<string, string> = {
+  create_improvement_goal: 'إنشاء هدف تحسين',
+  activate_improvement_goal: 'تفعيل هدف تحسين',
+  activate_follow_up_goal: 'تفعيل خطة متابعة',
+  cancel_improvement_goal: 'إلغاء هدف تحسين',
+  change_goal_due_date: 'تعديل موعد الاستحقاق',
+  reassign_goal_owner: 'إعادة إسناد الهدف',
+  change_goal_target: 'تعديل المستهدف',
+  update_improvement_goal: 'تعديل هدف تحسين',
+  approve_closure_evidence: 'اعتماد إثبات الإغلاق',
+  return_closure_evidence: 'إعادة إثبات الإغلاق',
+  approve_monthly_kpi: 'اعتماد KPI الشهري',
 };
 
 const missingLabels: Record<string, string> = {
@@ -138,8 +177,51 @@ const severityLabel: Record<ExecutiveItem['severity'], string> = {
   positive: 'إحاطة إيجابية',
 };
 
+const executiveStatusLabel: Record<string, string> = {
+  draft: 'مسودة',
+  active: 'قيد التنفيذ',
+  at_risk: 'معرض للتعثر',
+  achieved: 'متحقق',
+  evidence_review: 'إثبات قيد المراجعة',
+  closed: 'مغلق',
+  cancelled: 'ملغى',
+  review: 'قيد المراجعة',
+  approved: 'معتمد',
+  archived: 'مؤرشف',
+};
+
+const decisionStateSummary = (state?: Record<string, unknown> | null) => {
+  if (!state) return '—';
+  const parts: string[] = [];
+  const status = typeof state.status === 'string' ? state.status : '';
+  if (status) parts.push(`الحالة: ${executiveStatusLabel[status] || status}`);
+  if (state.month) parts.push(`الشهر: ${String(state.month)}`);
+  if (state.kpiScore !== undefined && state.kpiScore !== null) parts.push(`KPI: ${String(state.kpiScore)}/100`);
+  if (state.ownerName) parts.push(`المسؤول: ${String(state.ownerName)}`);
+  if (state.dueDate) parts.push(`الاستحقاق: ${formatDate(String(state.dueDate))}`);
+  if (state.targetValue !== undefined && state.targetValue !== null) parts.push(`المستهدف: ${String(state.targetValue)}`);
+  if (state.currentValue !== undefined && state.currentValue !== null) parts.push(`الحالي: ${String(state.currentValue)}`);
+  if (state.progressPercent !== undefined && state.progressPercent !== null) parts.push(`التقدم: ${String(state.progressPercent)}%`);
+  if (state.sustainabilityStatus) parts.push(`الاستدامة: ${String(state.sustainabilityStatus)}`);
+  return parts.length ? parts.join(' — ') : 'لا توجد حالة مختصرة';
+};
+
+const escapeHtml = (value: unknown) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
 export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImprovementPlan }) => {
   const [goals, setGoals] = useState<MosqueImprovementGoal[]>([]);
+  const [decisions, setDecisions] = useState<MosqueExecutiveDecision[]>([]);
+  const [decisionFrom, setDecisionFrom] = useState(firstDayOfRiyadhMonth());
+  const [decisionTo, setDecisionTo] = useState(riyadhDateInput());
+  const [decisionLoading, setDecisionLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingExecutiveAction | null>(null);
+  const [decisionReason, setDecisionReason] = useState('');
+  const [decisionSaving, setDecisionSaving] = useState(false);
   const [suggestions, setSuggestions] = useState<MosqueImprovementGoalSuggestion[]>([]);
   const [snapshots, setSnapshots] = useState<MosqueCompletionKpiSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,6 +233,18 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
   const [reviewSaving, setReviewSaving] = useState(false);
 
   const year = currentRiyadhYear();
+
+  const loadDecisionLog = async (from = decisionFrom, to = decisionTo) => {
+    setDecisionLoading(true);
+    try {
+      const rows = await mosqueApi.executiveDecisions({ from, to });
+      setDecisions(rows || []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل سجل القرارات التنفيذية');
+    } finally {
+      setDecisionLoading(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -172,6 +266,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
 
   useEffect(() => {
     void load();
+    void loadDecisionLog();
   }, []);
 
   const latestOfficialSnapshot = useMemo(
@@ -292,45 +387,55 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
     sustained: queue.filter((item) => item.kind === 'sustained').length,
   }), [queue]);
 
-  const extendGoal = async (goal: MosqueImprovementGoal) => {
-    if (!window.confirm(`تمديد موعد الهدف ${goal.goalNumber} لمدة 30 يومًا؟`)) return;
+  const extendGoal = async (goal: MosqueImprovementGoal, reason: string) => {
     setActingId(goal.id);
     try {
-      await mosqueApi.updateImprovementGoal(goal.id, { dueDate: addDaysDateInput(goal.dueDate, 30) });
-      toast.success('تم تمديد موعد الهدف 30 يومًا وإعادة تقييم حالته');
-      await load();
+      await mosqueApi.updateImprovementGoal(goal.id, {
+        dueDate: addDaysDateInput(goal.dueDate, 30),
+        decisionReason: reason,
+      });
+      toast.success('تم تمديد موعد الهدف 30 يومًا وتوثيق القرار في السجل');
+      await Promise.all([load(), loadDecisionLog()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تمديد موعد الهدف');
+      throw error;
     } finally {
       setActingId(null);
     }
   };
 
-  const activateFollowUp = async (goal: MosqueImprovementGoal) => {
+  const activateFollowUp = async (goal: MosqueImprovementGoal, reason: string) => {
     const followUp = goal.followUpGoalId ? goals.find((item) => item.id === goal.followUpGoalId) : null;
     if (!followUp) {
       toast.error('لم يتم العثور على مسودة المتابعة المرتبطة');
-      return;
+      throw new Error('لم يتم العثور على مسودة المتابعة المرتبطة');
     }
     if (followUp.status !== 'draft') {
       toast.info('خطة المتابعة مرتبطة ومفعلة بالفعل');
       return;
     }
-    if (!window.confirm(`تفعيل مسودة المتابعة ${followUp.goalNumber} والبدء في تنفيذها؟`)) return;
 
     setActingId(goal.id);
     try {
-      await mosqueApi.updateImprovementGoal(followUp.id, { status: 'active' });
-      toast.success('تم تفعيل خطة المتابعة المرتبطة بالانتكاس');
-      await load();
+      await mosqueApi.updateImprovementGoal(followUp.id, {
+        status: 'active',
+        decisionReason: reason,
+      });
+      toast.success('تم تفعيل خطة المتابعة وتوثيق القرار في السجل');
+      await Promise.all([load(), loadDecisionLog()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تفعيل خطة المتابعة');
+      throw error;
     } finally {
       setActingId(null);
     }
   };
 
-  const createGoalFromSuggestion = async (suggestion: MosqueImprovementGoalSuggestion, itemId: string) => {
+  const createGoalFromSuggestion = async (
+    suggestion: MosqueImprovementGoalSuggestion,
+    itemId: string,
+    reason: string
+  ) => {
     setActingId(itemId);
     try {
       const dueDate = addDaysDateInput(null, 90);
@@ -350,6 +455,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
         ownerUserId: null,
         dueDate,
         status: 'draft',
+        decisionReason: reason,
         correctiveActions: [{
           id: crypto.randomUUID(),
           title: 'تحليل السبب الجذري واعتماد الإجراء التصحيحي المناسب',
@@ -359,12 +465,49 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
         }],
         notes: 'مسودة هدف أنشئت من لوحة القرارات التنفيذية بناءً على آخر نتيجة KPI رسمية.',
       });
-      toast.success('تم إنشاء مسودة هدف تحسين، ويمكن إسنادها وتفعيلها من خطة التحسين');
-      await load();
+      toast.success('تم إنشاء مسودة هدف التحسين وتوثيق القرار في السجل');
+      await Promise.all([load(), loadDecisionLog()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر إنشاء مسودة هدف التحسين');
+      throw error;
     } finally {
       setActingId(null);
+    }
+  };
+
+  const openPendingDecision = (action: PendingExecutiveAction) => {
+    setPendingAction(action);
+    setDecisionReason(
+      action.type === 'extend'
+        ? 'منح مهلة إضافية لاستكمال الإجراءات التصحيحية ومعالجة أسباب التعثر.'
+        : action.type === 'activate_follow_up'
+          ? 'تفعيل خطة المتابعة لمعالجة التراجع الجوهري الذي ظهر بعد إغلاق الهدف.'
+          : 'اعتماد التوصية المبنية على آخر نتيجة KPI وتحويلها إلى مسودة هدف تحسين قابلة للمتابعة.'
+    );
+  };
+
+  const executePendingDecision = async () => {
+    if (!pendingAction) return;
+    if (decisionReason.trim().length < 3) {
+      toast.error('مبرر القرار مطلوب لتوثيقه في السجل التنفيذي');
+      return;
+    }
+
+    setDecisionSaving(true);
+    try {
+      if (pendingAction.type === 'extend') {
+        await extendGoal(pendingAction.goal, decisionReason.trim());
+      } else if (pendingAction.type === 'activate_follow_up') {
+        await activateFollowUp(pendingAction.goal, decisionReason.trim());
+      } else {
+        await createGoalFromSuggestion(pendingAction.suggestion, pendingAction.itemId, decisionReason.trim());
+      }
+      setPendingAction(null);
+      setDecisionReason('');
+    } catch {
+      // The action handler already shows a detailed error.
+    } finally {
+      setDecisionSaving(false);
     }
   };
 
@@ -375,18 +518,23 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
 
   const reviewEvidence = async (decision: 'approve' | 'return') => {
     if (!reviewGoal) return;
-    if (decision === 'return' && !reviewNote.trim()) {
-      toast.error('اكتب ملاحظة توضح متطلبات استكمال الإثبات');
+    if (reviewNote.trim().length < 3) {
+      toast.error('مبرر القرار مطلوب لحفظه في سجل القرارات التنفيذية');
       return;
     }
     if (decision === 'approve' && !window.confirm('اعتماد الأدلة وإغلاق الهدف نهائيًا؟')) return;
 
     setReviewSaving(true);
     try {
-      await mosqueApi.reviewImprovementGoalEvidence(reviewGoal.id, decision, reviewNote.trim() || undefined);
-      toast.success(decision === 'approve' ? 'تم اعتماد الأدلة وإغلاق الهدف' : 'تمت إعادة الإثبات للاستكمال');
+      await mosqueApi.reviewImprovementGoalEvidence(
+        reviewGoal.id,
+        decision,
+        reviewNote.trim(),
+        reviewNote.trim()
+      );
+      toast.success(decision === 'approve' ? 'تم اعتماد الأدلة وإغلاق الهدف وتوثيق القرار' : 'تمت إعادة الإثبات للاستكمال وتوثيق القرار');
       setReviewGoal(null);
-      await load();
+      await Promise.all([load(), loadDecisionLog()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تنفيذ قرار مراجعة الإثبات');
     } finally {
@@ -423,6 +571,117 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
     ];
     XLSX.utils.book_append_sheet(workbook, sheet, 'قرارات الإدارة');
     XLSX.writeFile(workbook, `IAU_Mosques_Executive_Decisions_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const exportDecisionLog = () => {
+    if (!decisions.length) {
+      toast.error('لا توجد قرارات ضمن الفترة المحددة');
+      return;
+    }
+
+    const rows = decisions.map((decision, index) => ({
+      'م': index + 1,
+      'رقم القرار': decision.decisionNumber,
+      'نوع القرار': decisionTypeLabel[decision.decisionType] || decision.decisionType,
+      'عنوان القرار': decision.title,
+      'المبرر': decision.rationale,
+      'الحالة قبل القرار': decisionStateSummary(decision.beforeState),
+      'الحالة بعد القرار': decisionStateSummary(decision.afterState),
+      'الهدف / الكيان المرتبط': decision.goalId || decision.entityId || '',
+      'المؤشر المرتبط': decision.metricKey ? (metricLabel[decision.metricKey] || decision.metricKey) : '',
+      'متخذ القرار': decision.actorName || '',
+      'الصفة': decision.actorRole === 'head' ? 'رئيس الوحدة' : (decision.actorRole || ''),
+      'التاريخ والوقت': new Date(decision.decidedAt).toLocaleString('ar-SA-u-ca-gregory'),
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    (sheet as any)['!views'] = [{ RTL: true }];
+    (sheet as any)['!cols'] = [
+      { wch: 6 }, { wch: 20 }, { wch: 28 }, { wch: 45 }, { wch: 55 }, { wch: 55 },
+      { wch: 55 }, { wch: 26 }, { wch: 24 }, { wch: 24 }, { wch: 16 }, { wch: 24 },
+    ];
+    XLSX.utils.book_append_sheet(workbook, sheet, 'سجل القرارات');
+    XLSX.writeFile(workbook, `IAU_Mosques_Executive_Decision_Log_${decisionFrom}_to_${decisionTo}.xlsx`);
+  };
+
+  const printDecisionMinutes = () => {
+    if (!decisions.length) {
+      toast.error('لا توجد قرارات ضمن الفترة المحددة لإعداد المحضر');
+      return;
+    }
+
+    const popup = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
+    if (!popup) {
+      toast.error('تعذر فتح نافذة الطباعة. تحقق من السماح بالنوافذ المنبثقة.');
+      return;
+    }
+
+    const rows = decisions.map((decision, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td><strong>${escapeHtml(decision.decisionNumber)}</strong><br/><small>${escapeHtml(decisionTypeLabel[decision.decisionType] || decision.decisionType)}</small></td>
+        <td>${escapeHtml(decision.title)}</td>
+        <td>${escapeHtml(decision.rationale)}</td>
+        <td>${escapeHtml(decisionStateSummary(decision.beforeState))}</td>
+        <td>${escapeHtml(decisionStateSummary(decision.afterState))}</td>
+        <td>${escapeHtml(decision.actorName || '—')}<br/><small>${escapeHtml(decision.actorRole === 'head' ? 'رئيس الوحدة' : (decision.actorRole || ''))}</small></td>
+        <td>${escapeHtml(new Date(decision.decidedAt).toLocaleString('ar-SA-u-ca-gregory'))}</td>
+      </tr>
+    `).join('');
+
+    popup.document.open();
+    popup.document.write(`<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>محضر القرارات التنفيذية</title>
+<style>
+@page { size: A4 landscape; margin: 12mm; }
+* { box-sizing: border-box; }
+body { font-family: Arial, Tahoma, sans-serif; color: #17202a; margin: 0; direction: rtl; }
+.header { text-align: center; border-bottom: 3px solid #0b4a3f; padding-bottom: 12px; margin-bottom: 16px; }
+.header h1 { margin: 0; color: #0b4a3f; font-size: 22px; }
+.header h2 { margin: 7px 0 0; font-size: 15px; font-weight: 700; }
+.meta { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; margin: 10px 0 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 9px; }
+th, td { border: 1px solid #b9c1c7; padding: 7px; vertical-align: top; line-height: 1.55; }
+th { background: #eaf4f1; color: #0b4a3f; font-weight: 800; }
+small { color: #64748b; }
+.footer { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; font-size: 11px; }
+.signature { min-height: 70px; border-top: 1px solid #94a3b8; padding-top: 8px; text-align: center; }
+.note { margin-top: 12px; font-size: 9px; color: #64748b; }
+@media print { button { display:none; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>جامعة الإمام عبدالرحمن بن فيصل</h1>
+    <h2>وحدة العناية بالمساجد والمصليات الجامعية — محضر القرارات التنفيذية</h2>
+  </div>
+  <div class="meta">
+    <div><strong>الفترة:</strong> ${escapeHtml(decisionFrom)} إلى ${escapeHtml(decisionTo)}</div>
+    <div><strong>عدد القرارات:</strong> ${decisions.length}</div>
+    <div><strong>تاريخ إعداد المحضر:</strong> ${escapeHtml(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>م</th><th>رقم / نوع القرار</th><th>موضوع القرار</th><th>المبرر</th>
+        <th>الحالة قبل</th><th>الحالة بعد</th><th>متخذ القرار</th><th>التاريخ والوقت</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="note">أُعد هذا المحضر آليًا من سجل القرارات التنفيذي المحفوظ في منصة IAU-Deeds، وتبقى تفاصيل كل قرار وحالته قبل التنفيذ وبعده محفوظة في السجل الإلكتروني.</div>
+  <div class="footer">
+    <div class="signature">إعداد ومراجعة<br/>الاسم: ____________________<br/>التوقيع: ____________________</div>
+    <div class="signature">رئيس وحدة العناية بالمساجد والمصليات الجامعية<br/>الاسم: ____________________<br/>التوقيع: ____________________</div>
+  </div>
+  <script>window.onload = () => window.print();<\/script>
+</body>
+</html>`);
+    popup.document.close();
   };
 
   return (
@@ -528,7 +787,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
                               size="sm"
                               className="bg-amber-700 text-white hover:bg-amber-800"
                               disabled={actingId === item.goal.id}
-                              onClick={() => void extendGoal(item.goal!)}
+                              onClick={() => openPendingDecision({ type: 'extend', itemId: item.id, goal: item.goal! })}
                             >
                               {actingId === item.goal.id ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" /> : <Clock3 className="ml-1 h-3.5 w-3.5" />}
                               تمديد 30 يومًا
@@ -543,7 +802,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
                               size="sm"
                               className="bg-rose-700 text-white hover:bg-rose-800"
                               disabled={actingId === item.goal.id}
-                              onClick={() => void activateFollowUp(item.goal!)}
+                              onClick={() => openPendingDecision({ type: 'activate_follow_up', itemId: item.id, goal: item.goal! })}
                             >
                               {actingId === item.goal.id ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="ml-1 h-3.5 w-3.5" />}
                               تفعيل خطة المتابعة
@@ -558,7 +817,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
                             size="sm"
                             className="bg-sky-700 text-white hover:bg-sky-800"
                             disabled={actingId === item.id}
-                            onClick={() => void createGoalFromSuggestion(item.suggestion!, item.id)}
+                            onClick={() => openPendingDecision({ type: 'create_suggestion', itemId: item.id, suggestion: item.suggestion! })}
                           >
                             {actingId === item.id ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" /> : <Target className="ml-1 h-3.5 w-3.5" />}
                             إنشاء مسودة هدف
@@ -579,6 +838,160 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
           )}
         </CardContent>
       </Card>
+
+      <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.06)]">
+        <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8]">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <Badge variant="outline" className="mb-2 border-violet-200 bg-white text-violet-800">سجل تدقيق غير قابل للتجاوز</Badge>
+              <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]">
+                <History className="h-5 w-5" />
+                سجل القرارات التنفيذية
+              </CardTitle>
+              <CardDescription className="mt-1 max-w-4xl leading-6">
+                يحفظ رقم القرار ونوعه ومبرره ومتخذ القرار والحالة قبل التنفيذ وبعده، ويمكن استخراج محضر إداري رسمي لأي فترة.
+              </CardDescription>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => void loadDecisionLog()} disabled={decisionLoading}>
+                <RefreshCw className={decisionLoading ? 'ml-2 h-4 w-4 animate-spin' : 'ml-2 h-4 w-4'} />
+                تحديث السجل
+              </Button>
+              <Button variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800" onClick={exportDecisionLog} disabled={!decisions.length}>
+                <FileSpreadsheet className="ml-2 h-4 w-4" />
+                تصدير السجل
+              </Button>
+              <Button className="bg-violet-700 text-white hover:bg-violet-800" onClick={printDecisionMinutes} disabled={!decisions.length}>
+                <Printer className="ml-2 h-4 w-4" />
+                محضر القرارات
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4 p-4 sm:p-5">
+          <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <label className="space-y-1.5">
+              <span className="text-[11px] font-black text-slate-600">من تاريخ</span>
+              <Input type="date" value={decisionFrom} onChange={(event) => setDecisionFrom(event.target.value)} />
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-[11px] font-black text-slate-600">إلى تاريخ</span>
+              <Input type="date" value={decisionTo} onChange={(event) => setDecisionTo(event.target.value)} />
+            </label>
+            <Button className="bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => void loadDecisionLog(decisionFrom, decisionTo)} disabled={decisionLoading || !decisionFrom || !decisionTo}>
+              تطبيق الفترة
+            </Button>
+          </div>
+
+          {decisionLoading ? (
+            <div className="flex min-h-32 items-center justify-center text-sm font-bold text-slate-500">
+              <RefreshCw className="ml-2 h-5 w-5 animate-spin" />
+              جاري تحميل سجل القرارات...
+            </div>
+          ) : decisions.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <History className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-3 text-sm font-black text-slate-600">لا توجد قرارات محفوظة ضمن الفترة المحددة.</p>
+              <p className="mt-1 text-xs text-slate-400">القرارات الجديدة الصادرة من مركز القرار أو اعتماد KPI ستوثق هنا تلقائيًا.</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-sm font-black text-slate-800">القرارات المسجلة</p>
+                <Badge variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]">{decisions.length} قرار</Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1380px] text-right text-xs">
+                  <thead className="bg-white text-[10px] font-black text-slate-500">
+                    <tr>
+                      <th className="px-3 py-3">رقم القرار</th>
+                      <th className="px-3 py-3">النوع</th>
+                      <th className="px-3 py-3">الموضوع والمبرر</th>
+                      <th className="px-3 py-3">الحالة قبل</th>
+                      <th className="px-3 py-3">الحالة بعد</th>
+                      <th className="px-3 py-3">الهدف / المؤشر</th>
+                      <th className="px-3 py-3">متخذ القرار</th>
+                      <th className="px-3 py-3">التاريخ والوقت</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {decisions.map((decision) => (
+                      <tr key={decision.id} className="align-top">
+                        <td className="px-3 py-3">
+                          <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800">{decision.decisionNumber}</Badge>
+                        </td>
+                        <td className="px-3 py-3 font-black text-slate-700">{decisionTypeLabel[decision.decisionType] || decision.decisionType}</td>
+                        <td className="max-w-[360px] px-3 py-3">
+                          <p className="font-black text-slate-800">{decision.title}</p>
+                          <p className="mt-1 leading-5 text-slate-500">{decision.rationale}</p>
+                        </td>
+                        <td className="max-w-[300px] px-3 py-3 leading-5 text-slate-500">{decisionStateSummary(decision.beforeState)}</td>
+                        <td className="max-w-[300px] px-3 py-3 leading-5 text-slate-700">{decisionStateSummary(decision.afterState)}</td>
+                        <td className="px-3 py-3">
+                          <p className="font-bold text-slate-700">{decision.goalId || decision.entityId || '—'}</p>
+                          <p className="mt-1 text-[10px] text-slate-400">{decision.metricKey ? (metricLabel[decision.metricKey] || decision.metricKey) : 'بدون مؤشر محدد'}</p>
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="font-black text-slate-800">{decision.actorName || '—'}</p>
+                          <p className="mt-1 text-[10px] text-slate-400">{decision.actorRole === 'head' ? 'رئيس الوحدة' : (decision.actorRole || '—')}</p>
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-slate-600">{new Date(decision.decidedAt).toLocaleString('ar-SA-u-ca-gregory')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={Boolean(pendingAction)} onOpenChange={(open) => !open && setPendingAction(null)}>
+        <DialogContent className="sm:max-w-[620px]" dir="rtl">
+          {pendingAction && (
+            <>
+              <DialogHeader className="text-right">
+                <DialogTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]">
+                  <Gavel className="h-5 w-5" />
+                  توثيق القرار التنفيذي
+                </DialogTitle>
+                <DialogDescription className="leading-6">
+                  {pendingAction.type === 'extend'
+                    ? `تمديد موعد الهدف ${pendingAction.goal.goalNumber} لمدة 30 يومًا.`
+                    : pendingAction.type === 'activate_follow_up'
+                      ? 'تفعيل مسودة خطة المتابعة المرتبطة بالانتكاس والبدء في تنفيذها.'
+                      : 'تحويل توصية KPI الحالية إلى مسودة هدف تحسين رسمي.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 py-2">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
+                  سيُحفظ هذا القرار برقم مستقل مع الحالة قبل التنفيذ وبعده، واسم متخذ القرار والتاريخ والوقت.
+                </div>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-black text-slate-600">مبرر القرار</span>
+                  <Textarea
+                    value={decisionReason}
+                    onChange={(event) => setDecisionReason(event.target.value)}
+                    rows={5}
+                    placeholder="اكتب مبرر القرار الإداري بصورة واضحة..."
+                  />
+                </label>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPendingAction(null)} disabled={decisionSaving}>إلغاء</Button>
+                <Button className="bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => void executePendingDecision()} disabled={decisionSaving}>
+                  {decisionSaving ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <Gavel className="ml-2 h-4 w-4" />}
+                  اعتماد القرار وتنفيذه
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(reviewGoal)} onOpenChange={(open) => !open && setReviewGoal(null)}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 sm:max-w-[860px]" dir="rtl">
@@ -626,12 +1039,12 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
                 </div>
 
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-black text-slate-600">ملاحظة القرار</span>
+                  <span className="text-xs font-black text-slate-600">مبرر القرار / ملاحظة المراجعة</span>
                   <Textarea
                     value={reviewNote}
                     onChange={(event) => setReviewNote(event.target.value)}
                     rows={4}
-                    placeholder="اختياري عند الاعتماد، وإلزامي عند إعادة الإثبات للاستكمال..."
+                    placeholder="اكتب مبرر القرار الإداري؛ يُحفظ في سجل القرارات التنفيذية..."
                   />
                 </label>
               </div>

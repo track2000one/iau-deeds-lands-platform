@@ -269,6 +269,26 @@ export type MosqueImprovementAction = {
   note?: string | null;
 };
 
+export type MosqueExecutiveDecision = {
+  id: string;
+  decisionNumber: string;
+  decisionType: string;
+  title: string;
+  rationale: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  goalId?: string | null;
+  metricKey?: string | null;
+  sourceSnapshotId?: string | null;
+  beforeState?: Record<string, unknown> | null;
+  afterState?: Record<string, unknown> | null;
+  actorUserId?: string | null;
+  actorName?: string | null;
+  actorRole?: string | null;
+  decidedAt: string;
+  createdAt: string;
+};
+
 export type MosqueImprovementEvidenceItem = {
   url: string;
   fileId?: string | null;
@@ -1035,6 +1055,16 @@ createQuranRackMovement: (input: Record<string, unknown>) => apiJson<{ movement:
       method: 'PATCH',
       body: JSON.stringify({ status, note: note || null }),
     }),
+  executiveDecisions: (filters: { from?: string; to?: string; decisionType?: string; goalId?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (filters.from) query.set('from', filters.from);
+    if (filters.to) query.set('to', filters.to);
+    if (filters.decisionType) query.set('decisionType', filters.decisionType);
+    if (filters.goalId) query.set('goalId', filters.goalId);
+    const suffix = query.toString();
+    return apiJson<MosqueExecutiveDecision[]>(`/api/mosques/executive-decisions${suffix ? `?${suffix}` : ''}`);
+  },
+
   improvementGoals: (filters: { year?: number; status?: string } = {}) => {
     const query = new URLSearchParams();
     if (filters.year) query.set('year', String(filters.year));
@@ -1055,10 +1085,10 @@ createQuranRackMovement: (input: Record<string, unknown>) => apiJson<{ movement:
       method: 'POST',
       body: JSON.stringify(input),
     }),
-  reviewImprovementGoalEvidence: (id: string, decision: 'approve' | 'return', note?: string) =>
+  reviewImprovementGoalEvidence: (id: string, decision: 'approve' | 'return', note?: string, decisionReason?: string) =>
     apiJson<MosqueImprovementGoal>(`/api/mosques/improvement-goals/${id}/evidence-review`, {
       method: 'PATCH',
-      body: JSON.stringify({ decision, note: note || null }),
+      body: JSON.stringify({ decision, note: note || null, decisionReason: decisionReason || null }),
     }),
   evaluateImprovementGoals: (year?: number) =>
     apiJson<MosqueImprovementGoal[]>('/api/mosques/improvement-goals/evaluate', {
