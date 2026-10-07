@@ -1,31 +1,49 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 import {
   AlertTriangle,
   Building2,
+  CalendarDays,
   CheckCircle2,
+  ClipboardList,
   Clock3,
   FileSpreadsheet,
   FileText,
   Image as ImageIcon,
   MapPin,
+  Pencil,
+  Plus,
   RefreshCw,
   Search,
+  User,
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
 import { Input } from './ui/input';
 import { NativeSelect } from './ui/native-select';
 import { Progress } from './ui/progress';
+import { Textarea } from './ui/textarea';
 import {
   mosqueApi,
+  type MosqueCompletionTask,
+  type MosqueCompletionTaskAssignee,
   type MosqueFieldVisit,
   type MosqueSite,
   type MosqueSiteMediaLibrary,
 } from '../api/mosques';
 
 type CompletenessState = 'complete' | 'review' | 'incomplete';
+type PriorityBand = 'urgent' | 'high' | 'medium' | 'normal';
 
 type MissingKey =
   | 'identity'
@@ -59,6 +77,13 @@ type CompletenessRow = {
   latestVisit: MosqueFieldVisit | null;
 };
 
+type PriorityRow = CompletenessRow & {
+  priorityScore: number;
+  priorityBand: PriorityBand;
+  activeTasks: MosqueCompletionTask[];
+  overdueTasks: MosqueCompletionTask[];
+};
+
 type MosqueDataCompletenessCenterProps = {
   sites: MosqueSite[];
   canEdit: boolean;
@@ -67,21 +92,24 @@ type MosqueDataCompletenessCenterProps = {
   onGoToVisits: () => void;
 };
 
-const missingCatalog: Array<{ key: MissingKey; label: string }> = [
-  { key: 'identity', label: 'اسم الموقع' },
-  { key: 'gender', label: 'فئة المصلى' },
-  { key: 'building', label: 'ربط المبنى' },
-  { key: 'location', label: 'بيانات الموقع' },
-  { key: 'coordinates', label: 'الإحداثيات' },
-  { key: 'area', label: 'المساحة' },
-  { key: 'capacity', label: 'السعة' },
-  { key: 'contact', label: 'التواصل / المسؤول' },
-  { key: 'photos', label: 'الصور' },
-  { key: 'documents', label: 'المستندات' },
-  { key: 'women_verification', label: 'التحقق من مصلى النساء' },
-  { key: 'women_details', label: 'تفاصيل مصلى النساء' },
-  { key: 'visit', label: 'الزيارة الميدانية' },
+const missingCatalog: Array<{ key: MissingKey; label: string; weight: number }> = [
+  { key: 'identity', label: 'اسم الموقع', weight: 20 },
+  { key: 'gender', label: 'فئة المصلى', weight: 14 },
+  { key: 'building', label: 'ربط المبنى', weight: 16 },
+  { key: 'location', label: 'بيانات الموقع', weight: 10 },
+  { key: 'coordinates', label: 'الإحداثيات', weight: 18 },
+  { key: 'area', label: 'المساحة', weight: 8 },
+  { key: 'capacity', label: 'السعة', weight: 8 },
+  { key: 'contact', label: 'التواصل / المسؤول', weight: 10 },
+  { key: 'photos', label: 'الصور', weight: 8 },
+  { key: 'documents', label: 'المستندات', weight: 12 },
+  { key: 'women_verification', label: 'التحقق من مصلى النساء', weight: 18 },
+  { key: 'women_details', label: 'تفاصيل مصلى النساء', weight: 10 },
+  { key: 'visit', label: 'الزيارة الميدانية', weight: 20 },
 ];
+
+const missingLabelByKey = Object.fromEntries(missingCatalog.map((item) => [item.key, item.label])) as Record<MissingKey, string>;
+const missingWeightByKey = Object.fromEntries(missingCatalog.map((item) => [item.key, item.weight])) as Record<MissingKey, number>;
 
 const focusTargetByMissingKey: Partial<Record<MissingKey, string>> = {
   identity: 'identity',
@@ -97,6 +125,48 @@ const focusTargetByMissingKey: Partial<Record<MissingKey, string>> = {
   women_verification: 'women',
   women_details: 'women',
 };
+
+const stateLabel: Record<CompletenessState, string> = {
+  complete: 'مكتمل',
+  review: 'يحتاج استكمال',
+  incomplete: 'ناقص',
+};
+
+const stateClass: Record<CompletenessState, string> = {
+  complete: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  review: 'border-amber-200 bg-amber-50 text-amber-800',
+  incomplete: 'border-rose-200 bg-rose-50 text-rose-800',
+};
+
+const priorityLabel: Record<PriorityBand, string> = {
+  urgent: 'عاجلة',
+  high: 'عالية',
+  medium: 'متوسطة',
+  normal: 'عادية',
+};
+
+const priorityClass: Record<PriorityBand, string> = {
+  urgent: 'border-rose-300 bg-rose-50 text-rose-800',
+  high: 'border-orange-300 bg-orange-50 text-orange-800',
+  medium: 'border-amber-300 bg-amber-50 text-amber-800',
+  normal: 'border-slate-200 bg-slate-50 text-slate-700',
+};
+
+const taskStatusLabel: Record<MosqueCompletionTask['status'], string> = {
+  open: 'مفتوحة',
+  in_progress: 'قيد التنفيذ',
+  completed: 'مكتملة',
+  cancelled: 'ملغاة',
+};
+
+const taskStatusClass: Record<MosqueCompletionTask['status'], string> = {
+  open: 'border-sky-200 bg-sky-50 text-sky-800',
+  in_progress: 'border-amber-200 bg-amber-50 text-amber-800',
+  completed: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  cancelled: 'border-slate-200 bg-slate-50 text-slate-600',
+};
+
+const activeTaskStatuses = new Set<MosqueCompletionTask['status']>(['open', 'in_progress']);
 
 const siteTypeLabel = (site: MosqueSite) => {
   if (site.siteType === 'jami') return 'جامع';
@@ -131,7 +201,7 @@ const validNumber = (value: unknown) =>
   && Number(value) > 0;
 
 const formatDate = (value?: string | null) => {
-  if (!value) return 'لا توجد زيارة';
+  if (!value) return 'غير محدد';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'غير محدد';
   return date.toLocaleDateString('ar-SA-u-ca-gregory', {
@@ -141,16 +211,38 @@ const formatDate = (value?: string | null) => {
   });
 };
 
-const stateLabel: Record<CompletenessState, string> = {
-  complete: 'مكتمل',
-  review: 'يحتاج استكمال',
-  incomplete: 'ناقص',
+const toDateInput = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 10);
 };
 
-const stateClass: Record<CompletenessState, string> = {
-  complete: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  review: 'border-amber-200 bg-amber-50 text-amber-800',
-  incomplete: 'border-rose-200 bg-rose-50 text-rose-800',
+const isTaskOverdue = (task: MosqueCompletionTask) => {
+  if (!task.dueDate || !activeTaskStatuses.has(task.status)) return false;
+  const due = new Date(task.dueDate);
+  if (Number.isNaN(due.getTime())) return false;
+  due.setHours(23, 59, 59, 999);
+  return due.getTime() < Date.now();
+};
+
+const bandFromScore = (score: number): PriorityBand => {
+  if (score >= 65) return 'urgent';
+  if (score >= 45) return 'high';
+  if (score >= 25) return 'medium';
+  return 'normal';
+};
+
+const taskPriorityFromBand = (band: PriorityBand): MosqueCompletionTask['priority'] => band;
+
+const emptyTaskForm = {
+  missingKey: '' as MissingKey | '',
+  priority: 'medium' as MosqueCompletionTask['priority'],
+  assignedToUserId: '',
+  dueDate: '',
+  description: '',
+  status: 'open' as MosqueCompletionTask['status'],
+  completionNote: '',
 };
 
 export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenterProps> = ({
@@ -163,10 +255,25 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
   const [visits, setVisits] = useState<MosqueFieldVisit[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
   const [visitsAvailable, setVisitsAvailable] = useState(true);
+
+  const [tasks, setTasks] = useState<MosqueCompletionTask[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasksAvailable, setTasksAvailable] = useState(true);
+
   const [search, setSearch] = useState('');
   const [stateFilter, setStateFilter] = useState<'all' | CompletenessState>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'mosques' | 'prayer_rooms'>('all');
   const [missingFilter, setMissingFilter] = useState<'all' | MissingKey>('all');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | PriorityBand>('all');
+  const [sortMode, setSortMode] = useState<'priority' | 'completion' | 'name'>('priority');
+
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [taskDialogRow, setTaskDialogRow] = useState<PriorityRow | null>(null);
+  const [editingTask, setEditingTask] = useState<MosqueCompletionTask | null>(null);
+  const [taskForm, setTaskForm] = useState(emptyTaskForm);
+  const [taskAssignees, setTaskAssignees] = useState<MosqueCompletionTaskAssignee[]>([]);
+  const [taskAssigneesLoading, setTaskAssigneesLoading] = useState(false);
+  const [taskSaving, setTaskSaving] = useState(false);
 
   const loadVisits = async () => {
     setVisitsLoading(true);
@@ -182,8 +289,23 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
     }
   };
 
+  const loadTasks = async () => {
+    setTasksLoading(true);
+    try {
+      const rows = await mosqueApi.completionTasks();
+      setTasks(rows || []);
+      setTasksAvailable(true);
+    } catch {
+      setTasks([]);
+      setTasksAvailable(false);
+    } finally {
+      setTasksLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadVisits();
+    void loadTasks();
   }, []);
 
   const latestVisitBySite = useMemo(() => {
@@ -199,14 +321,13 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
     return map;
   }, [visits]);
 
-  const rows = useMemo<CompletenessRow[]>(() => sites.map((site) => {
+  const baseRows = useMemo<CompletenessRow[]>(() => sites.map((site) => {
     const missing: MissingItem[] = [];
     const media = mediaCounts(site);
     const latestVisit = latestVisitBySite.get(site.id) || null;
     const checks: Array<MissingItem & { ok: boolean }> = [];
 
     checks.push({ key: 'identity', label: 'اسم الموقع', ok: Boolean(site.name?.trim()) });
-
     checks.push({
       key: 'gender',
       label: 'تحديد نوع المصلى (رجال/نساء)',
@@ -296,60 +417,111 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
     };
   }), [sites, latestVisitBySite, visitsAvailable]);
 
+  const priorityRows = useMemo<PriorityRow[]>(() => baseRows.map((row) => {
+    const siteTasks = tasks.filter((task) => task.siteId === row.site.id);
+    const activeTasks = siteTasks.filter((task) => activeTaskStatuses.has(task.status));
+    const overdueTasks = activeTasks.filter(isTaskOverdue);
+
+    const baseNeed = 100 - row.score;
+    const weightedGaps = row.missing.reduce((sum, item) => sum + (missingWeightByKey[item.key] || 0), 0);
+    const taskUrgency = activeTasks.reduce((sum, task) => {
+      if (task.priority === 'urgent') return sum + 10;
+      if (task.priority === 'high') return sum + 6;
+      return sum;
+    }, 0);
+    const overdueBonus = overdueTasks.length ? Math.min(25, overdueTasks.length * 12) : 0;
+
+    const priorityScore = row.missing.length
+      ? Math.min(100, Math.round(baseNeed + Math.min(38, weightedGaps * 0.45) + taskUrgency + overdueBonus))
+      : 0;
+
+    return {
+      ...row,
+      priorityScore,
+      priorityBand: bandFromScore(priorityScore),
+      activeTasks,
+      overdueTasks,
+    };
+  }), [baseRows, tasks]);
+
   const stats = useMemo(() => {
-    const total = rows.length;
+    const total = priorityRows.length;
     const average = total
-      ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / total)
+      ? Math.round(priorityRows.reduce((sum, row) => sum + row.score, 0) / total)
       : 100;
 
     return {
       total,
       average,
-      complete: rows.filter((row) => row.state === 'complete').length,
-      needsWork: rows.filter((row) => row.state !== 'complete').length,
-      missingCoordinates: rows.filter((row) => row.missing.some((item) => item.key === 'coordinates')).length,
-      missingDocuments: rows.filter((row) => row.missing.some((item) => item.key === 'documents')).length,
+      complete: priorityRows.filter((row) => row.state === 'complete').length,
+      needsWork: priorityRows.filter((row) => row.state !== 'complete').length,
+      missingCoordinates: priorityRows.filter((row) => row.missing.some((item) => item.key === 'coordinates')).length,
+      missingDocuments: priorityRows.filter((row) => row.missing.some((item) => item.key === 'documents')).length,
       noVisit: visitsAvailable
-        ? rows.filter((row) => row.missing.some((item) => item.key === 'visit')).length
+        ? priorityRows.filter((row) => row.missing.some((item) => item.key === 'visit')).length
         : 0,
     };
-  }, [rows, visitsAvailable]);
+  }, [priorityRows, visitsAvailable]);
+
+  const priorityStats = useMemo(() => ({
+    urgent: priorityRows.filter((row) => row.missing.length > 0 && row.priorityBand === 'urgent').length,
+    high: priorityRows.filter((row) => row.missing.length > 0 && row.priorityBand === 'high').length,
+    medium: priorityRows.filter((row) => row.missing.length > 0 && row.priorityBand === 'medium').length,
+    activeTasks: tasks.filter((task) => activeTaskStatuses.has(task.status)).length,
+    overdueTasks: tasks.filter(isTaskOverdue).length,
+  }), [priorityRows, tasks]);
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    return rows
-      .filter((row) => {
-        if (stateFilter !== 'all' && row.state !== stateFilter) return false;
-        if (typeFilter === 'mosques' && !['mosque', 'jami'].includes(row.site.siteType)) return false;
-        if (typeFilter === 'prayer_rooms' && row.site.siteType !== 'prayer_room') return false;
-        if (missingFilter !== 'all' && !row.missing.some((item) => item.key === missingFilter)) return false;
-        if (!q) return true;
+    const result = priorityRows.filter((row) => {
+      if (stateFilter !== 'all' && row.state !== stateFilter) return false;
+      if (priorityFilter !== 'all' && row.priorityBand !== priorityFilter) return false;
+      if (typeFilter === 'mosques' && !['mosque', 'jami'].includes(row.site.siteType)) return false;
+      if (typeFilter === 'prayer_rooms' && row.site.siteType !== 'prayer_room') return false;
+      if (missingFilter !== 'all' && !row.missing.some((item) => item.key === missingFilter)) return false;
+      if (!q) return true;
 
-        return [
-          row.site.name,
-          row.site.city,
-          row.site.district,
-          row.site.campusLocation,
-          row.site.building?.name,
-          row.site.building?.buildingNumber,
-          siteTypeLabel(row.site),
-          ...row.missing.map((item) => item.label),
-        ]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(q));
-      })
-      .sort((a, b) => a.score - b.score || a.site.name.localeCompare(b.site.name, 'ar', { numeric: true }));
-  }, [rows, search, stateFilter, typeFilter, missingFilter]);
+      return [
+        row.site.name,
+        row.site.city,
+        row.site.district,
+        row.site.campusLocation,
+        row.site.building?.name,
+        row.site.building?.buildingNumber,
+        siteTypeLabel(row.site),
+        ...row.missing.map((item) => item.label),
+        ...row.activeTasks.map((task) => task.assignedToName || ''),
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+    });
+
+    return result.sort((a, b) => {
+      if (sortMode === 'completion') return a.score - b.score || b.priorityScore - a.priorityScore;
+      if (sortMode === 'name') return a.site.name.localeCompare(b.site.name, 'ar', { numeric: true });
+      return b.priorityScore - a.priorityScore || a.score - b.score;
+    });
+  }, [priorityRows, search, stateFilter, priorityFilter, typeFilter, missingFilter, sortMode]);
+
+  const topPriorityRows = useMemo(
+    () => [...priorityRows]
+      .filter((row) => row.missing.length > 0)
+      .sort((a, b) => b.priorityScore - a.priorityScore || a.score - b.score)
+      .slice(0, 5),
+    [priorityRows]
+  );
 
   const resetFilters = () => {
     setSearch('');
     setStateFilter('all');
+    setPriorityFilter('all');
     setTypeFilter('all');
     setMissingFilter('all');
+    setSortMode('priority');
   };
 
-  const handleMissingAction = (row: CompletenessRow, item: MissingItem) => {
+  const handleMissingAction = (row: PriorityRow, item: MissingItem) => {
     if (item.key === 'visit') {
       onGoToVisits();
       return;
@@ -362,6 +534,128 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
     }
 
     onOpenSite(row.site);
+  };
+
+  const resetTaskFormForRow = (row: PriorityRow, preferredMissingKey?: MissingKey) => {
+    const activeKeys = new Set(row.activeTasks.map((task) => task.missingKey));
+    const missingKey = preferredMissingKey
+      || row.missing.find((item) => !activeKeys.has(item.key))?.key
+      || row.missing[0]?.key
+      || '';
+
+    setEditingTask(null);
+    setTaskForm({
+      ...emptyTaskForm,
+      missingKey,
+      priority: taskPriorityFromBand(row.priorityBand),
+    });
+  };
+
+  const loadAssigneesForSite = async (siteId: string) => {
+    setTaskAssigneesLoading(true);
+    try {
+      const rows = await mosqueApi.completionTaskAssignees(siteId);
+      setTaskAssignees(rows || []);
+    } catch (error) {
+      setTaskAssignees([]);
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل قائمة المسند إليهم');
+    } finally {
+      setTaskAssigneesLoading(false);
+    }
+  };
+
+  const openTaskManager = (row: PriorityRow, preferredMissingKey?: MissingKey, task?: MosqueCompletionTask) => {
+    setTaskDialogRow(row);
+    setTaskDialogOpen(true);
+    void loadAssigneesForSite(row.site.id);
+
+    if (task) {
+      setEditingTask(task);
+      setTaskForm({
+        missingKey: task.missingKey as MissingKey,
+        priority: task.priority,
+        assignedToUserId: task.assignedToUserId || '',
+        dueDate: toDateInput(task.dueDate),
+        description: task.description || '',
+        status: task.status,
+        completionNote: task.completionNote || '',
+      });
+      return;
+    }
+
+    resetTaskFormForRow(row, preferredMissingKey);
+  };
+
+  const startEditTask = (task: MosqueCompletionTask) => {
+    setEditingTask(task);
+    setTaskForm({
+      missingKey: task.missingKey as MissingKey,
+      priority: task.priority,
+      assignedToUserId: task.assignedToUserId || '',
+      dueDate: toDateInput(task.dueDate),
+      description: task.description || '',
+      status: task.status,
+      completionNote: task.completionNote || '',
+    });
+  };
+
+  const saveTask = async () => {
+    if (!taskDialogRow) return;
+    if (!taskForm.missingKey) {
+      toast.error('حدد بند النقص المراد متابعته');
+      return;
+    }
+    if (taskForm.status === 'completed' && !taskForm.completionNote.trim()) {
+      toast.error('ملاحظة الإنجاز مطلوبة عند إكمال المهمة');
+      return;
+    }
+
+    setTaskSaving(true);
+    try {
+      const label = missingLabelByKey[taskForm.missingKey] || taskForm.missingKey;
+      const payload = {
+        priority: taskForm.priority,
+        assignedToUserId: taskForm.assignedToUserId || null,
+        dueDate: taskForm.dueDate || null,
+        description: taskForm.description.trim() || null,
+      };
+
+      if (editingTask) {
+        await mosqueApi.updateCompletionTask(editingTask.id, {
+          ...payload,
+          status: taskForm.status,
+          completionNote: taskForm.completionNote.trim() || null,
+        });
+        toast.success('تم تحديث مهمة الاستكمال');
+      } else {
+        await mosqueApi.createCompletionTask({
+          siteId: taskDialogRow.site.id,
+          missingKey: taskForm.missingKey,
+          title: `استكمال: ${label} — ${taskDialogRow.site.name}`,
+          ...payload,
+        });
+        toast.success('تم إنشاء مهمة المتابعة وإسنادها');
+      }
+
+      const updatedTasks = await mosqueApi.completionTasks();
+      setTasks(updatedTasks || []);
+      setTasksAvailable(true);
+
+      const refreshedActive = (updatedTasks || []).filter(
+        (task) => task.siteId === taskDialogRow.site.id && activeTaskStatuses.has(task.status)
+      );
+      const refreshedRow: PriorityRow = {
+        ...taskDialogRow,
+        activeTasks: refreshedActive,
+        overdueTasks: refreshedActive.filter(isTaskOverdue),
+      };
+      setTaskDialogRow(refreshedRow);
+      resetTaskFormForRow(refreshedRow);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ مهمة الاستكمال');
+    } finally {
+      setTaskSaving(false);
+    }
   };
 
   const exportToExcel = () => {
@@ -377,7 +671,12 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
         || '',
       'نسبة الاكتمال': row.score,
       'حالة الاكتمال': stateLabel[row.state],
+      'درجة الأولوية': row.priorityScore,
+      'أولوية الاستكمال': priorityLabel[row.priorityBand],
       'البيانات الناقصة': row.missing.map((item) => item.label).join('، ') || 'لا توجد نواقص رئيسية',
+      'مهام المتابعة النشطة': row.activeTasks.map((task) => task.taskNumber).join('، '),
+      'المهام المتأخرة': row.overdueTasks.map((task) => task.taskNumber).join('، '),
+      'المسند إليهم': [...new Set(row.activeTasks.map((task) => task.assignedToName).filter(Boolean))].join('، '),
       'عدد الصور': row.photoCount,
       'عدد المستندات': row.documentCount,
       'آخر زيارة': row.latestVisit ? formatDate(row.latestVisit.visitDate) : '',
@@ -390,6 +689,10 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
       ['متوسط الاكتمال', stats.average + '%'],
       ['السجلات المكتملة', stats.complete],
       ['السجلات التي تحتاج استكمال', stats.needsWork],
+      ['أولوية عاجلة', priorityStats.urgent],
+      ['أولوية عالية', priorityStats.high],
+      ['مهام متابعة نشطة', priorityStats.activeTasks],
+      ['مهام متأخرة', priorityStats.overdueTasks],
       ['بدون إحداثيات', stats.missingCoordinates],
       ['بدون مستندات', stats.missingDocuments],
       ['بدون زيارة ميدانية', visitsAvailable ? stats.noVisit : 'تعذر تحميل سجل الزيارات'],
@@ -403,26 +706,35 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
     (detailsSheet as any)['!views'] = [{ RTL: true }];
     (summarySheet as any)['!views'] = [{ RTL: true }];
     (detailsSheet as any)['!cols'] = [
-      { wch: 6 },
-      { wch: 34 },
-      { wch: 16 },
-      { wch: 32 },
-      { wch: 16 },
-      { wch: 18 },
-      { wch: 58 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 18 },
+      { wch: 6 }, { wch: 34 }, { wch: 16 }, { wch: 30 }, { wch: 16 },
+      { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 55 }, { wch: 28 },
+      { wch: 24 }, { wch: 28 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 18 },
     ];
     (summarySheet as any)['!cols'] = [{ wch: 34 }, { wch: 22 }];
 
-    XLSX.utils.book_append_sheet(workbook, detailsSheet, 'اكتمال البيانات');
+    XLSX.utils.book_append_sheet(workbook, detailsSheet, 'أولويات الاستكمال');
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'الملخص');
 
     const dateStamp = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(workbook, `IAU_Mosques_Data_Completeness_${dateStamp}.xlsx`);
+    XLSX.writeFile(workbook, `IAU_Mosques_Data_Completeness_Priorities_${dateStamp}.xlsx`);
   };
+
+  const taskHistoryForDialog = useMemo(() => {
+    if (!taskDialogRow) return [];
+    return tasks
+      .filter((task) => task.siteId === taskDialogRow.site.id)
+      .sort((a, b) => {
+        const aActive = activeTaskStatuses.has(a.status) ? 1 : 0;
+        const bActive = activeTaskStatuses.has(b.status) ? 1 : 0;
+        if (aActive !== bActive) return bActive - aActive;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
+  }, [tasks, taskDialogRow]);
+
+  const activeTaskKeysForDialog = useMemo(
+    () => new Set(taskHistoryForDialog.filter((task) => activeTaskStatuses.has(task.status)).map((task) => task.missingKey)),
+    [taskHistoryForDialog]
+  );
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -430,18 +742,15 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
         <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8]">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <Badge
-                variant="outline"
-                className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]"
-              >
-                جودة البيانات
+              <Badge variant="outline" className="mb-2 border-[#d6b46a]/60 bg-white text-[#8a6a1f]">
+                جودة البيانات وأولويات الاستكمال
               </Badge>
               <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f] md:text-2xl">
                 <CheckCircle2 className="h-5 w-5" />
                 مركز اكتمال بيانات المساجد والمصليات
               </CardTitle>
               <CardDescription className="mt-1 max-w-4xl leading-6">
-                يكشف السجلات غير المكتملة ويحدد موضع النقص. اضغط على أي بند ناقص للانتقال مباشرة إلى موضع استكماله.
+                يرتب المواقع حسب أولوية المعالجة، ويكشف النواقص، ويتيح تحويل أي نقص إلى مهمة متابعة مسندة بموعد إنجاز.
               </CardDescription>
             </div>
 
@@ -458,11 +767,11 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
               <Button
                 variant="outline"
                 className="border-[#d9c9a5] bg-white text-[#0b4a3f]"
-                onClick={loadVisits}
-                disabled={visitsLoading}
+                onClick={() => { void loadVisits(); void loadTasks(); }}
+                disabled={visitsLoading || tasksLoading}
               >
-                <RefreshCw className={visitsLoading ? 'ml-2 h-4 w-4 animate-spin' : 'ml-2 h-4 w-4'} />
-                تحديث الزيارات
+                <RefreshCw className={(visitsLoading || tasksLoading) ? 'ml-2 h-4 w-4 animate-spin' : 'ml-2 h-4 w-4'} />
+                تحديث
               </Button>
               <Button
                 className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]"
@@ -479,7 +788,14 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
           {!visitsAvailable && (
             <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold leading-6 text-amber-900">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              تعذر تحميل سجل الزيارات حاليًا؛ تم حساب نسبة الاكتمال من بيانات السجل فقط دون احتساب الزيارة الميدانية.
+              تعذر تحميل سجل الزيارات حاليًا؛ تم حساب نسبة الاكتمال دون احتساب الزيارة الميدانية.
+            </div>
+          )}
+
+          {!tasksAvailable && (
+            <div className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold leading-6 text-sky-900">
+              <ClipboardList className="mt-0.5 h-4 w-4 shrink-0" />
+              تعذر تحميل مهام المتابعة حاليًا. تبقى أولوية البيانات ظاهرة، لكن الإسناد والمتابعة مؤقتًا غير متاحين.
             </div>
           )}
 
@@ -496,73 +812,131 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
             />
           </div>
 
+          <div className="rounded-[24px] border border-[#d9c9a5] bg-gradient-to-l from-[#fffaf0] via-white to-[#f2fbf8] p-4 shadow-sm">
+            <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-lg font-black text-[#0b4a3f]">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  مركز أولويات الاستكمال
+                </p>
+                <p className="mt-1 text-xs leading-6 text-slate-500">
+                  تعتمد الأولوية على نسبة النقص، أهمية البيانات المفقودة، أولوية المهام المسندة، وتأخر موعد الإنجاز.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <PriorityChip label="عاجلة" value={priorityStats.urgent} band="urgent" onClick={() => setPriorityFilter('urgent')} />
+                <PriorityChip label="عالية" value={priorityStats.high} band="high" onClick={() => setPriorityFilter('high')} />
+                <PriorityChip label="متوسطة" value={priorityStats.medium} band="medium" onClick={() => setPriorityFilter('medium')} />
+                <button
+                  type="button"
+                  className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-800"
+                  onClick={() => setSortMode('priority')}
+                >
+                  {priorityStats.activeTasks} مهمة نشطة
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800"
+                  onClick={() => setSortMode('priority')}
+                >
+                  {priorityStats.overdueTasks} متأخرة
+                </button>
+              </div>
+            </div>
+
+            {topPriorityRows.length > 0 && (
+              <div className="grid gap-3 lg:grid-cols-5">
+                {topPriorityRows.map((row, index) => (
+                  <button
+                    key={row.site.id}
+                    type="button"
+                    className="rounded-2xl border border-slate-200 bg-white p-3 text-right shadow-sm transition hover:-translate-y-0.5 hover:border-[#d6b46a]"
+                    onClick={() => canEdit && tasksAvailable ? openTaskManager(row) : onOpenSite(row.site)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#0b4a3f] text-[11px] font-black text-white">{index + 1}</span>
+                      <Badge variant="outline" className={priorityClass[row.priorityBand]}>{priorityLabel[row.priorityBand]}</Badge>
+                    </div>
+                    <p className="mt-3 line-clamp-2 text-sm font-black text-slate-800">{row.site.name}</p>
+                    <div className="mt-3 flex items-center justify-between text-[11px] font-bold text-slate-500">
+                      <span>اكتمال {row.score}%</span>
+                      <span>أولوية {row.priorityScore}</span>
+                    </div>
+                    <Progress value={row.priorityScore} className="mt-2 h-1.5" />
+                    <p className="mt-2 text-[10px] font-bold text-slate-400">{row.missing.length} بند ناقص · {row.activeTasks.length} مهمة نشطة</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="font-black text-[#0b4a3f]">البحث والتصفية حسب نوع النقص</p>
-                <p className="mt-1 text-xs text-slate-500">يمكن حصر المواقع التي ينقصها عنصر محدد ثم تصدير النتيجة إلى Excel.</p>
+                <p className="font-black text-[#0b4a3f]">البحث والتصفية</p>
+                <p className="mt-1 text-xs text-slate-500">يمكن حصر المواقع حسب الأولوية أو نوع النقص ثم تصدير النتيجة.</p>
               </div>
               <Button variant="outline" size="sm" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={resetFilters}>
                 مسح التصفية
               </Button>
             </div>
 
-            <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_205px_205px_240px_auto]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(250px,1fr)_180px_180px_190px_220px_190px_auto]">
               <div className="relative">
                 <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" />
                 <Input
                   className="h-11 border-[#d9c9a5] bg-white pr-9"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="ابحث باسم المسجد أو المصلى أو الموقع أو نوع النقص..."
+                  placeholder="ابحث باسم الموقع أو النقص أو المسند إليه..."
                 />
               </div>
 
-              <NativeSelect
-                className="h-11 bg-white"
-                value={stateFilter}
-                onChange={(event) => setStateFilter(event.target.value as 'all' | CompletenessState)}
-              >
+              <NativeSelect className="h-11 bg-white" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as 'all' | PriorityBand)}>
+                <option value="all">جميع الأولويات</option>
+                <option value="urgent">عاجلة</option>
+                <option value="high">عالية</option>
+                <option value="medium">متوسطة</option>
+                <option value="normal">عادية</option>
+              </NativeSelect>
+
+              <NativeSelect className="h-11 bg-white" value={stateFilter} onChange={(event) => setStateFilter(event.target.value as 'all' | CompletenessState)}>
                 <option value="all">جميع حالات الاكتمال</option>
                 <option value="incomplete">ناقص</option>
                 <option value="review">يحتاج استكمال</option>
                 <option value="complete">مكتمل</option>
               </NativeSelect>
 
-              <NativeSelect
-                className="h-11 bg-white"
-                value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value as 'all' | 'mosques' | 'prayer_rooms')}
-              >
+              <NativeSelect className="h-11 bg-white" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as 'all' | 'mosques' | 'prayer_rooms')}>
                 <option value="all">جميع المواقع</option>
                 <option value="mosques">المساجد والجوامع</option>
                 <option value="prayer_rooms">المصليات</option>
               </NativeSelect>
 
-              <NativeSelect
-                className="h-11 bg-white"
-                value={missingFilter}
-                onChange={(event) => setMissingFilter(event.target.value as 'all' | MissingKey)}
-              >
+              <NativeSelect className="h-11 bg-white" value={missingFilter} onChange={(event) => setMissingFilter(event.target.value as 'all' | MissingKey)}>
                 <option value="all">جميع أنواع النقص</option>
                 {missingCatalog.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
               </NativeSelect>
 
-              <Badge
-                variant="outline"
-                className="h-11 justify-center border-[#d6b46a]/55 bg-white px-3 font-black text-[#0b4a3f]"
-              >
+              <NativeSelect className="h-11 bg-white" value={sortMode} onChange={(event) => setSortMode(event.target.value as 'priority' | 'completion' | 'name')}>
+                <option value="priority">ترتيب: الأولوية</option>
+                <option value="completion">ترتيب: الأقل اكتمالًا</option>
+                <option value="name">ترتيب: الاسم</option>
+              </NativeSelect>
+
+              <Badge variant="outline" className="h-11 justify-center border-[#d6b46a]/55 bg-white px-3 font-black text-[#0b4a3f]">
                 {filteredRows.length} سجل
               </Badge>
             </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <div className="hidden grid-cols-[minmax(210px,1.2fr)_140px_180px_minmax(300px,1.5fr)_155px_110px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-black text-slate-500 xl:grid">
+            <div className="hidden grid-cols-[minmax(190px,1.1fr)_125px_155px_165px_minmax(290px,1.55fr)_145px_125px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-black text-slate-500 xl:grid">
               <span>الموقع</span>
               <span>التصنيف</span>
-              <span>نسبة الاكتمال</span>
-              <span>البيانات الناقصة</span>
+              <span>الأولوية</span>
+              <span>الاكتمال</span>
+              <span>البيانات الناقصة / المهام</span>
               <span>آخر زيارة</span>
               <span>الإجراء</span>
             </div>
@@ -576,7 +950,7 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
                 {filteredRows.map((row) => (
                   <div
                     key={row.site.id}
-                    className="grid gap-3 px-4 py-4 xl:grid-cols-[minmax(210px,1.2fr)_140px_180px_minmax(300px,1.5fr)_155px_110px] xl:items-center"
+                    className="grid gap-3 px-4 py-4 xl:grid-cols-[minmax(190px,1.1fr)_125px_155px_165px_minmax(290px,1.55fr)_145px_125px] xl:items-center"
                   >
                     <div className="min-w-0">
                       <p className="truncate font-black text-slate-800">{row.site.name}</p>
@@ -595,17 +969,25 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
                       </Badge>
                     </div>
 
+                    <div className="space-y-1.5">
+                      {row.missing.length ? (
+                        <>
+                          <Badge variant="outline" className={priorityClass[row.priorityBand]}>{priorityLabel[row.priorityBand]}</Badge>
+                          <p className="text-[10px] font-black text-slate-500">درجة {row.priorityScore}/100</p>
+                          {row.overdueTasks.length > 0 && <Badge variant="outline" className="border-rose-200 bg-rose-50 text-[10px] text-rose-800">{row.overdueTasks.length} متأخرة</Badge>}
+                        </>
+                      ) : (
+                        <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">لا توجد أولوية</Badge>
+                      )}
+                    </div>
+
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <Badge variant="outline" className={stateClass[row.state]}>
-                          {stateLabel[row.state]}
-                        </Badge>
+                        <Badge variant="outline" className={stateClass[row.state]}>{stateLabel[row.state]}</Badge>
                         <span className="text-sm font-black text-[#0b4a3f]">{row.score}%</span>
                       </div>
                       <Progress value={row.score} className="h-2" />
-                      <p className="text-[10px] font-bold text-slate-400">
-                        {row.completedChecks} من {row.totalChecks} عناصر مكتملة
-                      </p>
+                      <p className="text-[10px] font-bold text-slate-400">{row.completedChecks} من {row.totalChecks} عناصر مكتملة</p>
                     </div>
 
                     <div>
@@ -634,38 +1016,43 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
                         </div>
                       )}
 
+                      {row.activeTasks.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {row.activeTasks.map((task) => (
+                            <button
+                              key={task.id}
+                              type="button"
+                              onClick={() => canEdit && openTaskManager(row, task.missingKey as MissingKey, task)}
+                              className={`rounded-full border px-2.5 py-1 text-[10px] font-black transition ${isTaskOverdue(task) ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-sky-200 bg-sky-50 text-sky-800'}`}
+                              title={task.assignedToName ? `مسند إلى: ${task.assignedToName}` : 'مهمة متابعة غير مسندة'}
+                            >
+                              {task.taskNumber}{task.assignedToName ? ` · ${task.assignedToName}` : ''}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="mt-2 flex flex-wrap gap-3 text-[10px] font-bold text-slate-400">
-                        <span className="inline-flex items-center gap-1">
-                          <ImageIcon className="h-3.5 w-3.5" />
-                          {row.photoCount} صورة
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <FileText className="h-3.5 w-3.5" />
-                          {row.documentCount} مستند
-                        </span>
+                        <span className="inline-flex items-center gap-1"><ImageIcon className="h-3.5 w-3.5" />{row.photoCount} صورة</span>
+                        <span className="inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" />{row.documentCount} مستند</span>
                       </div>
                     </div>
 
                     <div className="text-xs">
-                      <p className="font-black text-slate-700">
-                        {formatDate(row.latestVisit?.visitDate)}
-                      </p>
-                      {row.latestVisit && (
-                        <p className="mt-1 text-[10px] font-bold text-slate-400">
-                          {row.latestVisit.visitNumber}
-                        </p>
-                      )}
+                      <p className="font-black text-slate-700">{row.latestVisit ? formatDate(row.latestVisit.visitDate) : 'لا توجد زيارة'}</p>
+                      {row.latestVisit && <p className="mt-1 text-[10px] font-bold text-slate-400">{row.latestVisit.visitNumber}</p>}
                     </div>
 
-                    <div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full border-[#d9c9a5] bg-white text-[#0b4a3f]"
-                        onClick={() => onOpenSite(row.site)}
-                      >
+                    <div className="space-y-2">
+                      <Button size="sm" variant="outline" className="w-full border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => onOpenSite(row.site)}>
                         فتح السجل
                       </Button>
+                      {canEdit && row.missing.length > 0 && tasksAvailable && (
+                        <Button size="sm" variant="outline" className="w-full border-sky-200 bg-sky-50 text-sky-800" onClick={() => openTaskManager(row)}>
+                          <ClipboardList className="ml-1 h-3.5 w-3.5" />
+                          المهام
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -674,14 +1061,199 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
           </div>
 
           <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-3 text-xs leading-6 text-slate-600">
-            <strong className="text-sky-900">منهجية الاحتساب:</strong>{' '}
-            يعتمد المركز على البيانات الأساسية للموقع، الإحداثيات، المساحة والسعة، جهة الاتصال،
-            الصور والمستندات، حالة مصلى النساء للمساجد والجوامع، وسجل الزيارة الميدانية عند توفره.
-            لا تعتبر حالة «لم يتم التحقق» لمصلى النساء حالة مكتملة. ويمكن الضغط على بند النقص نفسه
-            للانتقال إلى موضع المعالجة دون البحث اليدوي داخل النموذج.
+            <strong className="text-sky-900">منهجية الأولوية:</strong>{' '}
+            تبدأ من مقدار النقص في ملف الموقع، ثم تضاف أوزان أعلى للنواقص المؤثرة مثل غياب الزيارة،
+            الإحداثيات، التحقق من مصلى النساء وربط المبنى. كما ترفع المهام العاجلة والمتأخرة ترتيب الموقع تلقائيًا.
+            لا يتم إغلاق مهمة متابعة تلقائيًا عند استكمال الحقل؛ بل تبقى حتى يوثق المسؤول الإنجاز.
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={taskDialogOpen} onOpenChange={(open) => {
+        setTaskDialogOpen(open);
+        if (!open) {
+          setTaskDialogRow(null);
+          setEditingTask(null);
+          setTaskAssignees([]);
+          setTaskForm(emptyTaskForm);
+        }
+      }}>
+        <DialogContent className="max-h-[92vh] overflow-hidden p-0 sm:max-w-[980px]" dir="rtl">
+          <DialogHeader className="border-b border-slate-200 bg-[#fffdf8] p-5 text-right">
+            <DialogTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]">
+              <ClipboardList className="h-5 w-5" />
+              مهام استكمال البيانات
+            </DialogTitle>
+            <DialogDescription>
+              {taskDialogRow ? `${taskDialogRow.site.name} — أولوية الاستكمال: ${priorityLabel[taskDialogRow.priorityBand]} (${taskDialogRow.priorityScore}/100)` : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          {taskDialogRow && (
+            <div className="max-h-[calc(92vh-150px)] space-y-5 overflow-y-auto p-4 md:p-5">
+              <div className="grid gap-3 md:grid-cols-4">
+                <MiniMetric label="نسبة الاكتمال" value={`${taskDialogRow.score}%`} />
+                <MiniMetric label="النواقص الحالية" value={String(taskDialogRow.missing.length)} />
+                <MiniMetric label="المهام النشطة" value={String(taskDialogRow.activeTasks.length)} />
+                <MiniMetric label="المهام المتأخرة" value={String(taskDialogRow.overdueTasks.length)} />
+              </div>
+
+              {taskHistoryForDialog.length > 0 && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                  <p className="mb-3 text-sm font-black text-slate-800">سجل مهام الموقع</p>
+                  <div className="space-y-2">
+                    {taskHistoryForDialog.map((task) => {
+                      const gapStillMissing = taskDialogRow.missing.some((item) => item.key === task.missingKey);
+                      return (
+                        <div key={task.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <strong className="text-sm text-slate-800">{task.taskNumber}</strong>
+                              <Badge variant="outline" className={taskStatusClass[task.status]}>{taskStatusLabel[task.status]}</Badge>
+                              <Badge variant="outline" className={priorityClass[task.priority]}>{priorityLabel[task.priority]}</Badge>
+                              {isTaskOverdue(task) && <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-800">متأخرة</Badge>}
+                              {!gapStillMissing && activeTaskStatuses.has(task.status) && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">البند مستكمل — يحتاج إغلاق المهمة</Badge>}
+                            </div>
+                            <p className="mt-1 text-xs font-bold text-slate-700">{missingLabelByKey[task.missingKey as MissingKey] || task.title}</p>
+                            <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-500">
+                              <span className="inline-flex items-center gap-1"><User className="h-3.5 w-3.5" />{task.assignedToName || 'غير مسندة'}</span>
+                              <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{task.dueDate ? formatDate(task.dueDate) : 'بدون موعد'}</span>
+                            </div>
+                          </div>
+                          {canEdit && (
+                            <Button size="sm" variant="outline" className="shrink-0" onClick={() => startEditTask(task)}>
+                              <Pencil className="ml-1 h-3.5 w-3.5" />
+                              تعديل
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <Card className="border border-[#d9c9a5] shadow-none">
+                <CardHeader className="border-b border-[#eadfc8] bg-[#fffdf8] pb-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base font-black text-[#0b4a3f]">{editingTask ? 'تحديث مهمة المتابعة' : 'إنشاء مهمة متابعة'}</CardTitle>
+                      <CardDescription className="mt-1">{editingTask ? editingTask.taskNumber : 'حوّل أحد النواقص الحالية إلى مهمة مسندة بموعد واضح.'}</CardDescription>
+                    </div>
+                    {editingTask && (
+                      <Button variant="outline" size="sm" onClick={() => resetTaskFormForRow(taskDialogRow)}>
+                        <Plus className="ml-1 h-3.5 w-3.5" />
+                        مهمة جديدة
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="grid gap-4 pt-5 md:grid-cols-2">
+                  <FieldBlock label="بند الاستكمال">
+                    <NativeSelect
+                      className="h-11"
+                      value={taskForm.missingKey}
+                      disabled={Boolean(editingTask)}
+                      onChange={(event) => setTaskForm((current) => ({ ...current, missingKey: event.target.value as MissingKey }))}
+                    >
+                      <option value="">اختر البند</option>
+                      {taskDialogRow.missing.map((item) => {
+                        const hasActiveTask = activeTaskKeysForDialog.has(item.key) && editingTask?.missingKey !== item.key;
+                        return <option key={item.key} value={item.key} disabled={hasActiveTask}>{item.label}{hasActiveTask ? ' — مسندة بالفعل' : ''}</option>;
+                      })}
+                      {editingTask && !taskDialogRow.missing.some((item) => item.key === editingTask.missingKey) && (
+                        <option value={editingTask.missingKey}>{missingLabelByKey[editingTask.missingKey as MissingKey] || editingTask.missingKey} — تم استكمال البند</option>
+                      )}
+                    </NativeSelect>
+                  </FieldBlock>
+
+                  <FieldBlock label="الأولوية">
+                    <NativeSelect className="h-11" value={taskForm.priority} onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value as MosqueCompletionTask['priority'] }))}>
+                      <option value="normal">عادية</option>
+                      <option value="medium">متوسطة</option>
+                      <option value="high">عالية</option>
+                      <option value="urgent">عاجلة</option>
+                    </NativeSelect>
+                  </FieldBlock>
+
+                  <FieldBlock label="إسناد المهمة">
+                    <NativeSelect
+                      className="h-11"
+                      value={taskForm.assignedToUserId}
+                      disabled={taskAssigneesLoading}
+                      onChange={(event) => setTaskForm((current) => ({ ...current, assignedToUserId: event.target.value }))}
+                    >
+                      <option value="">{taskAssigneesLoading ? 'جاري تحميل المستخدمين...' : 'بدون إسناد حالي'}</option>
+                      {taskAssignees.map((assignee) => (
+                        <option key={assignee.id} value={assignee.id}>{assignee.username} — {assignee.moduleRole === 'head' ? 'رئيس/صلاحية شاملة' : 'مشرف'}</option>
+                      ))}
+                    </NativeSelect>
+                  </FieldBlock>
+
+                  <FieldBlock label="موعد الإنجاز">
+                    <Input
+                      className="h-11"
+                      type="date"
+                      value={taskForm.dueDate}
+                      onChange={(event) => setTaskForm((current) => ({ ...current, dueDate: event.target.value }))}
+                    />
+                  </FieldBlock>
+
+                  {editingTask && (
+                    <FieldBlock label="حالة المهمة">
+                      <NativeSelect className="h-11" value={taskForm.status} onChange={(event) => setTaskForm((current) => ({ ...current, status: event.target.value as MosqueCompletionTask['status'] }))}>
+                        <option value="open">مفتوحة</option>
+                        <option value="in_progress">قيد التنفيذ</option>
+                        <option value="completed">مكتملة</option>
+                        <option value="cancelled">ملغاة</option>
+                      </NativeSelect>
+                    </FieldBlock>
+                  )}
+
+                  <div className="md:col-span-2">
+                    <FieldBlock label="تعليمات / وصف المهمة">
+                      <Textarea
+                        rows={3}
+                        value={taskForm.description}
+                        onChange={(event) => setTaskForm((current) => ({ ...current, description: event.target.value }))}
+                        placeholder="مثال: استكمال الإحداثيات من الموقع الفعلي والتحقق منها قبل الحفظ."
+                      />
+                    </FieldBlock>
+                  </div>
+
+                  {editingTask && taskForm.status === 'completed' && (
+                    <div className="md:col-span-2">
+                      <FieldBlock label="ملاحظة الإنجاز *">
+                        <Textarea
+                          rows={3}
+                          value={taskForm.completionNote}
+                          onChange={(event) => setTaskForm((current) => ({ ...current, completionNote: event.target.value }))}
+                          placeholder="اذكر ما تم استكماله أو مصدر التحقق..."
+                        />
+                      </FieldBlock>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <DialogFooter className="border-t border-slate-200 bg-white p-4">
+            <Button variant="outline" onClick={() => setTaskDialogOpen(false)}>إغلاق</Button>
+            {canEdit && taskDialogRow && (
+              <Button
+                className="bg-[#0b4a3f] text-white hover:bg-[#126152]"
+                onClick={saveTask}
+                disabled={taskSaving || !taskForm.missingKey}
+              >
+                {taskSaving ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <ClipboardList className="ml-2 h-4 w-4" />}
+                {taskSaving ? 'جاري الحفظ...' : editingTask ? 'حفظ تحديث المهمة' : 'إنشاء مهمة المتابعة'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -702,12 +1274,44 @@ const Metric = ({
       <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#e8f5f2] text-[#006b63]">
         <Icon className="h-4 w-4" />
       </span>
-      <strong className="text-xl font-black text-[#0b4a3f]">
-        {value}{suffix || ''}
-      </strong>
+      <strong className="text-xl font-black text-[#0b4a3f]">{value}{suffix || ''}</strong>
     </div>
     <p className="mt-2 text-[11px] font-bold text-slate-500">{label}</p>
   </div>
+);
+
+const MiniMetric = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-3">
+    <p className="text-[11px] font-bold text-slate-500">{label}</p>
+    <p className="mt-1 text-lg font-black text-[#0b4a3f]">{value}</p>
+  </div>
+);
+
+const PriorityChip = ({
+  label,
+  value,
+  band,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  band: PriorityBand;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    className={`rounded-xl border px-3 py-2 text-xs font-black transition hover:-translate-y-0.5 ${priorityClass[band]}`}
+    onClick={onClick}
+  >
+    {label}: {value}
+  </button>
+);
+
+const FieldBlock = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <label className="block space-y-1.5">
+    <span className="text-xs font-black text-slate-700">{label}</span>
+    {children}
+  </label>
 );
 
 export default MosqueDataCompletenessCenter;
