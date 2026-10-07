@@ -67,6 +67,9 @@ const EMPTY: InvestmentExecutiveDashboard = {
     availableAndReadyReferenceArea: 0,
     opportunityCandidateCount: 0,
     opportunityCandidateArea: 0,
+    activeOpportunityCount: 0,
+    investedOpportunityCount: 0,
+    activeOpportunityEstimatedValue: 0,
     blockedAreaCount: 0,
     deedLinkedSiteCount: 0,
     siteBoundaryCount: 0,
@@ -304,6 +307,9 @@ export const InvestmentExecutiveDashboardPage: React.FC = () => {
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               {formatArea(kpis.opportunityCandidateArea)} م²
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              فرص نشطة حاليًا: {kpis.activeOpportunityCount}
             </p>
           </CardContent>
         </Card>
