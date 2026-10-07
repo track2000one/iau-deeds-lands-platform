@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Eye, LandPlot, MapPin, Search } from 'lucide-react';
+import { Eye, LandPlot, ListChecks, MapPin, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
 import { investmentsApi } from '../../features/investments/api';
@@ -111,6 +111,13 @@ export const InvestmentsPage: React.FC = () => {
           <Button variant="outline" onClick={() => navigate('/investments/map')}>
             <MapPin className="me-2 h-4 w-4" />
             الخريطة الاستثمارية
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/investments/gis-approvals')}
+          >
+            <ListChecks className="me-2 h-4 w-4" />
+            مركز اعتماد GIS
           </Button>
           {canAdd && (
             <Button onClick={() => navigate('/investments/areas/new')}>
