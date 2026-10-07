@@ -3337,7 +3337,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 {siteFilterType !== 'all' && <Badge variant="outline">النوع: {siteTypeLabels[siteFilterType]}</Badge>}
                 {siteFilterType === 'prayer_room' && siteFilterPrayerRoomGender !== 'all' && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">فئة المصلى: {prayerRoomGenderLabels[siteFilterPrayerRoomGender]}</Badge>}
                 {siteFilterWomenPrayerArea !== 'all' && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">مصلى النساء: {siteFilterWomenPrayerArea === 'with' ? 'موجود' : 'غير مسجل'}</Badge>}
-                {siteFilterStatus !== 'all' && <Badge variant="outline">الحالة: {siteStatusLabels[siteFilterStatus]}</Badge>
+                {siteFilterStatus !== 'all' && <Badge variant="outline">الحالة: {siteStatusLabels[siteFilterStatus]}</Badge>}
                 <Badge variant="outline">الفرز: {{ name: 'الاسم', building: 'رقم المبنى', city: 'المدينة', type: 'النوع', status: 'الحالة', area: 'المساحة' }[siteSortBy] || siteSortBy} — {siteSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}</Badge>
               </div>}
             </CardContent>
