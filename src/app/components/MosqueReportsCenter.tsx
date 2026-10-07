@@ -48,6 +48,21 @@ const nonApprovedPublicationTypeLabels: Record<string, string> = {
   publications: 'منشورات / نشرات',
   other: 'أخرى',
 };
+const visitScopeLabels: Record<string, string> = {
+  whole_site: 'الموقع بالكامل',
+  men_section: 'قسم الرجال',
+  women_section: 'مصلى النساء',
+  both_sections: 'قسم الرجال + مصلى النساء',
+};
+const isWomenVisitItem = (item: MosqueFieldVisit['items'][number]) =>
+  item.details?.section === 'women' || String(item.category || '').startsWith('مصلى النساء');
+const visitIncludesWomenSection = (visit: MosqueFieldVisit) =>
+  visit.site?.siteType === 'prayer_room'
+    ? visit.site.prayerRoomGender === 'women'
+    : Boolean(visit.site?.hasWomenPrayerArea) && ['whole_site', 'women_section', 'both_sections'].includes(visit.visitScope || 'whole_site');
+const womenOpenItemCount = (visit: MosqueFieldVisit) =>
+  (visit.items || []).filter((item) => isWomenVisitItem(item) && item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
+
 const getNonApprovedPublicationsSummary = (visit: MosqueFieldVisit) => {
   const item = (visit.items || []).find((entry) => entry.title === NON_APPROVED_PUBLICATIONS_ITEM_TITLE);
   const raw = (item?.details?.nonApprovedPublications || {}) as { observedCount?: number | null; withdrawnCount?: number | null; materialTypes?: string[] };
@@ -154,6 +169,9 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
       return ({ data: {
         'م': index + 1, 'المسجد / المصلى': site.name, 'النوع': siteTypeLabel(site), 'رقم المبنى': site.building?.buildingNumber || '-',
         'الحرم / الموقع': site.campusLocation || '-', 'المدينة': site.city || '-', 'الحي': site.district || '-', 'المساحة م²': site.area || '-', 'السعة': site.capacity || '-',
+        'يوجد مصلى نساء': site.siteType !== 'prayer_room' && site.hasWomenPrayerArea ? 'نعم' : 'لا',
+        'سعة مصلى النساء': site.hasWomenPrayerArea ? (site.womenPrayerArea?.capacity || '-') : '-',
+        'حالة مصلى النساء': site.hasWomenPrayerArea ? (siteStatusLabels[site.womenPrayerArea?.status || 'active'] || site.womenPrayerArea?.status || 'نشط') : '-',
         'الإمام': site.imamName || '-', 'المؤذن': site.muezzinName || '-', 'الخطيب': site.khateebName || '-', 'الحالة': siteStatusLabels[site.status] || site.status,
         'رصيد المصاحف الحالي': quranStock?.systemStock?.totalCount || 0, 'المضاف خلال الفترة': movement.added, 'المسحوب خلال الفترة': movement.withdrawn,
         'المرتجع خلال الفترة': movement.returned, 'صافي حركة المصاحف': movement.net, 'احتياج المصاحف الحالي': quranStock?.needCount || 0,
@@ -169,6 +187,9 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
       const publications = getNonApprovedPublicationsSummary(visit);
       return ({ data: {
         'م': index + 1, 'رقم الزيارة': visit.visitNumber, 'الموقع': visit.site?.name || '-', 'التاريخ': displayDate(visit.visitDate), 'النوع': visit.visitType,
+        'نطاق الزيارة': visitScopeLabels[visit.visitScope || 'whole_site'] || visit.visitScope || 'الموقع بالكامل',
+        'شملت مصلى النساء': visitIncludesWomenSection(visit) ? 'نعم' : 'لا',
+        'ملاحظات مصلى النساء المفتوحة': womenOpenItemCount(visit),
         'الحالة': statusLabels[visit.workflowStatus] || visit.workflowStatus, 'التقييم': visit.overallStatus, 'الأولوية': priorityLabels[visit.priority] || visit.priority,
         'الملاحظات المفتوحة': visit.items?.filter((item) => !['resolved', 'closed'].includes(item.resolutionStatus)).length || 0,
         'العاجلة': visit.items?.filter((item) => item.priority === 'urgent' && !['resolved', 'closed'].includes(item.resolutionStatus)).length || 0,
@@ -235,6 +256,10 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
   const openTickets = tickets.filter((item) => !['resolved', 'closed', 'rejected', 'archived'].includes(item.status)).length;
   const buildingsNeedPrayerRoom = buildings.filter((item) => item.coverageStatus === 'needs_prayer_room').length;
   const openVisitItems = visits.reduce((sum, visit) => sum + (visit.items?.filter((item) => !['resolved', 'closed'].includes(item.resolutionStatus)).length || 0), 0);
+  const sitesWithWomenPrayerArea = sites.filter((site) => ['mosque', 'jami'].includes(site.siteType) && site.hasWomenPrayerArea).length;
+  const womenSectionVisits = visits.filter(visitIncludesWomenSection).length;
+  const womenSectionOpenItems = visits.reduce((sum, visit) => sum + womenOpenItemCount(visit), 0);
+  const visitedWomenPrayerAreas = new Set(visits.filter(visitIncludesWomenSection).map((visit) => visit.siteId)).size;
   const filteredVisitRowsForMetrics = filterRows(datasets.visits);
   const nonApprovedPublicationsObserved = filteredVisitRowsForMetrics.reduce((sum, row) => sum + Number(row.data['المواد المخالفة المرصودة'] || 0), 0);
   const nonApprovedPublicationsWithdrawn = filteredVisitRowsForMetrics.reduce((sum, row) => sum + Number(row.data['المواد المخالفة المسحوبة'] || 0), 0);
@@ -269,6 +294,7 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
     appendExcelReportSheet(workbook, 'الملخص التنفيذي', [{
       'نوع التقرير': reportLabels[settings.reportType], 'النتائج المطابقة': activeRows, 'المساجد والمصليات': sites.length, 'المباني التي تحتاج مصلى': buildingsNeedPrayerRoom,
       'الطلبات المفتوحة': openRequests, 'البلاغات المفتوحة': openTickets, 'ملاحظات الزيارات المفتوحة': openVisitItems, 'احتياج المصاحف': quranNeed,
+      'المساجد والجوامع التي بها مصلى نساء': sitesWithWomenPrayerArea, 'زيارات شملت مصلى النساء': womenSectionVisits, 'مصليات النساء التي تمت تغطيتها': visitedWomenPrayerAreas, 'ملاحظات مصلى النساء المفتوحة': womenSectionOpenItems,
       'المواد المخالفة المرصودة': nonApprovedPublicationsObserved, 'المواد المخالفة المسحوبة': nonApprovedPublicationsWithdrawn, 'المواد المخالفة المتبقية': nonApprovedPublicationsRemaining,
       'المصاحف المضافة خلال الفترة': quranAddedInPeriod, 'المصاحف المسحوبة خلال الفترة': quranWithdrawnInPeriod, 'المصاحف المرتجعة خلال الفترة': quranReturnedInPeriod,
       'معايير التقرير': filterSummary(), 'تاريخ الاستخراج': new Date().toLocaleString('ar-SA-u-ca-gregory'),
@@ -376,6 +402,9 @@ export const MosqueReportsCenter: React.FC<Props> = ({ sites, buildings, request
             <ReportSideMetric label="طلبات مفتوحة" value={openRequests} />
             <ReportSideMetric label="بلاغات مفتوحة" value={openTickets} />
             <ReportSideMetric label="ملاحظات زيارات" value={openVisitItems} />
+            <ReportSideMetric label="مساجد بها مصلى نساء" value={sitesWithWomenPrayerArea} />
+            <ReportSideMetric label="زيارات مصلى النساء" value={womenSectionVisits} />
+            <ReportSideMetric label="ملاحظات مصلى النساء" value={womenSectionOpenItems} />
             <ReportSideMetric label="احتياج المصاحف" value={quranNeed} />
             <ReportSideMetric label="مخالفات مرصودة" value={nonApprovedPublicationsObserved} />
             <ReportSideMetric label="مخالفات مسحوبة" value={nonApprovedPublicationsWithdrawn} />
