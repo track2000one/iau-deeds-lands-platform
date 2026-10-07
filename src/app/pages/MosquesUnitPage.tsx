@@ -2320,6 +2320,11 @@ ${quranStockMovementForm.notes}` : ''}`
       area: site.area ?? '', capacity: site.capacity ?? '', quranTargetCount: site.quranTargetCount ?? '',
       hasWomenPrayerArea: Boolean(site.hasWomenPrayerArea),
       womenPrayerArea: {
+        presenceStatus: womenPrayerPresence(site),
+        verificationNotes: site.womenPrayerArea?.verificationNotes || '',
+        verifiedAt: site.womenPrayerArea?.verifiedAt || '',
+        verifiedBy: site.womenPrayerArea?.verifiedBy || '',
+        verifiedByName: site.womenPrayerArea?.verifiedByName || '',
         capacity: site.womenPrayerArea?.capacity ?? '',
         floor: site.womenPrayerArea?.floor || '',
         locationDescription: site.womenPrayerArea?.locationDescription || '',
@@ -2436,17 +2441,28 @@ ${quranStockMovementForm.notes}` : ''}`
         muezzinName: null,
         khateebName: null,
         prayerRoomGender: effectiveSiteType === 'prayer_room' ? siteForm.prayerRoomGender : null,
-        hasWomenPrayerArea: ['mosque', 'jami'].includes(effectiveSiteType) ? Boolean(siteForm.hasWomenPrayerArea) : false,
-        womenPrayerArea: ['mosque', 'jami'].includes(effectiveSiteType) && siteForm.hasWomenPrayerArea ? {
-          capacity: siteForm.womenPrayerArea?.capacity === '' ? null : Number(siteForm.womenPrayerArea?.capacity),
-          floor: siteForm.womenPrayerArea?.floor || null,
-          locationDescription: siteForm.womenPrayerArea?.locationDescription || null,
-          separateEntrance: Boolean(siteForm.womenPrayerArea?.separateEntrance),
-          hasAblution: Boolean(siteForm.womenPrayerArea?.hasAblution),
-          hasRestrooms: Boolean(siteForm.womenPrayerArea?.hasRestrooms),
-          status: siteForm.womenPrayerArea?.status || 'active',
-          notes: siteForm.womenPrayerArea?.notes || null,
-        } : null,
+        hasWomenPrayerArea: ['mosque', 'jami'].includes(effectiveSiteType) && siteForm.womenPrayerArea?.presenceStatus === 'present',
+        womenPrayerArea: ['mosque', 'jami'].includes(effectiveSiteType)
+          ? siteForm.womenPrayerArea?.presenceStatus === 'present'
+            ? {
+                presenceStatus: 'present',
+                verificationNotes: siteForm.womenPrayerArea?.verificationNotes || null,
+                capacity: siteForm.womenPrayerArea?.capacity === '' ? null : Number(siteForm.womenPrayerArea?.capacity),
+                floor: siteForm.womenPrayerArea?.floor || null,
+                locationDescription: siteForm.womenPrayerArea?.locationDescription || null,
+                separateEntrance: Boolean(siteForm.womenPrayerArea?.separateEntrance),
+                hasAblution: Boolean(siteForm.womenPrayerArea?.hasAblution),
+                hasRestrooms: Boolean(siteForm.womenPrayerArea?.hasRestrooms),
+                status: siteForm.womenPrayerArea?.status || 'active',
+                notes: siteForm.womenPrayerArea?.notes || null,
+              }
+            : siteForm.womenPrayerArea?.presenceStatus === 'verified_absent'
+              ? {
+                  presenceStatus: 'verified_absent',
+                  verificationNotes: siteForm.womenPrayerArea?.verificationNotes || null,
+                }
+              : null
+          : null,
         area: siteForm.area === '' ? null : Number(siteForm.area),
         capacity: siteForm.capacity === '' ? null : Number(siteForm.capacity),
         quranTargetCount: siteForm.quranTargetCount === '' ? null : Number(siteForm.quranTargetCount),
