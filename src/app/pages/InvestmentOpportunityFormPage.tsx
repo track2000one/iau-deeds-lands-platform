@@ -225,9 +225,9 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
     Number(selectedArea?.surveyedArea || 0) ||
     Number(selectedArea?.approximateArea || 0);
 
-  const terminal =
-    currentStatus === 'INVESTED' ||
-    currentStatus === 'CANCELLED';
+  const lockedForEdit =
+    isEdit &&
+    !['IDENTIFIED', 'UNDER_STUDY', 'REJECTED'].includes(currentStatus);
 
   const handleAreaChange = (areaId: string) => {
     const area = eligibleAreas.find((item) => item.id === areaId);
@@ -516,7 +516,7 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
             <Input
               id="title"
               value={form.title}
-              disabled={terminal}
+              disabled={lockedForEdit}
               onChange={(event) =>
                 setField('title', event.target.value)
               }
@@ -529,7 +529,7 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
             <Input
               id="investmentUse"
               value={form.investmentUse}
-              disabled={terminal}
+              disabled={lockedForEdit}
               onChange={(event) =>
                 setField('investmentUse', event.target.value)
               }
@@ -545,7 +545,7 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
               min="0"
               step="0.01"
               value={form.allocatedArea}
-              disabled={terminal}
+              disabled={lockedForEdit}
               onChange={(event) =>
                 setField('allocatedArea', event.target.value)
               }
@@ -558,7 +558,7 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
               id="projectDescription"
               rows={5}
               value={form.projectDescription}
-              disabled={terminal}
+              disabled={lockedForEdit}
               onChange={(event) =>
                 setField(
                   'projectDescription',
@@ -590,7 +590,7 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
               max="1200"
               step="1"
               value={form.durationMonths}
-              disabled={terminal}
+              disabled={lockedForEdit}
               onChange={(event) =>
                 setField('durationMonths', event.target.value)
               }
@@ -605,7 +605,7 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
               min="0"
               step="0.01"
               value={form.estimatedValue}
-              disabled={terminal}
+              disabled={lockedForEdit}
               onChange={(event) =>
                 setField('estimatedValue', event.target.value)
               }
@@ -617,7 +617,7 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
             <NativeSelect
               id="currency"
               value={form.currency}
-              disabled={terminal}
+              disabled={lockedForEdit}
               onChange={(event) =>
                 setField('currency', event.target.value)
               }
@@ -632,7 +632,7 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
               id="notes"
               rows={4}
               value={form.notes}
-              disabled={terminal}
+              disabled={lockedForEdit}
               onChange={(event) =>
                 setField('notes', event.target.value)
               }
@@ -640,6 +640,18 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {lockedForEdit && (
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardContent className="p-4 text-sm leading-7 text-amber-950">
+            <p className="font-semibold">بيانات الفرصة مقفلة في الحالة الحالية</p>
+            <p>
+              أعد الفرصة إلى «تحت الدراسة» من شاشة التفاصيل قبل تعديل عناصر
+              المشروع أو المدة أو القيمة.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border-sky-200 bg-sky-50/50">
         <CardContent className="p-4 text-sm leading-7 text-sky-950">
@@ -664,7 +676,7 @@ export const InvestmentOpportunityFormPage: React.FC = () => {
           type="submit"
           disabled={
             saving ||
-            terminal ||
+            lockedForEdit ||
             (!isEdit && activeEligibleAreas.length === 0)
           }
         >
