@@ -4,6 +4,7 @@ import {
   ArrowRight,
   CheckCircle2,
   CircleAlert,
+  FileUp,
   MapPin,
   RefreshCw,
   Search,
@@ -312,10 +313,21 @@ export const InvestmentGisAuditPage: React.FC = () => {
           </p>
         </div>
 
-        <Button variant="outline" onClick={load} disabled={loading}>
-          <RefreshCw className="me-2 h-4 w-4" />
-          تحديث التدقيق
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {canEdit && (
+            <Button
+              variant="outline"
+              onClick={() => navigate('/investments/site-boundary-import')}
+            >
+              <FileUp className="me-2 h-4 w-4" />
+              استيراد حدود المواقع
+            </Button>
+          )}
+          <Button variant="outline" onClick={load} disabled={loading}>
+            <RefreshCw className="me-2 h-4 w-4" />
+            تحديث التدقيق
+          </Button>
+        </div>
       </div>
 
       <Card className="border-sky-200 bg-sky-50/50">

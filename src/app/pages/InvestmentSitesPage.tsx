@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Building2, FileText, FolderPlus, MapPin, Pencil, Search, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Building2, FileText, FileUp, FolderPlus, MapPin, Pencil, Search, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -286,6 +286,15 @@ export const InvestmentSitesPage: React.FC = () => {
             <MapPin className="me-2 h-4 w-4" />
             الخريطة الاستثمارية
           </Button>
+          {canEdit && (
+            <Button
+              variant="outline"
+              onClick={() => navigate('/investments/site-boundary-import')}
+            >
+              <FileUp className="me-2 h-4 w-4" />
+              استيراد حدود المواقع
+            </Button>
+          )}
           {canAdd && (
             <Button
               variant="outline"
