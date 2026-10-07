@@ -459,17 +459,98 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
   const transitionGoal = async (goal: MosqueImprovementGoal, status: MosqueImprovementGoal['status']) => {
     const confirmation = status === 'cancelled'
       ? 'هل تريد إلغاء هدف التحسين؟ سيبقى محفوظًا في السجل.'
-      : status === 'closed'
-        ? 'هل تريد إغلاق الهدف المتحقق؟'
-        : null;
+      : null;
     if (confirmation && !window.confirm(confirmation)) return;
 
     try {
       await mosqueApi.updateImprovementGoal(goal.id, { status });
-      toast.success(status === 'active' ? 'تم تفعيل هدف التحسين' : status === 'closed' ? 'تم إغلاق الهدف' : 'تم إلغاء الهدف');
+      toast.success(status === 'active' ? 'تم تفعيل هدف التحسين' : 'تم إلغاء الهدف');
       await load(year);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحديث حالة الهدف');
+    }
+  };
+
+  const openEvidenceDialog = (goal: MosqueImprovementGoal) => {
+    setEvidenceGoal(goal);
+    setEvidenceSummary(goal.closureSummary || '');
+    setEvidenceItems(Array.isArray(goal.closureEvidence) ? goal.closureEvidence.map((item) => ({ ...item })) : []);
+    setEvidenceFiles([]);
+    setEvidenceDialogOpen(true);
+  };
+
+  const openReviewDialog = (goal: MosqueImprovementGoal) => {
+    setReviewGoal(goal);
+    setReviewNote(goal.evidenceReviewNote || '');
+    setReviewDialogOpen(true);
+  };
+
+  const submitEvidence = async () => {
+    if (!evidenceGoal) return;
+    if (evidenceSummary.trim().length < 10) {
+      toast.error('اكتب ملخصًا واضحًا لنتيجة التنفيذ بما لا يقل عن 10 أحرف');
+      return;
+    }
+    if (evidenceItems.length + evidenceFiles.length < 1) {
+      toast.error('يلزم إرفاق صورة أو مستند واحد على الأقل');
+      return;
+    }
+    if (evidenceItems.length + evidenceFiles.length > 20) {
+      toast.error('الحد الأعلى لإثباتات الإغلاق هو 20 ملفًا');
+      return;
+    }
+
+    setEvidenceSaving(true);
+    const uploadedFileIds: string[] = [];
+    try {
+      const uploadedItems: MosqueImprovementEvidenceItem[] = [];
+      for (const file of evidenceFiles) {
+        const uploaded = await mosqueApi.upload(file);
+        if (uploaded.driveFileId) uploadedFileIds.push(uploaded.driveFileId);
+        uploadedItems.push({
+          url: uploaded.driveUrl,
+          fileId: uploaded.driveFileId || null,
+          fileName: file.name || uploaded.fileName || null,
+          mimeType: uploaded.mimeType || file.type || null,
+          kind: String(uploaded.mimeType || file.type || '').startsWith('image/') ? 'image' : 'document',
+        });
+      }
+
+      await mosqueApi.submitImprovementGoalEvidence(evidenceGoal.id, {
+        summary: evidenceSummary.trim(),
+        evidence: [...evidenceItems, ...uploadedItems],
+      });
+      toast.success('تم إرسال إثبات الإغلاق لرئيس الوحدة للمراجعة');
+      setEvidenceDialogOpen(false);
+      await load(year);
+    } catch (error) {
+      for (const fileId of uploadedFileIds.reverse()) {
+        try { await mosqueApi.deleteUpload(fileId); } catch { /* best-effort cleanup */ }
+      }
+      toast.error(error instanceof Error ? error.message : 'تعذر إرسال إثبات الإغلاق');
+    } finally {
+      setEvidenceSaving(false);
+    }
+  };
+
+  const reviewEvidence = async (decision: 'approve' | 'return') => {
+    if (!reviewGoal) return;
+    if (decision === 'return' && !reviewNote.trim()) {
+      toast.error('اكتب ملاحظة توضح ما يلزم استكماله');
+      return;
+    }
+    if (decision === 'approve' && !window.confirm('اعتماد الأدلة وإغلاق الهدف نهائيًا؟')) return;
+
+    setReviewSaving(true);
+    try {
+      await mosqueApi.reviewImprovementGoalEvidence(reviewGoal.id, decision, reviewNote.trim() || undefined);
+      toast.success(decision === 'approve' ? 'تم اعتماد الأدلة وإغلاق الهدف' : 'تمت إعادة الإثبات للاستكمال');
+      setReviewDialogOpen(false);
+      await load(year);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر اعتماد قرار مراجعة الإثبات');
+    } finally {
+      setReviewSaving(false);
     }
   };
 
