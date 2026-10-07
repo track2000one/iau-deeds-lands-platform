@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
+import { Input } from './ui/input';
 import { NativeSelect } from './ui/native-select';
 import { Textarea } from './ui/textarea';
 import {
@@ -837,6 +838,160 @@ small { color: #64748b; }
           )}
         </CardContent>
       </Card>
+
+      <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.06)]">
+        <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8]">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <Badge variant="outline" className="mb-2 border-violet-200 bg-white text-violet-800">سجل تدقيق غير قابل للتجاوز</Badge>
+              <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]">
+                <History className="h-5 w-5" />
+                سجل القرارات التنفيذية
+              </CardTitle>
+              <CardDescription className="mt-1 max-w-4xl leading-6">
+                يحفظ رقم القرار ونوعه ومبرره ومتخذ القرار والحالة قبل التنفيذ وبعده، ويمكن استخراج محضر إداري رسمي لأي فترة.
+              </CardDescription>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => void loadDecisionLog()} disabled={decisionLoading}>
+                <RefreshCw className={decisionLoading ? 'ml-2 h-4 w-4 animate-spin' : 'ml-2 h-4 w-4'} />
+                تحديث السجل
+              </Button>
+              <Button variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800" onClick={exportDecisionLog} disabled={!decisions.length}>
+                <FileSpreadsheet className="ml-2 h-4 w-4" />
+                تصدير السجل
+              </Button>
+              <Button className="bg-violet-700 text-white hover:bg-violet-800" onClick={printDecisionMinutes} disabled={!decisions.length}>
+                <Printer className="ml-2 h-4 w-4" />
+                محضر القرارات
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4 p-4 sm:p-5">
+          <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <label className="space-y-1.5">
+              <span className="text-[11px] font-black text-slate-600">من تاريخ</span>
+              <Input type="date" value={decisionFrom} onChange={(event) => setDecisionFrom(event.target.value)} />
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-[11px] font-black text-slate-600">إلى تاريخ</span>
+              <Input type="date" value={decisionTo} onChange={(event) => setDecisionTo(event.target.value)} />
+            </label>
+            <Button className="bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => void loadDecisionLog(decisionFrom, decisionTo)} disabled={decisionLoading || !decisionFrom || !decisionTo}>
+              تطبيق الفترة
+            </Button>
+          </div>
+
+          {decisionLoading ? (
+            <div className="flex min-h-32 items-center justify-center text-sm font-bold text-slate-500">
+              <RefreshCw className="ml-2 h-5 w-5 animate-spin" />
+              جاري تحميل سجل القرارات...
+            </div>
+          ) : decisions.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <History className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-3 text-sm font-black text-slate-600">لا توجد قرارات محفوظة ضمن الفترة المحددة.</p>
+              <p className="mt-1 text-xs text-slate-400">القرارات الجديدة الصادرة من مركز القرار أو اعتماد KPI ستوثق هنا تلقائيًا.</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-sm font-black text-slate-800">القرارات المسجلة</p>
+                <Badge variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]">{decisions.length} قرار</Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1380px] text-right text-xs">
+                  <thead className="bg-white text-[10px] font-black text-slate-500">
+                    <tr>
+                      <th className="px-3 py-3">رقم القرار</th>
+                      <th className="px-3 py-3">النوع</th>
+                      <th className="px-3 py-3">الموضوع والمبرر</th>
+                      <th className="px-3 py-3">الحالة قبل</th>
+                      <th className="px-3 py-3">الحالة بعد</th>
+                      <th className="px-3 py-3">الهدف / المؤشر</th>
+                      <th className="px-3 py-3">متخذ القرار</th>
+                      <th className="px-3 py-3">التاريخ والوقت</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {decisions.map((decision) => (
+                      <tr key={decision.id} className="align-top">
+                        <td className="px-3 py-3">
+                          <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800">{decision.decisionNumber}</Badge>
+                        </td>
+                        <td className="px-3 py-3 font-black text-slate-700">{decisionTypeLabel[decision.decisionType] || decision.decisionType}</td>
+                        <td className="max-w-[360px] px-3 py-3">
+                          <p className="font-black text-slate-800">{decision.title}</p>
+                          <p className="mt-1 leading-5 text-slate-500">{decision.rationale}</p>
+                        </td>
+                        <td className="max-w-[300px] px-3 py-3 leading-5 text-slate-500">{decisionStateSummary(decision.beforeState)}</td>
+                        <td className="max-w-[300px] px-3 py-3 leading-5 text-slate-700">{decisionStateSummary(decision.afterState)}</td>
+                        <td className="px-3 py-3">
+                          <p className="font-bold text-slate-700">{decision.goalId || decision.entityId || '—'}</p>
+                          <p className="mt-1 text-[10px] text-slate-400">{decision.metricKey ? (metricLabel[decision.metricKey] || decision.metricKey) : 'بدون مؤشر محدد'}</p>
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="font-black text-slate-800">{decision.actorName || '—'}</p>
+                          <p className="mt-1 text-[10px] text-slate-400">{decision.actorRole === 'head' ? 'رئيس الوحدة' : (decision.actorRole || '—')}</p>
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-slate-600">{new Date(decision.decidedAt).toLocaleString('ar-SA-u-ca-gregory')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={Boolean(pendingAction)} onOpenChange={(open) => !open && setPendingAction(null)}>
+        <DialogContent className="sm:max-w-[620px]" dir="rtl">
+          {pendingAction && (
+            <>
+              <DialogHeader className="text-right">
+                <DialogTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]">
+                  <Gavel className="h-5 w-5" />
+                  توثيق القرار التنفيذي
+                </DialogTitle>
+                <DialogDescription className="leading-6">
+                  {pendingAction.type === 'extend'
+                    ? `تمديد موعد الهدف ${pendingAction.goal.goalNumber} لمدة 30 يومًا.`
+                    : pendingAction.type === 'activate_follow_up'
+                      ? 'تفعيل مسودة خطة المتابعة المرتبطة بالانتكاس والبدء في تنفيذها.'
+                      : 'تحويل توصية KPI الحالية إلى مسودة هدف تحسين رسمي.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 py-2">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
+                  سيُحفظ هذا القرار برقم مستقل مع الحالة قبل التنفيذ وبعده، واسم متخذ القرار والتاريخ والوقت.
+                </div>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-black text-slate-600">مبرر القرار</span>
+                  <Textarea
+                    value={decisionReason}
+                    onChange={(event) => setDecisionReason(event.target.value)}
+                    rows={5}
+                    placeholder="اكتب مبرر القرار الإداري بصورة واضحة..."
+                  />
+                </label>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPendingAction(null)} disabled={decisionSaving}>إلغاء</Button>
+                <Button className="bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => void executePendingDecision()} disabled={decisionSaving}>
+                  {decisionSaving ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <Gavel className="ml-2 h-4 w-4" />}
+                  اعتماد القرار وتنفيذه
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(reviewGoal)} onOpenChange={(open) => !open && setReviewGoal(null)}>
         <DialogContent className="max-h-[92vh] overflow-hidden p-0 sm:max-w-[860px]" dir="rtl">
