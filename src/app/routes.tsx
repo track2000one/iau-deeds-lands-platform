@@ -44,6 +44,7 @@ const InvestmentSiteFormPage = lazy(() => import('./pages/InvestmentSiteFormPage
 const InvestmentReferenceImportReviewPage = lazy(() => import('./pages/InvestmentReferenceImportReviewPage').then((m) => ({ default: m.InvestmentReferenceImportReviewPage })));
 const InvestmentMapPage = lazy(() => import('./pages/InvestmentMapPage').then((m) => ({ default: m.InvestmentMapPage })));
 const InvestmentBulkGeometryImportPage = lazy(() => import('./pages/InvestmentBulkGeometryImportPage').then((m) => ({ default: m.InvestmentBulkGeometryImportPage })));
+const InvestmentSiteBoundaryImportPage = lazy(() => import('./pages/InvestmentSiteBoundaryImportPage').then((m) => ({ default: m.InvestmentSiteBoundaryImportPage })));
 const InvestmentGisAuditPage = lazy(() => import('./pages/InvestmentGisAuditPage').then((m) => ({ default: m.InvestmentGisAuditPage })));
 const SiteInspectionFormPage = lazy(() => import('./pages/SiteInspectionFormPage').then((m) => ({ default: m.SiteInspectionFormPage })));
 const ViewSiteInspectionPage = lazy(() => import('./pages/ViewSiteInspectionPage').then((m) => ({ default: m.ViewSiteInspectionPage })));
@@ -181,6 +182,7 @@ export const router = createHashRouter([
           { path: 'reference-import-review', element: investmentPermission(<InvestmentReferenceImportReviewPage />, 'canAdd') },
           { path: 'map', element: investmentPermission(<InvestmentMapPage />, 'canView') },
           { path: 'geometry-import', element: investmentPermission(<InvestmentBulkGeometryImportPage />, 'canEdit') },
+          { path: 'site-boundary-import', element: investmentPermission(<InvestmentSiteBoundaryImportPage />, 'canEdit') },
           { path: 'gis-audit', element: investmentPermission(<InvestmentGisAuditPage />, 'canView') },
           { path: 'areas/new', element: investmentPermission(<InvestmentAreaFormPage />, 'canAdd') },
           { path: 'areas/:areaId/edit', element: investmentPermission(<InvestmentAreaFormPage />, 'canEdit') },
