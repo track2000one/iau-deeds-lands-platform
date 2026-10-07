@@ -90,6 +90,7 @@ type VisitForm = {
   tourId: string;
   siteId: string;
   visitType: MosqueFieldVisit['visitType'];
+  visitScope: MosqueFieldVisit['visitScope'];
   visitDate: string;
   departureAt: string;
   representativeName: string;
@@ -121,6 +122,26 @@ const visitTypeLabels: Record<string, string> = {
   urgent: 'زيارة عاجلة',
   closure_verification: 'تحقق من الإغلاق',
 };
+const visitScopeLabels: Record<string, string> = {
+  whole_site: 'الموقع بالكامل',
+  men_section: 'قسم الرجال',
+  women_section: 'مصلى النساء',
+  both_sections: 'قسم الرجال + مصلى النساء',
+};
+const defaultVisitScopeForSite = (site?: MosqueSite | null): MosqueFieldVisit['visitScope'] => {
+  if (!site) return 'whole_site';
+  if (site.siteType === 'prayer_room') return site.prayerRoomGender === 'women' ? 'women_section' : 'men_section';
+  return 'whole_site';
+};
+const visitIncludesWomenSection = (visit: Pick<MosqueFieldVisit, 'visitScope' | 'site'>) =>
+  visit.site?.siteType === 'prayer_room'
+    ? visit.site.prayerRoomGender === 'women'
+    : Boolean(visit.site?.hasWomenPrayerArea) && ['whole_site', 'women_section', 'both_sections'].includes(visit.visitScope || 'whole_site');
+const isWomenVisitItem = (item: MosqueFieldVisitItem) =>
+  item.details?.section === 'women' || String(item.category || '').startsWith('مصلى النساء');
+const womenOpenItemCount = (visit: MosqueFieldVisit) =>
+  (visit.items || []).filter((item) => isWomenVisitItem(item) && item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
+
 const visitStatusLabels: Record<string, string> = {
   planned: 'مجدولة',
   in_progress: 'جارية',
@@ -1035,6 +1056,7 @@ const emptyVisit = (items: MosqueFieldVisitItem[] = [], currentUsername = 'مس�
   tourId: '',
   siteId: '',
   visitType: 'initial',
+  visitScope: 'whole_site',
   visitDate: dateTimeLocal(new Date().toISOString()),
   departureAt: '',
   representativeName: '',
