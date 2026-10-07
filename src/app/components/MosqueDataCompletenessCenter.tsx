@@ -227,7 +227,12 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
     checks.push({
       key: 'coordinates',
       label: 'الإحداثيات',
-      ok: Number.isFinite(Number(site.latitude)) && Number.isFinite(Number(site.longitude)),
+      ok: site.latitude !== null
+        && site.latitude !== undefined
+        && site.longitude !== null
+        && site.longitude !== undefined
+        && Number.isFinite(Number(site.latitude))
+        && Number.isFinite(Number(site.longitude)),
     });
     checks.push({ key: 'area', label: 'المساحة', ok: validNumber(site.area) });
     checks.push({ key: 'capacity', label: 'السعة', ok: validNumber(site.capacity) });
