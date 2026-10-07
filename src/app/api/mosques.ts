@@ -672,9 +672,15 @@ export type MosqueDashboard = {
     newTickets: number;
     myRequests: number;
     myLeaves: number;
+    completionTasksActive: number;
+    completionTasksOverdue: number;
+    completionTasksDueToday: number;
+    completionTasksDueSoon: number;
+    completionTasksUnassigned: number;
   };
   recentRequests: MosqueRequest[];
   recentTickets: MosqueTicket[];
+  recentCompletionTasks: MosqueCompletionTask[];
   linkedSite?: MosqueSite | null;
   managedSiteIds?: string[];
 };
