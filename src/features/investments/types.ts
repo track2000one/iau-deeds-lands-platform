@@ -243,3 +243,112 @@ export interface GeometryApprovalQueueResponse {
     pages: number;
   };
 }
+
+
+export type InvestmentExecutiveBlockerCode =
+  | 'MISSING_DEED'
+  | 'MISSING_SITE_BOUNDARY'
+  | 'SITE_BOUNDARY_NOT_APPROVED'
+  | 'AREA_NOT_AVAILABLE'
+  | 'READINESS_NOT_READY'
+  | 'MISSING_AREA_BOUNDARY'
+  | 'AREA_BOUNDARY_NOT_APPROVED'
+  | 'MISSING_SURVEYED_AREA'
+  | 'MISSING_PROPOSED_USE';
+
+export interface InvestmentExecutiveAreaSummary {
+  id: string;
+  siteId: string;
+  siteCode: string;
+  siteName: string;
+  areaCode: string;
+  name?: string | null;
+  approximateArea: number;
+  surveyedArea: number;
+  referenceArea: number;
+  occupancyStatus: InvestmentAreaStatus;
+  investmentReadiness: InvestmentReadiness;
+  geometryApprovalStatus: GeometryApprovalStatus;
+  geometryAccuracy: GeometryAccuracy;
+  hasPolygon: boolean;
+  proposedUse?: string | null;
+  blockers: InvestmentExecutiveBlockerCode[];
+  blockerCount: number;
+  completionPercent: number;
+  opportunityCandidate: boolean;
+  updatedAt: string;
+}
+
+export interface InvestmentExecutiveSiteSummary {
+  id: string;
+  code: string;
+  name: string;
+  deedCount: number;
+  deedLinked: boolean;
+  siteHasBoundary: boolean;
+  siteBoundaryApproved: boolean;
+  geometryApprovalStatus: GeometryApprovalStatus;
+  geometryAccuracy: GeometryAccuracy;
+  areaCount: number;
+  availableCount: number;
+  readyCount: number;
+  polygonCount: number;
+  approvedGeometryCount: number;
+  candidateCount: number;
+  candidateArea: number;
+  totalApproximateArea: number;
+  totalReferenceArea: number;
+  completionPercent: number;
+  blockerCount: number;
+  blockerCounts: Partial<Record<InvestmentExecutiveBlockerCode, number>>;
+}
+
+export interface InvestmentExecutiveDashboard {
+  generatedAt: string;
+  methodology: {
+    name: string;
+    description: string;
+    requiredChecks: InvestmentExecutiveBlockerCode[];
+  };
+  kpis: {
+    siteCount: number;
+    areaCount: number;
+    totalApproximateArea: number;
+    totalReferenceArea: number;
+    availableAreaCount: number;
+    availableReferenceArea: number;
+    readyAreaCount: number;
+    readyReferenceArea: number;
+    availableAndReadyAreaCount: number;
+    availableAndReadyReferenceArea: number;
+    opportunityCandidateCount: number;
+    opportunityCandidateArea: number;
+    blockedAreaCount: number;
+    deedLinkedSiteCount: number;
+    siteBoundaryCount: number;
+    approvedSiteBoundaryCount: number;
+    areaPolygonCount: number;
+    approvedAreaGeometryCount: number;
+    surveyedAreaCount: number;
+    proposedUseCount: number;
+    operationalCompletionPercent: number;
+  };
+  distributions: {
+    readiness: Array<{ status: InvestmentReadiness; label: string; count: number }>;
+    occupancy: Array<{ status: InvestmentAreaStatus; label: string; count: number }>;
+    geometryApproval: Array<{
+      status: GeometryApprovalStatus;
+      label: string;
+      count: number;
+    }>;
+  };
+  blockers: Array<{
+    code: InvestmentExecutiveBlockerCode;
+    count: number;
+    label: string;
+    severity: 'critical' | 'warning';
+  }>;
+  siteRanking: InvestmentExecutiveSiteSummary[];
+  closestToOpportunity: InvestmentExecutiveAreaSummary[];
+  candidates: InvestmentExecutiveAreaSummary[];
+}
