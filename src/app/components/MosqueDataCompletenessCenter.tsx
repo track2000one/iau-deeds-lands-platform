@@ -39,6 +39,7 @@ import {
   type MosqueCompletionTask,
   type MosqueCompletionTaskAnalytics,
   type MosqueCompletionTaskAssignee,
+  type MosqueCompletionKpiSnapshot,
   type MosqueFieldVisit,
   type MosqueSite,
   type MosqueSiteMediaLibrary,
@@ -93,6 +94,7 @@ type MosqueDataCompletenessCenterProps = {
   onOpenSite: (site: MosqueSite) => void;
   onFixMissing: (site: MosqueSite, target: string) => void;
   onGoToVisits: () => void;
+  canManageKpiSnapshots: boolean;
   taskTimingFilter: TaskTimingFilter;
   onTaskTimingFilterChange: (filter: TaskTimingFilter) => void;
 };
@@ -183,6 +185,20 @@ const kpiStatusClass: Record<'excellent' | 'good' | 'needs_improvement' | 'no_da
   good: 'border-sky-200 bg-sky-50 text-sky-800',
   needs_improvement: 'border-rose-200 bg-rose-50 text-rose-800',
   no_data: 'border-slate-200 bg-slate-50 text-slate-600',
+};
+
+const snapshotStatusLabel: Record<MosqueCompletionKpiSnapshot['status'], string> = {
+  draft: 'مسودة',
+  review: 'قيد المراجعة',
+  approved: 'معتمد',
+  archived: 'مؤرشف',
+};
+
+const snapshotStatusClass: Record<MosqueCompletionKpiSnapshot['status'], string> = {
+  draft: 'border-slate-200 bg-slate-50 text-slate-700',
+  review: 'border-amber-200 bg-amber-50 text-amber-800',
+  approved: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  archived: 'border-violet-200 bg-violet-50 text-violet-800',
 };
 
 const activeTaskStatuses = new Set<MosqueCompletionTask['status']>(['open', 'in_progress']);
@@ -286,6 +302,7 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
   onOpenSite,
   onFixMissing,
   onGoToVisits,
+  canManageKpiSnapshots,
   taskTimingFilter,
   onTaskTimingFilterChange,
 }) => {
@@ -300,6 +317,8 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
   const [analyticsMonth, setAnalyticsMonth] = useState(riyadhDateKey().slice(0, 7));
   const [analytics, setAnalytics] = useState<MosqueCompletionTaskAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [kpiSnapshot, setKpiSnapshot] = useState<MosqueCompletionKpiSnapshot | null>(null);
+  const [snapshotSaving, setSnapshotSaving] = useState(false);
 
   const [search, setSearch] = useState('');
   const [stateFilter, setStateFilter] = useState<'all' | CompletenessState>('all');
@@ -347,12 +366,60 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
   const loadAnalytics = async (month = analyticsMonth) => {
     setAnalyticsLoading(true);
     try {
-      setAnalytics(await mosqueApi.completionTaskAnalytics(month));
+      const [live, snapshots] = await Promise.all([
+        mosqueApi.completionTaskAnalytics(month),
+        mosqueApi.completionKpiSnapshots({ month }),
+      ]);
+      const snapshot = snapshots[0] || null;
+      setKpiSnapshot(snapshot);
+      setAnalytics(snapshot && ['approved', 'archived'].includes(snapshot.status) ? snapshot.payload : live);
     } catch (error) {
       setAnalytics(null);
+      setKpiSnapshot(null);
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل مؤشرات أداء مهام الاستكمال');
     } finally {
       setAnalyticsLoading(false);
+    }
+  };
+
+  const generateKpiSnapshot = async () => {
+    setSnapshotSaving(true);
+    try {
+      const snapshot = await mosqueApi.generateCompletionKpiSnapshot(analyticsMonth);
+      setKpiSnapshot(snapshot);
+      toast.success(snapshot.status === 'draft' ? 'تم حفظ لقطة KPI كمسودة' : 'تم حفظ لقطة KPI');
+      await loadAnalytics(analyticsMonth);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ لقطة KPI');
+    } finally {
+      setSnapshotSaving(false);
+    }
+  };
+
+  const transitionKpiSnapshot = async (status: MosqueCompletionKpiSnapshot['status']) => {
+    if (!kpiSnapshot) return;
+    let note: string | undefined;
+    if (kpiSnapshot.status === 'review' && status === 'draft') {
+      const value = window.prompt('اكتب سبب إعادة نتيجة KPI إلى المسودة:');
+      if (!value?.trim()) return;
+      note = value.trim();
+    }
+    setSnapshotSaving(true);
+    try {
+      const updated = await mosqueApi.transitionCompletionKpiSnapshot(kpiSnapshot.id, status, note);
+      setKpiSnapshot(updated);
+      setAnalytics(['approved', 'archived'].includes(updated.status) ? updated.payload : analytics);
+      toast.success(
+        status === 'review' ? 'تم إرسال نتيجة KPI للمراجعة'
+          : status === 'approved' ? 'تم اعتماد نتيجة KPI وإقفالها'
+            : status === 'archived' ? 'تم أرشفة نتيجة KPI'
+              : 'تمت إعادة نتيجة KPI إلى المسودة'
+      );
+      await loadAnalytics(analyticsMonth);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحديث حالة لقطة KPI');
+    } finally {
+      setSnapshotSaving(false);
     }
   };
 
@@ -1104,6 +1171,72 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
                 </div>
               ) : analytics ? (
                 <>
+                  <div className="rounded-2xl border border-[#d9c9a5] bg-[#fffdf8] p-4">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-black text-[#0b4a3f]">إقفال واعتماد نتيجة KPI الشهرية</p>
+                          {kpiSnapshot ? (
+                            <Badge variant="outline" className={snapshotStatusClass[kpiSnapshot.status]}>
+                              {snapshotStatusLabel[kpiSnapshot.status]}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-slate-200 bg-white text-slate-600">نتيجة حية غير مقفلة</Badge>
+                          )}
+                        </div>
+                        <p className="mt-1 text-[11px] leading-6 text-slate-500">
+                          {kpiSnapshot && ['approved', 'archived'].includes(kpiSnapshot.status)
+                            ? 'المؤشرات المعروضة لهذا الشهر مأخوذة من اللقطة الرسمية الثابتة ولن تتأثر بتعديلات لاحقة على المهام.'
+                            : kpiSnapshot
+                              ? `تم التقاط النتيجة بتاريخ ${formatDate(kpiSnapshot.generatedAt)} ويمكن تحديثها ما دامت في حالة مسودة.`
+                              : 'احفظ لقطة شهرية لبدء دورة المراجعة والاعتماد. لا يمكن اعتماد الشهر الحالي قبل انتهائه.'}
+                        </p>
+                        {kpiSnapshot && (
+                          <div className="mt-2 flex flex-wrap gap-3 text-[10px] font-bold text-slate-500">
+                            <span>درجة اللقطة: {kpiSnapshot.kpiScore == null ? '—' : kpiSnapshot.kpiScore + '/100'}</span>
+                            <span>المعيار: {kpiSnapshot.standardCode}</span>
+                            {kpiSnapshot.approvedAt && <span>اعتمدت: {formatDate(kpiSnapshot.approvedAt)}</span>}
+                            {kpiSnapshot.approvedByName && <span>المعتمد: {kpiSnapshot.approvedByName}</span>}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {canManageKpiSnapshots && (!kpiSnapshot || kpiSnapshot.status === 'draft') && (
+                          <Button variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={generateKpiSnapshot} disabled={snapshotSaving}>
+                            <RefreshCw className={snapshotSaving ? 'ml-2 h-4 w-4 animate-spin' : 'ml-2 h-4 w-4'} />
+                            {kpiSnapshot ? 'تحديث المسودة' : 'حفظ لقطة الشهر'}
+                          </Button>
+                        )}
+                        {canManageKpiSnapshots && kpiSnapshot?.status === 'draft' && (
+                          <Button className="bg-amber-600 text-white hover:bg-amber-700" onClick={() => void transitionKpiSnapshot('review')} disabled={snapshotSaving}>
+                            إرسال للمراجعة
+                          </Button>
+                        )}
+                        {canManageKpiSnapshots && kpiSnapshot?.status === 'review' && (
+                          <>
+                            <Button variant="outline" className="border-slate-300 bg-white" onClick={() => void transitionKpiSnapshot('draft')} disabled={snapshotSaving}>
+                              إعادة للمسودة
+                            </Button>
+                            <Button
+                              className="bg-emerald-700 text-white hover:bg-emerald-800"
+                              onClick={() => void transitionKpiSnapshot('approved')}
+                              disabled={snapshotSaving || analyticsMonth >= riyadhDateKey().slice(0, 7)}
+                              title={analyticsMonth >= riyadhDateKey().slice(0, 7) ? 'لا يمكن اعتماد الشهر قبل انتهائه' : 'اعتماد وإقفال النتيجة'}
+                            >
+                              اعتماد وإقفال
+                            </Button>
+                          </>
+                        )}
+                        {canManageKpiSnapshots && kpiSnapshot?.status === 'approved' && (
+                          <Button variant="outline" className="border-violet-200 bg-violet-50 text-violet-800" onClick={() => void transitionKpiSnapshot('archived')} disabled={snapshotSaving}>
+                            أرشفة النتيجة
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
                     <PerformanceMetric label="تقييم KPI" value={kpiStatusLabel[analytics.unitKpi.status]} />
                     <PerformanceMetric label="مهام منجزة" value={analytics.summary.completed} />

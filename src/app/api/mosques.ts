@@ -222,6 +222,31 @@ export type MosqueCompletionTaskAnalytics = {
   };
 };
 
+export type MosqueCompletionKpiSnapshot = {
+  id: string;
+  month: string;
+  status: 'draft' | 'review' | 'approved' | 'archived';
+  standardCode: string;
+  kpiScore: number | null;
+  kpiStatus: MosqueCompletionKpiResult['status'];
+  payload: MosqueCompletionTaskAnalytics;
+  note?: string | null;
+  generatedBy?: string | null;
+  generatedByName?: string | null;
+  generatedAt: string;
+  reviewedBy?: string | null;
+  reviewedByName?: string | null;
+  reviewedAt?: string | null;
+  approvedBy?: string | null;
+  approvedByName?: string | null;
+  approvedAt?: string | null;
+  archivedBy?: string | null;
+  archivedByName?: string | null;
+  archivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type MosqueFieldVisitImage = {
   url: string;
   fileId?: string | null;
@@ -863,6 +888,23 @@ createQuranRackMovement: (input: Record<string, unknown>) => apiJson<{ movement:
     const suffix = month ? `?month=${encodeURIComponent(month)}` : '';
     return apiJson<MosqueCompletionTaskAnalytics>(`/api/mosques/completion-tasks/analytics${suffix}`);
   },
+  completionKpiSnapshots: (filters: { month?: string; status?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (filters.month) query.set('month', filters.month);
+    if (filters.status) query.set('status', filters.status);
+    const suffix = query.toString();
+    return apiJson<MosqueCompletionKpiSnapshot[]>(`/api/mosques/completion-kpi-snapshots${suffix ? `?${suffix}` : ''}`);
+  },
+  generateCompletionKpiSnapshot: (month: string, note?: string) =>
+    apiJson<MosqueCompletionKpiSnapshot>(`/api/mosques/completion-kpi-snapshots/${encodeURIComponent(month)}`, {
+      method: 'POST',
+      body: JSON.stringify({ note: note || null }),
+    }),
+  transitionCompletionKpiSnapshot: (id: string, status: MosqueCompletionKpiSnapshot['status'], note?: string) =>
+    apiJson<MosqueCompletionKpiSnapshot>(`/api/mosques/completion-kpi-snapshots/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, note: note || null }),
+    }),
   completionTasks: (filters: { siteId?: string; status?: string } = {}) => {
     const query = new URLSearchParams();
     if (filters.siteId) query.set('siteId', filters.siteId);
