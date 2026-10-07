@@ -187,6 +187,20 @@ const kpiStatusClass: Record<'excellent' | 'good' | 'needs_improvement' | 'no_da
   no_data: 'border-slate-200 bg-slate-50 text-slate-600',
 };
 
+const snapshotStatusLabel: Record<MosqueCompletionKpiSnapshot['status'], string> = {
+  draft: 'مسودة',
+  review: 'قيد المراجعة',
+  approved: 'معتمد',
+  archived: 'مؤرشف',
+};
+
+const snapshotStatusClass: Record<MosqueCompletionKpiSnapshot['status'], string> = {
+  draft: 'border-slate-200 bg-slate-50 text-slate-700',
+  review: 'border-amber-200 bg-amber-50 text-amber-800',
+  approved: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  archived: 'border-violet-200 bg-violet-50 text-violet-800',
+};
+
 const activeTaskStatuses = new Set<MosqueCompletionTask['status']>(['open', 'in_progress']);
 
 const siteTypeLabel = (site: MosqueSite) => {
