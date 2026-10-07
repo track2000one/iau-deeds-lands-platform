@@ -44,6 +44,7 @@ import {
 
 type CompletenessState = 'complete' | 'review' | 'incomplete';
 type PriorityBand = 'urgent' | 'high' | 'medium' | 'normal';
+type TaskTimingFilter = 'all' | 'overdue' | 'today' | 'soon' | 'unassigned';
 
 type MissingKey =
   | 'identity'
@@ -90,6 +91,8 @@ type MosqueDataCompletenessCenterProps = {
   onOpenSite: (site: MosqueSite) => void;
   onFixMissing: (site: MosqueSite, target: string) => void;
   onGoToVisits: () => void;
+  taskTimingFilter: TaskTimingFilter;
+  onTaskTimingFilterChange: (filter: TaskTimingFilter) => void;
 };
 
 const missingCatalog: Array<{ key: MissingKey; label: string; weight: number }> = [
@@ -218,12 +221,28 @@ const toDateInput = (value?: string | null) => {
   return date.toISOString().slice(0, 10);
 };
 
+const RIYADH_TIME_ZONE = 'Asia/Riyadh';
+const riyadhDateKey = (value: Date | string = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: RIYADH_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(value));
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+};
+const calendarDayNumber = (dateKey: string) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+const daysUntilTaskDue = (task: MosqueCompletionTask) => {
+  if (!task.dueDate || !activeTaskStatuses.has(task.status)) return null;
+  return calendarDayNumber(riyadhDateKey(task.dueDate)) - calendarDayNumber(riyadhDateKey());
+};
 const isTaskOverdue = (task: MosqueCompletionTask) => {
-  if (!task.dueDate || !activeTaskStatuses.has(task.status)) return false;
-  const due = new Date(task.dueDate);
-  if (Number.isNaN(due.getTime())) return false;
-  due.setHours(23, 59, 59, 999);
-  return due.getTime() < Date.now();
+  const days = daysUntilTaskDue(task);
+  return days !== null && days < 0;
 };
 
 const bandFromScore = (score: number): PriorityBand => {
@@ -251,6 +270,8 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
   onOpenSite,
   onFixMissing,
   onGoToVisits,
+  taskTimingFilter,
+  onTaskTimingFilterChange,
 }) => {
   const [visits, setVisits] = useState<MosqueFieldVisit[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
@@ -480,6 +501,17 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
       if (typeFilter === 'mosques' && !['mosque', 'jami'].includes(row.site.siteType)) return false;
       if (typeFilter === 'prayer_rooms' && row.site.siteType !== 'prayer_room') return false;
       if (missingFilter !== 'all' && !row.missing.some((item) => item.key === missingFilter)) return false;
+      if (taskTimingFilter !== 'all') {
+        const matchesTiming = row.activeTasks.some((task) => {
+          if (taskTimingFilter === 'unassigned') return !task.assignedToUserId;
+          const days = daysUntilTaskDue(task);
+          if (days === null) return false;
+          if (taskTimingFilter === 'overdue') return days < 0;
+          if (taskTimingFilter === 'today') return days === 0;
+          return days >= 1 && days <= 3;
+        });
+        if (!matchesTiming) return false;
+      }
       if (!q) return true;
 
       return [
@@ -502,7 +534,7 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
       if (sortMode === 'name') return a.site.name.localeCompare(b.site.name, 'ar', { numeric: true });
       return b.priorityScore - a.priorityScore || a.score - b.score;
     });
-  }, [priorityRows, search, stateFilter, priorityFilter, typeFilter, missingFilter, sortMode]);
+  }, [priorityRows, search, stateFilter, priorityFilter, typeFilter, missingFilter, taskTimingFilter, sortMode]);
 
   const topPriorityRows = useMemo(
     () => [...priorityRows]
@@ -518,6 +550,7 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
     setPriorityFilter('all');
     setTypeFilter('all');
     setMissingFilter('all');
+    onTaskTimingFilterChange('all');
     setSortMode('priority');
   };
 
@@ -881,7 +914,7 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
               </Button>
             </div>
 
-            <div className="grid gap-3 xl:grid-cols-[minmax(250px,1fr)_180px_180px_190px_220px_190px_auto]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(240px,1fr)_170px_175px_180px_210px_210px_180px_auto]">
               <div className="relative">
                 <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" />
                 <Input
@@ -916,6 +949,14 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
               <NativeSelect className="h-11 bg-white" value={missingFilter} onChange={(event) => setMissingFilter(event.target.value as 'all' | MissingKey)}>
                 <option value="all">جميع أنواع النقص</option>
                 {missingCatalog.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+              </NativeSelect>
+
+              <NativeSelect className="h-11 bg-white" value={taskTimingFilter} onChange={(event) => onTaskTimingFilterChange(event.target.value as TaskTimingFilter)}>
+                <option value="all">جميع مواعيد المهام</option>
+                <option value="overdue">مهام متأخرة</option>
+                <option value="today">مستحقة اليوم</option>
+                <option value="soon">تستحق خلال 3 أيام</option>
+                <option value="unassigned">مهام غير مسندة</option>
               </NativeSelect>
 
               <NativeSelect className="h-11 bg-white" value={sortMode} onChange={(event) => setSortMode(event.target.value as 'priority' | 'completion' | 'name')}>
