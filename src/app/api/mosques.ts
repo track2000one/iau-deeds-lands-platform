@@ -101,6 +101,44 @@ export type MosqueSite = {
   _count?: { requests: number; tickets: number; personnel: number };
 };
 
+export type MosqueCompletionTask = {
+  id: string;
+  taskNumber: string;
+  siteId: string;
+  missingKey: string;
+  title: string;
+  description?: string | null;
+  priority: 'normal' | 'medium' | 'high' | 'urgent';
+  status: 'open' | 'in_progress' | 'completed' | 'cancelled';
+  assignedToUserId?: string | null;
+  assignedToName?: string | null;
+  dueDate?: string | null;
+  completionNote?: string | null;
+  completedAt?: string | null;
+  createdBy?: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  site?: {
+    id: string;
+    name: string;
+    siteType: MosqueSite['siteType'];
+    prayerRoomGender?: MosqueSite['prayerRoomGender'];
+    campusLocation?: string | null;
+    buildingId?: string | null;
+    supervisorUserId?: string | null;
+  } | null;
+};
+
+export type MosqueCompletionTaskAssignee = {
+  id: string;
+  username: string;
+  email?: string | null;
+  moduleRole: 'head' | 'supervisor' | 'personnel' | 'university_member' | 'viewer' | string;
+  fullPermission?: boolean;
+  assignmentSiteId?: string | null;
+};
+
 export type MosqueFieldVisitImage = {
   url: string;
   fileId?: string | null;
@@ -731,6 +769,22 @@ createQuranRackMovement: (input: Record<string, unknown>) => apiJson<{ movement:
   staffDirectory: () => apiJson<MosqueStaffUser[]>('/api/mosques/staff-directory'),
   assignments: () => apiJson<MosqueAssignment[]>('/api/mosques/assignments'),
   setAssignment: (userId: string, input: Record<string, unknown>) => apiJson<MosqueAssignment>(`/api/mosques/assignments/${userId}`, { method: 'PUT', body: JSON.stringify(input) }),
+
+  completionTasks: (filters: { siteId?: string; status?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (filters.siteId) query.set('siteId', filters.siteId);
+    if (filters.status) query.set('status', filters.status);
+    const suffix = query.toString();
+    return apiJson<MosqueCompletionTask[]>(`/api/mosques/completion-tasks${suffix ? `?${suffix}` : ''}`);
+  },
+  completionTaskAssignees: (siteId?: string) => {
+    const suffix = siteId ? `?siteId=${encodeURIComponent(siteId)}` : '';
+    return apiJson<MosqueCompletionTaskAssignee[]>(`/api/mosques/completion-task-assignees${suffix}`);
+  },
+  createCompletionTask: (input: Record<string, unknown>) =>
+    apiJson<MosqueCompletionTask>('/api/mosques/completion-tasks', { method: 'POST', body: JSON.stringify(input) }),
+  updateCompletionTask: (id: string, input: Record<string, unknown>) =>
+    apiJson<MosqueCompletionTask>(`/api/mosques/completion-tasks/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
 
   notifications: () => apiJson<MosqueNotification[]>('/api/mosques/notifications'),
   readNotification: (id: string) => apiJson<MosqueNotification>(`/api/mosques/notifications/${id}/read`, { method: 'PATCH' }),
