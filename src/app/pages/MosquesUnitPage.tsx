@@ -629,6 +629,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [siteFilterCity, setSiteFilterCity] = useState('');
   const [siteFilterType, setSiteFilterType] = useState('all');
   const [siteFilterPrayerRoomGender, setSiteFilterPrayerRoomGender] = useState<'all' | 'men' | 'women'>('all');
+  const [siteFilterWomenPrayerArea, setSiteFilterWomenPrayerArea] = useState<'all' | 'with' | 'without'>('all');
   const [siteFilterStatus, setSiteFilterStatus] = useState('all');
   const [buildingCoverageSearch, setBuildingCoverageSearch] = useState('');
   const [buildingCoverageFilter, setBuildingCoverageFilter] = useState('all');
@@ -838,7 +839,7 @@ export const MosquesUnitPage: React.FC = () => {
 
     if (q) {
       result = result.filter((site) =>
-        [site.name, site.city, site.district, site.campusLocation, site.imamName, site.muezzinName, site.khateebName]
+        [site.name, site.city, site.district, site.campusLocation, site.imamName, site.muezzinName, site.khateebName, site.womenPrayerArea?.locationDescription, site.womenPrayerArea?.floor]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(q))
       );
@@ -847,6 +848,10 @@ export const MosquesUnitPage: React.FC = () => {
     if (siteFilterType !== 'all') result = result.filter((site) => site.siteType === siteFilterType);
     if (siteFilterType === 'prayer_room' && siteFilterPrayerRoomGender !== 'all') {
       result = result.filter((site) => site.prayerRoomGender === siteFilterPrayerRoomGender);
+    }
+    if (siteFilterWomenPrayerArea !== 'all') {
+      result = result.filter((site) => ['mosque', 'jami'].includes(site.siteType)
+        && (siteFilterWomenPrayerArea === 'with' ? Boolean(site.hasWomenPrayerArea) : !site.hasWomenPrayerArea));
     }
     if (siteFilterStatus !== 'all') result = result.filter((site) => site.status === siteFilterStatus);
 
@@ -868,12 +873,13 @@ export const MosquesUnitPage: React.FC = () => {
     });
 
     return result;
-  }, [sites, search, role, linkedSiteId, siteFilterCity, siteFilterType, siteFilterPrayerRoomGender, siteFilterStatus, siteSortBy, siteSortDirection]);
+  }, [sites, search, role, linkedSiteId, siteFilterCity, siteFilterType, siteFilterPrayerRoomGender, siteFilterWomenPrayerArea, siteFilterStatus, siteSortBy, siteSortDirection]);
 
   const siteFilterStats = useMemo(() => ({
     total: visibleSites.length,
     mosques: visibleSites.filter((site) => site.siteType === 'mosque' || site.siteType === 'jami').length,
     prayerRooms: visibleSites.filter((site) => site.siteType === 'prayer_room').length,
+    womenPrayerAreas: visibleSites.filter(hasAttachedWomenPrayerArea).length,
     totalArea: visibleSites.reduce((sum, site) => sum + (Number(site.area) || 0), 0),
   }), [visibleSites]);
 
@@ -882,6 +888,7 @@ export const MosquesUnitPage: React.FC = () => {
     setSiteFilterCity('');
     setSiteFilterType('all');
     setSiteFilterPrayerRoomGender('all');
+    setSiteFilterWomenPrayerArea('all');
     setSiteFilterStatus('all');
     setSiteSortBy('name');
     setSiteSortDirection('asc');
