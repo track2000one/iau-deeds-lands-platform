@@ -2,6 +2,7 @@ import React from 'react';
 import {
   AlertTriangle,
   ArrowRight,
+  BriefcaseBusiness,
   CheckCircle2,
   ClipboardCheck,
   FileText,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
+import { usePermissions } from '../../context/PermissionsContext';
 import { investmentsApi } from '../../features/investments/api';
 import type {
   InvestmentExecutiveBlockerCode,
@@ -141,6 +143,9 @@ const CoverageBar: React.FC<CoverageBarProps> = ({
 
 export const InvestmentExecutiveDashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { hasPermission, isAdmin } = usePermissions();
+  const canAddOpportunity =
+    isAdmin || hasPermission('investments', 'canAdd');
   const [data, setData] =
     React.useState<InvestmentExecutiveDashboard>(EMPTY);
   const [loading, setLoading] = React.useState(true);
@@ -644,15 +649,29 @@ export const InvestmentExecutiveDashboardPage: React.FC = () => {
                       {formatArea(area.referenceArea)} م²
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      navigate(`/investments/areas/${area.id}`)
-                    }
-                  >
-                    فتح
-                  </Button>
+                  <div className="flex flex-wrap gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        navigate(`/investments/areas/${area.id}`)
+                      }
+                    >
+                      فتح
+                    </Button>
+                    {canAddOpportunity && (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          navigate(
+                            `/investments/opportunities/new?areaId=${encodeURIComponent(area.id)}`
+                          )
+                        }
+                      >
+                        إنشاء فرصة
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
