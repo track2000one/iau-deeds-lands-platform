@@ -3250,6 +3250,16 @@ ${quranStockMovementForm.notes}` : ''}`
                 <NativeSelect className="h-11 rounded-xl" value={siteFilterStatus} onChange={(e) => setSiteFilterStatus(e.target.value)}><option value="all">جميع الحالات</option><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect>
                 <NativeSelect className="h-11 rounded-xl" value={siteSortBy} onChange={(e) => setSiteSortBy(e.target.value)}><option value="name">فرز حسب الاسم</option><option value="building">فرز حسب رقم المبنى</option><option value="city">فرز حسب المدينة</option><option value="type">فرز حسب النوع</option><option value="status">فرز حسب الحالة</option><option value="area">فرز حسب المساحة</option></NativeSelect>
                 </div>
+                {siteFilterType !== 'prayer_room' && <div className="mt-3 flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50/45 p-2.5 sm:flex-row sm:items-center sm:justify-between">
+                  <div><p className="text-xs font-black text-emerald-950">فلتر سريع لمصلى النساء</p><p className="mt-0.5 text-[11px] text-emerald-800">يطبق على المساجد والجوامع فقط، ولا يخلط بينها وبين المصليات النسائية المستقلة.</p></div>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      ['all', 'الكل'],
+                      ['with', 'بها مصلى نساء'],
+                      ['without', 'بدون مصلى نساء مسجل'],
+                    ] as const).map(([value, label]) => <Button key={value} type="button" size="sm" variant={siteFilterWomenPrayerArea === value ? 'default' : 'outline'} className={siteFilterWomenPrayerArea === value ? 'border border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900' : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-50'} onClick={() => setSiteFilterWomenPrayerArea(value)}>{label}</Button>)}
+                  </div>
+                </div>}
               </div>
 
               <details className="group overflow-hidden rounded-2xl border border-[#e3d6b9] bg-white">
