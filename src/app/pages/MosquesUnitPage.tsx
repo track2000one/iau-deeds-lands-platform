@@ -52,6 +52,7 @@ import { Tabs, TabsContent } from '../components/ui/tabs';
 import { MapCoordinatePicker } from '../components/MapCoordinatePicker';
 import { MosqueFieldVisitsPanel } from '../components/MosqueFieldVisitsPanel';
 import { MosqueReportsCenter } from '../components/MosqueReportsCenter';
+import { MosqueDataCompletenessCenter } from '../components/MosqueDataCompletenessCenter';
 import { BuildingCoverageReportsDialog } from '../components/BuildingCoverageReportsDialog';
 import { isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
@@ -3074,6 +3075,7 @@ ${quranStockMovementForm.notes}` : ''}`
                   <p className="px-2 pb-1 text-[10px] font-black tracking-wide text-slate-400">التشغيل اليومي</p>
                   <MosqueSideNavButton label="الرئيسية" icon={BarChart3} active={activeTab === 'overview'} onClick={() => goToDashboardSection('overview')} />
                   <MosqueSideNavButton label="المساجد والمصليات" icon={Building2} active={activeTab === 'sites'} onClick={() => goToDashboardSection('sites')} />
+                  {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="اكتمال البيانات" icon={CheckCircle2} active={activeTab === 'data-completeness'} onClick={() => goToDashboardSection('data-completeness')} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="الجولات والزيارات" icon={ClipboardList} active={activeTab === 'field-visits'} onClick={() => goToDashboardSection('field-visits')} />}
                   {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="الطلبات والصيانة" icon={Wrench} active={activeTab === 'requests'} onClick={() => goToDashboardSection('requests')} badge={dashboard?.stats.newRequests || 0} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="البلاغات" icon={MessageSquare} active={activeTab === 'tickets'} onClick={() => goToDashboardSection('tickets')} badge={dashboard?.stats.openTickets || 0} />}
@@ -3118,6 +3120,7 @@ ${quranStockMovementForm.notes}` : ''}`
               <NativeSelect className="h-12 w-full rounded-xl border-slate-200 bg-[#f7f9fb] px-3 text-sm font-bold text-slate-700" value={activeTab} onChange={(e) => handleTabChange(e.target.value)}>
                 <option value="overview">الرئيسية</option>
                 <option value="sites">المساجد والمصليات</option>
+                {['head', 'supervisor'].includes(role) && <option value="data-completeness">اكتمال البيانات</option>}
                 {['head', 'supervisor'].includes(role) && <option value="buildings">تغطية المباني بخدمة الصلاة</option>}
                 {['head', 'supervisor'].includes(role) && <option value="field-visits">الجولات والزيارات</option>}
                 {['head', 'supervisor', 'personnel'].includes(role) && <option value="quran">المصاحف</option>}
@@ -3532,6 +3535,14 @@ ${quranStockMovementForm.notes}` : ''}`
               </CardContent>
             </Card>;
           })}</div>}
+        </TabsContent>}
+
+        {['head', 'supervisor'].includes(role) && <TabsContent value="data-completeness" className="space-y-4">
+          <MosqueDataCompletenessCenter
+            sites={sites}
+            onOpenSite={(site) => { setActiveTab('sites'); setPreviewSite(site); }}
+            onGoToVisits={() => setActiveTab('field-visits')}
+          />
         </TabsContent>}
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="field-visits" className="space-y-4">
