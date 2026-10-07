@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import {
+  Activity,
   AlertTriangle,
   CheckCircle2,
   ClipboardCheck,
@@ -122,6 +123,29 @@ const actionStatusLabel: Record<MosqueImprovementAction['status'], string> = {
   completed: 'مكتمل',
 };
 
+const sustainabilityLabel = (status?: string | null) => {
+  if (status === 'sustained') return 'مستدام';
+  if (status === 'needs_follow_up') return 'يحتاج متابعة';
+  if (status === 'regressed') return 'انتكاس';
+  if (status === 'monitoring') return 'قيد إثبات الاستدامة';
+  return 'بانتظار القياس';
+};
+
+const sustainabilityClass = (status?: string | null) => {
+  if (status === 'sustained') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+  if (status === 'needs_follow_up') return 'border-amber-200 bg-amber-50 text-amber-800';
+  if (status === 'regressed') return 'border-rose-200 bg-rose-50 text-rose-800';
+  if (status === 'monitoring') return 'border-sky-200 bg-sky-50 text-sky-800';
+  return 'border-slate-200 bg-slate-50 text-slate-600';
+};
+
+const sustainabilityCheckLabel = (status?: string | null) => {
+  if (status === 'sustained') return 'محقق';
+  if (status === 'needs_follow_up') return 'متابعة';
+  if (status === 'regressed') return 'انتكاس';
+  return 'غير مقاس';
+};
+
 const missingLabels: Record<string, string> = {
   identity: 'اسم الموقع',
   gender: 'فئة المصلى',
@@ -190,7 +214,9 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
   const [suggestions, setSuggestions] = useState<MosqueImprovementGoalSuggestions | null>(null);
   const [loading, setLoading] = useState(true);
   const [evaluating, setEvaluating] = useState(false);
+  const [sustainabilityEvaluating, setSustainabilityEvaluating] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | MosqueImprovementGoal['status']>('all');
+  const [sustainabilityFilter, setSustainabilityFilter] = useState<'all' | 'not_started' | 'monitoring' | 'sustained' | 'needs_follow_up' | 'regressed'>('all');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<MosqueImprovementGoal | null>(null);
@@ -249,6 +275,11 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       achieved: goals.filter((goal) => goal.status === 'achieved').length,
       evidenceReview: goals.filter((goal) => goal.status === 'evidence_review').length,
       closed: goals.filter((goal) => goal.status === 'closed').length,
+      sustainabilityWaiting: goals.filter((goal) => goal.status === 'closed' && (!goal.sustainabilityStatus || goal.sustainabilityStatus === 'not_started')).length,
+      sustainabilityMonitoring: goals.filter((goal) => goal.status === 'closed' && goal.sustainabilityStatus === 'monitoring').length,
+      sustainabilitySustained: goals.filter((goal) => goal.status === 'closed' && goal.sustainabilityStatus === 'sustained').length,
+      sustainabilityNeedsFollowUp: goals.filter((goal) => goal.status === 'closed' && goal.sustainabilityStatus === 'needs_follow_up').length,
+      sustainabilityRegressed: goals.filter((goal) => goal.status === 'closed' && goal.sustainabilityStatus === 'regressed').length,
       performanceProgress,
       actionProgress,
     };
@@ -262,6 +293,14 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
   const availableSuggestions = useMemo(
     () => (suggestions?.suggestions || []).filter((item) => !item.alreadyExists),
     [suggestions]
+  );
+
+  const closedGoals = useMemo(
+    () => goals.filter((goal) => goal.status === 'closed' && (
+      sustainabilityFilter === 'all'
+      || (goal.sustainabilityStatus || 'not_started') === sustainabilityFilter
+    )),
+    [goals, sustainabilityFilter]
   );
 
   const openNewGoal = (suggestion?: MosqueImprovementGoalSuggestion) => {
@@ -567,6 +606,19 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       toast.error(error instanceof Error ? error.message : 'تعذر تحديث قياس الأهداف');
     } finally {
       setEvaluating(false);
+    }
+  };
+
+  const evaluateSustainability = async () => {
+    setSustainabilityEvaluating(true);
+    try {
+      await mosqueApi.evaluateImprovementGoalSustainability(year);
+      await load(year);
+      toast.success('تم تحديث قياس استدامة الأهداف المغلقة من النتائج الرسمية اللاحقة');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحديث قياس استدامة التحسين');
+    } finally {
+      setSustainabilityEvaluating(false);
     }
   };
 
