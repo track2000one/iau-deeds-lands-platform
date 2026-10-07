@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   CircleAlert,
   FileUp,
+  ListChecks,
   MapPin,
   RefreshCw,
   Search,
@@ -314,6 +315,13 @@ export const InvestmentGisAuditPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/investments/gis-approvals')}
+          >
+            <ListChecks className="me-2 h-4 w-4" />
+            مركز اعتماد GIS
+          </Button>
           {canEdit && (
             <Button
               variant="outline"
