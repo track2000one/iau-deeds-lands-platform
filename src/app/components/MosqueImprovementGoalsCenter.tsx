@@ -952,7 +952,7 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
             <div className="grid gap-3 md:grid-cols-2">
               <label className="space-y-1.5 md:col-span-2">
                 <span className="text-xs font-black text-slate-600">عنوان الهدف</span>
-                <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} disabled={Boolean(editingGoal && !canManage)} />
+                <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} disabled={Boolean(editingGoal && (!canManage || editingGoal.status === 'achieved'))} />
               </label>
 
               <label className="space-y-1.5">
@@ -1012,12 +1012,12 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
 
               <label className="space-y-1.5">
                 <span className="text-xs font-black text-slate-600">القيمة المستهدفة</span>
-                <Input type="number" step="0.1" value={form.targetValue} onChange={(event) => setForm((current) => ({ ...current, targetValue: event.target.value }))} disabled={!canManage} />
+                <Input type="number" step="0.1" value={form.targetValue} onChange={(event) => setForm((current) => ({ ...current, targetValue: event.target.value }))} disabled={!canManage || editingGoal?.status === 'achieved'} />
               </label>
 
               <label className="space-y-1.5">
                 <span className="text-xs font-black text-slate-600">مسؤول تنفيذ الهدف</span>
-                <NativeSelect value={form.ownerUserId} onChange={(event) => setForm((current) => ({ ...current, ownerUserId: event.target.value }))} disabled={!canManage}>
+                <NativeSelect value={form.ownerUserId} onChange={(event) => setForm((current) => ({ ...current, ownerUserId: event.target.value }))} disabled={!canManage || editingGoal?.status === 'achieved'}>
                   <option value="">غير مسند</option>
                   {assignees.map((item) => <option key={item.id} value={item.id}>{item.username} — {item.moduleRole === 'head' ? 'رئيس الوحدة' : 'مشرف'}</option>)}
                 </NativeSelect>
@@ -1025,7 +1025,7 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
 
               <label className="space-y-1.5">
                 <span className="text-xs font-black text-slate-600">تاريخ الاستحقاق</span>
-                <Input type="date" value={form.dueDate} onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))} disabled={!canManage} />
+                <Input type="date" value={form.dueDate} onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))} disabled={!canManage || editingGoal?.status === 'achieved'} />
               </label>
 
               {!editingGoal && (
@@ -1092,6 +1092,220 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
               حفظ
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={evidenceDialogOpen} onOpenChange={setEvidenceDialogOpen}>
+        <DialogContent className="max-h-[92vh] overflow-hidden p-0 sm:max-w-[820px]" dir="rtl">
+          {evidenceGoal && (
+            <>
+              <DialogHeader className="border-b border-slate-200 bg-[#fffdf8] p-5 text-right">
+                <div className="flex flex-wrap items-center gap-2">
+                  <DialogTitle className="text-xl font-black text-[#0b4a3f]">إثبات إغلاق هدف التحسين</DialogTitle>
+                  <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">{evidenceGoal.goalNumber}</Badge>
+                </div>
+                <DialogDescription>
+                  تحقق الهدف رقميًا. يلزم توثيق نتيجة التنفيذ وإرفاق الأدلة قبل إرساله لرئيس الوحدة لاعتماد الإغلاق.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="max-h-[calc(92vh-155px)] space-y-5 overflow-y-auto p-4 md:p-5">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+                  <p className="text-sm font-black text-emerald-900">{evidenceGoal.title}</p>
+                  <div className="mt-2 flex flex-wrap gap-4 text-[11px] text-emerald-800">
+                    <span>المؤشر: {metricLabel[evidenceGoal.metricKey]}</span>
+                    <span>الحالي: {formatMetric(evidenceGoal.metricKey, evidenceGoal.currentValue)}</span>
+                    <span>المستهدف: {formatMetric(evidenceGoal.metricKey, evidenceGoal.targetValue)}</span>
+                    <span>الإجراءات: {evidenceGoal.actionProgressPercent}%</span>
+                  </div>
+                </div>
+
+                {evidenceGoal.evidenceStatus === 'returned' && (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                    <p className="flex items-center gap-2 text-sm font-black text-rose-900"><RotateCcw className="h-4 w-4" />ملاحظات الإعادة للاستكمال</p>
+                    <p className="mt-2 text-xs leading-6 text-rose-800">{evidenceGoal.evidenceReviewNote || 'يرجى استكمال أدلة الإغلاق وإعادة إرسالها.'}</p>
+                    <p className="mt-1 text-[10px] text-rose-600">يمكن الاحتفاظ بالمرفقات السابقة أو حذفها من القائمة وإضافة ملفات بديلة.</p>
+                  </div>
+                )}
+
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-black text-slate-600">ملخص نتيجة التنفيذ والإغلاق</span>
+                  <Textarea
+                    value={evidenceSummary}
+                    onChange={(event) => setEvidenceSummary(event.target.value)}
+                    rows={5}
+                    placeholder="اشرح ما تم تنفيذه، وكيف تحقق المستهدف، وما الذي تثبته المرفقات..."
+                  />
+                  <p className="text-[10px] text-slate-400">هذا الملخص يصبح جزءًا من ملف الإغلاق الرسمي بعد الاعتماد.</p>
+                </label>
+
+                <div className="rounded-2xl border border-slate-200 bg-[#fbfcfd] p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="flex items-center gap-2 text-sm font-black text-slate-800"><Upload className="h-4 w-4" />أدلة التنفيذ</p>
+                      <p className="mt-1 text-[10px] text-slate-500">صور أو PDF أو Word، بحد أقصى 20 ملفًا إجمالًا.</p>
+                    </div>
+                    <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[#d9c9a5] bg-white px-3 py-2 text-xs font-black text-[#0b4a3f] shadow-sm hover:bg-[#fffaf0]">
+                      <Plus className="ml-1 h-3.5 w-3.5" />
+                      إضافة ملفات
+                      <input
+                        className="hidden"
+                        type="file"
+                        multiple
+                        accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx"
+                        onChange={(event) => {
+                          const next = Array.from(event.target.files || []);
+                          if (evidenceItems.length + evidenceFiles.length + next.length > 20) {
+                            toast.error('الحد الأعلى 20 ملفًا لإثبات الإغلاق');
+                          } else {
+                            setEvidenceFiles((current) => [...current, ...next]);
+                          }
+                          event.currentTarget.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    {evidenceItems.map((item, index) => (
+                      <div key={`${item.url}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          {item.kind === 'image' ? <ImageIcon className="h-4 w-4 shrink-0 text-emerald-700" /> : <FileText className="h-4 w-4 shrink-0 text-sky-700" />}
+                          <div className="min-w-0">
+                            <p className="truncate text-[11px] font-black text-slate-700">{item.fileName || 'مرفق إثبات'}</p>
+                            <p className="text-[9px] text-slate-400">مرفق محفوظ سابقًا</p>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-1">
+                          <Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-[#0b4a3f]" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}>فتح</Button>
+                          <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-rose-600" onClick={() => setEvidenceItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {evidenceFiles.map((file, index) => (
+                      <div key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          {file.type.startsWith('image/') ? <ImageIcon className="h-4 w-4 shrink-0 text-emerald-700" /> : <FileText className="h-4 w-4 shrink-0 text-sky-700" />}
+                          <div className="min-w-0">
+                            <p className="truncate text-[11px] font-black text-slate-700">{file.name}</p>
+                            <p className="text-[9px] text-slate-400">{Math.max(1, Math.round(file.size / 1024))} KB — جاهز للرفع</p>
+                          </div>
+                        </div>
+                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-rose-600" onClick={() => setEvidenceFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    ))}
+
+                    {!evidenceItems.length && !evidenceFiles.length && (
+                      <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs font-bold text-slate-400">لم تتم إضافة أدلة بعد.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="border-t border-slate-200 bg-white p-4">
+                <Button variant="outline" onClick={() => setEvidenceDialogOpen(false)} disabled={evidenceSaving}>إلغاء</Button>
+                <Button className="bg-emerald-700 text-white hover:bg-emerald-800" onClick={submitEvidence} disabled={evidenceSaving}>
+                  {evidenceSaving ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
+                  إرسال للمراجعة
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent className="max-h-[92vh] overflow-hidden p-0 sm:max-w-[860px]" dir="rtl">
+          {reviewGoal && (
+            <>
+              <DialogHeader className="border-b border-slate-200 bg-[#fffdf8] p-5 text-right">
+                <div className="flex flex-wrap items-center gap-2">
+                  <DialogTitle className="text-xl font-black text-[#0b4a3f]">ملف إثبات إغلاق هدف التحسين</DialogTitle>
+                  <Badge variant="outline" className={statusClass[reviewGoal.status]}>{statusLabel[reviewGoal.status]}</Badge>
+                </div>
+                <DialogDescription>{reviewGoal.goalNumber} — {reviewGoal.title}</DialogDescription>
+              </DialogHeader>
+
+              <div className="max-h-[calc(92vh-155px)] space-y-5 overflow-y-auto p-4 md:p-5">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <InfoBox label="تقدم المؤشر" value={`${reviewGoal.progressPercent}%`} icon={Gauge} />
+                  <InfoBox label="تقدم الإجراءات" value={`${reviewGoal.actionProgressPercent}%`} icon={ClipboardCheck} />
+                  <InfoBox label="عدد أدلة الإغلاق" value={String(Array.isArray(reviewGoal.closureEvidence) ? reviewGoal.closureEvidence.length : 0)} icon={FileCheck2} />
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-black text-slate-500">ملخص نتيجة التنفيذ</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-800">{reviewGoal.closureSummary || 'لا يوجد ملخص محفوظ.'}</p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-[#fbfcfd] p-4">
+                  <p className="text-sm font-black text-slate-800">المرفقات المؤيدة</p>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    {(Array.isArray(reviewGoal.closureEvidence) ? reviewGoal.closureEvidence : []).map((item, index) => (
+                      <button
+                        key={`${item.url}-${index}`}
+                        type="button"
+                        onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+                        className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-right transition hover:border-[#d6b46a] hover:bg-[#fffdf8]"
+                      >
+                        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${item.kind === 'image' ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'}`}>
+                          {item.kind === 'image' ? <ImageIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-[11px] font-black text-slate-700">{item.fileName || `إثبات ${index + 1}`}</span>
+                          <span className="mt-0.5 block text-[9px] text-slate-400">{item.mimeType || (item.kind === 'image' ? 'صورة' : 'مستند')} — فتح المرفق</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-[10px] font-black text-slate-400">رفع الإثبات</p>
+                    <p className="mt-1 text-xs font-black text-slate-800">{reviewGoal.evidenceSubmittedName || '—'}</p>
+                    <p className="mt-1 text-[10px] text-slate-500">{formatDate(reviewGoal.evidenceSubmittedAt)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-[10px] font-black text-slate-400">مراجعة الإثبات</p>
+                    <p className="mt-1 text-xs font-black text-slate-800">{reviewGoal.evidenceReviewedName || (reviewGoal.status === 'evidence_review' ? 'بانتظار رئيس الوحدة' : '—')}</p>
+                    <p className="mt-1 text-[10px] text-slate-500">{formatDate(reviewGoal.evidenceReviewedAt)}</p>
+                  </div>
+                </div>
+
+                {reviewGoal.evidenceReviewNote && reviewGoal.status !== 'evidence_review' && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-xs font-black text-amber-900">ملاحظة المراجعة</p>
+                    <p className="mt-2 text-xs leading-6 text-amber-800">{reviewGoal.evidenceReviewNote}</p>
+                  </div>
+                )}
+
+                {canManage && reviewGoal.status === 'evidence_review' && (
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-black text-slate-600">ملاحظة قرار المراجعة</span>
+                    <Textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} rows={4} placeholder="اختياري عند الاعتماد، وإلزامي عند الإعادة للاستكمال..." />
+                  </label>
+                )}
+              </div>
+
+              <DialogFooter className="border-t border-slate-200 bg-white p-4">
+                <Button variant="outline" onClick={() => setReviewDialogOpen(false)} disabled={reviewSaving}>إغلاق</Button>
+                {canManage && reviewGoal.status === 'evidence_review' && (
+                  <>
+                    <Button variant="outline" className="border-rose-200 bg-rose-50 text-rose-800" onClick={() => void reviewEvidence('return')} disabled={reviewSaving}>
+                      <RotateCcw className="ml-2 h-4 w-4" />
+                      إعادة للاستكمال
+                    </Button>
+                    <Button className="bg-violet-700 text-white hover:bg-violet-800" onClick={() => void reviewEvidence('approve')} disabled={reviewSaving}>
+                      {reviewSaving ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="ml-2 h-4 w-4" />}
+                      اعتماد وإغلاق
+                    </Button>
+                  </>
+                )}
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
