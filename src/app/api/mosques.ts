@@ -264,6 +264,21 @@ export type MosqueImprovementEvidenceItem = {
   submittedAt?: string | null;
 };
 
+export type MosqueImprovementSustainabilityCheck = {
+  id: string;
+  goalId: string;
+  month: string;
+  snapshotId: string;
+  value?: number | null;
+  targetValue: number;
+  status: 'sustained' | 'needs_follow_up' | 'regressed' | 'no_data' | string;
+  retentionPercent?: number | null;
+  note?: string | null;
+  evaluatedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type MosqueImprovementGoal = {
   id: string;
   goalNumber: string;
@@ -302,6 +317,17 @@ export type MosqueImprovementGoal = {
   evidenceReviewedAt?: string | null;
   evidenceReviewNote?: string | null;
   closedAt?: string | null;
+  sustainabilityStatus?: 'not_started' | 'monitoring' | 'sustained' | 'needs_follow_up' | 'regressed' | string;
+  sustainabilityValue?: number | null;
+  sustainabilityMonth?: string | null;
+  sustainabilityObservedMonths?: number;
+  sustainabilityTargetMonths?: number;
+  sustainabilityNote?: string | null;
+  sustainabilityEvaluatedAt?: string | null;
+  relapseDetectedAt?: string | null;
+  parentGoalId?: string | null;
+  followUpGoalId?: string | null;
+  sustainabilityChecks?: MosqueImprovementSustainabilityCheck[];
   lastEvaluatedAt?: string | null;
   createdBy?: string | null;
   createdByName?: string | null;
@@ -1022,6 +1048,11 @@ createQuranRackMovement: (input: Record<string, unknown>) => apiJson<{ movement:
     }),
   evaluateImprovementGoals: (year?: number) =>
     apiJson<MosqueImprovementGoal[]>('/api/mosques/improvement-goals/evaluate', {
+      method: 'POST',
+      body: JSON.stringify({ year: year || null }),
+    }),
+  evaluateImprovementGoalSustainability: (year?: number) =>
+    apiJson<MosqueImprovementGoal[]>('/api/mosques/improvement-goals/sustainability/evaluate', {
       method: 'POST',
       body: JSON.stringify({ year: year || null }),
     }),
