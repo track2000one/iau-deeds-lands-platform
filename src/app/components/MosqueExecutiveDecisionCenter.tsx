@@ -176,6 +176,42 @@ const severityLabel: Record<ExecutiveItem['severity'], string> = {
   positive: 'إحاطة إيجابية',
 };
 
+const executiveStatusLabel: Record<string, string> = {
+  draft: 'مسودة',
+  active: 'قيد التنفيذ',
+  at_risk: 'معرض للتعثر',
+  achieved: 'متحقق',
+  evidence_review: 'إثبات قيد المراجعة',
+  closed: 'مغلق',
+  cancelled: 'ملغى',
+  review: 'قيد المراجعة',
+  approved: 'معتمد',
+  archived: 'مؤرشف',
+};
+
+const decisionStateSummary = (state?: Record<string, unknown> | null) => {
+  if (!state) return '—';
+  const parts: string[] = [];
+  const status = typeof state.status === 'string' ? state.status : '';
+  if (status) parts.push(`الحالة: ${executiveStatusLabel[status] || status}`);
+  if (state.month) parts.push(`الشهر: ${String(state.month)}`);
+  if (state.kpiScore !== undefined && state.kpiScore !== null) parts.push(`KPI: ${String(state.kpiScore)}/100`);
+  if (state.ownerName) parts.push(`المسؤول: ${String(state.ownerName)}`);
+  if (state.dueDate) parts.push(`الاستحقاق: ${formatDate(String(state.dueDate))}`);
+  if (state.targetValue !== undefined && state.targetValue !== null) parts.push(`المستهدف: ${String(state.targetValue)}`);
+  if (state.currentValue !== undefined && state.currentValue !== null) parts.push(`الحالي: ${String(state.currentValue)}`);
+  if (state.progressPercent !== undefined && state.progressPercent !== null) parts.push(`التقدم: ${String(state.progressPercent)}%`);
+  if (state.sustainabilityStatus) parts.push(`الاستدامة: ${String(state.sustainabilityStatus)}`);
+  return parts.length ? parts.join(' — ') : 'لا توجد حالة مختصرة';
+};
+
+const escapeHtml = (value: unknown) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
 export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImprovementPlan }) => {
   const [goals, setGoals] = useState<MosqueImprovementGoal[]>([]);
   const [decisions, setDecisions] = useState<MosqueExecutiveDecision[]>([]);
