@@ -1,5 +1,6 @@
 import { apiJson } from '../../lib/http';
 import type {
+  EligibleInvestmentArea,
   GeometryApprovalQueueResponse,
   InvestmentExecutiveDashboard,
   InvestmentArea,
@@ -7,6 +8,10 @@ import type {
   InvestmentAttachmentSummary,
   InvestmentAreaQuery,
   InvestmentDeedOption,
+  InvestmentOpportunity,
+  InvestmentOpportunityInput,
+  InvestmentOpportunityListResponse,
+  InvestmentOpportunityStatus,
   InvestmentSite,
   InvestmentSiteInput,
   PaginatedResponse,
@@ -26,6 +31,91 @@ const buildQuery = (params: Record<string, unknown>) => {
 };
 
 export const investmentsApi = {
+  getOpportunities: (params: {
+    status?: InvestmentOpportunityStatus | '';
+    areaId?: string;
+    siteId?: string;
+    search?: string;
+    active?: 'true' | 'false';
+    page?: number;
+    limit?: number;
+  } = {}) =>
+    apiJson<InvestmentOpportunityListResponse>(
+      `/api/investment-opportunities${buildQuery(params)}`
+    ),
+
+  getOpportunity: (id: string) =>
+    apiJson<InvestmentOpportunity>(
+      `/api/investment-opportunities/${id}`
+    ),
+
+  getEligibleOpportunityAreas: () =>
+    apiJson<{
+      items: EligibleInvestmentArea[];
+      eligibleCount: number;
+    }>('/api/investment-opportunities/eligible-areas'),
+
+  createOpportunity: (data: InvestmentOpportunityInput) =>
+    apiJson<InvestmentOpportunity>('/api/investment-opportunities', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateOpportunity: (
+    id: string,
+    data: Partial<Omit<InvestmentOpportunityInput, 'areaId'>>
+  ) =>
+    apiJson<InvestmentOpportunity>(
+      `/api/investment-opportunities/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }
+    ),
+
+  transitionOpportunity: (
+    id: string,
+    data: {
+      toStatus: InvestmentOpportunityStatus;
+      note?: string | null;
+    }
+  ) =>
+    apiJson<InvestmentOpportunity>(
+      `/api/investment-opportunities/${id}/status`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }
+    ),
+
+  archiveOpportunity: (id: string) =>
+    apiJson<void>(`/api/investment-opportunities/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getOpportunityAttachments: (id: string) =>
+    apiJson<InvestmentAttachmentSummary[]>(
+      `/api/attachments/investment_opportunity/${id}`
+    ),
+
+  createOpportunityAttachment: (data: {
+    entityId: string;
+    title: string;
+    driveUrl: string;
+    notes?: string | null;
+  }) =>
+    apiJson<InvestmentAttachmentSummary>('/api/attachments', {
+      method: 'POST',
+      body: JSON.stringify({
+        entityType: 'investment_opportunity',
+        entityId: data.entityId,
+        attachmentType: 'other',
+        title: data.title,
+        driveUrl: data.driveUrl,
+        notes: data.notes ?? null,
+      }),
+    }),
+
   getExecutiveDashboard: () =>
     apiJson<InvestmentExecutiveDashboard>(
       '/api/investment-executive-dashboard'
@@ -46,7 +136,7 @@ export const investmentsApi = {
     ),
 
   getGeometryAttachments: (
-    entityType: 'investment_site' | 'investment_area',
+    entityType: 'investment_site' | 'investment_area' | 'investment_opportunity',
     entityId: string
   ) =>
     apiJson<InvestmentAttachmentSummary[]>(
