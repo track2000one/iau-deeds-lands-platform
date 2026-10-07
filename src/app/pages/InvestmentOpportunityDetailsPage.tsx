@@ -280,9 +280,9 @@ export const InvestmentOpportunityDetailsPage: React.FC = () => {
 
   const area = opportunity.area;
   const site = area?.site;
-  const terminal =
-    opportunity.status === 'INVESTED' ||
-    opportunity.status === 'CANCELLED';
+  const editable = ['IDENTIFIED', 'UNDER_STUDY', 'REJECTED'].includes(
+    opportunity.status
+  );
 
   const transitions = allowedTransitions[opportunity.status].filter(
     (target) => {
@@ -333,7 +333,7 @@ export const InvestmentOpportunityDetailsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {canEdit && !terminal && (
+          {canEdit && editable && (
             <Button
               variant="outline"
               onClick={() =>
