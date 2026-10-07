@@ -23,6 +23,7 @@ import {
   FileSpreadsheet,
   FileText,
   Filter,
+  Gavel,
   MapPin,
   MessageSquare,
   Plus,
@@ -58,6 +59,7 @@ import { MosqueDataCompletenessCenter } from '../components/MosqueDataCompletene
 import { MosqueKpiArchive } from '../components/MosqueKpiArchive';
 import { MosqueKpiAnnualDashboard } from '../components/MosqueKpiAnnualDashboard';
 import { MosqueImprovementGoalsCenter } from '../components/MosqueImprovementGoalsCenter';
+import { MosqueExecutiveDecisionCenter } from '../components/MosqueExecutiveDecisionCenter';
 import { BuildingCoverageReportsDialog } from '../components/BuildingCoverageReportsDialog';
 import { isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
@@ -3126,6 +3128,7 @@ ${quranStockMovementForm.notes}` : ''}`
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="أرشيف KPI" icon={Archive} active={activeTab === 'kpi-archive'} onClick={() => goToDashboardSection('kpi-archive')} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="التحليل السنوي KPI" icon={BarChart3} active={activeTab === 'kpi-annual'} onClick={() => goToDashboardSection('kpi-annual')} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="خطة التحسين" icon={Target} active={activeTab === 'improvement-goals'} onClick={() => goToDashboardSection('improvement-goals')} />}
+                  {role === 'head' && <MosqueSideNavButton label="قرارات الإدارة" icon={Gavel} active={activeTab === 'executive-decisions'} onClick={() => goToDashboardSection('executive-decisions')} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="الجولات والزيارات" icon={ClipboardList} active={activeTab === 'field-visits'} onClick={() => goToDashboardSection('field-visits')} />}
                   {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="الطلبات والصيانة" icon={Wrench} active={activeTab === 'requests'} onClick={() => goToDashboardSection('requests')} badge={dashboard?.stats.newRequests || 0} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="البلاغات" icon={MessageSquare} active={activeTab === 'tickets'} onClick={() => goToDashboardSection('tickets')} badge={dashboard?.stats.openTickets || 0} />}
@@ -3174,6 +3177,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 {['head', 'supervisor'].includes(role) && <option value="kpi-archive">أرشيف مؤشرات الأداء KPI</option>}
                 {['head', 'supervisor'].includes(role) && <option value="kpi-annual">التحليل السنوي KPI</option>}
                 {['head', 'supervisor'].includes(role) && <option value="improvement-goals">خطة التحسين السنوية</option>}
+                {role === 'head' && <option value="executive-decisions">قرارات الإدارة التنفيذية</option>}
                 {['head', 'supervisor'].includes(role) && <option value="buildings">تغطية المباني بخدمة الصلاة</option>}
                 {['head', 'supervisor'].includes(role) && <option value="field-visits">الجولات والزيارات</option>}
                 {['head', 'supervisor', 'personnel'].includes(role) && <option value="quran">المصاحف</option>}
@@ -3693,6 +3697,10 @@ ${quranStockMovementForm.notes}` : ''}`
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="improvement-goals" className="space-y-4">
           <MosqueImprovementGoalsCenter role={role} currentUsername={currentUsername} />
+        </TabsContent>}
+
+        {role === 'head' && <TabsContent value="executive-decisions" className="space-y-4">
+          <MosqueExecutiveDecisionCenter onOpenImprovementPlan={() => setActiveTab('improvement-goals')} />
         </TabsContent>}
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="field-visits" className="space-y-4">
