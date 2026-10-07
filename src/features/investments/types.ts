@@ -20,6 +20,25 @@ export type GeometryAccuracy =
   | 'SURVEYED'
   | 'OFFICIAL';
 
+export type GeometryApprovalStatus =
+  | 'DRAFT'
+  | 'REVIEWED'
+  | 'APPROVED'
+  | 'CHANGE_REQUESTED';
+
+export interface InvestmentAttachmentSummary {
+  id: string;
+  entityType: 'investment_site' | 'investment_area';
+  entityId: string;
+  attachmentType: string;
+  title: string;
+  driveUrl: string;
+  driveFileId?: string | null;
+  mimeType?: string | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
 export interface InvestmentDeedSummary {
   id: string;
   deedNumber: string;
@@ -49,6 +68,15 @@ export interface InvestmentSite {
   longitude?: number | string | null;
   geoJson?: InvestmentPolygonFeature | null;
   geometryAccuracy: GeometryAccuracy;
+  geometryApprovalStatus: GeometryApprovalStatus;
+  geometryReviewedById?: string | null;
+  geometryReviewedByName?: string | null;
+  geometryReviewedAt?: string | null;
+  geometryApprovedById?: string | null;
+  geometryApprovedByName?: string | null;
+  geometryApprovedAt?: string | null;
+  geometryReferenceAttachmentId?: string | null;
+  geometryWorkflowNote?: string | null;
   region?: string | null;
   city?: string | null;
   district?: string | null;
@@ -73,6 +101,15 @@ export interface InvestmentArea {
   longitude?: number | string | null;
   geoJson?: InvestmentPolygonFeature | null;
   geometryAccuracy: GeometryAccuracy;
+  geometryApprovalStatus: GeometryApprovalStatus;
+  geometryReviewedById?: string | null;
+  geometryReviewedByName?: string | null;
+  geometryReviewedAt?: string | null;
+  geometryApprovedById?: string | null;
+  geometryApprovedByName?: string | null;
+  geometryApprovedAt?: string | null;
+  geometryReferenceAttachmentId?: string | null;
+  geometryWorkflowNote?: string | null;
   occupancyStatus: InvestmentAreaStatus;
   investmentReadiness: InvestmentReadiness;
   currentUse?: string | null;
