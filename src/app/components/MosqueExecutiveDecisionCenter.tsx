@@ -197,6 +197,18 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
 
   const year = currentRiyadhYear();
 
+  const loadDecisionLog = async (from = decisionFrom, to = decisionTo) => {
+    setDecisionLoading(true);
+    try {
+      const rows = await mosqueApi.executiveDecisions({ from, to });
+      setDecisions(rows || []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل سجل القرارات التنفيذية');
+    } finally {
+      setDecisionLoading(false);
+    }
+  };
+
   const load = async () => {
     setLoading(true);
     try {
@@ -217,6 +229,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
 
   useEffect(() => {
     void load();
+    void loadDecisionLog();
   }, []);
 
   const latestOfficialSnapshot = useMemo(
