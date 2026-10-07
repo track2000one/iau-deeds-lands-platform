@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import {
   AlertTriangle,
+  BarChart3,
   Building2,
   CalendarDays,
   CheckCircle2,
@@ -36,6 +37,7 @@ import { Textarea } from './ui/textarea';
 import {
   mosqueApi,
   type MosqueCompletionTask,
+  type MosqueCompletionTaskAnalytics,
   type MosqueCompletionTaskAssignee,
   type MosqueFieldVisit,
   type MosqueSite,
@@ -281,6 +283,10 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksAvailable, setTasksAvailable] = useState(true);
 
+  const [analyticsMonth, setAnalyticsMonth] = useState(riyadhDateKey().slice(0, 7));
+  const [analytics, setAnalytics] = useState<MosqueCompletionTaskAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+
   const [search, setSearch] = useState('');
   const [stateFilter, setStateFilter] = useState<'all' | CompletenessState>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'mosques' | 'prayer_rooms'>('all');
@@ -324,10 +330,26 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
     }
   };
 
+  const loadAnalytics = async (month = analyticsMonth) => {
+    setAnalyticsLoading(true);
+    try {
+      setAnalytics(await mosqueApi.completionTaskAnalytics(month));
+    } catch (error) {
+      setAnalytics(null);
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل مؤشرات أداء مهام الاستكمال');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadVisits();
     void loadTasks();
   }, []);
+
+  useEffect(() => {
+    void loadAnalytics(analyticsMonth);
+  }, [analyticsMonth]);
 
   const latestVisitBySite = useMemo(() => {
     const map = new Map<string, MosqueFieldVisit>();
@@ -673,6 +695,7 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
       const updatedTasks = await mosqueApi.completionTasks();
       setTasks(updatedTasks || []);
       setTasksAvailable(true);
+      void loadAnalytics(analyticsMonth);
 
       const refreshedActive = (updatedTasks || []).filter(
         (task) => task.siteId === taskDialogRow.site.id && activeTaskStatuses.has(task.status)
@@ -689,6 +712,109 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
     } finally {
       setTaskSaving(false);
     }
+  };
+
+
+  const exportMonthlyPerformanceReport = () => {
+    if (!analytics) {
+      toast.error('لا توجد بيانات أداء متاحة للتصدير');
+      return;
+    }
+
+    const summaryRows = [
+      ['التقرير', 'تقرير الأداء الشهري لمهام استكمال بيانات المساجد والمصليات'],
+      ['الشهر', analytics.month],
+      ['تاريخ الاستخراج', new Date().toLocaleString('ar-SA')],
+      [],
+      ['المؤشر', 'القيمة'],
+      ['مهام أنشئت خلال الشهر', analytics.summary.created],
+      ['مهام أنجزت خلال الشهر', analytics.summary.completed],
+      ['نسبة إنجاز المهام المنشأة', analytics.summary.completionRate + '%'],
+      ['المهام النشطة حاليًا', analytics.summary.active],
+      ['المهام المتأخرة حاليًا', analytics.summary.overdue],
+      ['المستحقة اليوم', analytics.summary.dueToday],
+      ['المستحقة خلال 3 أيام', analytics.summary.dueSoon],
+      ['المهام غير المسندة', analytics.summary.unassigned],
+      ['المهام المنجزة ضمن الموعد', analytics.summary.onTimeCompleted],
+      ['المهام المنجزة ذات موعد محدد', analytics.summary.completedWithDueDate],
+      ['نسبة الالتزام بالمواعيد', analytics.summary.onTimeRate == null ? 'لا تتوفر عينة' : analytics.summary.onTimeRate + '%'],
+      ['متوسط مدة الإنجاز', analytics.summary.avgCompletionHours == null ? 'لا تتوفر بيانات' : (analytics.summary.avgCompletionHours / 24).toFixed(1) + ' يوم'],
+    ];
+
+    const assigneeRows = analytics.byAssignee.map((row, index) => ({
+      'م': index + 1,
+      'المسؤول': row.assigneeName,
+      'مهام أنشئت': row.created,
+      'مهام منجزة': row.completed,
+      'مهام نشطة': row.active,
+      'متأخرة': row.overdue,
+      'مستحقة اليوم': row.dueToday,
+      'منجزة ضمن الموعد': row.onTimeCompleted,
+      'مهام منجزة ذات موعد': row.completedWithDueDate,
+      'نسبة الالتزام بالمواعيد': row.onTimeRate == null ? '' : row.onTimeRate + '%',
+      'متوسط مدة الإنجاز بالأيام': row.avgCompletionHours == null ? '' : Number((row.avgCompletionHours / 24).toFixed(1)),
+    }));
+
+    const gapRows = analytics.byMissingKey.map((row, index) => ({
+      'م': index + 1,
+      'نوع النقص': missingLabelByKey[row.missingKey as MissingKey] || row.missingKey,
+      'إجمالي المهام': row.total,
+      'أنشئت خلال الشهر': row.created,
+      'أنجزت خلال الشهر': row.completed,
+      'نشطة حاليًا': row.active,
+      'متأخرة حاليًا': row.overdue,
+    }));
+
+    const trendRows = analytics.trend.map((row) => ({
+      'الشهر': row.month,
+      'مهام أنشئت': row.created,
+      'مهام منجزة': row.completed,
+      'نسبة الالتزام بالمواعيد': row.onTimeRate == null ? '' : row.onTimeRate + '%',
+    }));
+
+    const periodTaskMap = new Map<string, MosqueCompletionTask>();
+    analytics.periodTasks.created.forEach((task) => periodTaskMap.set(task.id, task));
+    analytics.periodTasks.completed.forEach((task) => periodTaskMap.set(task.id, task));
+    const taskRows = [...periodTaskMap.values()]
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .map((task, index) => ({
+        'م': index + 1,
+        'رقم المهمة': task.taskNumber,
+        'الموقع': task.site?.name || '',
+        'بند الاستكمال': missingLabelByKey[task.missingKey as MissingKey] || task.missingKey,
+        'الأولوية': priorityLabel[task.priority],
+        'الحالة': taskStatusLabel[task.status],
+        'المسؤول': task.assignedToName || 'غير مسندة',
+        'تاريخ الإنشاء': formatDate(task.createdAt),
+        'موعد الإنجاز': task.dueDate ? formatDate(task.dueDate) : '',
+        'تاريخ الإكمال': task.completedAt ? formatDate(task.completedAt) : '',
+        'ملاحظة الإنجاز': task.completionNote || '',
+      }));
+
+    const workbook = XLSX.utils.book_new();
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
+    const assigneeSheet = XLSX.utils.json_to_sheet(assigneeRows);
+    const gapSheet = XLSX.utils.json_to_sheet(gapRows);
+    const trendSheet = XLSX.utils.json_to_sheet(trendRows);
+    const tasksSheet = XLSX.utils.json_to_sheet(taskRows);
+
+    for (const sheet of [summarySheet, assigneeSheet, gapSheet, trendSheet, tasksSheet]) {
+      (sheet as any)['!views'] = [{ RTL: true }];
+    }
+
+    (summarySheet as any)['!cols'] = [{ wch: 40 }, { wch: 28 }];
+    (assigneeSheet as any)['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 19 }, { wch: 21 }, { wch: 23 }, { wch: 24 }];
+    (gapSheet as any)['!cols'] = [{ wch: 6 }, { wch: 34 }, { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 16 }];
+    (trendSheet as any)['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 24 }];
+    (tasksSheet as any)['!cols'] = [{ wch: 6 }, { wch: 18 }, { wch: 30 }, { wch: 34 }, { wch: 14 }, { wch: 16 }, { wch: 26 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 42 }];
+
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'الملخص التنفيذي');
+    XLSX.utils.book_append_sheet(workbook, assigneeSheet, 'أداء المسؤولين');
+    XLSX.utils.book_append_sheet(workbook, gapSheet, 'أنواع النواقص');
+    XLSX.utils.book_append_sheet(workbook, trendSheet, 'الاتجاه الشهري');
+    XLSX.utils.book_append_sheet(workbook, tasksSheet, 'تفاصيل المهام');
+
+    XLSX.writeFile(workbook, `IAU_Mosques_Completion_Performance_${analytics.month}.xlsx`);
   };
 
   const exportToExcel = () => {
@@ -902,6 +1028,159 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
               </div>
             )}
           </div>
+
+
+          <Card className="overflow-hidden rounded-[24px] border border-[#d9c9a5] bg-white shadow-sm">
+            <CardHeader className="border-b border-[#eadfc8] bg-gradient-to-l from-[#fffaf0] via-white to-[#f2fbf8] pb-4">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg font-black text-[#0b4a3f]">
+                    <BarChart3 className="h-5 w-5" />
+                    لوحة أداء مهام الاستكمال
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    مؤشرات شهرية لسرعة الإنجاز، الالتزام بالمواعيد، أداء المسؤولين وأكثر أنواع النواقص تكرارًا.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    className="h-10 w-[165px] border-[#d9c9a5] bg-white"
+                    type="month"
+                    value={analyticsMonth}
+                    onChange={(event) => setAnalyticsMonth(event.target.value)}
+                  />
+                  <Button
+                    variant="outline"
+                    className="border-[#d9c9a5] bg-white text-[#0b4a3f]"
+                    onClick={() => void loadAnalytics(analyticsMonth)}
+                    disabled={analyticsLoading}
+                  >
+                    <RefreshCw className={analyticsLoading ? 'ml-2 h-4 w-4 animate-spin' : 'ml-2 h-4 w-4'} />
+                    تحديث المؤشرات
+                  </Button>
+                  <Button
+                    className="bg-[#0b4a3f] text-white hover:bg-[#126152]"
+                    onClick={exportMonthlyPerformanceReport}
+                    disabled={!analytics || analyticsLoading}
+                  >
+                    <FileSpreadsheet className="ml-2 h-4 w-4" />
+                    التقرير الشهري
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-5 p-4 sm:p-5">
+              {analyticsLoading ? (
+                <div className="flex min-h-32 items-center justify-center text-sm font-bold text-slate-500">
+                  <RefreshCw className="ml-2 h-5 w-5 animate-spin" />
+                  جاري احتساب مؤشرات الأداء...
+                </div>
+              ) : analytics ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+                    <PerformanceMetric label="مهام أنشئت" value={analytics.summary.created} />
+                    <PerformanceMetric label="مهام منجزة" value={analytics.summary.completed} />
+                    <PerformanceMetric label="معدل الإنجاز" value={analytics.summary.completionRate} suffix="%" />
+                    <PerformanceMetric label="الالتزام بالموعد" value={analytics.summary.onTimeRate == null ? '—' : analytics.summary.onTimeRate} suffix={analytics.summary.onTimeRate == null ? '' : '%'} />
+                    <PerformanceMetric label="متوسط الإنجاز" value={analytics.summary.avgCompletionHours == null ? '—' : (analytics.summary.avgCompletionHours / 24).toFixed(1)} suffix={analytics.summary.avgCompletionHours == null ? '' : ' يوم'} />
+                    <PerformanceMetric label="متأخرة حاليًا" value={analytics.summary.overdue} />
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                    <div className="overflow-hidden rounded-2xl border border-slate-200">
+                      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-sm font-black text-slate-800">أداء المسؤولين</p>
+                        <p className="mt-1 text-[11px] text-slate-500">يقاس الإنجاز الفعلي ونسبة الالتزام بالموعد ومتوسط مدة الإغلاق.</p>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[760px] text-right text-xs">
+                          <thead className="bg-white text-[10px] font-black text-slate-500">
+                            <tr>
+                              <th className="px-3 py-3">المسؤول</th>
+                              <th className="px-3 py-3">منجزة</th>
+                              <th className="px-3 py-3">نشطة</th>
+                              <th className="px-3 py-3">متأخرة</th>
+                              <th className="px-3 py-3">الالتزام</th>
+                              <th className="px-3 py-3">متوسط الإنجاز</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {analytics.byAssignee.slice(0, 10).map((row) => (
+                              <tr key={row.assigneeUserId || row.assigneeName}>
+                                <td className="px-3 py-3 font-black text-slate-800">{row.assigneeName}</td>
+                                <td className="px-3 py-3 text-slate-600">{row.completed}</td>
+                                <td className="px-3 py-3 text-slate-600">{row.active}</td>
+                                <td className="px-3 py-3"><span className={row.overdue ? 'font-black text-rose-700' : 'text-slate-500'}>{row.overdue}</span></td>
+                                <td className="px-3 py-3">{row.onTimeRate == null ? '—' : `${row.onTimeRate}%`}</td>
+                                <td className="px-3 py-3">{row.avgCompletionHours == null ? '—' : `${(row.avgCompletionHours / 24).toFixed(1)} يوم`}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-[#fbfcfd] p-4">
+                      <p className="text-sm font-black text-slate-800">أكثر أنواع النقص تكرارًا</p>
+                      <p className="mt-1 text-[11px] text-slate-500">بحسب المهام التي أُنشئت خلال الشهر المحدد.</p>
+                      <div className="mt-4 space-y-3">
+                        {analytics.byMissingKey.slice(0, 6).length ? analytics.byMissingKey.slice(0, 6).map((row) => {
+                          const max = Math.max(...analytics.byMissingKey.map((item) => item.created), 1);
+                          const percent = Math.max(4, Math.round((row.created / max) * 100));
+                          return (
+                            <div key={row.missingKey}>
+                              <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+                                <span className="font-bold text-slate-700">{missingLabelByKey[row.missingKey as MissingKey] || row.missingKey}</span>
+                                <strong className="text-[#0b4a3f]">{row.created}</strong>
+                              </div>
+                              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                                <div className="h-full rounded-full bg-[#0b4a3f]" style={{ width: `${percent}%` }} />
+                              </div>
+                            </div>
+                          );
+                        }) : <p className="py-8 text-center text-xs font-bold text-slate-400">لا توجد مهام منشأة خلال هذا الشهر.</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-slate-800">اتجاه الأداء خلال 6 أشهر</p>
+                        <p className="mt-1 text-[11px] text-slate-500">مقارنة عدد المهام المنشأة والمنجزة ونسبة الالتزام بالموعد.</p>
+                      </div>
+                      <Badge variant="outline" className="border-[#d9c9a5] bg-[#fffdf8] text-[#0b4a3f]">{analytics.month}</Badge>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                      {analytics.trend.map((row) => {
+                        const maxValue = Math.max(...analytics.trend.flatMap((item) => [item.created, item.completed]), 1);
+                        return (
+                          <div key={row.month} className="rounded-2xl border border-slate-200 bg-[#fbfcfd] p-3">
+                            <p className="text-xs font-black text-slate-700">{row.month}</p>
+                            <div className="mt-3 flex h-24 items-end justify-center gap-2">
+                              <div className="flex h-full w-7 items-end rounded-t-lg bg-slate-100" title={`أنشئت: ${row.created}`}>
+                                <div className="w-full rounded-t-lg bg-[#d6b46a]" style={{ height: `${Math.max(4, Math.round((row.created / maxValue) * 100))}%` }} />
+                              </div>
+                              <div className="flex h-full w-7 items-end rounded-t-lg bg-slate-100" title={`أنجزت: ${row.completed}`}>
+                                <div className="w-full rounded-t-lg bg-[#0b4a3f]" style={{ height: `${Math.max(4, Math.round((row.completed / maxValue) * 100))}%` }} />
+                              </div>
+                            </div>
+                            <div className="mt-2 flex justify-between text-[9px] font-bold text-slate-500"><span>إنشاء {row.created}</span><span>إنجاز {row.completed}</span></div>
+                            <p className="mt-2 text-center text-[10px] font-black text-slate-600">التزام {row.onTimeRate == null ? '—' : `${row.onTimeRate}%`}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">
+                  تعذر تحميل مؤشرات الأداء للشهر المحدد.
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -1318,6 +1597,21 @@ const Metric = ({
       <strong className="text-xl font-black text-[#0b4a3f]">{value}{suffix || ''}</strong>
     </div>
     <p className="mt-2 text-[11px] font-bold text-slate-500">{label}</p>
+  </div>
+);
+
+const PerformanceMetric = ({
+  label,
+  value,
+  suffix = '',
+}: {
+  label: string;
+  value: number | string;
+  suffix?: string;
+}) => (
+  <div className="rounded-2xl border border-slate-200 bg-[#fbfcfd] p-3">
+    <p className="text-[10px] font-black text-slate-500">{label}</p>
+    <p className="mt-2 text-2xl font-black text-[#0b4a3f]">{value}{suffix}</p>
   </div>
 );
 
