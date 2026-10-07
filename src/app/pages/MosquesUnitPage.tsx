@@ -294,8 +294,20 @@ const card3d = 'border-[#dcc58e]/70 bg-gradient-to-b from-white via-[#fffdf7] to
 const button3d = 'shadow-[0_4px_0_rgba(8,63,53,0.14),0_8px_16px_rgba(8,63,53,0.08),inset_0_1px_0_rgba(255,255,255,0.96)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(8,63,53,0.12)]';
 const siteActionButton = `${button3d} h-10 w-full min-w-0 justify-center gap-1.5 whitespace-nowrap px-2 text-xs font-bold leading-none`;
 
+const emptyWomenPrayerArea = () => ({
+  capacity: '',
+  floor: '',
+  locationDescription: '',
+  separateEntrance: false,
+  hasAblution: false,
+  hasRestrooms: false,
+  status: 'active',
+  notes: '',
+});
+
 const emptySite = {
-  name: '', siteType: 'mosque', prayerRoomGender: '', spatialRelation: 'independent', buildingId: '', floor: '', roomNumber: '', city: 'الدمام', district: '', campusLocation: '', area: '', capacity: '', quranTargetCount: '', latitude: '', longitude: '',
+  name: '', siteType: 'mosque', prayerRoomGender: '', spatialRelation: 'independent', buildingId: '', floor: '', roomNumber: '', city: 'الدمام', district: '', campusLocation: '', area: '', capacity: '', quranTargetCount: '',
+  hasWomenPrayerArea: false, womenPrayerArea: emptyWomenPrayerArea(), latitude: '', longitude: '',
   status: 'active', imamName: '', muezzinName: '', khateebName: '', coordinatorName: '', supervisorName: '', contactPhone: '', supervisorUserId: '', notes: '',
 };
 const emptyBuilding = {
@@ -526,6 +538,8 @@ const mediaImportSitePayload = (site: MosqueSite, images: MosqueSiteMediaLibrary
   area: site.area ?? null,
   capacity: site.capacity ?? null,
   quranTargetCount: site.quranTargetCount ?? null,
+  hasWomenPrayerArea: site.hasWomenPrayerArea ?? false,
+  womenPrayerArea: site.womenPrayerArea ?? null,
   latitude: site.latitude ?? null,
   longitude: site.longitude ?? null,
   mapUrl: site.mapUrl ?? null,
@@ -2230,7 +2244,19 @@ ${quranStockMovementForm.notes}` : ''}`
     setSiteMediaLibrary(normalizeSiteMedia(site?.images || null));
     setSiteForm(site ? {
       name: site.name, siteType: site.siteType, prayerRoomGender: site.prayerRoomGender || '', spatialRelation: site.spatialRelation || 'independent', buildingId: site.buildingId || '', floor: site.floor || '', roomNumber: site.roomNumber || '', city: site.city || '', district: site.district || '', campusLocation: site.campusLocation || '',
-      area: site.area ?? '', capacity: site.capacity ?? '', quranTargetCount: site.quranTargetCount ?? '', latitude: site.latitude ?? '', longitude: site.longitude ?? '', status: site.status,
+      area: site.area ?? '', capacity: site.capacity ?? '', quranTargetCount: site.quranTargetCount ?? '',
+      hasWomenPrayerArea: Boolean(site.hasWomenPrayerArea),
+      womenPrayerArea: {
+        capacity: site.womenPrayerArea?.capacity ?? '',
+        floor: site.womenPrayerArea?.floor || '',
+        locationDescription: site.womenPrayerArea?.locationDescription || '',
+        separateEntrance: site.womenPrayerArea?.separateEntrance === true,
+        hasAblution: site.womenPrayerArea?.hasAblution === true,
+        hasRestrooms: site.womenPrayerArea?.hasRestrooms === true,
+        status: site.womenPrayerArea?.status || 'active',
+        notes: site.womenPrayerArea?.notes || '',
+      },
+      latitude: site.latitude ?? '', longitude: site.longitude ?? '', status: site.status,
       imamName: site.imamName || '', muezzinName: site.muezzinName || '', khateebName: site.khateebName || '', coordinatorName: site.coordinatorName || '', supervisorName: site.supervisorName || '', contactPhone: site.contactPhone || '', supervisorUserId: site.supervisorUserId || '', notes: site.notes || '',
     } : emptySite);
     setSiteDialog(true);
@@ -2337,6 +2363,17 @@ ${quranStockMovementForm.notes}` : ''}`
         muezzinName: null,
         khateebName: null,
         prayerRoomGender: effectiveSiteType === 'prayer_room' ? siteForm.prayerRoomGender : null,
+        hasWomenPrayerArea: ['mosque', 'jami'].includes(effectiveSiteType) ? Boolean(siteForm.hasWomenPrayerArea) : false,
+        womenPrayerArea: ['mosque', 'jami'].includes(effectiveSiteType) && siteForm.hasWomenPrayerArea ? {
+          capacity: siteForm.womenPrayerArea?.capacity === '' ? null : Number(siteForm.womenPrayerArea?.capacity),
+          floor: siteForm.womenPrayerArea?.floor || null,
+          locationDescription: siteForm.womenPrayerArea?.locationDescription || null,
+          separateEntrance: Boolean(siteForm.womenPrayerArea?.separateEntrance),
+          hasAblution: Boolean(siteForm.womenPrayerArea?.hasAblution),
+          hasRestrooms: Boolean(siteForm.womenPrayerArea?.hasRestrooms),
+          status: siteForm.womenPrayerArea?.status || 'active',
+          notes: siteForm.womenPrayerArea?.notes || null,
+        } : null,
         area: siteForm.area === '' ? null : Number(siteForm.area),
         capacity: siteForm.capacity === '' ? null : Number(siteForm.capacity),
         quranTargetCount: siteForm.quranTargetCount === '' ? null : Number(siteForm.quranTargetCount),
@@ -4295,7 +4332,16 @@ ${quranStockMovementForm.notes}` : ''}`
                 <Field label="النوع">
                   {siteForm.spatialRelation === 'inside_building'
                     ? <div className="space-y-1"><Input className="h-11 bg-emerald-50 font-bold text-emerald-800" readOnly value="مصلى" /><p className="text-[11px] leading-5 text-emerald-700">داخل المباني الجامعية يسمح بتسجيل المصليات فقط، ولا يمكن إنشاء مسجد أو جامع داخل المبنى.</p></div>
-                    : <NativeSelect className="h-11" value={siteForm.siteType} onChange={(e) => setSiteForm({ ...siteForm, siteType: e.target.value, prayerRoomGender: e.target.value === 'prayer_room' ? siteForm.prayerRoomGender : '' })}><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect>}
+                    : <NativeSelect className="h-11" value={siteForm.siteType} onChange={(e) => {
+                      const nextType = e.target.value;
+                      setSiteForm({
+                        ...siteForm,
+                        siteType: nextType,
+                        prayerRoomGender: nextType === 'prayer_room' ? siteForm.prayerRoomGender : '',
+                        hasWomenPrayerArea: ['mosque', 'jami'].includes(nextType) ? Boolean(siteForm.hasWomenPrayerArea) : false,
+                        womenPrayerArea: ['mosque', 'jami'].includes(nextType) ? siteForm.womenPrayerArea : emptyWomenPrayerArea(),
+                      });
+                    }}><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect>}
                 </Field>
                 {siteForm.siteType === 'prayer_room' && <Field label="فئة المصلى *"><NativeSelect className="h-11" value={siteForm.prayerRoomGender || ''} onChange={(e) => setSiteForm({ ...siteForm, prayerRoomGender: e.target.value })}><option value="">اختر الفئة</option><option value="men">رجال</option><option value="women">نساء</option></NativeSelect></Field>}
                 <Field label="الارتباط المكاني *"><NativeSelect className="h-11" value={siteForm.spatialRelation || 'independent'} onChange={(e) => {
@@ -4324,6 +4370,34 @@ ${quranStockMovementForm.notes}` : ''}`
                 <Field label="اسم المشرف (يدوي)"><Input className="h-11" value={siteForm.supervisorName} onChange={(e) => setSiteForm({ ...siteForm, supervisorName: e.target.value })} placeholder="اكتب اسم المشرف يدويًا" /><p className="mt-1 text-[11px] leading-5 text-muted-foreground">للتوثيق الاسمي فقط؛ لا ينشئ حسابًا ولا يمنح صلاحيات دخول.</p></Field>
               </CardContent>
             </Card>
+            {siteForm.spatialRelation !== 'inside_building' && ['mosque', 'jami'].includes(siteForm.siteType) && <Card className="overflow-hidden border-emerald-200/80 bg-white/95 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
+              <CardHeader className="border-b border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-teal-50/60 pb-4">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg"><Users className="h-5 w-5 text-emerald-700" />مصلى النساء</CardTitle>
+                <CardDescription>يسجل مصلى النساء كقسم تابع للمسجد أو الجامع، وتدخل بياناته في الجولات والزيارات والتقارير دون إنشاء موقع مستقل.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-5">
+                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                  <input type="checkbox" className="mt-1 h-4 w-4 accent-emerald-700" checked={Boolean(siteForm.hasWomenPrayerArea)} onChange={(e) => setSiteForm((current: any) => ({
+                    ...current,
+                    hasWomenPrayerArea: e.target.checked,
+                    womenPrayerArea: current.womenPrayerArea || emptyWomenPrayerArea(),
+                  }))} />
+                  <span><span className="block font-black text-emerald-950">يوجد مصلى للنساء داخل {siteForm.siteType === 'jami' ? 'الجامع' : 'المسجد'}</span><span className="mt-1 block text-xs leading-6 text-emerald-800">عند التفعيل تظهر بيانات القسم ويصبح متاحًا كنطاق مستقل في الزيارات الميدانية والتقارير.</span></span>
+                </label>
+                {siteForm.hasWomenPrayerArea && <div className="grid gap-4 rounded-2xl border border-emerald-100 bg-white p-4 md:grid-cols-2 lg:grid-cols-3">
+                  <Field label="السعة التقريبية"><Input className="h-11" type="number" min="0" step="1" value={siteForm.womenPrayerArea?.capacity ?? ''} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, capacity: e.target.value } }))} placeholder="مثال: 80" /></Field>
+                  <Field label="الدور / المستوى"><Input className="h-11" value={siteForm.womenPrayerArea?.floor || ''} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, floor: e.target.value } }))} placeholder="مثال: الدور العلوي" /></Field>
+                  <Field label="الحالة"><NativeSelect className="h-11" value={siteForm.womenPrayerArea?.status || 'active'} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, status: e.target.value } }))}><option value="active">مفتوح وجاهز</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect></Field>
+                  <div className="md:col-span-2 lg:col-span-3"><Field label="وصف موقع مصلى النساء داخل المسجد / الجامع"><Input className="h-11" value={siteForm.womenPrayerArea?.locationDescription || ''} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, locationDescription: e.target.value } }))} placeholder="مثال: الجهة الشمالية — مدخل مستقل بجوار البوابة الشرقية" /></Field></div>
+                  {([
+                    ['separateEntrance', 'مدخل مستقل'],
+                    ['hasAblution', 'مواضئ خاصة بالنساء'],
+                    ['hasRestrooms', 'دورات مياه خاصة بالنساء'],
+                  ] as const).map(([key, label]) => <label key={key} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" className="h-4 w-4 accent-emerald-700" checked={Boolean(siteForm.womenPrayerArea?.[key])} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, [key]: e.target.checked } }))} />{label}</label>)}
+                  <div className="md:col-span-2 lg:col-span-3"><Field label="ملاحظات مصلى النساء"><Textarea rows={3} value={siteForm.womenPrayerArea?.notes || ''} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, notes: e.target.value } }))} placeholder="أي ملاحظات تشغيلية أو تجهيزات خاصة بالقسم..." /></Field></div>
+                </div>}
+              </CardContent>
+            </Card>}
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
               <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-emerald-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><Building2 className="h-5 w-5" />السعة وبيانات التواصل</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2 xl:grid-cols-5">
