@@ -1304,6 +1304,39 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     }
   };
 
+  const mergeVisitChecklistForContext = React.useCallback((nextItems: MosqueFieldVisitItem[], currentItems: MosqueFieldVisitItem[]) => {
+    const keyOf = (item: MosqueFieldVisitItem) => String(item.details?.section || 'general') + '|' + item.category + '|' + item.title;
+    const currentByKey = new Map(currentItems.filter((item) => !isManualFieldVisitItem(item)).map((item) => [keyOf(item), item]));
+    const manualItems = currentItems.filter(isManualFieldVisitItem);
+    const merged = freshItems(nextItems).map((item) => {
+      const existing = currentByKey.get(keyOf(item));
+      return existing ? { ...existing } : item;
+    });
+    return [...merged, ...manualItems];
+  }, []);
+
+  const loadVisitChecklistForContext = React.useCallback(async (
+    siteId: string,
+    visitScope: MosqueFieldVisit['visitScope'],
+    preserveCurrent = true
+  ) => {
+    if (!siteId) return;
+    const site = sites.find((item) => item.id === siteId);
+    const normalizedScope = site?.siteType === 'prayer_room' ? defaultVisitScopeForSite(site) : visitScope;
+    try {
+      const checklist = await mosqueApi.fieldVisitChecklist(siteId, normalizedScope);
+      setVisitForm((current) => ({
+        ...current,
+        siteId,
+        visitScope: normalizedScope,
+        items: preserveCurrent ? mergeVisitChecklistForContext(checklist, current.items) : freshItems(checklist),
+      }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحديث قائمة الفحص حسب نطاق الزيارة');
+      setVisitForm((current) => ({ ...current, siteId, visitScope: normalizedScope }));
+    }
+  }, [sites, mergeVisitChecklistForContext]);
+
   const openNewVisit = (preset?: { siteId?: string; tourId?: string }) => {
     const existingVisit = preset?.siteId ? activeVisitBySite.get(preset.siteId) : null;
     if (existingVisit) {
