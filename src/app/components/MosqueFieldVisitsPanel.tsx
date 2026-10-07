@@ -935,6 +935,8 @@ type ProgramReportColumnKey =
   | 'visit_number'
   | 'site'
   | 'visit_type'
+  | 'visit_scope'
+  | 'women_open_items'
   | 'date'
   | 'tour'
   | 'location'
@@ -953,6 +955,8 @@ const programReportColumns: Array<{ key: ProgramReportColumnKey; label: string; 
   { key: 'visit_number', label: 'رقم الزيارة' },
   { key: 'site', label: 'المسجد / المصلى', align: 'right' },
   { key: 'visit_type', label: 'نوع الزيارة' },
+  { key: 'visit_scope', label: 'نطاق الزيارة' },
+  { key: 'women_open_items', label: 'ملاحظات مصلى النساء' },
   { key: 'date', label: 'التاريخ' },
   { key: 'tour', label: 'الجولة', align: 'right' },
   { key: 'location', label: 'الموقع', align: 'right' },
@@ -969,13 +973,13 @@ const programReportColumns: Array<{ key: ProgramReportColumnKey; label: string; 
 ];
 
 const defaultProgramReportColumns: ProgramReportColumnKey[] = [
-  'visit_number', 'site', 'visit_type', 'date', 'overall', 'open_items', 'urgent_items', 'workflow',
+  'visit_number', 'site', 'visit_type', 'visit_scope', 'date', 'overall', 'open_items', 'women_open_items', 'urgent_items', 'workflow',
 ];
 const basicProgramReportColumns: ProgramReportColumnKey[] = [
-  'visit_number', 'site', 'visit_type', 'date', 'overall', 'workflow',
+  'visit_number', 'site', 'visit_type', 'visit_scope', 'date', 'overall', 'workflow',
 ];
 const followUpProgramReportColumns: ProgramReportColumnKey[] = [
-  'visit_number', 'site', 'date', 'priority', 'open_items', 'urgent_items', 'overdue_items', 'workflow',
+  'visit_number', 'site', 'visit_scope', 'date', 'priority', 'open_items', 'women_open_items', 'urgent_items', 'overdue_items', 'workflow',
 ];
 
 type VisitReportColumnKey =
@@ -2386,6 +2390,8 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
       if (column === 'visit_number') return visit.visitNumber;
       if (column === 'site') return visit.site.name;
       if (column === 'visit_type') return visitTypeLabels[visit.visitType] || visit.visitType;
+      if (column === 'visit_scope') return visitScopeLabels[visit.visitScope || 'whole_site'] || visit.visitScope || 'الموقع بالكامل';
+      if (column === 'women_open_items') return womenOpenItemCount(visit);
       if (column === 'date') return new Date(visit.visitDate).toLocaleDateString('ar-SA-u-ca-gregory');
       if (column === 'tour') return visit.tour ? [visit.tour.tourNumber, visit.tour.title].filter(Boolean).join(' — ') : '-';
       if (column === 'location') return [visit.site.campusLocation, visit.site.district, visit.site.city].filter(Boolean).join(' — ') || '-';
@@ -2414,6 +2420,8 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
       'الملاحظات المفتوحة': filteredVisits.reduce((total, visit) => total + openCount(visit), 0),
       'العاجلة': filteredVisits.reduce((total, visit) => total + urgentCount(visit), 0),
       'المتأخرة': filteredVisits.reduce((total, visit) => total + overdueCount(visit), 0),
+      'زيارات شملت مصلى النساء': filteredVisits.filter(visitIncludesWomenSection).length,
+      'ملاحظات مصلى النساء المفتوحة': filteredVisits.reduce((total, visit) => total + womenOpenItemCount(visit), 0),
       'تاريخ التصدير': new Date().toLocaleString('ar-SA-u-ca-gregory'),
     }]);
     appendExcelReportSheet(workbook, 'الزيارات', filteredVisits.map((visit, index) => Object.fromEntries([
@@ -2648,6 +2656,8 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
     }, { observed: 0, withdrawn: 0, remaining: 0 });
     const reportSiteCount = new Set(filteredVisits.map((visit) => visit.siteId)).size;
     const reportCompleted = filteredVisits.filter((visit) => ['completed', 'closed'].includes(visit.workflowStatus)).length;
+    const reportWomenVisits = filteredVisits.filter(visitIncludesWomenSection).length;
+    const reportWomenOpenItems = filteredVisits.reduce((total, visit) => total + womenOpenItemCount(visit), 0);
     const activeColumnKeys = programPrintColumns.length ? programPrintColumns : defaultProgramReportColumns;
     const selectedColumnDefs = programReportColumns.filter((column) => activeColumnKeys.includes(column.key));
     const tableFontSize = selectedColumnDefs.length >= 13 ? 7.5 : selectedColumnDefs.length >= 10 ? 8.5 : 10;
@@ -2657,6 +2667,8 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
         case 'visit_number': return visit.visitNumber;
         case 'site': return visit.site.name;
         case 'visit_type': return visitTypeLabels[visit.visitType] || visit.visitType;
+        case 'visit_scope': return visitScopeLabels[visit.visitScope || 'whole_site'] || visit.visitScope || 'الموقع بالكامل';
+        case 'women_open_items': return womenOpenItemCount(visit);
         case 'date': return new Date(visit.visitDate).toLocaleDateString('ar-SA-u-ca-gregory');
         case 'tour': return visit.tour ? [visit.tour.tourNumber, visit.tour.title].filter(Boolean).join(' — ') : '-';
         case 'location': return [visit.site.campusLocation, visit.site.district, visit.site.city].filter(Boolean).join(' — ') || '-';
@@ -2685,7 +2697,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
     }).join('');
     const report = window.open('', '_blank', 'width=1200,height=850');
     if (!report) return toast.error('تعذر فتح نافذة التقرير. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.');
-    report.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${html(reportTitle)}</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{border:2px solid #0369a1;border-radius:16px;padding:16px;background:linear-gradient(135deg,#f0f9ff,#fff,#ecfdf5)}.kicker{font-size:11px;color:#0369a1;font-weight:bold}h1{font-size:24px;margin:6px 0}.subtitle{font-size:11px;color:#475569}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.metric{border:1px solid #cbd5e1;border-radius:10px;padding:10px;text-align:center;background:#fff}.metric small{display:block;color:#64748b}.metric b{display:block;font-size:22px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:${tableFontSize}px;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:6px;text-align:center;vertical-align:middle;word-break:break-word}th{background:#e2e8f0;white-space:nowrap}.right{text-align:right}.footer{display:flex;justify-content:space-between;margin-top:12px;font-size:9px;color:#64748b}</style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><h1>${html(reportTitle)}</h1><div class="subtitle">تم إنشاء التقرير من ${filteredVisits.length} زيارة وفق الفرز والتصفية الحالية${activeFilterCount ? ` (${activeFilterCount} معيار تصفية)` : ''}. الأعمدة المختارة: ${selectedColumnDefs.length} بالإضافة إلى عمود التسلسل.</div></div><div class="metrics"><div class="metric"><small>الزيارات في التقرير</small><b>${filteredVisits.length}</b></div><div class="metric"><small>المواقع</small><b>${reportSiteCount}</b></div><div class="metric"><small>المكتملة / المغلقة</small><b>${reportCompleted}</b></div><div class="metric"><small>الملاحظات المفتوحة</small><b>${reportOpenItems}</b></div><div class="metric"><small>العاجلة</small><b>${reportUrgentItems}</b></div><div class="metric"><small>المتأخرة</small><b>${reportOverdueItems}</b></div><div class="metric"><small>كتب ومطبوعات مخالفة مرصودة</small><b>${publicationTotals.observed}</b></div><div class="metric"><small>كتب ومطبوعات مخالفة مسحوبة</small><b>${publicationTotals.withdrawn}</b></div><div class="metric"><small>كتب ومطبوعات مخالفة متبقية</small><b>${publicationTotals.remaining}</b></div></div><table><thead><tr><th>م</th>${headerCells}</tr></thead><tbody>${rows || `<tr><td colspan="${selectedColumnDefs.length + 1}">لا توجد زيارات مطابقة</td></tr>`}</tbody></table><div class="footer"><span>منصة IAU Deeds — البرنامج الميداني</span><span>${html(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
+    report.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${html(reportTitle)}</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{border:2px solid #0369a1;border-radius:16px;padding:16px;background:linear-gradient(135deg,#f0f9ff,#fff,#ecfdf5)}.kicker{font-size:11px;color:#0369a1;font-weight:bold}h1{font-size:24px;margin:6px 0}.subtitle{font-size:11px;color:#475569}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.metric{border:1px solid #cbd5e1;border-radius:10px;padding:10px;text-align:center;background:#fff}.metric small{display:block;color:#64748b}.metric b{display:block;font-size:22px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:${tableFontSize}px;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:6px;text-align:center;vertical-align:middle;word-break:break-word}th{background:#e2e8f0;white-space:nowrap}.right{text-align:right}.footer{display:flex;justify-content:space-between;margin-top:12px;font-size:9px;color:#64748b}</style></head><body><div class="head"><div class="kicker">جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات الجامعية</div><h1>${html(reportTitle)}</h1><div class="subtitle">تم إنشاء التقرير من ${filteredVisits.length} زيارة وفق الفرز والتصفية الحالية${activeFilterCount ? ` (${activeFilterCount} معيار تصفية)` : ''}. الأعمدة المختارة: ${selectedColumnDefs.length} بالإضافة إلى عمود التسلسل.</div></div><div class="metrics"><div class="metric"><small>الزيارات في التقرير</small><b>${filteredVisits.length}</b></div><div class="metric"><small>المواقع</small><b>${reportSiteCount}</b></div><div class="metric"><small>المكتملة / المغلقة</small><b>${reportCompleted}</b></div><div class="metric"><small>الملاحظات المفتوحة</small><b>${reportOpenItems}</b></div><div class="metric"><small>العاجلة</small><b>${reportUrgentItems}</b></div><div class="metric"><small>المتأخرة</small><b>${reportOverdueItems}</b></div><div class="metric"><small>زيارات شملت مصلى النساء</small><b>${reportWomenVisits}</b></div><div class="metric"><small>ملاحظات مصلى النساء المفتوحة</small><b>${reportWomenOpenItems}</b></div><div class="metric"><small>كتب ومطبوعات مخالفة مرصودة</small><b>${publicationTotals.observed}</b></div><div class="metric"><small>كتب ومطبوعات مخالفة مسحوبة</small><b>${publicationTotals.withdrawn}</b></div><div class="metric"><small>كتب ومطبوعات مخالفة متبقية</small><b>${publicationTotals.remaining}</b></div></div><table><thead><tr><th>م</th>${headerCells}</tr></thead><tbody>${rows || `<tr><td colspan="${selectedColumnDefs.length + 1}">لا توجد زيارات مطابقة</td></tr>`}</tbody></table><div class="footer"><span>منصة IAU Deeds — البرنامج الميداني</span><span>${html(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</span></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
     report.document.close();
     setProgramPrintDialog(false);
   };
@@ -3012,6 +3024,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
           <div className="grid gap-3 rounded-2xl border bg-slate-50/70 p-4 sm:grid-cols-2 lg:grid-cols-3">
             <InfoBox label="المسجد أو المصلى" value={viewingVisit.site.name} />
             <InfoBox label="نوع الزيارة" value={visitTypeLabels[viewingVisit.visitType]} />
+            <InfoBox label="نطاق الزيارة" value={visitScopeLabels[viewingVisit.visitScope || 'whole_site'] || 'الموقع بالكامل'} />
             <InfoBox label="حالة الزيارة" value={visitStatusLabels[viewingVisit.workflowStatus]} />
             <InfoBox label="تاريخ الوصول" value={new Date(viewingVisit.visitDate).toLocaleString('ar-SA-u-ca-gregory')} />
             <InfoBox label="وقت المغادرة" value={viewingVisit.departureAt ? new Date(viewingVisit.departureAt).toLocaleString('ar-SA-u-ca-gregory') : '-'} />
