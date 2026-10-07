@@ -639,7 +639,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
                               size="sm"
                               className="bg-amber-700 text-white hover:bg-amber-800"
                               disabled={actingId === item.goal.id}
-                              onClick={() => void extendGoal(item.goal!)}
+                              onClick={() => openPendingDecision({ type: 'extend', itemId: item.id, goal: item.goal! })}
                             >
                               {actingId === item.goal.id ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" /> : <Clock3 className="ml-1 h-3.5 w-3.5" />}
                               تمديد 30 يومًا
@@ -654,7 +654,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
                               size="sm"
                               className="bg-rose-700 text-white hover:bg-rose-800"
                               disabled={actingId === item.goal.id}
-                              onClick={() => void activateFollowUp(item.goal!)}
+                              onClick={() => openPendingDecision({ type: 'activate_follow_up', itemId: item.id, goal: item.goal! })}
                             >
                               {actingId === item.goal.id ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="ml-1 h-3.5 w-3.5" />}
                               تفعيل خطة المتابعة
@@ -669,7 +669,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
                             size="sm"
                             className="bg-sky-700 text-white hover:bg-sky-800"
                             disabled={actingId === item.id}
-                            onClick={() => void createGoalFromSuggestion(item.suggestion!, item.id)}
+                            onClick={() => openPendingDecision({ type: 'create_suggestion', itemId: item.id, suggestion: item.suggestion! })}
                           >
                             {actingId === item.id ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" /> : <Target className="ml-1 h-3.5 w-3.5" />}
                             إنشاء مسودة هدف
@@ -737,12 +737,12 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
                 </div>
 
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-black text-slate-600">ملاحظة القرار</span>
+                  <span className="text-xs font-black text-slate-600">مبرر القرار / ملاحظة المراجعة</span>
                   <Textarea
                     value={reviewNote}
                     onChange={(event) => setReviewNote(event.target.value)}
                     rows={4}
-                    placeholder="اختياري عند الاعتماد، وإلزامي عند إعادة الإثبات للاستكمال..."
+                    placeholder="اكتب مبرر القرار الإداري؛ يُحفظ في سجل القرارات التنفيذية..."
                   />
                 </label>
               </div>
