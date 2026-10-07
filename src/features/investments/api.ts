@@ -1,6 +1,7 @@
 import { apiJson } from '../../lib/http';
 import type {
   GeometryApprovalQueueResponse,
+  InvestmentExecutiveDashboard,
   InvestmentArea,
   InvestmentAreaInput,
   InvestmentAttachmentSummary,
@@ -25,6 +26,11 @@ const buildQuery = (params: Record<string, unknown>) => {
 };
 
 export const investmentsApi = {
+  getExecutiveDashboard: () =>
+    apiJson<InvestmentExecutiveDashboard>(
+      '/api/investment-executive-dashboard'
+    ),
+
   getGeometryApprovalQueue: (params: {
     status?: 'ALL' | 'DRAFT' | 'REVIEWED' | 'APPROVED' | 'CHANGE_REQUESTED';
     entityType?: 'ALL' | 'investment_site' | 'investment_area';
