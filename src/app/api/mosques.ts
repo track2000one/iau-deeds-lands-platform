@@ -139,6 +139,56 @@ export type MosqueCompletionTaskAssignee = {
   assignmentSiteId?: string | null;
 };
 
+export type MosqueCompletionTaskAnalytics = {
+  month: string;
+  period: { from: string; toExclusive: string };
+  summary: {
+    created: number;
+    completed: number;
+    completionRate: number;
+    active: number;
+    overdue: number;
+    dueToday: number;
+    dueSoon: number;
+    unassigned: number;
+    completedWithDueDate: number;
+    onTimeCompleted: number;
+    onTimeRate: number | null;
+    avgCompletionHours: number | null;
+  };
+  byAssignee: Array<{
+    assigneeUserId?: string | null;
+    assigneeName: string;
+    created: number;
+    completed: number;
+    active: number;
+    overdue: number;
+    dueToday: number;
+    onTimeCompleted: number;
+    completedWithDueDate: number;
+    onTimeRate: number | null;
+    avgCompletionHours: number | null;
+  }>;
+  byMissingKey: Array<{
+    missingKey: string;
+    total: number;
+    created: number;
+    completed: number;
+    active: number;
+    overdue: number;
+  }>;
+  trend: Array<{
+    month: string;
+    created: number;
+    completed: number;
+    onTimeRate: number | null;
+  }>;
+  periodTasks: {
+    created: MosqueCompletionTask[];
+    completed: MosqueCompletionTask[];
+  };
+};
+
 export type MosqueFieldVisitImage = {
   url: string;
   fileId?: string | null;
@@ -776,6 +826,10 @@ createQuranRackMovement: (input: Record<string, unknown>) => apiJson<{ movement:
   assignments: () => apiJson<MosqueAssignment[]>('/api/mosques/assignments'),
   setAssignment: (userId: string, input: Record<string, unknown>) => apiJson<MosqueAssignment>(`/api/mosques/assignments/${userId}`, { method: 'PUT', body: JSON.stringify(input) }),
 
+  completionTaskAnalytics: (month?: string) => {
+    const suffix = month ? `?month=${encodeURIComponent(month)}` : '';
+    return apiJson<MosqueCompletionTaskAnalytics>(`/api/mosques/completion-tasks/analytics${suffix}`);
+  },
   completionTasks: (filters: { siteId?: string; status?: string } = {}) => {
     const query = new URLSearchParams();
     if (filters.siteId) query.set('siteId', filters.siteId);
