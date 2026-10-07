@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import {
+  Activity,
   AlertTriangle,
   CheckCircle2,
   ClipboardCheck,
@@ -122,6 +123,29 @@ const actionStatusLabel: Record<MosqueImprovementAction['status'], string> = {
   completed: 'مكتمل',
 };
 
+const sustainabilityLabel = (status?: string | null) => {
+  if (status === 'sustained') return 'مستدام';
+  if (status === 'needs_follow_up') return 'يحتاج متابعة';
+  if (status === 'regressed') return 'انتكاس';
+  if (status === 'monitoring') return 'قيد إثبات الاستدامة';
+  return 'بانتظار القياس';
+};
+
+const sustainabilityClass = (status?: string | null) => {
+  if (status === 'sustained') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+  if (status === 'needs_follow_up') return 'border-amber-200 bg-amber-50 text-amber-800';
+  if (status === 'regressed') return 'border-rose-200 bg-rose-50 text-rose-800';
+  if (status === 'monitoring') return 'border-sky-200 bg-sky-50 text-sky-800';
+  return 'border-slate-200 bg-slate-50 text-slate-600';
+};
+
+const sustainabilityCheckLabel = (status?: string | null) => {
+  if (status === 'sustained') return 'محقق';
+  if (status === 'needs_follow_up') return 'متابعة';
+  if (status === 'regressed') return 'انتكاس';
+  return 'غير مقاس';
+};
+
 const missingLabels: Record<string, string> = {
   identity: 'اسم الموقع',
   gender: 'فئة المصلى',
@@ -190,7 +214,9 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
   const [suggestions, setSuggestions] = useState<MosqueImprovementGoalSuggestions | null>(null);
   const [loading, setLoading] = useState(true);
   const [evaluating, setEvaluating] = useState(false);
+  const [sustainabilityEvaluating, setSustainabilityEvaluating] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | MosqueImprovementGoal['status']>('all');
+  const [sustainabilityFilter, setSustainabilityFilter] = useState<'all' | 'not_started' | 'monitoring' | 'sustained' | 'needs_follow_up' | 'regressed'>('all');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<MosqueImprovementGoal | null>(null);
@@ -249,6 +275,11 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       achieved: goals.filter((goal) => goal.status === 'achieved').length,
       evidenceReview: goals.filter((goal) => goal.status === 'evidence_review').length,
       closed: goals.filter((goal) => goal.status === 'closed').length,
+      sustainabilityWaiting: goals.filter((goal) => goal.status === 'closed' && (!goal.sustainabilityStatus || goal.sustainabilityStatus === 'not_started')).length,
+      sustainabilityMonitoring: goals.filter((goal) => goal.status === 'closed' && goal.sustainabilityStatus === 'monitoring').length,
+      sustainabilitySustained: goals.filter((goal) => goal.status === 'closed' && goal.sustainabilityStatus === 'sustained').length,
+      sustainabilityNeedsFollowUp: goals.filter((goal) => goal.status === 'closed' && goal.sustainabilityStatus === 'needs_follow_up').length,
+      sustainabilityRegressed: goals.filter((goal) => goal.status === 'closed' && goal.sustainabilityStatus === 'regressed').length,
       performanceProgress,
       actionProgress,
     };
@@ -262,6 +293,14 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
   const availableSuggestions = useMemo(
     () => (suggestions?.suggestions || []).filter((item) => !item.alreadyExists),
     [suggestions]
+  );
+
+  const closedGoals = useMemo(
+    () => goals.filter((goal) => goal.status === 'closed' && (
+      sustainabilityFilter === 'all'
+      || (goal.sustainabilityStatus || 'not_started') === sustainabilityFilter
+    )),
+    [goals, sustainabilityFilter]
   );
 
   const openNewGoal = (suggestion?: MosqueImprovementGoalSuggestion) => {
@@ -570,6 +609,19 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
     }
   };
 
+  const evaluateSustainability = async () => {
+    setSustainabilityEvaluating(true);
+    try {
+      await mosqueApi.evaluateImprovementGoalSustainability(year);
+      await load(year);
+      toast.success('تم تحديث قياس استدامة الأهداف المغلقة من النتائج الرسمية اللاحقة');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحديث قياس استدامة التحسين');
+    } finally {
+      setSustainabilityEvaluating(false);
+    }
+  };
+
   const exportPlan = () => {
     if (!goals.length) {
       toast.error('لا توجد أهداف لتصديرها');
@@ -603,6 +655,14 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       'مراجع الإثبات': goal.evidenceReviewedName || '',
       'تاريخ المراجعة': formatDate(goal.evidenceReviewedAt),
       'ملاحظة المراجعة': goal.evidenceReviewNote || '',
+      'حالة الاستدامة': sustainabilityLabel(goal.sustainabilityStatus),
+      'آخر قيمة بعد الإغلاق': formatMetric(goal.metricKey, goal.sustainabilityValue),
+      'آخر شهر متابعة': goal.sustainabilityMonth || '',
+      'أشهر المتابعة': goal.sustainabilityObservedMonths || 0,
+      'الأشهر المطلوبة لإثبات الاستدامة': goal.sustainabilityTargetMonths || 3,
+      'ملاحظة الاستدامة': goal.sustainabilityNote || '',
+      'تاريخ رصد الانتكاس': formatDate(goal.relapseDetectedAt),
+      'يوجد خطة متابعة تلقائية': goal.followUpGoalId ? 'نعم' : 'لا',
       'ملاحظات': goal.notes || '',
     }));
 
@@ -634,6 +694,22 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       }))
     );
 
+    const sustainabilityRows = goals.flatMap((goal) =>
+      (Array.isArray(goal.sustainabilityChecks) ? goal.sustainabilityChecks : []).map((check, index) => ({
+        'رقم الهدف': goal.goalNumber,
+        'الهدف': goal.title,
+        'المؤشر': metricLabel[goal.metricKey],
+        'م': index + 1,
+        'الشهر': check.month,
+        'القيمة': formatMetric(goal.metricKey, check.value),
+        'المستهدف': formatMetric(goal.metricKey, check.targetValue),
+        'التصنيف': sustainabilityCheckLabel(check.status),
+        'نسبة الاحتفاظ بالتحسن': check.retentionPercent == null ? '' : check.retentionPercent + '%',
+        'الملاحظة': check.note || '',
+        'تاريخ القياس': formatDate(check.evaluatedAt),
+      }))
+    );
+
     const summaryRows = [
       ['التقرير', 'خطة التحسين السنوية لمؤشرات بيانات المساجد والمصليات'],
       ['السنة', year],
@@ -645,6 +721,11 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       ['متحققة وتنتظر الإثبات', summary.achieved],
       ['إثباتات قيد المراجعة', summary.evidenceReview],
       ['مغلقة بعد اعتماد الإثبات', summary.closed],
+      ['استدامة مؤكدة', summary.sustainabilitySustained],
+      ['قيد إثبات الاستدامة', summary.sustainabilityMonitoring],
+      ['تحتاج متابعة بعد الإغلاق', summary.sustainabilityNeedsFollowUp],
+      ['انتكاس بعد الإغلاق', summary.sustainabilityRegressed],
+      ['بانتظار أول قياس استدامة', summary.sustainabilityWaiting],
       ['متوسط تقدم المؤشرات', summary.performanceProgress + '%'],
       ['متوسط تقدم الإجراءات', summary.actionProgress + '%'],
     ];
@@ -654,19 +735,22 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
     const goalsSheet = XLSX.utils.json_to_sheet(goalRows);
     const actionsSheet = XLSX.utils.json_to_sheet(actionRows);
     const evidenceSheet = XLSX.utils.json_to_sheet(evidenceRows);
+    const sustainabilitySheet = XLSX.utils.json_to_sheet(sustainabilityRows);
 
-    for (const sheet of [summarySheet, goalsSheet, actionsSheet, evidenceSheet]) {
+    for (const sheet of [summarySheet, goalsSheet, actionsSheet, evidenceSheet, sustainabilitySheet]) {
       (sheet as any)['!views'] = [{ RTL: true }];
     }
     (summarySheet as any)['!cols'] = [{ wch: 34 }, { wch: 28 }];
-    (goalsSheet as any)['!cols'] = Array.from({ length: 28 }, () => ({ wch: 22 }));
+    (goalsSheet as any)['!cols'] = Array.from({ length: 36 }, () => ({ wch: 22 }));
     (actionsSheet as any)['!cols'] = [{ wch: 18 }, { wch: 36 }, { wch: 6 }, { wch: 48 }, { wch: 18 }, { wch: 18 }, { wch: 36 }];
     (evidenceSheet as any)['!cols'] = [{ wch: 18 }, { wch: 36 }, { wch: 6 }, { wch: 14 }, { wch: 34 }, { wch: 24 }, { wch: 48 }, { wch: 18 }, { wch: 24 }, { wch: 18 }, { wch: 40 }];
+    (sustainabilitySheet as any)['!cols'] = [{ wch: 18 }, { wch: 40 }, { wch: 24 }, { wch: 6 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 24 }, { wch: 52 }, { wch: 18 }];
 
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'الملخص');
     XLSX.utils.book_append_sheet(workbook, goalsSheet, 'الأهداف');
     XLSX.utils.book_append_sheet(workbook, actionsSheet, 'الإجراءات التصحيحية');
     XLSX.utils.book_append_sheet(workbook, evidenceSheet, 'أدلة الإغلاق');
+    XLSX.utils.book_append_sheet(workbook, sustainabilitySheet, 'استدامة التحسين');
     XLSX.writeFile(workbook, `IAU_Mosques_Improvement_Plan_${year}.xlsx`);
   };
 
@@ -693,6 +777,10 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
                 <RefreshCw className={evaluating ? 'ml-2 h-4 w-4 animate-spin' : 'ml-2 h-4 w-4'} />
                 تحديث القياس
               </Button>
+              <Button variant="outline" className="border-sky-200 bg-sky-50 text-sky-800" onClick={evaluateSustainability} disabled={sustainabilityEvaluating || loading || summary.closed === 0}>
+                <Activity className={sustainabilityEvaluating ? 'ml-2 h-4 w-4 animate-pulse' : 'ml-2 h-4 w-4'} />
+                تحديث الاستدامة
+              </Button>
               <Button variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800" onClick={exportPlan} disabled={!goals.length}>
                 <FileSpreadsheet className="ml-2 h-4 w-4" />
                 تصدير الخطة
@@ -716,6 +804,104 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
             <SummaryMetric label="إثبات قيد المراجعة" value={summary.evidenceReview} icon={FileCheck2} />
             <SummaryMetric label="مغلقة ومعتمدة" value={summary.closed} icon={ShieldCheck} />
           </div>
+
+          {summary.closed > 0 && (
+            <div className="rounded-[24px] border border-sky-200 bg-gradient-to-l from-sky-50/70 via-white to-emerald-50/40 p-4">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-black text-[#0b4a3f]">
+                    <Activity className="h-4 w-4" />
+                    متابعة استدامة التحسين بعد الإغلاق
+                  </p>
+                  <p className="mt-1 max-w-4xl text-[11px] leading-6 text-slate-600">
+                    يراقب النظام نتائج KPI الرسمية بعد الإغلاق. الاستدامة تعتمد بعد 3 أشهر رسمية متتالية من استمرار تحقيق المستهدف؛
+                    الانخفاض المحدود يصنف «يحتاج متابعة»، وفقد أكثر من نصف التحسن المتحقق يصنف «انتكاس» ويُنشئ مسودة خطة متابعة تلقائيًا.
+                  </p>
+                </div>
+                <NativeSelect className="h-10 min-w-[190px] bg-white" value={sustainabilityFilter} onChange={(event) => setSustainabilityFilter(event.target.value as typeof sustainabilityFilter)}>
+                  <option value="all">جميع الأهداف المغلقة</option>
+                  <option value="not_started">بانتظار القياس</option>
+                  <option value="monitoring">قيد إثبات الاستدامة</option>
+                  <option value="sustained">مستدام</option>
+                  <option value="needs_follow_up">يحتاج متابعة</option>
+                  <option value="regressed">انتكاس</option>
+                </NativeSelect>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+                <SustainabilityMetric label="بانتظار القياس" value={summary.sustainabilityWaiting} tone="neutral" />
+                <SustainabilityMetric label="قيد الإثبات" value={summary.sustainabilityMonitoring} tone="info" />
+                <SustainabilityMetric label="مستدام" value={summary.sustainabilitySustained} tone="success" />
+                <SustainabilityMetric label="يحتاج متابعة" value={summary.sustainabilityNeedsFollowUp} tone="warning" />
+                <SustainabilityMetric label="انتكاس" value={summary.sustainabilityRegressed} tone="danger" />
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {closedGoals.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs font-bold text-slate-400">
+                    لا توجد أهداف مغلقة ضمن تصفية الاستدامة الحالية.
+                  </div>
+                ) : closedGoals.map((goal) => {
+                  const checks = Array.isArray(goal.sustainabilityChecks) ? goal.sustainabilityChecks : [];
+                  const followUp = goal.followUpGoalId ? goals.find((item) => item.id === goal.followUpGoalId) : null;
+                  return (
+                    <div key={goal.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className={sustainabilityClass(goal.sustainabilityStatus)}>{sustainabilityLabel(goal.sustainabilityStatus)}</Badge>
+                            <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800">{goal.goalNumber}</Badge>
+                            <span className="text-[10px] font-bold text-slate-400">أغلق في {formatDate(goal.closedAt)}</span>
+                          </div>
+                          <p className="mt-2 text-sm font-black text-slate-800">{goal.title}</p>
+                          <p className="mt-1 text-[10px] leading-5 text-slate-500">{goal.sustainabilityNote || 'بانتظار أول نتيجة رسمية بعد الإغلاق.'}</p>
+                        </div>
+                        <div className="grid min-w-[280px] grid-cols-3 gap-2 text-center">
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <p className="text-[9px] font-bold text-slate-400">آخر قيمة</p>
+                            <p className="mt-1 text-xs font-black text-[#0b4a3f]">{formatMetric(goal.metricKey, goal.sustainabilityValue)}</p>
+                          </div>
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <p className="text-[9px] font-bold text-slate-400">المستهدف</p>
+                            <p className="mt-1 text-xs font-black text-[#0b4a3f]">{formatMetric(goal.metricKey, goal.targetValue)}</p>
+                          </div>
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <p className="text-[9px] font-bold text-slate-400">أشهر القياس</p>
+                            <p className="mt-1 text-xs font-black text-[#0b4a3f]">{goal.sustainabilityObservedMonths || 0}/{goal.sustainabilityTargetMonths || 3}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {checks.length ? checks.map((check) => (
+                          <div key={check.id} className={`rounded-xl border px-3 py-2 ${sustainabilityClass(check.status === 'sustained' ? 'sustained' : check.status === 'needs_follow_up' ? 'needs_follow_up' : check.status === 'regressed' ? 'regressed' : 'not_started')}`}>
+                            <p className="text-[9px] font-black">{check.month}</p>
+                            <p className="mt-1 text-[10px] font-bold">{sustainabilityCheckLabel(check.status)} — {formatMetric(goal.metricKey, check.value)}</p>
+                            {check.retentionPercent != null && check.status !== 'sustained' && (
+                              <p className="mt-0.5 text-[9px] opacity-80">الاحتفاظ بالتحسن: {check.retentionPercent}%</p>
+                            )}
+                          </div>
+                        )) : (
+                          <span className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-[10px] font-bold text-slate-400">لا توجد أشهر رسمية لاحقة للإغلاق حتى الآن.</span>
+                        )}
+                      </div>
+
+                      {goal.sustainabilityStatus === 'regressed' && (
+                        <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+                          <p className="text-[11px] font-black text-rose-900">تم رصد انتكاس جوهري بعد الإغلاق.</p>
+                          <p className="mt-1 text-[10px] leading-5 text-rose-700">
+                            {followUp
+                              ? `أنشأ النظام تلقائيًا مسودة خطة متابعة رقم ${followUp.goalNumber} ويمكن مراجعتها وتفعيلها من سجل الأهداف أدناه.`
+                              : 'أنشأ النظام مسودة خطة متابعة تلقائيًا مرتبطة بهذا الهدف.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {availableSuggestions.length > 0 && (
             <div className="rounded-[24px] border border-amber-200 bg-amber-50/60 p-4">
@@ -910,6 +1096,25 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
                               عرض الإثبات السابق
                             </Button>
                           )}
+                        </div>
+                      </div>
+                    )}
+
+                    {goal.status === 'closed' && (
+                      <div className={`mt-3 rounded-2xl border p-3 ${sustainabilityClass(goal.sustainabilityStatus)}`}>
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="flex items-center gap-2 text-[11px] font-black">
+                              <Activity className="h-4 w-4" />
+                              استدامة التحسين: {sustainabilityLabel(goal.sustainabilityStatus)}
+                            </p>
+                            <p className="mt-1 text-[10px] leading-5 opacity-80">{goal.sustainabilityNote || 'بانتظار أول نتيجة KPI رسمية بعد الإغلاق.'}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-[10px] font-black">
+                            <span className="rounded-lg border border-current/20 bg-white/70 px-2 py-1">آخر قياس: {goal.sustainabilityMonth || '—'}</span>
+                            <span className="rounded-lg border border-current/20 bg-white/70 px-2 py-1">القيمة: {formatMetric(goal.metricKey, goal.sustainabilityValue)}</span>
+                            <span className="rounded-lg border border-current/20 bg-white/70 px-2 py-1">الأشهر: {goal.sustainabilityObservedMonths || 0}/{goal.sustainabilityTargetMonths || 3}</span>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1340,5 +1545,31 @@ const InfoBox = ({ label, value, icon: Icon }: { label: string; value: string; i
     <p className="mt-2 text-lg font-black text-[#0b4a3f]">{value}</p>
   </div>
 );
+
+const SustainabilityMetric = ({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+}) => {
+  const toneClass = tone === 'success'
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+    : tone === 'warning'
+      ? 'border-amber-200 bg-amber-50 text-amber-800'
+      : tone === 'danger'
+        ? 'border-rose-200 bg-rose-50 text-rose-800'
+        : tone === 'info'
+          ? 'border-sky-200 bg-sky-50 text-sky-800'
+          : 'border-slate-200 bg-slate-50 text-slate-700';
+  return (
+    <div className={`rounded-2xl border p-3 text-center ${toneClass}`}>
+      <p className="text-2xl font-black">{value}</p>
+      <p className="mt-1 text-[10px] font-black">{label}</p>
+    </div>
+  );
+};
 
 export default MosqueImprovementGoalsCenter;
