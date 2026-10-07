@@ -1171,6 +1171,72 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
                 </div>
               ) : analytics ? (
                 <>
+                  <div className="rounded-2xl border border-[#d9c9a5] bg-[#fffdf8] p-4">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-black text-[#0b4a3f]">إقفال واعتماد نتيجة KPI الشهرية</p>
+                          {kpiSnapshot ? (
+                            <Badge variant="outline" className={snapshotStatusClass[kpiSnapshot.status]}>
+                              {snapshotStatusLabel[kpiSnapshot.status]}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-slate-200 bg-white text-slate-600">نتيجة حية غير مقفلة</Badge>
+                          )}
+                        </div>
+                        <p className="mt-1 text-[11px] leading-6 text-slate-500">
+                          {kpiSnapshot && ['approved', 'archived'].includes(kpiSnapshot.status)
+                            ? 'المؤشرات المعروضة لهذا الشهر مأخوذة من اللقطة الرسمية الثابتة ولن تتأثر بتعديلات لاحقة على المهام.'
+                            : kpiSnapshot
+                              ? `تم التقاط النتيجة بتاريخ ${formatDate(kpiSnapshot.generatedAt)} ويمكن تحديثها ما دامت في حالة مسودة.`
+                              : 'احفظ لقطة شهرية لبدء دورة المراجعة والاعتماد. لا يمكن اعتماد الشهر الحالي قبل انتهائه.'}
+                        </p>
+                        {kpiSnapshot && (
+                          <div className="mt-2 flex flex-wrap gap-3 text-[10px] font-bold text-slate-500">
+                            <span>درجة اللقطة: {kpiSnapshot.kpiScore == null ? '—' : kpiSnapshot.kpiScore + '/100'}</span>
+                            <span>المعيار: {kpiSnapshot.standardCode}</span>
+                            {kpiSnapshot.approvedAt && <span>اعتمدت: {formatDate(kpiSnapshot.approvedAt)}</span>}
+                            {kpiSnapshot.approvedByName && <span>المعتمد: {kpiSnapshot.approvedByName}</span>}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {canManageKpiSnapshots && (!kpiSnapshot || kpiSnapshot.status === 'draft') && (
+                          <Button variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={generateKpiSnapshot} disabled={snapshotSaving}>
+                            <RefreshCw className={snapshotSaving ? 'ml-2 h-4 w-4 animate-spin' : 'ml-2 h-4 w-4'} />
+                            {kpiSnapshot ? 'تحديث المسودة' : 'حفظ لقطة الشهر'}
+                          </Button>
+                        )}
+                        {canManageKpiSnapshots && kpiSnapshot?.status === 'draft' && (
+                          <Button className="bg-amber-600 text-white hover:bg-amber-700" onClick={() => void transitionKpiSnapshot('review')} disabled={snapshotSaving}>
+                            إرسال للمراجعة
+                          </Button>
+                        )}
+                        {canManageKpiSnapshots && kpiSnapshot?.status === 'review' && (
+                          <>
+                            <Button variant="outline" className="border-slate-300 bg-white" onClick={() => void transitionKpiSnapshot('draft')} disabled={snapshotSaving}>
+                              إعادة للمسودة
+                            </Button>
+                            <Button
+                              className="bg-emerald-700 text-white hover:bg-emerald-800"
+                              onClick={() => void transitionKpiSnapshot('approved')}
+                              disabled={snapshotSaving || analyticsMonth >= riyadhDateKey().slice(0, 7)}
+                              title={analyticsMonth >= riyadhDateKey().slice(0, 7) ? 'لا يمكن اعتماد الشهر قبل انتهائه' : 'اعتماد وإقفال النتيجة'}
+                            >
+                              اعتماد وإقفال
+                            </Button>
+                          </>
+                        )}
+                        {canManageKpiSnapshots && kpiSnapshot?.status === 'approved' && (
+                          <Button variant="outline" className="border-violet-200 bg-violet-50 text-violet-800" onClick={() => void transitionKpiSnapshot('archived')} disabled={snapshotSaving}>
+                            أرشفة النتيجة
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
                     <PerformanceMetric label="تقييم KPI" value={kpiStatusLabel[analytics.unitKpi.status]} />
                     <PerformanceMetric label="مهام منجزة" value={analytics.summary.completed} />
