@@ -1706,9 +1706,9 @@ ${quranStockMovementForm.notes}` : ''}`
     if (key === 'cityDistrict') return cityDistrict;
     if (key === 'area') return site.area ?? '-';
     if (key === 'capacity') return site.capacity ?? '-';
-    if (key === 'womenPrayerArea') return ['mosque', 'jami'].includes(site.siteType) ? (site.hasWomenPrayerArea ? 'موجود' : 'غير مسجل') : '-';
+    if (key === 'womenPrayerArea') return ['mosque', 'jami'].includes(site.siteType) ? womenPrayerPresenceLabels[womenPrayerPresence(site)] : '-';
     if (key === 'womenCapacity') return site.hasWomenPrayerArea ? (site.womenPrayerArea?.capacity ?? '-') : '-';
-    if (key === 'womenStatus') return site.hasWomenPrayerArea ? womenPrayerAreaStatusLabel(site) : '-';
+    if (key === 'womenStatus') return site.hasWomenPrayerArea ? womenPrayerAreaStatusLabel(site) : womenPrayerPresenceLabels[womenPrayerPresence(site)];
     if (key === 'imam') return site.imamName || '-';
     if (key === 'muezzin') return site.muezzinName || '-';
     if (key === 'khateeb') return site.khateebName || '-';
@@ -1797,9 +1797,9 @@ ${quranStockMovementForm.notes}` : ''}`
       if (key === 'cityDistrict') return cityDistrict;
       if (key === 'area') return site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-';
       if (key === 'capacity') return site.capacity ? site.capacity.toLocaleString('ar-SA') : '-';
-      if (key === 'womenPrayerArea') return ['mosque', 'jami'].includes(site.siteType) ? (site.hasWomenPrayerArea ? 'موجود' : 'غير مسجل') : '-';
+      if (key === 'womenPrayerArea') return ['mosque', 'jami'].includes(site.siteType) ? womenPrayerPresenceLabels[womenPrayerPresence(site)] : '-';
       if (key === 'womenCapacity') return site.hasWomenPrayerArea && site.womenPrayerArea?.capacity ? Number(site.womenPrayerArea.capacity).toLocaleString('ar-SA') : '-';
-      if (key === 'womenStatus') return site.hasWomenPrayerArea ? womenPrayerAreaStatusLabel(site) : '-';
+      if (key === 'womenStatus') return site.hasWomenPrayerArea ? womenPrayerAreaStatusLabel(site) : womenPrayerPresenceLabels[womenPrayerPresence(site)];
       if (key === 'imam') return site.imamName || '-';
       if (key === 'muezzin') return site.muezzinName || '-';
       if (key === 'khateeb') return site.khateebName || '-';
@@ -2024,11 +2024,13 @@ ${quranStockMovementForm.notes}` : ''}`
         ['المساحة', site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'],
         ['الطاقة الاستيعابية', site.capacity ? site.capacity.toLocaleString('ar-SA') : '-'],
         ...(['mosque', 'jami'].includes(site.siteType) ? [
-          ['مصلى النساء', site.hasWomenPrayerArea ? 'موجود' : 'غير مسجل'],
-          ['حالة مصلى النساء', site.hasWomenPrayerArea ? womenPrayerAreaStatusLabel(site) : '-'],
+          ['حالة وجود مصلى النساء', womenPrayerPresenceLabels[womenPrayerPresence(site)]],
+          ['الحالة التشغيلية لمصلى النساء', site.hasWomenPrayerArea ? womenPrayerAreaStatusLabel(site) : '-'],
           ['سعة مصلى النساء', site.hasWomenPrayerArea && site.womenPrayerArea?.capacity ? Number(site.womenPrayerArea.capacity).toLocaleString('ar-SA') : '-'],
           ['الدور / المستوى لمصلى النساء', site.hasWomenPrayerArea ? (site.womenPrayerArea?.floor || '-') : '-'],
           ['موقع مصلى النساء', site.hasWomenPrayerArea ? (site.womenPrayerArea?.locationDescription || '-') : '-'],
+          ['تاريخ التحقق', site.womenPrayerArea?.verifiedAt ? new Date(site.womenPrayerArea.verifiedAt).toLocaleDateString('ar-SA-u-ca-gregory') : '-'],
+          ['ملاحظة / مرجع التحقق', site.womenPrayerArea?.verificationNotes || '-'],
         ] : []),
         ['الإمام', site.imamName || '-'],
         ['المؤذن', site.muezzinName || '-'],
