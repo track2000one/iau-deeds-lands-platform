@@ -243,6 +243,20 @@ export type MosqueCompletionKpiSnapshot = {
   archivedBy?: string | null;
   archivedByName?: string | null;
   archivedAt?: string | null;
+  automation?: {
+    status: 'success' | 'failed';
+    snapshotMonth?: string;
+    evaluatedGoals?: number;
+    newlyAchieved?: number;
+    newlyAtRisk?: number;
+    closedGoalsMonitored?: number;
+    sustainabilityChanged?: number;
+    sustained?: number;
+    needsFollowUp?: number;
+    regressed?: number;
+    followUpDraftsCreated?: number;
+    message?: string;
+  };
   createdAt: string;
   updatedAt: string;
 };
