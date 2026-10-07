@@ -1667,6 +1667,9 @@ ${quranStockMovementForm.notes}` : ''}`
     if (key === 'cityDistrict') return cityDistrict;
     if (key === 'area') return site.area ?? '-';
     if (key === 'capacity') return site.capacity ?? '-';
+    if (key === 'womenPrayerArea') return ['mosque', 'jami'].includes(site.siteType) ? (site.hasWomenPrayerArea ? 'موجود' : 'غير مسجل') : '-';
+    if (key === 'womenCapacity') return site.hasWomenPrayerArea ? (site.womenPrayerArea?.capacity ?? '-') : '-';
+    if (key === 'womenStatus') return site.hasWomenPrayerArea ? womenPrayerAreaStatusLabel(site) : '-';
     if (key === 'imam') return site.imamName || '-';
     if (key === 'muezzin') return site.muezzinName || '-';
     if (key === 'khateeb') return site.khateebName || '-';
@@ -1755,6 +1758,9 @@ ${quranStockMovementForm.notes}` : ''}`
       if (key === 'cityDistrict') return cityDistrict;
       if (key === 'area') return site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-';
       if (key === 'capacity') return site.capacity ? site.capacity.toLocaleString('ar-SA') : '-';
+      if (key === 'womenPrayerArea') return ['mosque', 'jami'].includes(site.siteType) ? (site.hasWomenPrayerArea ? 'موجود' : 'غير مسجل') : '-';
+      if (key === 'womenCapacity') return site.hasWomenPrayerArea && site.womenPrayerArea?.capacity ? Number(site.womenPrayerArea.capacity).toLocaleString('ar-SA') : '-';
+      if (key === 'womenStatus') return site.hasWomenPrayerArea ? womenPrayerAreaStatusLabel(site) : '-';
       if (key === 'imam') return site.imamName || '-';
       if (key === 'muezzin') return site.muezzinName || '-';
       if (key === 'khateeb') return site.khateebName || '-';
@@ -1774,6 +1780,9 @@ ${quranStockMovementForm.notes}` : ''}`
       cityDistrict: 1.5,
       area: 0.65,
       capacity: 0.75,
+      womenPrayerArea: 0.8,
+      womenCapacity: 0.8,
+      womenStatus: 0.95,
       imam: 1.05,
       muezzin: 1.05,
       khateeb: 1.05,
@@ -1820,7 +1829,7 @@ ${quranStockMovementForm.notes}` : ''}`
     const cellTextOverflow = sitePrintWrapMode === 'single' ? 'ellipsis' : 'clip';
     const cellPadding = selectedColumns.length >= 11 ? '0.62mm 0.42mm' : selectedColumns.length >= 8 ? '0.72mm 0.5mm' : '0.88mm 0.65mm';
 
-    const centerColumns = new Set<SitePrintColumnKey>(['type', 'building', 'area', 'capacity', 'contactPhone', 'coordinates', 'status']);
+    const centerColumns = new Set<SitePrintColumnKey>(['type', 'building', 'area', 'capacity', 'womenPrayerArea', 'womenCapacity', 'womenStatus', 'contactPhone', 'coordinates', 'status']);
     const tableHeader = selectedColumns.map((column) => `<th class="col-${column.key}">${escapeHtml(column.label)}</th>`).join('');
     const tableRows = rows.map((site, index) => {
       const cells = selectedColumns.map((column) => `<td class="col-${column.key}${column.key === 'name' ? ' name' : ''}${centerColumns.has(column.key) ? ' center' : ''}"${column.key === 'building' || column.key === 'coordinates' || column.key === 'contactPhone' ? ' dir="ltr"' : ''}>${display(columnValue(site, column.key))}</td>`).join('');
@@ -1834,6 +1843,9 @@ ${quranStockMovementForm.notes}` : ''}`
       siteFilterType !== 'all' ? `النوع: ${siteTypeLabels[siteFilterType] || siteFilterType}` : null,
       siteFilterType === 'prayer_room' && siteFilterPrayerRoomGender !== 'all'
         ? `فئة المصلى: ${prayerRoomGenderLabels[siteFilterPrayerRoomGender] || siteFilterPrayerRoomGender}`
+        : null,
+      siteFilterWomenPrayerArea !== 'all'
+        ? `مصلى النساء: ${siteFilterWomenPrayerArea === 'with' ? 'موجود' : 'غير مسجل'}`
         : null,
       siteFilterStatus !== 'all' ? `الحالة: ${siteStatusLabels[siteFilterStatus] || siteFilterStatus}` : null,
       `الفرز: ${sortLabels[siteSortBy] || siteSortBy} — ${siteSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}`,
