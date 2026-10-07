@@ -410,7 +410,8 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
     try {
       if (editingGoal) {
         const isSupervisor = role === 'supervisor';
-        const payload = isSupervisor
+        const closureStage = editingGoal.status === 'achieved';
+        const payload = isSupervisor || closureStage
           ? {
               notes: form.notes || null,
               correctiveActions: form.correctiveActions,
@@ -786,7 +787,10 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
             <div className="space-y-3">
               {visibleGoals.map((goal) => {
                 const actions = Array.isArray(goal.correctiveActions) ? goal.correctiveActions : [];
-                const canEditThis = canManage || (role === 'supervisor' && goal.ownerName === currentUsername);
+                const isOwner = role === 'supervisor' && goal.ownerName === currentUsername;
+                const canEditThis = (canManage || isOwner) && !['evidence_review', 'closed', 'cancelled'].includes(goal.status);
+                const canSubmitEvidence = canManage || isOwner;
+                const evidence = Array.isArray(goal.closureEvidence) ? goal.closureEvidence : [];
                 return (
                   <div key={goal.id} className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -806,10 +810,10 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        {canEditThis && !['closed', 'cancelled'].includes(goal.status) && (
+                        {canEditThis && (
                           <Button size="sm" variant="outline" className="border-slate-200 bg-white" onClick={() => openEditGoal(goal)}>
                             <Pencil className="ml-1 h-3.5 w-3.5" />
-                            {canManage ? 'إدارة الهدف' : 'تحديث الإجراءات'}
+                            {goal.status === 'achieved' ? 'استكمال الإجراءات' : canManage ? 'إدارة الهدف' : 'تحديث الإجراءات'}
                           </Button>
                         )}
                         {canManage && goal.status === 'draft' && (
@@ -822,9 +826,32 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
                             إلغاء
                           </Button>
                         )}
-                        {canManage && goal.status === 'achieved' && (
-                          <Button size="sm" className="bg-violet-700 text-white hover:bg-violet-800" onClick={() => void transitionGoal(goal, 'closed')}>
-                            إغلاق الهدف
+                        {goal.status === 'achieved' && canSubmitEvidence && (
+                          <Button
+                            size="sm"
+                            className="bg-emerald-700 text-white hover:bg-emerald-800"
+                            onClick={() => openEvidenceDialog(goal)}
+                            disabled={actions.length > 0 && goal.actionProgressPercent < 100}
+                            title={actions.length > 0 && goal.actionProgressPercent < 100 ? 'أكمل جميع الإجراءات التصحيحية أولًا' : undefined}
+                          >
+                            <Upload className="ml-1 h-3.5 w-3.5" />
+                            {goal.evidenceStatus === 'returned' ? 'إعادة رفع الإثبات' : 'رفع إثبات الإغلاق'}
+                          </Button>
+                        )}
+                        {goal.status === 'evidence_review' && (
+                          <Button
+                            size="sm"
+                            className={canManage ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-slate-700 text-white hover:bg-slate-800'}
+                            onClick={() => openReviewDialog(goal)}
+                          >
+                            <FileCheck2 className="ml-1 h-3.5 w-3.5" />
+                            {canManage ? 'مراجعة الإثبات' : 'عرض الإثبات'}
+                          </Button>
+                        )}
+                        {goal.status === 'closed' && (
+                          <Button size="sm" variant="outline" className="border-violet-200 bg-violet-50 text-violet-800" onClick={() => openReviewDialog(goal)}>
+                            <ShieldCheck className="ml-1 h-3.5 w-3.5" />
+                            ملف الإغلاق
                           </Button>
                         )}
                       </div>
@@ -858,6 +885,34 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
                         <p className="mt-2 text-[11px] font-bold leading-5 text-slate-600">{goal.measurementNote || 'لم يتم القياس من نتيجة رسمية بعد.'}</p>
                       </div>
                     </div>
+
+                    {['achieved', 'evidence_review', 'closed'].includes(goal.status) && (
+                      <div className={`mt-3 rounded-2xl border p-3 ${goal.status === 'closed' ? 'border-violet-200 bg-violet-50/50' : goal.status === 'evidence_review' ? 'border-amber-200 bg-amber-50/50' : 'border-emerald-200 bg-emerald-50/40'}`}>
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="flex items-center gap-2 text-[11px] font-black text-slate-700">
+                              <FileCheck2 className="h-4 w-4" />
+                              حوكمة إثبات الإغلاق
+                            </p>
+                            <p className="mt-1 text-[10px] leading-5 text-slate-500">
+                              {goal.status === 'closed'
+                                ? `اعتمد الإغلاق بواسطة ${goal.evidenceReviewedName || 'رئيس الوحدة'} بتاريخ ${formatDate(goal.evidenceReviewedAt || goal.closedAt)}.`
+                                : goal.status === 'evidence_review'
+                                  ? `تم رفع ${evidence.length} مرفق/مرفقات بواسطة ${goal.evidenceSubmittedName || 'المسؤول'} بتاريخ ${formatDate(goal.evidenceSubmittedAt)} وهي بانتظار قرار رئيس الوحدة.`
+                                  : goal.evidenceStatus === 'returned'
+                                    ? `أعيد الإثبات للاستكمال: ${goal.evidenceReviewNote || 'يرجى استكمال متطلبات الإثبات'}`
+                                    : 'تحقق المستهدف رقميًا، ولا يكتمل الإغلاق الإداري قبل رفع واعتماد أدلة التنفيذ.'}
+                            </p>
+                          </div>
+                          {evidence.length > 0 && goal.status === 'achieved' && (
+                            <Button size="sm" variant="outline" className="shrink-0 border-slate-200 bg-white" onClick={() => openReviewDialog(goal)}>
+                              <FileText className="ml-1 h-3.5 w-3.5" />
+                              عرض الإثبات السابق
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {actions.length > 0 && (
                       <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
