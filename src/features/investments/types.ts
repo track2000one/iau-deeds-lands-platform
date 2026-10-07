@@ -276,6 +276,13 @@ export interface InvestmentExecutiveAreaSummary {
   blockerCount: number;
   completionPercent: number;
   opportunityCandidate: boolean;
+  activeOpportunity?: {
+    id: string;
+    opportunityNumber: string;
+    status: InvestmentOpportunityStatus;
+    estimatedValue?: number | string | null;
+  } | null;
+  availableForOpportunityCreation?: boolean;
   updatedAt: string;
 }
 
@@ -323,6 +330,9 @@ export interface InvestmentExecutiveDashboard {
     availableAndReadyReferenceArea: number;
     opportunityCandidateCount: number;
     opportunityCandidateArea: number;
+    activeOpportunityCount: number;
+    investedOpportunityCount: number;
+    activeOpportunityEstimatedValue: number;
     blockedAreaCount: number;
     deedLinkedSiteCount: number;
     siteBoundaryCount: number;
