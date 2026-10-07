@@ -1105,7 +1105,7 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
               ) : analytics ? (
                 <>
                   <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-                    <PerformanceMetric label="مهام أنشئت" value={analytics.summary.created} />
+                    <PerformanceMetric label="تقييم KPI" value={kpiStatusLabel[analytics.unitKpi.status]} />
                     <PerformanceMetric label="مهام منجزة" value={analytics.summary.completed} />
                     <PerformanceMetric label="معدل الإنجاز" value={analytics.summary.completionRate} suffix="%" />
                     <PerformanceMetric label="الالتزام بالموعد" value={analytics.summary.onTimeRate == null ? '—' : analytics.summary.onTimeRate} suffix={analytics.summary.onTimeRate == null ? '' : '%'} />
