@@ -636,7 +636,7 @@ export type MosqueDashboard = {
   managedSiteIds?: string[];
 };
 
-export type PublicMosqueSite = Pick<MosqueSite, 'publicToken' | 'name' | 'siteType' | 'prayerRoomGender' | 'city' | 'district' | 'campusLocation' | 'area' | 'capacity' | 'latitude' | 'longitude' | 'mapUrl' | 'status'>;
+export type PublicMosqueSite = Pick<MosqueSite, 'publicToken' | 'name' | 'siteType' | 'prayerRoomGender' | 'hasWomenPrayerArea' | 'womenPrayerArea' | 'city' | 'district' | 'campusLocation' | 'area' | 'capacity' | 'latitude' | 'longitude' | 'mapUrl' | 'status'>;
 
 const publicJson = async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
   const base = getApiBaseUrl();
