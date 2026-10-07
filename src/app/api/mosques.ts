@@ -255,6 +255,15 @@ export type MosqueImprovementAction = {
   note?: string | null;
 };
 
+export type MosqueImprovementEvidenceItem = {
+  url: string;
+  fileId?: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  kind: 'image' | 'document';
+  submittedAt?: string | null;
+};
+
 export type MosqueImprovementGoal = {
   id: string;
   goalNumber: string;
@@ -274,7 +283,7 @@ export type MosqueImprovementGoal = {
   currentMonth?: string | null;
   progressPercent: number;
   actionProgressPercent: number;
-  status: 'draft' | 'active' | 'at_risk' | 'achieved' | 'closed' | 'cancelled';
+  status: 'draft' | 'active' | 'at_risk' | 'achieved' | 'evidence_review' | 'closed' | 'cancelled';
   ownerUserId?: string | null;
   ownerName?: string | null;
   dueDate?: string | null;
@@ -282,6 +291,16 @@ export type MosqueImprovementGoal = {
   notes?: string | null;
   measurementNote?: string | null;
   achievedAt?: string | null;
+  closureSummary?: string | null;
+  closureEvidence?: MosqueImprovementEvidenceItem[] | null;
+  evidenceStatus?: 'not_submitted' | 'submitted' | 'returned' | 'approved' | string;
+  evidenceSubmittedBy?: string | null;
+  evidenceSubmittedName?: string | null;
+  evidenceSubmittedAt?: string | null;
+  evidenceReviewedBy?: string | null;
+  evidenceReviewedName?: string | null;
+  evidenceReviewedAt?: string | null;
+  evidenceReviewNote?: string | null;
   closedAt?: string | null;
   lastEvaluatedAt?: string | null;
   createdBy?: string | null;
@@ -991,6 +1010,16 @@ createQuranRackMovement: (input: Record<string, unknown>) => apiJson<{ movement:
     apiJson<MosqueImprovementGoal>('/api/mosques/improvement-goals', { method: 'POST', body: JSON.stringify(input) }),
   updateImprovementGoal: (id: string, input: Record<string, unknown>) =>
     apiJson<MosqueImprovementGoal>(`/api/mosques/improvement-goals/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  submitImprovementGoalEvidence: (id: string, input: { summary: string; evidence: MosqueImprovementEvidenceItem[] }) =>
+    apiJson<MosqueImprovementGoal>(`/api/mosques/improvement-goals/${id}/evidence`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  reviewImprovementGoalEvidence: (id: string, decision: 'approve' | 'return', note?: string) =>
+    apiJson<MosqueImprovementGoal>(`/api/mosques/improvement-goals/${id}/evidence-review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ decision, note: note || null }),
+    }),
   evaluateImprovementGoals: (year?: number) =>
     apiJson<MosqueImprovementGoal[]>('/api/mosques/improvement-goals/evaluate', {
       method: 'POST',
