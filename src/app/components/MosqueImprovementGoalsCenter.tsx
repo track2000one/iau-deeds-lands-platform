@@ -505,7 +505,7 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       }))
     );
 
-    const summary = [
+    const summaryRows = [
       ['التقرير', 'خطة التحسين السنوية لمؤشرات بيانات المساجد والمصليات'],
       ['السنة', year],
       ['تاريخ الاستخراج', new Date().toLocaleString('ar-SA')],
@@ -519,7 +519,7 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
     ];
 
     const workbook = XLSX.utils.book_new();
-    const summarySheet = XLSX.utils.aoa_to_sheet(summary);
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
     const goalsSheet = XLSX.utils.json_to_sheet(goalRows);
     const actionsSheet = XLSX.utils.json_to_sheet(actionRows);
 
