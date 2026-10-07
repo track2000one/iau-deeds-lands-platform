@@ -2,6 +2,7 @@ import { apiJson } from '../../lib/http';
 import type {
   InvestmentArea,
   InvestmentAreaInput,
+  InvestmentAttachmentSummary,
   InvestmentAreaQuery,
   InvestmentDeedOption,
   InvestmentSite,
@@ -23,6 +24,52 @@ const buildQuery = (params: Record<string, unknown>) => {
 };
 
 export const investmentsApi = {
+  getGeometryAttachments: (
+    entityType: 'investment_site' | 'investment_area',
+    entityId: string
+  ) =>
+    apiJson<InvestmentAttachmentSummary[]>(
+      `/api/attachments/${entityType}/${entityId}`
+    ),
+
+  createGeometryAttachment: (data: {
+    entityType: 'investment_site' | 'investment_area';
+    entityId: string;
+    title: string;
+    driveUrl: string;
+    notes?: string | null;
+  }) =>
+    apiJson<InvestmentAttachmentSummary>('/api/attachments', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...data,
+        attachmentType: 'survey_document',
+      }),
+    }),
+
+  runGeometryWorkflow: <T>(
+    entityType: 'investment_site' | 'investment_area',
+    entityId: string,
+    data: {
+      action: 'REVIEW' | 'APPROVE' | 'REQUEST_CHANGE';
+      note?: string | null;
+      referenceAttachmentId?: string | null;
+    }
+  ) => {
+    const resource =
+      entityType === 'investment_site'
+        ? 'investment-sites'
+        : 'investment-areas';
+
+    return apiJson<T>(
+      `/api/${resource}/${entityId}/geometry-workflow`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
   getSites: (params: { search?: string; page?: number; limit?: number } = {}) =>
     apiJson<PaginatedResponse<InvestmentSite>>(
       `/api/investment-sites${buildQuery(params)}`
