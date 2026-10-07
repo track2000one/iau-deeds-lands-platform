@@ -777,6 +777,10 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
                 <RefreshCw className={evaluating ? 'ml-2 h-4 w-4 animate-spin' : 'ml-2 h-4 w-4'} />
                 تحديث القياس
               </Button>
+              <Button variant="outline" className="border-sky-200 bg-sky-50 text-sky-800" onClick={evaluateSustainability} disabled={sustainabilityEvaluating || loading || summary.closed === 0}>
+                <Activity className={sustainabilityEvaluating ? 'ml-2 h-4 w-4 animate-pulse' : 'ml-2 h-4 w-4'} />
+                تحديث الاستدامة
+              </Button>
               <Button variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800" onClick={exportPlan} disabled={!goals.length}>
                 <FileSpreadsheet className="ml-2 h-4 w-4" />
                 تصدير الخطة
@@ -800,6 +804,104 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
             <SummaryMetric label="إثبات قيد المراجعة" value={summary.evidenceReview} icon={FileCheck2} />
             <SummaryMetric label="مغلقة ومعتمدة" value={summary.closed} icon={ShieldCheck} />
           </div>
+
+          {summary.closed > 0 && (
+            <div className="rounded-[24px] border border-sky-200 bg-gradient-to-l from-sky-50/70 via-white to-emerald-50/40 p-4">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-black text-[#0b4a3f]">
+                    <Activity className="h-4 w-4" />
+                    متابعة استدامة التحسين بعد الإغلاق
+                  </p>
+                  <p className="mt-1 max-w-4xl text-[11px] leading-6 text-slate-600">
+                    يراقب النظام نتائج KPI الرسمية بعد الإغلاق. الاستدامة تعتمد بعد 3 أشهر رسمية متتالية من استمرار تحقيق المستهدف؛
+                    الانخفاض المحدود يصنف «يحتاج متابعة»، وفقد أكثر من نصف التحسن المتحقق يصنف «انتكاس» ويُنشئ مسودة خطة متابعة تلقائيًا.
+                  </p>
+                </div>
+                <NativeSelect className="h-10 min-w-[190px] bg-white" value={sustainabilityFilter} onChange={(event) => setSustainabilityFilter(event.target.value as typeof sustainabilityFilter)}>
+                  <option value="all">جميع الأهداف المغلقة</option>
+                  <option value="not_started">بانتظار القياس</option>
+                  <option value="monitoring">قيد إثبات الاستدامة</option>
+                  <option value="sustained">مستدام</option>
+                  <option value="needs_follow_up">يحتاج متابعة</option>
+                  <option value="regressed">انتكاس</option>
+                </NativeSelect>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+                <SustainabilityMetric label="بانتظار القياس" value={summary.sustainabilityWaiting} tone="neutral" />
+                <SustainabilityMetric label="قيد الإثبات" value={summary.sustainabilityMonitoring} tone="info" />
+                <SustainabilityMetric label="مستدام" value={summary.sustainabilitySustained} tone="success" />
+                <SustainabilityMetric label="يحتاج متابعة" value={summary.sustainabilityNeedsFollowUp} tone="warning" />
+                <SustainabilityMetric label="انتكاس" value={summary.sustainabilityRegressed} tone="danger" />
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {closedGoals.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs font-bold text-slate-400">
+                    لا توجد أهداف مغلقة ضمن تصفية الاستدامة الحالية.
+                  </div>
+                ) : closedGoals.map((goal) => {
+                  const checks = Array.isArray(goal.sustainabilityChecks) ? goal.sustainabilityChecks : [];
+                  const followUp = goal.followUpGoalId ? goals.find((item) => item.id === goal.followUpGoalId) : null;
+                  return (
+                    <div key={goal.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className={sustainabilityClass(goal.sustainabilityStatus)}>{sustainabilityLabel(goal.sustainabilityStatus)}</Badge>
+                            <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800">{goal.goalNumber}</Badge>
+                            <span className="text-[10px] font-bold text-slate-400">أغلق في {formatDate(goal.closedAt)}</span>
+                          </div>
+                          <p className="mt-2 text-sm font-black text-slate-800">{goal.title}</p>
+                          <p className="mt-1 text-[10px] leading-5 text-slate-500">{goal.sustainabilityNote || 'بانتظار أول نتيجة رسمية بعد الإغلاق.'}</p>
+                        </div>
+                        <div className="grid min-w-[280px] grid-cols-3 gap-2 text-center">
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <p className="text-[9px] font-bold text-slate-400">آخر قيمة</p>
+                            <p className="mt-1 text-xs font-black text-[#0b4a3f]">{formatMetric(goal.metricKey, goal.sustainabilityValue)}</p>
+                          </div>
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <p className="text-[9px] font-bold text-slate-400">المستهدف</p>
+                            <p className="mt-1 text-xs font-black text-[#0b4a3f]">{formatMetric(goal.metricKey, goal.targetValue)}</p>
+                          </div>
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <p className="text-[9px] font-bold text-slate-400">أشهر القياس</p>
+                            <p className="mt-1 text-xs font-black text-[#0b4a3f]">{goal.sustainabilityObservedMonths || 0}/{goal.sustainabilityTargetMonths || 3}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {checks.length ? checks.map((check) => (
+                          <div key={check.id} className={`rounded-xl border px-3 py-2 ${sustainabilityClass(check.status === 'sustained' ? 'sustained' : check.status === 'needs_follow_up' ? 'needs_follow_up' : check.status === 'regressed' ? 'regressed' : 'not_started')}`}>
+                            <p className="text-[9px] font-black">{check.month}</p>
+                            <p className="mt-1 text-[10px] font-bold">{sustainabilityCheckLabel(check.status)} — {formatMetric(goal.metricKey, check.value)}</p>
+                            {check.retentionPercent != null && check.status !== 'sustained' && (
+                              <p className="mt-0.5 text-[9px] opacity-80">الاحتفاظ بالتحسن: {check.retentionPercent}%</p>
+                            )}
+                          </div>
+                        )) : (
+                          <span className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-[10px] font-bold text-slate-400">لا توجد أشهر رسمية لاحقة للإغلاق حتى الآن.</span>
+                        )}
+                      </div>
+
+                      {goal.sustainabilityStatus === 'regressed' && (
+                        <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+                          <p className="text-[11px] font-black text-rose-900">تم رصد انتكاس جوهري بعد الإغلاق.</p>
+                          <p className="mt-1 text-[10px] leading-5 text-rose-700">
+                            {followUp
+                              ? `أنشأ النظام تلقائيًا مسودة خطة متابعة رقم ${followUp.goalNumber} ويمكن مراجعتها وتفعيلها من سجل الأهداف أدناه.`
+                              : 'أنشأ النظام مسودة خطة متابعة تلقائيًا مرتبطة بهذا الهدف.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {availableSuggestions.length > 0 && (
             <div className="rounded-[24px] border border-amber-200 bg-amber-50/60 p-4">
