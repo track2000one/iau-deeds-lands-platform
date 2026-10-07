@@ -350,45 +350,55 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
     sustained: queue.filter((item) => item.kind === 'sustained').length,
   }), [queue]);
 
-  const extendGoal = async (goal: MosqueImprovementGoal) => {
-    if (!window.confirm(`تمديد موعد الهدف ${goal.goalNumber} لمدة 30 يومًا؟`)) return;
+  const extendGoal = async (goal: MosqueImprovementGoal, reason: string) => {
     setActingId(goal.id);
     try {
-      await mosqueApi.updateImprovementGoal(goal.id, { dueDate: addDaysDateInput(goal.dueDate, 30) });
-      toast.success('تم تمديد موعد الهدف 30 يومًا وإعادة تقييم حالته');
-      await load();
+      await mosqueApi.updateImprovementGoal(goal.id, {
+        dueDate: addDaysDateInput(goal.dueDate, 30),
+        decisionReason: reason,
+      });
+      toast.success('تم تمديد موعد الهدف 30 يومًا وتوثيق القرار في السجل');
+      await Promise.all([load(), loadDecisionLog()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تمديد موعد الهدف');
+      throw error;
     } finally {
       setActingId(null);
     }
   };
 
-  const activateFollowUp = async (goal: MosqueImprovementGoal) => {
+  const activateFollowUp = async (goal: MosqueImprovementGoal, reason: string) => {
     const followUp = goal.followUpGoalId ? goals.find((item) => item.id === goal.followUpGoalId) : null;
     if (!followUp) {
       toast.error('لم يتم العثور على مسودة المتابعة المرتبطة');
-      return;
+      throw new Error('لم يتم العثور على مسودة المتابعة المرتبطة');
     }
     if (followUp.status !== 'draft') {
       toast.info('خطة المتابعة مرتبطة ومفعلة بالفعل');
       return;
     }
-    if (!window.confirm(`تفعيل مسودة المتابعة ${followUp.goalNumber} والبدء في تنفيذها؟`)) return;
 
     setActingId(goal.id);
     try {
-      await mosqueApi.updateImprovementGoal(followUp.id, { status: 'active' });
-      toast.success('تم تفعيل خطة المتابعة المرتبطة بالانتكاس');
-      await load();
+      await mosqueApi.updateImprovementGoal(followUp.id, {
+        status: 'active',
+        decisionReason: reason,
+      });
+      toast.success('تم تفعيل خطة المتابعة وتوثيق القرار في السجل');
+      await Promise.all([load(), loadDecisionLog()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تفعيل خطة المتابعة');
+      throw error;
     } finally {
       setActingId(null);
     }
   };
 
-  const createGoalFromSuggestion = async (suggestion: MosqueImprovementGoalSuggestion, itemId: string) => {
+  const createGoalFromSuggestion = async (
+    suggestion: MosqueImprovementGoalSuggestion,
+    itemId: string,
+    reason: string
+  ) => {
     setActingId(itemId);
     try {
       const dueDate = addDaysDateInput(null, 90);
@@ -408,6 +418,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
         ownerUserId: null,
         dueDate,
         status: 'draft',
+        decisionReason: reason,
         correctiveActions: [{
           id: crypto.randomUUID(),
           title: 'تحليل السبب الجذري واعتماد الإجراء التصحيحي المناسب',
@@ -417,12 +428,49 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
         }],
         notes: 'مسودة هدف أنشئت من لوحة القرارات التنفيذية بناءً على آخر نتيجة KPI رسمية.',
       });
-      toast.success('تم إنشاء مسودة هدف تحسين، ويمكن إسنادها وتفعيلها من خطة التحسين');
-      await load();
+      toast.success('تم إنشاء مسودة هدف التحسين وتوثيق القرار في السجل');
+      await Promise.all([load(), loadDecisionLog()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر إنشاء مسودة هدف التحسين');
+      throw error;
     } finally {
       setActingId(null);
+    }
+  };
+
+  const openPendingDecision = (action: PendingExecutiveAction) => {
+    setPendingAction(action);
+    setDecisionReason(
+      action.type === 'extend'
+        ? 'منح مهلة إضافية لاستكمال الإجراءات التصحيحية ومعالجة أسباب التعثر.'
+        : action.type === 'activate_follow_up'
+          ? 'تفعيل خطة المتابعة لمعالجة التراجع الجوهري الذي ظهر بعد إغلاق الهدف.'
+          : 'اعتماد التوصية المبنية على آخر نتيجة KPI وتحويلها إلى مسودة هدف تحسين قابلة للمتابعة.'
+    );
+  };
+
+  const executePendingDecision = async () => {
+    if (!pendingAction) return;
+    if (decisionReason.trim().length < 3) {
+      toast.error('مبرر القرار مطلوب لتوثيقه في السجل التنفيذي');
+      return;
+    }
+
+    setDecisionSaving(true);
+    try {
+      if (pendingAction.type === 'extend') {
+        await extendGoal(pendingAction.goal, decisionReason.trim());
+      } else if (pendingAction.type === 'activate_follow_up') {
+        await activateFollowUp(pendingAction.goal, decisionReason.trim());
+      } else {
+        await createGoalFromSuggestion(pendingAction.suggestion, pendingAction.itemId, decisionReason.trim());
+      }
+      setPendingAction(null);
+      setDecisionReason('');
+    } catch {
+      // The action handler already shows a detailed error.
+    } finally {
+      setDecisionSaving(false);
     }
   };
 
@@ -433,18 +481,23 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
 
   const reviewEvidence = async (decision: 'approve' | 'return') => {
     if (!reviewGoal) return;
-    if (decision === 'return' && !reviewNote.trim()) {
-      toast.error('اكتب ملاحظة توضح متطلبات استكمال الإثبات');
+    if (reviewNote.trim().length < 3) {
+      toast.error('مبرر القرار مطلوب لحفظه في سجل القرارات التنفيذية');
       return;
     }
     if (decision === 'approve' && !window.confirm('اعتماد الأدلة وإغلاق الهدف نهائيًا؟')) return;
 
     setReviewSaving(true);
     try {
-      await mosqueApi.reviewImprovementGoalEvidence(reviewGoal.id, decision, reviewNote.trim() || undefined);
-      toast.success(decision === 'approve' ? 'تم اعتماد الأدلة وإغلاق الهدف' : 'تمت إعادة الإثبات للاستكمال');
+      await mosqueApi.reviewImprovementGoalEvidence(
+        reviewGoal.id,
+        decision,
+        reviewNote.trim(),
+        reviewNote.trim()
+      );
+      toast.success(decision === 'approve' ? 'تم اعتماد الأدلة وإغلاق الهدف وتوثيق القرار' : 'تمت إعادة الإثبات للاستكمال وتوثيق القرار');
       setReviewGoal(null);
-      await load();
+      await Promise.all([load(), loadDecisionLog()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تنفيذ قرار مراجعة الإثبات');
     } finally {
