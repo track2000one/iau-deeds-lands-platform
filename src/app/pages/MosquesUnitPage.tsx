@@ -689,6 +689,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [showBuildingMap, setShowBuildingMap] = useState(false);
   const [locatingBuilding, setLocatingBuilding] = useState(false);
   const [siteDialog, setSiteDialog] = useState(false);
+  const [siteEditFocusKey, setSiteEditFocusKey] = useState<string | null>(null);
   const [editingSite, setEditingSite] = useState<MosqueSite | null>(null);
   const [siteForm, setSiteForm] = useState<any>(emptySite);
   const [siteMediaKind, setSiteMediaKind] = useState<'site_image' | 'mosque_image' | 'document'>('mosque_image');
@@ -2312,7 +2313,8 @@ ${quranStockMovementForm.notes}` : ''}`
     }
   };
 
-  const openSiteDialog = (site?: MosqueSite) => {
+  const openSiteDialog = (site?: MosqueSite, focusKey?: string | null) => {
+    setSiteEditFocusKey(focusKey || null);
     setEditingSite(site || null);
     setShowSiteMap(false);
     setSiteMediaKind('mosque_image');
@@ -2342,6 +2344,21 @@ ${quranStockMovementForm.notes}` : ''}`
     } : emptySite);
     setSiteDialog(true);
   };
+
+  useEffect(() => {
+    if (!siteDialog || !siteEditFocusKey) return;
+    const timer = window.setTimeout(() => {
+      const target = document.querySelector(`[data-completeness-target="${siteEditFocusKey}"]`) as HTMLElement | null;
+      if (!target) return;
+      const highlight = ['ring-2', 'ring-amber-400', 'ring-offset-2'];
+      target.classList.add(...highlight);
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const control = target.querySelector('input:not([readonly]), select, textarea, button') as HTMLElement | null;
+      control?.focus({ preventScroll: true });
+      window.setTimeout(() => target.classList.remove(...highlight), 2200);
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [siteDialog, siteEditFocusKey]);
 
   const sitePickerCoordinates = useMemo(() => {
     const latitude = Number(siteForm.latitude);
@@ -3540,7 +3557,9 @@ ${quranStockMovementForm.notes}` : ''}`
         {['head', 'supervisor'].includes(role) && <TabsContent value="data-completeness" className="space-y-4">
           <MosqueDataCompletenessCenter
             sites={sites}
+            canEdit={canEdit}
             onOpenSite={(site) => { setActiveTab('sites'); setPreviewSite(site); }}
+            onFixMissing={(site, target) => openSiteDialog(site, target)}
             onGoToVisits={() => setActiveTab('field-visits')}
           />
         </TabsContent>}
@@ -4479,7 +4498,7 @@ ${quranStockMovementForm.notes}` : ''}`
         </DialogContent>
       </Dialog>
 
-      <Dialog open={siteDialog} onOpenChange={setSiteDialog}>
+      <Dialog open={siteDialog} onOpenChange={(open) => { setSiteDialog(open); if (!open) setSiteEditFocusKey(null); }}>
         <DialogContent className="grid h-[94dvh] max-h-[94dvh] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden p-0 gap-0 border-sky-200/80 bg-gradient-to-br from-white via-sky-50/40 to-violet-50/30 sm:max-w-[1180px]" dir="rtl">
           <DialogHeader className="border-b border-sky-100/90 bg-gradient-to-l from-sky-50 via-white to-violet-50/70 p-5 text-right md:p-6">
             <div className="flex items-start gap-3">
@@ -4494,7 +4513,7 @@ ${quranStockMovementForm.notes}` : ''}`
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
               <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-violet-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><FileText className="h-5 w-5" />المعلومات الأساسية</CardTitle><CardDescription>تعريف المسجد أو الجامع أو المصلى وحالته وموقعه الإداري داخل الجامعة.</CardDescription></CardHeader>
               <CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2 lg:grid-cols-3">
-                <Field label="اسم المسجد / الجامع / المصلى *"><Input className="h-11" autoFocus value={siteForm.name} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} placeholder="مثال: مسجد الحرم الجامعي" /></Field>
+                <div data-completeness-target="identity"><Field label="اسم المسجد / الجامع / المصلى *"><Input className="h-11" autoFocus={!siteEditFocusKey} value={siteForm.name} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} placeholder="مثال: مسجد الحرم الجامعي" /></Field></div>
                 <Field label="النوع">
                   {siteForm.spatialRelation === 'inside_building'
                     ? <div className="space-y-1"><Input className="h-11 bg-emerald-50 font-bold text-emerald-800" readOnly value="مصلى" /><p className="text-[11px] leading-5 text-emerald-700">داخل المباني الجامعية يسمح بتسجيل المصليات فقط، ولا يمكن إنشاء مسجد أو جامع داخل المبنى.</p></div>
@@ -4509,7 +4528,7 @@ ${quranStockMovementForm.notes}` : ''}`
                       });
                     }}><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect>}
                 </Field>
-                {siteForm.siteType === 'prayer_room' && <Field label="فئة المصلى *"><NativeSelect className="h-11" value={siteForm.prayerRoomGender || ''} onChange={(e) => setSiteForm({ ...siteForm, prayerRoomGender: e.target.value })}><option value="">اختر الفئة</option><option value="men">رجال</option><option value="women">نساء</option></NativeSelect></Field>}
+                {siteForm.siteType === 'prayer_room' && <div data-completeness-target="gender"><Field label="فئة المصلى *"><NativeSelect className="h-11" value={siteForm.prayerRoomGender || ''} onChange={(e) => setSiteForm({ ...siteForm, prayerRoomGender: e.target.value })}><option value="">اختر الفئة</option><option value="men">رجال</option><option value="women">نساء</option></NativeSelect></Field></div>}
                 <Field label="الارتباط المكاني *"><NativeSelect className="h-11" value={siteForm.spatialRelation || 'independent'} onChange={(e) => {
                   const insideBuilding = e.target.value === 'inside_building';
                   setSiteForm({
@@ -4523,7 +4542,7 @@ ${quranStockMovementForm.notes}` : ''}`
                   });
                 }}><option value="independent">موقع مستقل</option><option value="inside_building">داخل مبنى جامعي — مصلى فقط</option></NativeSelect></Field>
                 {siteForm.spatialRelation === 'inside_building' && <>
-                  <Field label="رقم المبنى * — من السجل المركزي"><NativeSelect className="h-11" value={siteForm.buildingId || ''} onChange={(e) => setSiteForm({ ...siteForm, buildingId: e.target.value })}><option value="">اختر المبنى المعتمد</option>{officialBuildings.map((building) => <option key={building.id} value={building.id}>{building.buildingNumber}{building.name ? (' — ' + building.name) : ''}</option>)}</NativeSelect></Field>
+                  <div data-completeness-target="building"><Field label="رقم المبنى * — من السجل المركزي"><NativeSelect className="h-11" value={siteForm.buildingId || ''} onChange={(e) => setSiteForm({ ...siteForm, buildingId: e.target.value })}><option value="">اختر المبنى المعتمد</option>{officialBuildings.map((building) => <option key={building.id} value={building.id}>{building.buildingNumber}{building.name ? (' — ' + building.name) : ''}</option>)}</NativeSelect></Field></div>
                   <Field label="الدور"><Input className="h-11" value={siteForm.floor || ''} onChange={(e) => setSiteForm({ ...siteForm, floor: e.target.value })} placeholder="مثال: الأرضي" /></Field>
                   <Field label="رقم الغرفة / الموقع الداخلي"><Input className="h-11" value={siteForm.roomNumber || ''} onChange={(e) => setSiteForm({ ...siteForm, roomNumber: e.target.value })} placeholder="مثال: 012 أو الجناح الشرقي" /></Field>
                 </>}
@@ -4531,12 +4550,12 @@ ${quranStockMovementForm.notes}` : ''}`
                 <Field label="الحالة"><NativeSelect className="h-11" value={siteForm.status} onChange={(e) => setSiteForm({ ...siteForm, status: e.target.value })}><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect></Field>
                 <Field label={siteForm.spatialRelation === 'inside_building' ? 'المدينة — موروثة من السجل المركزي' : 'المدينة'}><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} value={siteForm.city} onChange={(e) => setSiteForm({ ...siteForm, city: e.target.value })} /></Field>
                 <Field label={siteForm.spatialRelation === 'inside_building' ? 'الحي — موروث من السجل المركزي' : 'الحي'}><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} value={siteForm.district} onChange={(e) => setSiteForm({ ...siteForm, district: e.target.value })} /></Field>
-                <Field label={siteForm.spatialRelation === 'inside_building' ? 'الحرم / الموقع — موروث من السجل المركزي' : 'الموقع داخل الجامعة'}><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} value={siteForm.campusLocation} onChange={(e) => setSiteForm({ ...siteForm, campusLocation: e.target.value })} placeholder="الحرم / المبنى / الكلية" /></Field>
+                <div data-completeness-target="location"><Field label={siteForm.spatialRelation === 'inside_building' ? 'الحرم / الموقع — موروث من السجل المركزي' : 'الموقع داخل الجامعة'}><Input className={`h-11 ${siteForm.spatialRelation === 'inside_building' ? 'bg-slate-50' : ''}`} readOnly={siteForm.spatialRelation === 'inside_building'} value={siteForm.campusLocation} onChange={(e) => setSiteForm({ ...siteForm, campusLocation: e.target.value })} placeholder="الحرم / المبنى / الكلية" /></Field></div>
                 {isAdmin && <Field label="المشرف المسؤول عن الموقع"><NativeSelect className="h-11" value={siteForm.supervisorUserId || ''} onChange={(e) => setSiteForm({ ...siteForm, supervisorUserId: e.target.value })}><option value="">بدون إسناد حالي</option>{staffUsers.filter((user) => user.moduleRole === 'supervisor').map((user) => <option key={user.uid} value={user.uid}>{user.username}</option>)}</NativeSelect></Field>}
                 <Field label="اسم المشرف (يدوي)"><Input className="h-11" value={siteForm.supervisorName} onChange={(e) => setSiteForm({ ...siteForm, supervisorName: e.target.value })} placeholder="اكتب اسم المشرف يدويًا" /><p className="mt-1 text-[11px] leading-5 text-muted-foreground">للتوثيق الاسمي فقط؛ لا ينشئ حسابًا ولا يمنح صلاحيات دخول.</p></Field>
               </CardContent>
             </Card>
-            {siteForm.spatialRelation !== 'inside_building' && ['mosque', 'jami'].includes(siteForm.siteType) && <Card className="overflow-hidden border-emerald-200/80 bg-white/95 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
+            {siteForm.spatialRelation !== 'inside_building' && ['mosque', 'jami'].includes(siteForm.siteType) && <Card data-completeness-target="women" className="overflow-hidden border-emerald-200/80 bg-white/95 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
               <CardHeader className="border-b border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-teal-50/60 pb-4">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg"><Users className="h-5 w-5 text-emerald-700" />مصلى النساء</CardTitle>
                 <CardDescription>يسجل مصلى النساء كقسم تابع للمسجد أو الجامع، وتدخل بياناته في الجولات والزيارات والتقارير دون إنشاء موقع مستقل.</CardDescription>
@@ -4604,14 +4623,14 @@ ${quranStockMovementForm.notes}` : ''}`
             <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
               <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-emerald-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><Building2 className="h-5 w-5" />السعة وبيانات التواصل</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-1 gap-4 pt-5 md:grid-cols-2 xl:grid-cols-5">
-                <Field label="المساحة م²"><Input className="h-11" type="number" min="0" step="any" inputMode="decimal" value={siteForm.area} onChange={(e) => setSiteForm({ ...siteForm, area: e.target.value })} /></Field>
-                <Field label="الطاقة الاستيعابية"><Input className="h-11" type="number" min="0" inputMode="numeric" value={siteForm.capacity} onChange={(e) => setSiteForm({ ...siteForm, capacity: e.target.value })} /></Field>
+                <div data-completeness-target="area"><Field label="المساحة م²"><Input className="h-11" type="number" min="0" step="any" inputMode="decimal" value={siteForm.area} onChange={(e) => setSiteForm({ ...siteForm, area: e.target.value })} /></Field></div>
+                <div data-completeness-target="capacity"><Field label="الطاقة الاستيعابية"><Input className="h-11" type="number" min="0" inputMode="numeric" value={siteForm.capacity} onChange={(e) => setSiteForm({ ...siteForm, capacity: e.target.value })} /></Field></div>
                 <Field label="العدد المستهدف للمصاحف"><Input className="h-11" type="number" min="0" step="1" inputMode="numeric" value={siteForm.quranTargetCount} onChange={(e) => setSiteForm({ ...siteForm, quranTargetCount: e.target.value })} placeholder="مثال: 100" /><p className="mt-1 text-[11px] leading-5 text-muted-foreground">العدد المناسب توفره في الموقع؛ يحسب النظام الاحتياج تلقائيًا من الرصيد الحالي.</p></Field>
                 <Field label="اسم المنسق"><Input className="h-11" value={siteForm.coordinatorName} onChange={(e) => setSiteForm({ ...siteForm, coordinatorName: e.target.value })} placeholder="اسم منسق الموقع" /></Field>
-                <Field label="رقم التواصل"><Input className="h-11" type="tel" inputMode="tel" value={siteForm.contactPhone} onChange={(e) => setSiteForm({ ...siteForm, contactPhone: e.target.value })} placeholder="05xxxxxxxx" /></Field>
+                <div data-completeness-target="contact"><Field label="رقم التواصل"><Input className="h-11" type="tel" inputMode="tel" value={siteForm.contactPhone} onChange={(e) => setSiteForm({ ...siteForm, contactPhone: e.target.value })} placeholder="05xxxxxxxx" /></Field></div>
               </CardContent>
             </Card>
-            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
+            <Card data-completeness-target="coordinates" className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
               <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-blue-50/60 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><MapPin className="h-5 w-5" />الموقع الجغرافي</CardTitle><CardDescription>{siteForm.spatialRelation === 'inside_building' ? 'الإحداثيات موروثة تلقائيًا من السجل المركزي للمبنى. لتعديلها حدّث المبنى المركزي.' : 'يمكن إدخال الإحداثيات يدويًا أو التقاط الموقع الحالي من الجهاز.'}</CardDescription></CardHeader>
               <CardContent className="space-y-4 pt-5">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -4649,7 +4668,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 <div className="md:col-span-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm leading-6 text-sky-900">لتغيير الإمام أو المؤذن أو الخطيب، عدّل سجل الشخص من تبويب <strong>«منسوبو المساجد»</strong> وحدد المسجد/المصلى والصفة الصحيحة. ستتحدث بطاقة الموقع والمعاينة والطباعة تلقائيًا.</div>
               </CardContent>
             </Card>
-            <Card className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
+            <Card data-completeness-target="media" className="overflow-hidden border-sky-200/70 bg-white/90 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
               <CardHeader className="border-b border-sky-100 bg-gradient-to-l from-sky-50/95 via-white to-amber-50/50 pb-4"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><FileText className="h-5 w-5" />صور ومرفقات المسجد / المصلى</CardTitle><CardDescription>يمكن رفع عدة صور للمسجد أو للموقع، إضافة إلى PDF وWord وExcel وPowerPoint وMP4. الحد الأقصى 20 MB لكل ملف.</CardDescription></CardHeader>
               <CardContent className="space-y-4 pt-5">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr]">
