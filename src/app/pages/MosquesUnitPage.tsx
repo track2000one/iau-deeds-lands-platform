@@ -5110,6 +5110,7 @@ const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onEx
   const requests = site._count?.requests || 0;
   const tickets = site._count?.tickets || 0;
   const personnel = site._count?.personnel || 0;
+  const womenPresence = womenPrayerPresence(site);
 
   return <Card className="group overflow-hidden rounded-[24px] border border-[#ded3b8] bg-white shadow-[0_10px_28px_rgba(6,60,51,0.07)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c9a753] hover:shadow-[0_16px_34px_rgba(6,60,51,0.12)]">
     <div className="grid min-h-[190px] sm:grid-cols-[180px_1fr]">
@@ -5142,18 +5143,21 @@ const SiteCard = ({ site, canEdit, canDelete, canPrint, onPreview, onPrint, onEx
           <div><span className="text-slate-500">المنسق</span><p className="mt-0.5 truncate font-bold text-slate-800">{site.coordinatorName || '-'}</p></div>
         </div>
 
-        {['mosque', 'jami'].includes(site.siteType) && <div className={`mt-3 rounded-xl border px-3 py-2.5 text-xs ${site.hasWomenPrayerArea ? 'border-emerald-200 bg-emerald-50/70' : 'border-slate-200 bg-slate-50/70'}`}>
+        {['mosque', 'jami'].includes(site.siteType) && <div className={`mt-3 rounded-xl border px-3 py-2.5 text-xs ${womenPresence === 'present' ? 'border-emerald-200 bg-emerald-50/70' : womenPresence === 'verified_absent' ? 'border-amber-200 bg-amber-50/70' : 'border-slate-200 bg-slate-50/70'}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className={`flex items-center gap-2 font-black ${site.hasWomenPrayerArea ? 'text-emerald-900' : 'text-slate-600'}`}><Users className="h-4 w-4" />مصلى النساء</div>
-            <Badge variant="outline" className={site.hasWomenPrayerArea ? (site.womenPrayerArea?.status === 'temporarily_closed' ? 'border-slate-300 bg-white text-slate-600' : site.womenPrayerArea?.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-emerald-300 bg-white text-emerald-800') : 'border-slate-300 bg-white text-slate-500'}>
-              {site.hasWomenPrayerArea ? womenPrayerAreaStatusLabel(site) : 'غير مسجل'}
-            </Badge>
+            <div className={`flex items-center gap-2 font-black ${womenPresence === 'present' ? 'text-emerald-900' : womenPresence === 'verified_absent' ? 'text-amber-900' : 'text-slate-600'}`}><Users className="h-4 w-4" />مصلى النساء</div>
+            <div className="flex flex-wrap gap-1">
+              <Badge variant="outline" className={womenPrayerPresenceClass(womenPresence)}>{womenPrayerPresenceLabels[womenPresence]}</Badge>
+              {womenPresence === 'present' && <Badge variant="outline" className={site.womenPrayerArea?.status === 'temporarily_closed' ? 'border-slate-300 bg-white text-slate-600' : site.womenPrayerArea?.status === 'maintenance' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-emerald-300 bg-white text-emerald-800'}>{womenPrayerAreaStatusLabel(site)}</Badge>}
+            </div>
           </div>
-          {site.hasWomenPrayerArea ? <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-emerald-900">
+          {womenPresence === 'present' ? <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-emerald-900">
             <span>السعة: <strong>{site.womenPrayerArea?.capacity ? Number(site.womenPrayerArea.capacity).toLocaleString('ar-SA') : '-'}</strong></span>
             <span>الدور: <strong>{site.womenPrayerArea?.floor || '-'}</strong></span>
             {site.womenPrayerArea?.separateEntrance === true && <span className="font-bold">مدخل مستقل</span>}
-          </div> : <p className="mt-1 leading-5 text-slate-500">لا يوجد مصلى نساء مسجل ضمن بيانات هذا {site.siteType === 'jami' ? 'الجامع' : 'المسجد'}.</p>}
+          </div> : womenPresence === 'verified_absent'
+            ? <p className="mt-1 leading-5 text-amber-800">{site.womenPrayerArea?.verificationNotes || 'تم اعتماد عدم وجود مصلى نساء.'}</p>
+            : <p className="mt-1 leading-5 text-slate-500">تحتاج البيانات إلى تحقق ميداني أو مراجعة معتمدة قبل اعتبار مصلى النساء موجودًا أو غير موجود.</p>}
         </div>}
       </div>
     </div>
