@@ -89,6 +89,7 @@ export const InvestmentOpportunitiesPage: React.FC = () => {
   });
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState('');
+  const areaId = searchParams.get('areaId') || '';
   const [siteId, setSiteId] = React.useState(
     () => searchParams.get('siteId') || ''
   );
@@ -106,6 +107,7 @@ export const InvestmentOpportunitiesPage: React.FC = () => {
         investmentsApi.getOpportunities({
           search: search.trim() || undefined,
           siteId: siteId || undefined,
+          areaId: areaId || undefined,
           status: status || undefined,
           page,
           limit: 25,
@@ -130,7 +132,7 @@ export const InvestmentOpportunitiesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search, siteId, status]);
+  }, [areaId, page, search, siteId, status]);
 
   React.useEffect(() => {
     const timer = window.setTimeout(load, 250);
@@ -156,6 +158,11 @@ export const InvestmentOpportunitiesPage: React.FC = () => {
             وحتى التفاوض والاستثمار أو الإلغاء، مع ارتباط مباشر بالمساحة
             الاستثمارية الأصلية.
           </p>
+          {areaId && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              عرض الفرص المرتبطة بمساحة محددة.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2">
