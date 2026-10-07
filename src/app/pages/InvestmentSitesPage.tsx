@@ -15,6 +15,13 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../components/ui/table';
 
+const approvalLabels: Record<string, string> = {
+  DRAFT: 'مسودة',
+  REVIEWED: 'تمت المراجعة',
+  APPROVED: 'معتمدة',
+  CHANGE_REQUESTED: 'طلب تعديل',
+};
+
 const getSiteDeeds = (site: InvestmentSite) => {
   const deeds = [
     ...(site.deed ? [site.deed] : []),
@@ -465,6 +472,7 @@ export const InvestmentSitesPage: React.FC = () => {
                 <TableHead>اسم الموقع الرئيسي</TableHead>
                 <TableHead>الصك المرتبط</TableHead>
                 <TableHead>المساحات</TableHead>
+                <TableHead>اعتماد الحدود</TableHead>
                 <TableHead>الإجراءات</TableHead>
               </TableRow>
             </TableHeader>
@@ -491,6 +499,19 @@ export const InvestmentSitesPage: React.FC = () => {
                     )}
                   </TableCell>
                   <TableCell>{site._count?.areas ?? 0}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        site.geometryApprovalStatus === 'APPROVED'
+                          ? 'secondary'
+                          : site.geometryApprovalStatus === 'CHANGE_REQUESTED'
+                            ? 'destructive'
+                            : 'outline'
+                      }
+                    >
+                      {approvalLabels[site.geometryApprovalStatus || 'DRAFT']}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       <Button
