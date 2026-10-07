@@ -8,6 +8,8 @@ import {
   FileCheck2,
   FileSpreadsheet,
   Gavel,
+  History,
+  Printer,
   RefreshCw,
   RotateCcw,
   ShieldCheck,
@@ -32,6 +34,7 @@ import { Textarea } from './ui/textarea';
 import {
   mosqueApi,
   type MosqueCompletionKpiSnapshot,
+  type MosqueExecutiveDecision,
   type MosqueImprovementGoal,
   type MosqueImprovementGoalSuggestion,
 } from '../api/mosques';
@@ -45,6 +48,11 @@ type DecisionKind =
   | 'sustained';
 
 type QueueFilter = 'all' | 'decisions' | 'monitoring' | 'positive';
+
+type PendingExecutiveAction =
+  | { type: 'extend'; itemId: string; goal: MosqueImprovementGoal }
+  | { type: 'activate_follow_up'; itemId: string; goal: MosqueImprovementGoal }
+  | { type: 'create_suggestion'; itemId: string; suggestion: MosqueImprovementGoalSuggestion };
 
 type ExecutiveItem = {
   id: string;
@@ -68,6 +76,36 @@ const currentRiyadhYear = () => {
     year: 'numeric',
   }).formatToParts(new Date());
   return Number(parts.find((part) => part.type === 'year')?.value || new Date().getFullYear());
+};
+
+const riyadhDateInput = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Riyadh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+};
+
+const firstDayOfRiyadhMonth = () => {
+  const today = riyadhDateInput();
+  return `${today.slice(0, 7)}-01`;
+};
+
+const decisionTypeLabel: Record<string, string> = {
+  create_improvement_goal: 'إنشاء هدف تحسين',
+  activate_improvement_goal: 'تفعيل هدف تحسين',
+  activate_follow_up_goal: 'تفعيل خطة متابعة',
+  cancel_improvement_goal: 'إلغاء هدف تحسين',
+  change_goal_due_date: 'تعديل موعد الاستحقاق',
+  reassign_goal_owner: 'إعادة إسناد الهدف',
+  change_goal_target: 'تعديل المستهدف',
+  update_improvement_goal: 'تعديل هدف تحسين',
+  approve_closure_evidence: 'اعتماد إثبات الإغلاق',
+  return_closure_evidence: 'إعادة إثبات الإغلاق',
+  approve_monthly_kpi: 'اعتماد KPI الشهري',
 };
 
 const missingLabels: Record<string, string> = {
@@ -140,6 +178,13 @@ const severityLabel: Record<ExecutiveItem['severity'], string> = {
 
 export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImprovementPlan }) => {
   const [goals, setGoals] = useState<MosqueImprovementGoal[]>([]);
+  const [decisions, setDecisions] = useState<MosqueExecutiveDecision[]>([]);
+  const [decisionFrom, setDecisionFrom] = useState(firstDayOfRiyadhMonth());
+  const [decisionTo, setDecisionTo] = useState(riyadhDateInput());
+  const [decisionLoading, setDecisionLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingExecutiveAction | null>(null);
+  const [decisionReason, setDecisionReason] = useState('');
+  const [decisionSaving, setDecisionSaving] = useState(false);
   const [suggestions, setSuggestions] = useState<MosqueImprovementGoalSuggestion[]>([]);
   const [snapshots, setSnapshots] = useState<MosqueCompletionKpiSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
