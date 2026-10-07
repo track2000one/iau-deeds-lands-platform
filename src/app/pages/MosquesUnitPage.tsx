@@ -55,6 +55,7 @@ import { MosqueFieldVisitsPanel } from '../components/MosqueFieldVisitsPanel';
 import { MosqueReportsCenter } from '../components/MosqueReportsCenter';
 import { MosqueDataCompletenessCenter } from '../components/MosqueDataCompletenessCenter';
 import { MosqueKpiArchive } from '../components/MosqueKpiArchive';
+import { MosqueKpiAnnualDashboard } from '../components/MosqueKpiAnnualDashboard';
 import { BuildingCoverageReportsDialog } from '../components/BuildingCoverageReportsDialog';
 import { isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
@@ -3115,6 +3116,7 @@ ${quranStockMovementForm.notes}` : ''}`
                   <MosqueSideNavButton label="المساجد والمصليات" icon={Building2} active={activeTab === 'sites'} onClick={() => goToDashboardSection('sites')} />
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="اكتمال البيانات" icon={CheckCircle2} active={activeTab === 'data-completeness'} onClick={() => goToDashboardSection('data-completeness')} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="أرشيف KPI" icon={Archive} active={activeTab === 'kpi-archive'} onClick={() => goToDashboardSection('kpi-archive')} />}
+                  {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="التحليل السنوي KPI" icon={BarChart3} active={activeTab === 'kpi-annual'} onClick={() => goToDashboardSection('kpi-annual')} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="الجولات والزيارات" icon={ClipboardList} active={activeTab === 'field-visits'} onClick={() => goToDashboardSection('field-visits')} />}
                   {['head', 'supervisor', 'personnel'].includes(role) && <MosqueSideNavButton label="الطلبات والصيانة" icon={Wrench} active={activeTab === 'requests'} onClick={() => goToDashboardSection('requests')} badge={dashboard?.stats.newRequests || 0} />}
                   {['head', 'supervisor'].includes(role) && <MosqueSideNavButton label="البلاغات" icon={MessageSquare} active={activeTab === 'tickets'} onClick={() => goToDashboardSection('tickets')} badge={dashboard?.stats.openTickets || 0} />}
@@ -3161,6 +3163,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 <option value="sites">المساجد والمصليات</option>
                 {['head', 'supervisor'].includes(role) && <option value="data-completeness">اكتمال البيانات</option>}
                 {['head', 'supervisor'].includes(role) && <option value="kpi-archive">أرشيف مؤشرات الأداء KPI</option>}
+                {['head', 'supervisor'].includes(role) && <option value="kpi-annual">التحليل السنوي KPI</option>}
                 {['head', 'supervisor'].includes(role) && <option value="buildings">تغطية المباني بخدمة الصلاة</option>}
                 {['head', 'supervisor'].includes(role) && <option value="field-visits">الجولات والزيارات</option>}
                 {['head', 'supervisor', 'personnel'].includes(role) && <option value="quran">المصاحف</option>}
@@ -3672,6 +3675,10 @@ ${quranStockMovementForm.notes}` : ''}`
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="kpi-archive" className="space-y-4">
           <MosqueKpiArchive />
+        </TabsContent>}
+
+        {['head', 'supervisor'].includes(role) && <TabsContent value="kpi-annual" className="space-y-4">
+          <MosqueKpiAnnualDashboard />
         </TabsContent>}
 
         {['head', 'supervisor'].includes(role) && <TabsContent value="field-visits" className="space-y-4">
