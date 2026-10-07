@@ -39,6 +39,7 @@ import {
   type MosqueCompletionTask,
   type MosqueCompletionTaskAnalytics,
   type MosqueCompletionTaskAssignee,
+  type MosqueCompletionKpiSnapshot,
   type MosqueFieldVisit,
   type MosqueSite,
   type MosqueSiteMediaLibrary,
@@ -93,6 +94,7 @@ type MosqueDataCompletenessCenterProps = {
   onOpenSite: (site: MosqueSite) => void;
   onFixMissing: (site: MosqueSite, target: string) => void;
   onGoToVisits: () => void;
+  canManageKpiSnapshots: boolean;
   taskTimingFilter: TaskTimingFilter;
   onTaskTimingFilterChange: (filter: TaskTimingFilter) => void;
 };
@@ -286,6 +288,7 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
   onOpenSite,
   onFixMissing,
   onGoToVisits,
+  canManageKpiSnapshots,
   taskTimingFilter,
   onTaskTimingFilterChange,
 }) => {
@@ -300,6 +303,8 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
   const [analyticsMonth, setAnalyticsMonth] = useState(riyadhDateKey().slice(0, 7));
   const [analytics, setAnalytics] = useState<MosqueCompletionTaskAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [kpiSnapshot, setKpiSnapshot] = useState<MosqueCompletionKpiSnapshot | null>(null);
+  const [snapshotSaving, setSnapshotSaving] = useState(false);
 
   const [search, setSearch] = useState('');
   const [stateFilter, setStateFilter] = useState<'all' | CompletenessState>('all');
@@ -347,12 +352,60 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
   const loadAnalytics = async (month = analyticsMonth) => {
     setAnalyticsLoading(true);
     try {
-      setAnalytics(await mosqueApi.completionTaskAnalytics(month));
+      const [live, snapshots] = await Promise.all([
+        mosqueApi.completionTaskAnalytics(month),
+        mosqueApi.completionKpiSnapshots({ month }),
+      ]);
+      const snapshot = snapshots[0] || null;
+      setKpiSnapshot(snapshot);
+      setAnalytics(snapshot && ['approved', 'archived'].includes(snapshot.status) ? snapshot.payload : live);
     } catch (error) {
       setAnalytics(null);
+      setKpiSnapshot(null);
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل مؤشرات أداء مهام الاستكمال');
     } finally {
       setAnalyticsLoading(false);
+    }
+  };
+
+  const generateKpiSnapshot = async () => {
+    setSnapshotSaving(true);
+    try {
+      const snapshot = await mosqueApi.generateCompletionKpiSnapshot(analyticsMonth);
+      setKpiSnapshot(snapshot);
+      toast.success(snapshot.status === 'draft' ? 'تم حفظ لقطة KPI كمسودة' : 'تم حفظ لقطة KPI');
+      await loadAnalytics(analyticsMonth);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ لقطة KPI');
+    } finally {
+      setSnapshotSaving(false);
+    }
+  };
+
+  const transitionKpiSnapshot = async (status: MosqueCompletionKpiSnapshot['status']) => {
+    if (!kpiSnapshot) return;
+    let note: string | undefined;
+    if (kpiSnapshot.status === 'review' && status === 'draft') {
+      const value = window.prompt('اكتب سبب إعادة نتيجة KPI إلى المسودة:');
+      if (!value?.trim()) return;
+      note = value.trim();
+    }
+    setSnapshotSaving(true);
+    try {
+      const updated = await mosqueApi.transitionCompletionKpiSnapshot(kpiSnapshot.id, status, note);
+      setKpiSnapshot(updated);
+      setAnalytics(['approved', 'archived'].includes(updated.status) ? updated.payload : analytics);
+      toast.success(
+        status === 'review' ? 'تم إرسال نتيجة KPI للمراجعة'
+          : status === 'approved' ? 'تم اعتماد نتيجة KPI وإقفالها'
+            : status === 'archived' ? 'تم أرشفة نتيجة KPI'
+              : 'تمت إعادة نتيجة KPI إلى المسودة'
+      );
+      await loadAnalytics(analyticsMonth);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحديث حالة لقطة KPI');
+    } finally {
+      setSnapshotSaving(false);
     }
   };
 
