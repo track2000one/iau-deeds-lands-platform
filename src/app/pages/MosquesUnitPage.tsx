@@ -3194,10 +3194,11 @@ ${quranStockMovementForm.notes}` : ''}`
               </div>
             </CardHeader>
             <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <SiteRegistryMetric label="السجلات الظاهرة" value={siteFilterStats.total} />
                 <SiteRegistryMetric label="المساجد والجوامع" value={siteFilterStats.mosques} />
-                <SiteRegistryMetric label="المصليات" value={siteFilterStats.prayerRooms} />
+                <SiteRegistryMetric label="بها مصلى نساء" value={siteFilterStats.womenPrayerAreas} />
+                <SiteRegistryMetric label="المصليات المستقلة" value={siteFilterStats.prayerRooms} />
                 <SiteRegistryMetric label="إجمالي المساحة" value={siteFilterStats.totalArea} suffix="م²" />
               </div>
               <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
@@ -3208,15 +3209,25 @@ ${quranStockMovementForm.notes}` : ''}`
                     <NativeSelect className="h-9 min-w-[120px]" value={siteSortDirection} onChange={(e) => setSiteSortDirection(e.target.value as 'asc' | 'desc')}><option value="asc">تصاعدي ↑</option><option value="desc">تنازلي ↓</option></NativeSelect>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-8">
                 <div className="relative md:col-span-2 xl:col-span-2">
                   <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input className="h-11 rounded-xl pr-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالاسم أو المدينة أو الحي أو الموقع أو الإمام..." />
                   {search && <Button type="button" variant="ghost" size="icon" className="absolute left-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setSearch('')}><X className="h-4 w-4" /></Button>}
                 </div>
                 <NativeSelect className="h-11 rounded-xl" value={siteFilterCity} onChange={(e) => setSiteFilterCity(e.target.value)}><option value="">جميع المدن</option>{siteCities.map((city) => <option key={city} value={city}>{city}</option>)}</NativeSelect>
-                <NativeSelect className="h-11 rounded-xl" value={siteFilterType} onChange={(e) => { const nextType = e.target.value; setSiteFilterType(nextType); if (nextType !== 'prayer_room') setSiteFilterPrayerRoomGender('all'); }}><option value="all">جميع الأنواع</option><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect>
+                <NativeSelect className="h-11 rounded-xl" value={siteFilterType} onChange={(e) => {
+                  const nextType = e.target.value;
+                  setSiteFilterType(nextType);
+                  if (nextType !== 'prayer_room') setSiteFilterPrayerRoomGender('all');
+                  if (nextType === 'prayer_room') setSiteFilterWomenPrayerArea('all');
+                }}><option value="all">جميع الأنواع</option><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect>
                 {siteFilterType === 'prayer_room' && <NativeSelect className="h-11 rounded-xl border-emerald-200 bg-emerald-50/40" value={siteFilterPrayerRoomGender} onChange={(e) => setSiteFilterPrayerRoomGender(e.target.value as 'all' | 'men' | 'women')}><option value="all">كل المصليات</option><option value="men">مصلى رجال</option><option value="women">مصلى نساء</option></NativeSelect>}
+                {siteFilterType !== 'prayer_room' && <NativeSelect className="h-11 rounded-xl border-emerald-200 bg-emerald-50/40" value={siteFilterWomenPrayerArea} onChange={(e) => setSiteFilterWomenPrayerArea(e.target.value as 'all' | 'with' | 'without')}>
+                  <option value="all">كل حالات مصلى النساء</option>
+                  <option value="with">بها مصلى نساء</option>
+                  <option value="without">بدون مصلى نساء مسجل</option>
+                </NativeSelect>}
                 <NativeSelect className="h-11 rounded-xl" value={siteFilterStatus} onChange={(e) => setSiteFilterStatus(e.target.value)}><option value="all">جميع الحالات</option><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect>
                 <NativeSelect className="h-11 rounded-xl" value={siteSortBy} onChange={(e) => setSiteSortBy(e.target.value)}><option value="name">فرز حسب الاسم</option><option value="building">فرز حسب رقم المبنى</option><option value="city">فرز حسب المدينة</option><option value="type">فرز حسب النوع</option><option value="status">فرز حسب الحالة</option><option value="area">فرز حسب المساحة</option></NativeSelect>
                 </div>
@@ -3290,13 +3301,14 @@ ${quranStockMovementForm.notes}` : ''}`
                 </div>
               </div>
 
-              {(search || siteFilterCity || siteFilterType !== 'all' || siteFilterPrayerRoomGender !== 'all' || siteFilterStatus !== 'all' || siteSortBy !== 'name' || siteSortDirection !== 'asc') && <div className="flex flex-wrap items-center gap-2 text-xs">
+              {(search || siteFilterCity || siteFilterType !== 'all' || siteFilterPrayerRoomGender !== 'all' || siteFilterWomenPrayerArea !== 'all' || siteFilterStatus !== 'all' || siteSortBy !== 'name' || siteSortDirection !== 'asc') && <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="font-bold text-slate-600">المعايير الحالية:</span>
                 {search && <Badge variant="outline">بحث: {search}</Badge>}
                 {siteFilterCity && <Badge variant="outline">المدينة: {siteFilterCity}</Badge>}
                 {siteFilterType !== 'all' && <Badge variant="outline">النوع: {siteTypeLabels[siteFilterType]}</Badge>}
                 {siteFilterType === 'prayer_room' && siteFilterPrayerRoomGender !== 'all' && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">فئة المصلى: {prayerRoomGenderLabels[siteFilterPrayerRoomGender]}</Badge>}
-                {siteFilterStatus !== 'all' && <Badge variant="outline">الحالة: {siteStatusLabels[siteFilterStatus]}</Badge>}
+                {siteFilterWomenPrayerArea !== 'all' && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">مصلى النساء: {siteFilterWomenPrayerArea === 'with' ? 'موجود' : 'غير مسجل'}</Badge>}
+                {siteFilterStatus !== 'all' && <Badge variant="outline">الحالة: {siteStatusLabels[siteFilterStatus]}</Badge>
                 <Badge variant="outline">الفرز: {{ name: 'الاسم', building: 'رقم المبنى', city: 'المدينة', type: 'النوع', status: 'الحالة', area: 'المساحة' }[siteSortBy] || siteSortBy} — {siteSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}</Badge>
               </div>}
             </CardContent>
