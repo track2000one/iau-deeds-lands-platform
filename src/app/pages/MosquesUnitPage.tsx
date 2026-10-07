@@ -182,10 +182,27 @@ const siteTypeDisplayLabel = (site: Pick<MosqueSite, 'siteType' | 'prayerRoomGen
     ? `مصلى ${prayerRoomGenderLabels[site.prayerRoomGender] || site.prayerRoomGender}`
     : siteTypeLabels[site.siteType] || site.siteType;
 
+type WomenPrayerPresence = 'present' | 'verified_absent' | 'unverified';
+
+const womenPrayerPresence = (site: Pick<MosqueSite, 'siteType' | 'hasWomenPrayerArea' | 'womenPrayerArea'>): WomenPrayerPresence => {
+  if (site.hasWomenPrayerArea) return 'present';
+  return site.womenPrayerArea?.presenceStatus === 'verified_absent' ? 'verified_absent' : 'unverified';
+};
+const womenPrayerPresenceLabels: Record<WomenPrayerPresence, string> = {
+  present: 'يوجد مصلى نساء',
+  verified_absent: 'لا يوجد — تم التحقق',
+  unverified: 'لم يتم التحقق',
+};
+const womenPrayerPresenceClass = (presence: WomenPrayerPresence) =>
+  presence === 'present'
+    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+    : presence === 'verified_absent'
+      ? 'border-amber-300 bg-amber-50 text-amber-800'
+      : 'border-slate-300 bg-slate-50 text-slate-600';
 const hasAttachedWomenPrayerArea = (site: Pick<MosqueSite, 'siteType' | 'hasWomenPrayerArea'>) =>
   ['mosque', 'jami'].includes(site.siteType) && Boolean(site.hasWomenPrayerArea);
 const womenPrayerAreaStatusLabel = (site: Pick<MosqueSite, 'hasWomenPrayerArea' | 'womenPrayerArea'>) =>
-  site.hasWomenPrayerArea ? (siteStatusLabels[site.womenPrayerArea?.status || 'active'] || site.womenPrayerArea?.status || 'نشط') : 'غير مسجل';
+  site.hasWomenPrayerArea ? (siteStatusLabels[site.womenPrayerArea?.status || 'active'] || site.womenPrayerArea?.status || 'نشط') : womenPrayerPresenceLabels[womenPrayerPresence(site)];
 
 
 type SitePrintColumnKey = 'name' | 'type' | 'building' | 'location' | 'cityDistrict' | 'area' | 'capacity' | 'womenPrayerArea' | 'womenCapacity' | 'womenStatus' | 'imam' | 'muezzin' | 'khateeb' | 'coordinatorName' | 'contactPhone' | 'coordinates' | 'status' | 'notes';
@@ -303,6 +320,11 @@ const button3d = 'shadow-[0_4px_0_rgba(8,63,53,0.14),0_8px_16px_rgba(8,63,53,0.0
 const siteActionButton = `${button3d} h-10 w-full min-w-0 justify-center gap-1.5 whitespace-nowrap px-2 text-xs font-bold leading-none`;
 
 const emptyWomenPrayerArea = () => ({
+  presenceStatus: 'unverified' as WomenPrayerPresence,
+  verificationNotes: '',
+  verifiedAt: '',
+  verifiedBy: '',
+  verifiedByName: '',
   capacity: '',
   floor: '',
   locationDescription: '',
@@ -629,7 +651,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [siteFilterCity, setSiteFilterCity] = useState('');
   const [siteFilterType, setSiteFilterType] = useState('all');
   const [siteFilterPrayerRoomGender, setSiteFilterPrayerRoomGender] = useState<'all' | 'men' | 'women'>('all');
-  const [siteFilterWomenPrayerArea, setSiteFilterWomenPrayerArea] = useState<'all' | 'with' | 'without'>('all');
+  const [siteFilterWomenPrayerArea, setSiteFilterWomenPrayerArea] = useState<'all' | WomenPrayerPresence>('all');
   const [siteFilterStatus, setSiteFilterStatus] = useState('all');
   const [buildingCoverageSearch, setBuildingCoverageSearch] = useState('');
   const [buildingCoverageFilter, setBuildingCoverageFilter] = useState('all');
@@ -851,7 +873,7 @@ export const MosquesUnitPage: React.FC = () => {
     }
     if (siteFilterWomenPrayerArea !== 'all') {
       result = result.filter((site) => ['mosque', 'jami'].includes(site.siteType)
-        && (siteFilterWomenPrayerArea === 'with' ? Boolean(site.hasWomenPrayerArea) : !site.hasWomenPrayerArea));
+        && womenPrayerPresence(site) === siteFilterWomenPrayerArea);
     }
     if (siteFilterStatus !== 'all') result = result.filter((site) => site.status === siteFilterStatus);
 
@@ -882,6 +904,23 @@ export const MosquesUnitPage: React.FC = () => {
     womenPrayerAreas: visibleSites.filter(hasAttachedWomenPrayerArea).length,
     totalArea: visibleSites.reduce((sum, site) => sum + (Number(site.area) || 0), 0),
   }), [visibleSites]);
+
+  const womenDataQualityStats = useMemo(() => {
+    const accessibleSites = role === 'personnel' && linkedSiteId ? sites.filter((site) => site.id === linkedSiteId) : sites;
+    const mosqueSites = accessibleSites.filter((site) => ['mosque', 'jami'].includes(site.siteType));
+    const present = mosqueSites.filter((site) => womenPrayerPresence(site) === 'present').length;
+    const verifiedAbsent = mosqueSites.filter((site) => womenPrayerPresence(site) === 'verified_absent').length;
+    const unverified = mosqueSites.filter((site) => womenPrayerPresence(site) === 'unverified').length;
+    const verified = present + verifiedAbsent;
+    return {
+      total: mosqueSites.length,
+      present,
+      verifiedAbsent,
+      unverified,
+      verified,
+      completionPercent: mosqueSites.length ? Math.round((verified / mosqueSites.length) * 100) : 100,
+    };
+  }, [sites, role, linkedSiteId]);
 
   const resetSiteFilters = () => {
     setSearch('');
