@@ -1884,7 +1884,7 @@ ${quranStockMovementForm.notes}` : ''}`
         ? `فئة المصلى: ${prayerRoomGenderLabels[siteFilterPrayerRoomGender] || siteFilterPrayerRoomGender}`
         : null,
       siteFilterWomenPrayerArea !== 'all'
-        ? `مصلى النساء: ${siteFilterWomenPrayerArea === 'with' ? 'موجود' : 'غير مسجل'}`
+        ? `مصلى النساء: ${womenPrayerPresenceLabels[siteFilterWomenPrayerArea]}`
         : null,
       siteFilterStatus !== 'all' ? `الحالة: ${siteStatusLabels[siteFilterStatus] || siteFilterStatus}` : null,
       `الفرز: ${sortLabels[siteSortBy] || siteSortBy} — ${siteSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}`,
@@ -3275,6 +3275,40 @@ ${quranStockMovementForm.notes}` : ''}`
                 <SiteRegistryMetric label="المصليات المستقلة" value={siteFilterStats.prayerRooms} />
                 <SiteRegistryMetric label="إجمالي المساحة" value={siteFilterStats.totalArea} suffix="م²" />
               </div>
+
+              {womenDataQualityStats.total > 0 && <div className="rounded-2xl border border-sky-200 bg-gradient-to-l from-sky-50/80 via-white to-emerald-50/55 p-4">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Shield className="h-4 w-4 text-sky-700" />
+                      <p className="font-black text-slate-800">جودة بيانات مصلى النساء</p>
+                      <Badge variant="outline" className={womenDataQualityStats.unverified ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-emerald-300 bg-emerald-50 text-emerald-800'}>
+                        اكتمال التحقق {womenDataQualityStats.completionPercent}%
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs leading-6 text-slate-600">لا يُعد عدم وجود سجل لمصلى النساء دليلاً على عدم وجوده ميدانيًا؛ تبقى الحالة «لم يتم التحقق» حتى اعتمادها صراحة.</p>
+                    <div className="mt-3 flex items-center gap-3">
+                      <Progress value={womenDataQualityStats.completionPercent} className="h-2.5 flex-1" />
+                      <span className="whitespace-nowrap text-xs font-black text-sky-800">{womenDataQualityStats.verified} / {womenDataQualityStats.total} متحقق</span>
+                    </div>
+                  </div>
+                  <div className="grid min-w-[320px] grid-cols-3 gap-2">
+                    <button type="button" onClick={() => setSiteFilterWomenPrayerArea('present')} className="rounded-xl border border-emerald-200 bg-white p-3 text-center transition hover:border-emerald-400">
+                      <span className="block text-[10px] font-bold text-emerald-700">يوجد</span><strong className="mt-1 block text-xl text-emerald-900">{womenDataQualityStats.present}</strong>
+                    </button>
+                    <button type="button" onClick={() => setSiteFilterWomenPrayerArea('verified_absent')} className="rounded-xl border border-amber-200 bg-white p-3 text-center transition hover:border-amber-400">
+                      <span className="block text-[10px] font-bold text-amber-700">لا يوجد — متحقق</span><strong className="mt-1 block text-xl text-amber-900">{womenDataQualityStats.verifiedAbsent}</strong>
+                    </button>
+                    <button type="button" onClick={() => setSiteFilterWomenPrayerArea('unverified')} className="rounded-xl border border-slate-200 bg-white p-3 text-center transition hover:border-slate-400">
+                      <span className="block text-[10px] font-bold text-slate-600">لم يتم التحقق</span><strong className="mt-1 block text-xl text-slate-800">{womenDataQualityStats.unverified}</strong>
+                    </button>
+                  </div>
+                </div>
+                {womenDataQualityStats.unverified > 0 && <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs leading-6 text-amber-900">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>يوجد {womenDataQualityStats.unverified.toLocaleString('ar-SA')} مسجد/جامع يحتاج استكمال التحقق من وجود مصلى النساء. اضغط على الرقم لعرضها مباشرة.</span>
+                </div>}
+              </div>}
               <div className="rounded-2xl border border-[#e3d6b9] bg-[#fbf8f1] p-3">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div><p className="font-black text-[#0b4a3f]">البحث والتصفية</p><p className="mt-1 text-xs text-slate-500">تتحدث البطاقات والنتائج والتقارير مباشرة وفق المعايير المختارة.</p></div>
@@ -3297,10 +3331,11 @@ ${quranStockMovementForm.notes}` : ''}`
                   if (nextType === 'prayer_room') setSiteFilterWomenPrayerArea('all');
                 }}><option value="all">جميع الأنواع</option><option value="mosque">مسجد</option><option value="jami">جامع</option><option value="prayer_room">مصلى</option></NativeSelect>
                 {siteFilterType === 'prayer_room' && <NativeSelect className="h-11 rounded-xl border-emerald-200 bg-emerald-50/40" value={siteFilterPrayerRoomGender} onChange={(e) => setSiteFilterPrayerRoomGender(e.target.value as 'all' | 'men' | 'women')}><option value="all">كل المصليات</option><option value="men">مصلى رجال</option><option value="women">مصلى نساء</option></NativeSelect>}
-                {siteFilterType !== 'prayer_room' && <NativeSelect className="h-11 rounded-xl border-emerald-200 bg-emerald-50/40" value={siteFilterWomenPrayerArea} onChange={(e) => setSiteFilterWomenPrayerArea(e.target.value as 'all' | 'with' | 'without')}>
+                {siteFilterType !== 'prayer_room' && <NativeSelect className="h-11 rounded-xl border-emerald-200 bg-emerald-50/40" value={siteFilterWomenPrayerArea} onChange={(e) => setSiteFilterWomenPrayerArea(e.target.value as 'all' | WomenPrayerPresence)}>
                   <option value="all">كل حالات مصلى النساء</option>
-                  <option value="with">بها مصلى نساء</option>
-                  <option value="without">بدون مصلى نساء مسجل</option>
+                  <option value="present">يوجد مصلى نساء</option>
+                  <option value="verified_absent">لا يوجد — تم التحقق</option>
+                  <option value="unverified">لم يتم التحقق</option>
                 </NativeSelect>}
                 <NativeSelect className="h-11 rounded-xl" value={siteFilterStatus} onChange={(e) => setSiteFilterStatus(e.target.value)}><option value="all">جميع الحالات</option><option value="active">نشط</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect>
                 <NativeSelect className="h-11 rounded-xl" value={siteSortBy} onChange={(e) => setSiteSortBy(e.target.value)}><option value="name">فرز حسب الاسم</option><option value="building">فرز حسب رقم المبنى</option><option value="city">فرز حسب المدينة</option><option value="type">فرز حسب النوع</option><option value="status">فرز حسب الحالة</option><option value="area">فرز حسب المساحة</option></NativeSelect>
@@ -3310,8 +3345,9 @@ ${quranStockMovementForm.notes}` : ''}`
                   <div className="flex flex-wrap gap-2">
                     {([
                       ['all', 'الكل'],
-                      ['with', 'بها مصلى نساء'],
-                      ['without', 'بدون مصلى نساء مسجل'],
+                      ['present', 'يوجد مصلى نساء'],
+                      ['verified_absent', 'لا يوجد — متحقق'],
+                      ['unverified', 'لم يتم التحقق'],
                     ] as const).map(([value, label]) => <Button key={value} type="button" size="sm" variant={siteFilterWomenPrayerArea === value ? 'default' : 'outline'} className={siteFilterWomenPrayerArea === value ? 'border border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900' : 'border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-50'} onClick={() => setSiteFilterWomenPrayerArea(value)}>{label}</Button>)}
                   </div>
                 </div>}
@@ -3391,7 +3427,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 {siteFilterCity && <Badge variant="outline">المدينة: {siteFilterCity}</Badge>}
                 {siteFilterType !== 'all' && <Badge variant="outline">النوع: {siteTypeLabels[siteFilterType]}</Badge>}
                 {siteFilterType === 'prayer_room' && siteFilterPrayerRoomGender !== 'all' && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">فئة المصلى: {prayerRoomGenderLabels[siteFilterPrayerRoomGender]}</Badge>}
-                {siteFilterWomenPrayerArea !== 'all' && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">مصلى النساء: {siteFilterWomenPrayerArea === 'with' ? 'موجود' : 'غير مسجل'}</Badge>}
+                {siteFilterWomenPrayerArea !== 'all' && <Badge variant="outline" className={womenPrayerPresenceClass(siteFilterWomenPrayerArea)}>مصلى النساء: {womenPrayerPresenceLabels[siteFilterWomenPrayerArea]}</Badge>}
                 {siteFilterStatus !== 'all' && <Badge variant="outline">الحالة: {siteStatusLabels[siteFilterStatus]}</Badge>}
                 <Badge variant="outline">الفرز: {{ name: 'الاسم', building: 'رقم المبنى', city: 'المدينة', type: 'النوع', status: 'الحالة', area: 'المساحة' }[siteSortBy] || siteSortBy} — {siteSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}</Badge>
               </div>}
