@@ -131,7 +131,7 @@ const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' 
   if (type.includes('ticket') || text.includes('بلاغ')) return 'ticket';
   if (type.includes('leave') || text.includes('إجاز') || text.includes('اعتذار')) return 'leave';
   if (type.includes('quran') || text.includes('مصحف') || text.includes('مصاحف')) return 'quran';
-  if (type.includes('improvement_goal') || text.includes('هدف تحسين') || text.includes('تحقق هدف')) return 'improvement';
+  if (type.includes('improvement_goal') || type.includes('completion_kpi_approval_automation') || text.includes('هدف تحسين') || text.includes('تحقق هدف') || text.includes('أتمتة ما بعد اعتماد KPI')) return 'improvement';
   if (type.includes('completion_task') || text.includes('مهمة استكمال') || text.includes('استكمال بيانات')) return 'completion';
   if (type.includes('site') || type.includes('mosque') || text.includes('مسجد') || text.includes('مصلى')) return 'site';
   return 'other';
