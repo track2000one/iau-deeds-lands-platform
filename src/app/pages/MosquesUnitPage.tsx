@@ -2405,6 +2405,12 @@ ${quranStockMovementForm.notes}` : ''}`
       );
       if (duplicate) return toast.error(`يوجد بالفعل مصلى ${siteForm.prayerRoomGender === 'men' ? 'رجال' : 'نساء'} مرتبط بهذا المبنى باسم «${duplicate.name}». عدّل السجل الموجود بدل إنشاء سجل مكرر.`);
     }
+    const womenPresence = ['mosque', 'jami'].includes(effectiveSiteType)
+      ? (siteForm.womenPrayerArea?.presenceStatus || (siteForm.hasWomenPrayerArea ? 'present' : 'unverified'))
+      : 'unverified';
+    if (womenPresence === 'verified_absent' && !String(siteForm.womenPrayerArea?.verificationNotes || '').trim()) {
+      return toast.error('عند اعتماد «لا يوجد مصلى نساء» يجب تدوين ملاحظة أو مرجع التحقق.');
+    }
     setSaving(true);
     try {
       const nextMedia: MosqueSiteMediaLibrary = {
@@ -4523,24 +4529,61 @@ ${quranStockMovementForm.notes}` : ''}`
                 <CardDescription>يسجل مصلى النساء كقسم تابع للمسجد أو الجامع، وتدخل بياناته في الجولات والزيارات والتقارير دون إنشاء موقع مستقل.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-5">
-                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-                  <input type="checkbox" className="mt-1 h-4 w-4 accent-emerald-700" checked={Boolean(siteForm.hasWomenPrayerArea)} onChange={(e) => setSiteForm((current: any) => ({
-                    ...current,
-                    hasWomenPrayerArea: e.target.checked,
-                    womenPrayerArea: current.womenPrayerArea || emptyWomenPrayerArea(),
-                  }))} />
-                  <span><span className="block font-black text-emerald-950">يوجد مصلى للنساء داخل {siteForm.siteType === 'jami' ? 'الجامع' : 'المسجد'}</span><span className="mt-1 block text-xs leading-6 text-emerald-800">عند التفعيل تظهر بيانات القسم ويصبح متاحًا كنطاق مستقل في الزيارات الميدانية والتقارير.</span></span>
-                </label>
-                {siteForm.hasWomenPrayerArea && <div className="grid gap-4 rounded-2xl border border-emerald-100 bg-white p-4 md:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <p className="mb-2 text-sm font-black text-slate-800">حالة التحقق من وجود مصلى النساء *</p>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {([
+                      ['present', 'يوجد مصلى نساء', 'تم التحقق من وجود قسم مخصص للنساء داخل الموقع.'],
+                      ['verified_absent', 'لا يوجد — تم التحقق', 'تم التحقق فعليًا من عدم وجود مصلى نساء.'],
+                      ['unverified', 'لم يتم التحقق', 'لا توجد معلومة مؤكدة حتى الآن ويظهر السجل ضمن قائمة الاستكمال.'],
+                    ] as const).map(([value, label, description]) => {
+                      const selected = (siteForm.womenPrayerArea?.presenceStatus || (siteForm.hasWomenPrayerArea ? 'present' : 'unverified')) === value;
+                      const tone = value === 'present'
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-950'
+                        : value === 'verified_absent'
+                          ? 'border-amber-300 bg-amber-50 text-amber-950'
+                          : 'border-slate-300 bg-slate-50 text-slate-700';
+                      return <button key={value} type="button" onClick={() => setSiteForm((current: any) => ({
+                        ...current,
+                        hasWomenPrayerArea: value === 'present',
+                        womenPrayerArea: {
+                          ...(current.womenPrayerArea || emptyWomenPrayerArea()),
+                          presenceStatus: value,
+                          verifiedAt: '',
+                          verifiedBy: '',
+                          verifiedByName: '',
+                        },
+                      }))} className={`rounded-2xl border p-4 text-right transition ${selected ? tone + ' ring-2 ring-offset-1 ring-current/20 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                        <span className="block text-sm font-black">{label}</span>
+                        <span className="mt-1 block text-[11px] leading-5 opacity-80">{description}</span>
+                      </button>;
+                    })}
+                  </div>
+                </div>
+
+                {(siteForm.womenPrayerArea?.presenceStatus || (siteForm.hasWomenPrayerArea ? 'present' : 'unverified')) === 'unverified' && <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700">
+                  <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-slate-500" />
+                  <div><strong>الحالة غير محسومة.</strong> لن تعتبر المنصة أن مصلى النساء غير موجود، وسيظهر هذا المسجد/الجامع ضمن قائمة «لم يتم التحقق» إلى أن تتم مراجعة البيانات أو الزيارة الميدانية.</div>
+                </div>}
+
+                {(siteForm.womenPrayerArea?.presenceStatus || (siteForm.hasWomenPrayerArea ? 'present' : 'unverified')) === 'verified_absent' && <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                  <Field label="ملاحظة / مرجع التحقق *">
+                    <Textarea rows={3} value={siteForm.womenPrayerArea?.verificationNotes || ''} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, verificationNotes: e.target.value } }))} placeholder="مثال: تم التحقق ميدانيًا أثناء الزيارة بتاريخ ... ولا يوجد قسم مخصص للنساء." />
+                  </Field>
+                  <p className="mt-2 text-[11px] leading-5 text-amber-800">سيحفظ النظام تاريخ الاعتماد وهوية المستخدم الذي أكد الحالة تلقائيًا.</p>
+                </div>}
+
+                {(siteForm.womenPrayerArea?.presenceStatus || (siteForm.hasWomenPrayerArea ? 'present' : 'unverified')) === 'present' && <div className="grid gap-4 rounded-2xl border border-emerald-100 bg-white p-4 md:grid-cols-2 lg:grid-cols-3">
                   <Field label="السعة التقريبية"><Input className="h-11" type="number" min="0" step="1" value={siteForm.womenPrayerArea?.capacity ?? ''} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, capacity: e.target.value } }))} placeholder="مثال: 80" /></Field>
                   <Field label="الدور / المستوى"><Input className="h-11" value={siteForm.womenPrayerArea?.floor || ''} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, floor: e.target.value } }))} placeholder="مثال: الدور العلوي" /></Field>
-                  <Field label="الحالة"><NativeSelect className="h-11" value={siteForm.womenPrayerArea?.status || 'active'} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, status: e.target.value } }))}><option value="active">مفتوح وجاهز</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect></Field>
+                  <Field label="الحالة التشغيلية"><NativeSelect className="h-11" value={siteForm.womenPrayerArea?.status || 'active'} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, status: e.target.value } }))}><option value="active">مفتوح وجاهز</option><option value="maintenance">تحت الصيانة</option><option value="temporarily_closed">مغلق مؤقتًا</option></NativeSelect></Field>
                   <div className="md:col-span-2 lg:col-span-3"><Field label="وصف موقع مصلى النساء داخل المسجد / الجامع"><Input className="h-11" value={siteForm.womenPrayerArea?.locationDescription || ''} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, locationDescription: e.target.value } }))} placeholder="مثال: الجهة الشمالية — مدخل مستقل بجوار البوابة الشرقية" /></Field></div>
                   {([
                     ['separateEntrance', 'مدخل مستقل'],
                     ['hasAblution', 'مواضئ خاصة بالنساء'],
                     ['hasRestrooms', 'دورات مياه خاصة بالنساء'],
                   ] as const).map(([key, label]) => <label key={key} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700"><input type="checkbox" className="h-4 w-4 accent-emerald-700" checked={Boolean(siteForm.womenPrayerArea?.[key])} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, [key]: e.target.checked } }))} />{label}</label>)}
+                  <div className="md:col-span-2 lg:col-span-3"><Field label="ملاحظة / مصدر التحقق"><Textarea rows={2} value={siteForm.womenPrayerArea?.verificationNotes || ''} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, verificationNotes: e.target.value } }))} placeholder="اختياري: مرجع الزيارة أو مصدر تأكيد وجود المصلى..." /></Field></div>
                   <div className="md:col-span-2 lg:col-span-3"><Field label="ملاحظات مصلى النساء"><Textarea rows={3} value={siteForm.womenPrayerArea?.notes || ''} onChange={(e) => setSiteForm((current: any) => ({ ...current, womenPrayerArea: { ...current.womenPrayerArea, notes: e.target.value } }))} placeholder="أي ملاحظات تشغيلية أو تجهيزات خاصة بالقسم..." /></Field></div>
                 </div>}
               </CardContent>
