@@ -247,6 +247,77 @@ export type MosqueCompletionKpiSnapshot = {
   updatedAt: string;
 };
 
+export type MosqueImprovementAction = {
+  id: string;
+  title: string;
+  status: 'planned' | 'in_progress' | 'completed';
+  dueDate?: string | null;
+  note?: string | null;
+};
+
+export type MosqueImprovementGoal = {
+  id: string;
+  goalNumber: string;
+  year: number;
+  title: string;
+  category: 'unit_metric' | 'assignee_metric' | 'gap_reduction';
+  metricKey: 'completionRate' | 'onTimeRate' | 'avgCompletionDays' | 'overdueRate' | 'kpiScore' | 'gapCreatedCount';
+  sourceMonth?: string | null;
+  sourceSnapshotId?: string | null;
+  assigneeUserId?: string | null;
+  assigneeName?: string | null;
+  gapKey?: string | null;
+  baselineValue: number;
+  targetValue: number;
+  targetDirection: 'gte' | 'lte';
+  currentValue?: number | null;
+  currentMonth?: string | null;
+  progressPercent: number;
+  actionProgressPercent: number;
+  status: 'draft' | 'active' | 'at_risk' | 'achieved' | 'closed' | 'cancelled';
+  ownerUserId?: string | null;
+  ownerName?: string | null;
+  dueDate?: string | null;
+  correctiveActions?: MosqueImprovementAction[] | null;
+  notes?: string | null;
+  measurementNote?: string | null;
+  achievedAt?: string | null;
+  closedAt?: string | null;
+  lastEvaluatedAt?: string | null;
+  createdBy?: string | null;
+  createdByName?: string | null;
+  updatedBy?: string | null;
+  updatedByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MosqueImprovementGoalSuggestion = {
+  category: MosqueImprovementGoal['category'];
+  metricKey: MosqueImprovementGoal['metricKey'];
+  title: string;
+  baselineValue: number;
+  targetValue: number;
+  targetDirection: MosqueImprovementGoal['targetDirection'];
+  sourceMonth: string;
+  sourceSnapshotId: string;
+  assigneeUserId?: string | null;
+  assigneeName?: string | null;
+  gapKey?: string | null;
+  alreadyExists: boolean;
+};
+
+export type MosqueImprovementGoalSuggestions = {
+  year: number;
+  sourceSnapshot: {
+    id: string;
+    month: string;
+    kpiScore?: number | null;
+    kpiStatus?: string | null;
+  } | null;
+  suggestions: MosqueImprovementGoalSuggestion[];
+};
+
 export type MosqueFieldVisitImage = {
   url: string;
   fileId?: string | null;
@@ -905,6 +976,27 @@ createQuranRackMovement: (input: Record<string, unknown>) => apiJson<{ movement:
       method: 'PATCH',
       body: JSON.stringify({ status, note: note || null }),
     }),
+  improvementGoals: (filters: { year?: number; status?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (filters.year) query.set('year', String(filters.year));
+    if (filters.status) query.set('status', filters.status);
+    const suffix = query.toString();
+    return apiJson<MosqueImprovementGoal[]>(`/api/mosques/improvement-goals${suffix ? `?${suffix}` : ''}`);
+  },
+  improvementGoalAssignees: () =>
+    apiJson<MosqueCompletionTaskAssignee[]>('/api/mosques/improvement-goal-assignees'),
+  improvementGoalSuggestions: (year: number) =>
+    apiJson<MosqueImprovementGoalSuggestions>(`/api/mosques/improvement-goal-suggestions?year=${encodeURIComponent(String(year))}`),
+  createImprovementGoal: (input: Record<string, unknown>) =>
+    apiJson<MosqueImprovementGoal>('/api/mosques/improvement-goals', { method: 'POST', body: JSON.stringify(input) }),
+  updateImprovementGoal: (id: string, input: Record<string, unknown>) =>
+    apiJson<MosqueImprovementGoal>(`/api/mosques/improvement-goals/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  evaluateImprovementGoals: (year?: number) =>
+    apiJson<MosqueImprovementGoal[]>('/api/mosques/improvement-goals/evaluate', {
+      method: 'POST',
+      body: JSON.stringify({ year: year || null }),
+    }),
+
   completionTasks: (filters: { siteId?: string; status?: string } = {}) => {
     const query = new URLSearchParams();
     if (filters.siteId) query.set('siteId', filters.siteId);
