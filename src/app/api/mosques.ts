@@ -51,6 +51,11 @@ export type MosqueBuilding = {
 };
 
 export type MosqueWomenPrayerArea = {
+  presenceStatus?: 'present' | 'verified_absent' | 'unverified';
+  verificationNotes?: string | null;
+  verifiedAt?: string | null;
+  verifiedBy?: string | null;
+  verifiedByName?: string | null;
   capacity?: number | null;
   floor?: string | null;
   locationDescription?: string | null;
