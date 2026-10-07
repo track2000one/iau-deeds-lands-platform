@@ -572,6 +572,117 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
     XLSX.writeFile(workbook, `IAU_Mosques_Executive_Decisions_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
+  const exportDecisionLog = () => {
+    if (!decisions.length) {
+      toast.error('لا توجد قرارات ضمن الفترة المحددة');
+      return;
+    }
+
+    const rows = decisions.map((decision, index) => ({
+      'م': index + 1,
+      'رقم القرار': decision.decisionNumber,
+      'نوع القرار': decisionTypeLabel[decision.decisionType] || decision.decisionType,
+      'عنوان القرار': decision.title,
+      'المبرر': decision.rationale,
+      'الحالة قبل القرار': decisionStateSummary(decision.beforeState),
+      'الحالة بعد القرار': decisionStateSummary(decision.afterState),
+      'الهدف / الكيان المرتبط': decision.goalId || decision.entityId || '',
+      'المؤشر المرتبط': decision.metricKey ? (metricLabel[decision.metricKey] || decision.metricKey) : '',
+      'متخذ القرار': decision.actorName || '',
+      'الصفة': decision.actorRole === 'head' ? 'رئيس الوحدة' : (decision.actorRole || ''),
+      'التاريخ والوقت': new Date(decision.decidedAt).toLocaleString('ar-SA-u-ca-gregory'),
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    (sheet as any)['!views'] = [{ RTL: true }];
+    (sheet as any)['!cols'] = [
+      { wch: 6 }, { wch: 20 }, { wch: 28 }, { wch: 45 }, { wch: 55 }, { wch: 55 },
+      { wch: 55 }, { wch: 26 }, { wch: 24 }, { wch: 24 }, { wch: 16 }, { wch: 24 },
+    ];
+    XLSX.utils.book_append_sheet(workbook, sheet, 'سجل القرارات');
+    XLSX.writeFile(workbook, `IAU_Mosques_Executive_Decision_Log_${decisionFrom}_to_${decisionTo}.xlsx`);
+  };
+
+  const printDecisionMinutes = () => {
+    if (!decisions.length) {
+      toast.error('لا توجد قرارات ضمن الفترة المحددة لإعداد المحضر');
+      return;
+    }
+
+    const popup = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
+    if (!popup) {
+      toast.error('تعذر فتح نافذة الطباعة. تحقق من السماح بالنوافذ المنبثقة.');
+      return;
+    }
+
+    const rows = decisions.map((decision, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td><strong>${escapeHtml(decision.decisionNumber)}</strong><br/><small>${escapeHtml(decisionTypeLabel[decision.decisionType] || decision.decisionType)}</small></td>
+        <td>${escapeHtml(decision.title)}</td>
+        <td>${escapeHtml(decision.rationale)}</td>
+        <td>${escapeHtml(decisionStateSummary(decision.beforeState))}</td>
+        <td>${escapeHtml(decisionStateSummary(decision.afterState))}</td>
+        <td>${escapeHtml(decision.actorName || '—')}<br/><small>${escapeHtml(decision.actorRole === 'head' ? 'رئيس الوحدة' : (decision.actorRole || ''))}</small></td>
+        <td>${escapeHtml(new Date(decision.decidedAt).toLocaleString('ar-SA-u-ca-gregory'))}</td>
+      </tr>
+    `).join('');
+
+    popup.document.open();
+    popup.document.write(`<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>محضر القرارات التنفيذية</title>
+<style>
+@page { size: A4 landscape; margin: 12mm; }
+* { box-sizing: border-box; }
+body { font-family: Arial, Tahoma, sans-serif; color: #17202a; margin: 0; direction: rtl; }
+.header { text-align: center; border-bottom: 3px solid #0b4a3f; padding-bottom: 12px; margin-bottom: 16px; }
+.header h1 { margin: 0; color: #0b4a3f; font-size: 22px; }
+.header h2 { margin: 7px 0 0; font-size: 15px; font-weight: 700; }
+.meta { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; margin: 10px 0 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 9px; }
+th, td { border: 1px solid #b9c1c7; padding: 7px; vertical-align: top; line-height: 1.55; }
+th { background: #eaf4f1; color: #0b4a3f; font-weight: 800; }
+small { color: #64748b; }
+.footer { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; font-size: 11px; }
+.signature { min-height: 70px; border-top: 1px solid #94a3b8; padding-top: 8px; text-align: center; }
+.note { margin-top: 12px; font-size: 9px; color: #64748b; }
+@media print { button { display:none; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>جامعة الإمام عبدالرحمن بن فيصل</h1>
+    <h2>وحدة العناية بالمساجد والمصليات الجامعية — محضر القرارات التنفيذية</h2>
+  </div>
+  <div class="meta">
+    <div><strong>الفترة:</strong> ${escapeHtml(decisionFrom)} إلى ${escapeHtml(decisionTo)}</div>
+    <div><strong>عدد القرارات:</strong> ${decisions.length}</div>
+    <div><strong>تاريخ إعداد المحضر:</strong> ${escapeHtml(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>م</th><th>رقم / نوع القرار</th><th>موضوع القرار</th><th>المبرر</th>
+        <th>الحالة قبل</th><th>الحالة بعد</th><th>متخذ القرار</th><th>التاريخ والوقت</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="note">أُعد هذا المحضر آليًا من سجل القرارات التنفيذي المحفوظ في منصة IAU-Deeds، وتبقى تفاصيل كل قرار وحالته قبل التنفيذ وبعده محفوظة في السجل الإلكتروني.</div>
+  <div class="footer">
+    <div class="signature">إعداد ومراجعة<br/>الاسم: ____________________<br/>التوقيع: ____________________</div>
+    <div class="signature">رئيس وحدة العناية بالمساجد والمصليات الجامعية<br/>الاسم: ____________________<br/>التوقيع: ____________________</div>
+  </div>
+  <script>window.onload = () => window.print();<\/script>
+</body>
+</html>`);
+    popup.document.close();
+  };
+
   return (
     <div className="space-y-4" dir="rtl">
       <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.08)]">
