@@ -8,7 +8,6 @@ import {
   Gauge,
   LandPlot,
   ListChecks,
-  MapPinned,
   RefreshCw,
   ShieldCheck,
   Target,
@@ -62,6 +61,8 @@ const EMPTY: InvestmentExecutiveDashboard = {
     availableReferenceArea: 0,
     readyAreaCount: 0,
     readyReferenceArea: 0,
+    availableAndReadyAreaCount: 0,
+    availableAndReadyReferenceArea: 0,
     opportunityCandidateCount: 0,
     opportunityCandidateArea: 0,
     blockedAreaCount: 0,
@@ -167,12 +168,6 @@ export const InvestmentExecutiveDashboardPage: React.FC = () => {
   const generatedAt = data.generatedAt
     ? formatDate(data.generatedAt)
     : '-';
-
-  const readyAndAvailable = data.siteRanking.reduce(
-    (sum, site) =>
-      sum + Math.min(site.availableCount, site.readyCount),
-    0
-  );
 
   return (
     <div className="space-y-6">
@@ -280,7 +275,7 @@ export const InvestmentExecutiveDashboardPage: React.FC = () => {
               {kpis.readyAreaCount}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              متاحة وجاهزة تقريبًا: {readyAndAvailable}
+              متاحة وجاهزة: {kpis.availableAndReadyAreaCount}
             </p>
           </CardContent>
         </Card>
