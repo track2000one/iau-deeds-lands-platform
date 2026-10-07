@@ -65,7 +65,7 @@ const formatDate = (value?: string | null) => {
   }).format(date);
 };
 
-export const GeometryApprovalPanel = <T extends GeometryRecord>({
+export const GeometryApprovalPanel = <T extends GeometryRecord,>({
   entityType,
   record,
   canEdit,
