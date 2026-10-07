@@ -1984,6 +1984,13 @@ ${quranStockMovementForm.notes}` : ''}`
         ['الموقع داخل الجامعة', location],
         ['المساحة', site.area ? `${site.area.toLocaleString('ar-SA')} م²` : '-'],
         ['الطاقة الاستيعابية', site.capacity ? site.capacity.toLocaleString('ar-SA') : '-'],
+        ...(['mosque', 'jami'].includes(site.siteType) ? [
+          ['مصلى النساء', site.hasWomenPrayerArea ? 'موجود' : 'غير مسجل'],
+          ['حالة مصلى النساء', site.hasWomenPrayerArea ? womenPrayerAreaStatusLabel(site) : '-'],
+          ['سعة مصلى النساء', site.hasWomenPrayerArea && site.womenPrayerArea?.capacity ? Number(site.womenPrayerArea.capacity).toLocaleString('ar-SA') : '-'],
+          ['الدور / المستوى لمصلى النساء', site.hasWomenPrayerArea ? (site.womenPrayerArea?.floor || '-') : '-'],
+          ['موقع مصلى النساء', site.hasWomenPrayerArea ? (site.womenPrayerArea?.locationDescription || '-') : '-'],
+        ] : []),
         ['الإمام', site.imamName || '-'],
         ['المؤذن', site.muezzinName || '-'],
         ['الخطيب', site.khateebName || '-'],
