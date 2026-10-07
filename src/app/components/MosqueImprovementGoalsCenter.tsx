@@ -594,6 +594,14 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       'نوع النقص': goal.gapKey ? (missingLabels[goal.gapKey] || goal.gapKey) : '',
       'تاريخ الاستحقاق': formatDate(goal.dueDate),
       'ملاحظة القياس': goal.measurementNote || '',
+      'حالة الإثبات': goal.evidenceStatus || 'not_submitted',
+      'ملخص الإغلاق': goal.closureSummary || '',
+      'عدد المرفقات': Array.isArray(goal.closureEvidence) ? goal.closureEvidence.length : 0,
+      'رافع الإثبات': goal.evidenceSubmittedName || '',
+      'تاريخ رفع الإثبات': formatDate(goal.evidenceSubmittedAt),
+      'مراجع الإثبات': goal.evidenceReviewedName || '',
+      'تاريخ المراجعة': formatDate(goal.evidenceReviewedAt),
+      'ملاحظة المراجعة': goal.evidenceReviewNote || '',
       'ملاحظات': goal.notes || '',
     }));
 
@@ -609,6 +617,22 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       }))
     );
 
+    const evidenceRows = goals.flatMap((goal) =>
+      (Array.isArray(goal.closureEvidence) ? goal.closureEvidence : []).map((item, index) => ({
+        'رقم الهدف': goal.goalNumber,
+        'الهدف': goal.title,
+        'م': index + 1,
+        'نوع الإثبات': item.kind === 'image' ? 'صورة' : 'مستند',
+        'اسم الملف': item.fileName || '',
+        'نوع الملف': item.mimeType || '',
+        'الرابط': item.url,
+        'تاريخ الرفع': item.submittedAt ? formatDate(item.submittedAt) : formatDate(goal.evidenceSubmittedAt),
+        'رافع الإثبات': goal.evidenceSubmittedName || '',
+        'حالة المراجعة': goal.evidenceStatus || '',
+        'ملاحظة المراجعة': goal.evidenceReviewNote || '',
+      }))
+    );
+
     const summaryRows = [
       ['التقرير', 'خطة التحسين السنوية لمؤشرات بيانات المساجد والمصليات'],
       ['السنة', year],
@@ -617,7 +641,9 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
       ['إجمالي الأهداف', summary.total],
       ['قيد التنفيذ', summary.active],
       ['معرضة للتعثر', summary.atRisk],
-      ['متحققة / مغلقة', summary.achieved],
+      ['متحققة وتنتظر الإثبات', summary.achieved],
+      ['إثباتات قيد المراجعة', summary.evidenceReview],
+      ['مغلقة بعد اعتماد الإثبات', summary.closed],
       ['متوسط تقدم المؤشرات', summary.performanceProgress + '%'],
       ['متوسط تقدم الإجراءات', summary.actionProgress + '%'],
     ];
@@ -626,17 +652,20 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
     const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
     const goalsSheet = XLSX.utils.json_to_sheet(goalRows);
     const actionsSheet = XLSX.utils.json_to_sheet(actionRows);
+    const evidenceSheet = XLSX.utils.json_to_sheet(evidenceRows);
 
-    for (const sheet of [summarySheet, goalsSheet, actionsSheet]) {
+    for (const sheet of [summarySheet, goalsSheet, actionsSheet, evidenceSheet]) {
       (sheet as any)['!views'] = [{ RTL: true }];
     }
     (summarySheet as any)['!cols'] = [{ wch: 34 }, { wch: 28 }];
-    (goalsSheet as any)['!cols'] = Array.from({ length: 19 }, () => ({ wch: 22 }));
+    (goalsSheet as any)['!cols'] = Array.from({ length: 28 }, () => ({ wch: 22 }));
     (actionsSheet as any)['!cols'] = [{ wch: 18 }, { wch: 36 }, { wch: 6 }, { wch: 48 }, { wch: 18 }, { wch: 18 }, { wch: 36 }];
+    (evidenceSheet as any)['!cols'] = [{ wch: 18 }, { wch: 36 }, { wch: 6 }, { wch: 14 }, { wch: 34 }, { wch: 24 }, { wch: 48 }, { wch: 18 }, { wch: 24 }, { wch: 18 }, { wch: 40 }];
 
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'الملخص');
     XLSX.utils.book_append_sheet(workbook, goalsSheet, 'الأهداف');
     XLSX.utils.book_append_sheet(workbook, actionsSheet, 'الإجراءات التصحيحية');
+    XLSX.utils.book_append_sheet(workbook, evidenceSheet, 'أدلة الإغلاق');
     XLSX.writeFile(workbook, `IAU_Mosques_Improvement_Plan_${year}.xlsx`);
   };
 
@@ -678,12 +707,13 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
         </CardHeader>
 
         <CardContent className="space-y-5 p-4 sm:p-5">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
             <SummaryMetric label="إجمالي الأهداف" value={summary.total} icon={Flag} />
             <SummaryMetric label="قيد التنفيذ" value={summary.active} icon={TrendingUp} />
             <SummaryMetric label="معرضة للتعثر" value={summary.atRisk} icon={AlertTriangle} tone={summary.atRisk ? 'danger' : 'normal'} />
-            <SummaryMetric label="متحققة / مغلقة" value={summary.achieved} icon={CheckCircle2} />
-            <SummaryMetric label="متوسط التقدم" value={summary.performanceProgress} suffix="%" icon={Gauge} />
+            <SummaryMetric label="تنتظر إثبات الإغلاق" value={summary.achieved} icon={Upload} />
+            <SummaryMetric label="إثبات قيد المراجعة" value={summary.evidenceReview} icon={FileCheck2} />
+            <SummaryMetric label="مغلقة ومعتمدة" value={summary.closed} icon={ShieldCheck} />
           </div>
 
           {availableSuggestions.length > 0 && (
@@ -734,8 +764,9 @@ export const MosqueImprovementGoalsCenter: React.FC<MosqueImprovementGoalsCenter
               <option value="draft">مسودة</option>
               <option value="active">قيد التنفيذ</option>
               <option value="at_risk">معرض للتعثر</option>
-              <option value="achieved">متحقق</option>
-              <option value="closed">مغلق</option>
+              <option value="achieved">متحقق — بانتظار الإثبات</option>
+              <option value="evidence_review">إثبات قيد المراجعة</option>
+              <option value="closed">مغلق ومعتمد</option>
               <option value="cancelled">ملغى</option>
             </NativeSelect>
           </div>
