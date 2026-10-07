@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
+  TrendingUp,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -259,6 +260,13 @@ export const InvestmentGisApprovalCenterPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/investments/executive')}
+          >
+            <TrendingUp className="me-2 h-4 w-4" />
+            المؤشرات التنفيذية
+          </Button>
           <Button
             variant="outline"
             onClick={() => navigate('/investments/gis-audit')}
