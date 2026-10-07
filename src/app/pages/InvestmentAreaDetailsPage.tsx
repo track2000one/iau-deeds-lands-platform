@@ -11,6 +11,7 @@ import {
   downloadKml,
   downloadKmz,
 } from '../../features/investments/geometryFiles';
+import { GeometryApprovalPanel } from '../components/GeometryApprovalPanel';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -36,6 +37,8 @@ export const InvestmentAreaDetailsPage: React.FC = () => {
   const { areaId } = useParams();
   const { hasPermission, isAdmin } = usePermissions();
   const canEdit = isAdmin || hasPermission('investments', 'canEdit');
+  const canAddAttachment =
+    isAdmin || hasPermission('investments', 'canAdd');
   const [area, setArea] = React.useState<InvestmentArea | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -212,6 +215,15 @@ export const InvestmentAreaDetailsPage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      <GeometryApprovalPanel
+        entityType="investment_area"
+        record={area}
+        canEdit={canEdit}
+        canAddAttachment={canAddAttachment}
+        isAdmin={isAdmin}
+        onUpdated={setArea}
+      />
     </div>
   );
 };
