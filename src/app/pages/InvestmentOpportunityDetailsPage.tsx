@@ -419,6 +419,43 @@ export const InvestmentOpportunityDetailsPage: React.FC = () => {
         </Card>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Clock3 className="h-5 w-5" />
+            محطات الدورة الإجرائية
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div>
+            <p className="text-xs text-muted-foreground">تاريخ الإنشاء</p>
+            <p className="mt-1 font-semibold">{formatDate(opportunity.createdAt)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {opportunity.createdByName || 'غير محدد'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">الإحالة للموافقة</p>
+            <p className="mt-1 font-semibold">{formatDate(opportunity.submittedAt)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">الاعتماد</p>
+            <p className="mt-1 font-semibold">{formatDate(opportunity.approvedAt)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {opportunity.approvedByName || 'غير محدد'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">الطرح</p>
+            <p className="mt-1 font-semibold">{formatDate(opportunity.offeredAt)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">الاستثمار</p>
+            <p className="mt-1 font-semibold">{formatDate(opportunity.investedAt)}</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
