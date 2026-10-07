@@ -3149,7 +3149,8 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
               {sites.map((site) => {
                 const activeVisit = activeVisitBySite.get(site.id);
                 const blocked = !editingVisit && Boolean(activeVisit);
-                return <option key={site.id} value={site.id} disabled={blocked}>{site.name} — {site.campusLocation || site.city || ''}{site.hasWomenPrayerArea ? ' — يوجد مصلى نساء' : ''}{blocked ? ` — زيارة قائمة ${activeVisit?.visitNumber || ''}` : ''}</option>;
+                const womenLabel = ['mosque', 'jami'].includes(site.siteType) ? ` — ${womenPrayerPresenceLabel(site)}` : '';
+                return <option key={site.id} value={site.id} disabled={blocked}>{site.name} — {site.campusLocation || site.city || ''}{womenLabel}{blocked ? ` — زيارة قائمة ${activeVisit?.visitNumber || ''}` : ''}</option>;
               })}
             </NativeSelect>
           </Field>
@@ -3173,13 +3174,21 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
               ) : <>
                 <option value="whole_site">الموقع بالكامل</option>
                 <option value="men_section">قسم الرجال</option>
-                {selectedVisitSite?.hasWomenPrayerArea && <option value="women_section">مصلى النساء فقط</option>}
-                {selectedVisitSite?.hasWomenPrayerArea && <option value="both_sections">قسم الرجال + مصلى النساء</option>}
+                {womenPrayerPresence(selectedVisitSite) === 'present' && <option value="women_section">مصلى النساء فقط</option>}
+                {womenPrayerPresence(selectedVisitSite) === 'present' && <option value="both_sections">قسم الرجال + مصلى النساء</option>}
               </>}
             </NativeSelect>
           </Field>
-          {selectedVisitSite?.hasWomenPrayerArea && ['whole_site', 'women_section', 'both_sections'].includes(visitForm.visitScope) && <div className="md:col-span-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-6 text-emerald-900">
+          {selectedVisitSite && ['mosque', 'jami'].includes(selectedVisitSite.siteType) && womenPrayerPresence(selectedVisitSite) === 'present' && ['whole_site', 'women_section', 'both_sections'].includes(visitForm.visitScope) && <div className="md:col-span-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-6 text-emerald-900">
             يشمل نطاق هذه الزيارة مصلى النساء؛ أضيفت بنود الفحص الخاصة بالنظافة والمرافق والتكييف والإنارة والسلامة والخصوصية والتجهيزات والإتاحة تلقائيًا.
+          </div>}
+          {selectedVisitSite && ['mosque', 'jami'].includes(selectedVisitSite.siteType) && womenPrayerPresence(selectedVisitSite) === 'unverified' && <div className="md:col-span-3 flex items-start gap-2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-bold leading-6 text-slate-700">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>لم يتم التحقق من وجود مصلى النساء في هذا الموقع. نطاق «مصلى النساء» غير متاح حتى استكمال حالة التحقق من سجل المسجد أو الجامع.</span>
+          </div>}
+          {selectedVisitSite && ['mosque', 'jami'].includes(selectedVisitSite.siteType) && womenPrayerPresence(selectedVisitSite) === 'verified_absent' && <div className="md:col-span-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold leading-6 text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>تم التحقق من عدم وجود مصلى نساء في هذا الموقع؛ لذلك لا يظهر نطاق خاص بالنساء في الزيارة.</span>
           </div>}
           <Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field>
           <Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field>
