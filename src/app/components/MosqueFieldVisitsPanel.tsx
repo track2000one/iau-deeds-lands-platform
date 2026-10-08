@@ -29,6 +29,7 @@ import {
   mosqueApi,
   type MosqueFieldTour,
   type MosqueFieldVisit,
+  type MosqueCompletionTaskAssignee,
   type MosqueFieldVisitAttachment,
   type MosqueFieldVisitImage,
   type MosqueFieldVisitItem,
@@ -84,6 +85,11 @@ type Props = {
   canEdit: boolean;
   canDelete: boolean;
   canPrint: boolean;
+};
+
+type TourVisitAssignment = {
+  primaryAssigneeUserId: string;
+  womenAssigneeUserId: string;
 };
 
 type VisitForm = {
@@ -1120,9 +1126,11 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
 
   const [tourDialog, setTourDialog] = React.useState(false);
   const [tourSearch, setTourSearch] = React.useState('');
+  const [fieldVisitAssignees, setFieldVisitAssignees] = React.useState<MosqueCompletionTaskAssignee[]>([]);
   const [tourForm, setTourForm] = React.useState({
     title: '', scheduledDate: new Date().toISOString().slice(0, 10), scope: '',
     teamMembers: currentUsername || 'مستخدم', notes: '', siteIds: [] as string[],
+    visitAssignments: {} as Record<string, TourVisitAssignment>,
   });
 
   const [visitDialog, setVisitDialog] = React.useState(false);
@@ -1154,7 +1162,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryData, tourData, visitData, checklist, quranStockData, quranRackData, requestRows, baselineStatus] = await Promise.all([
+      const [summaryData, tourData, visitData, checklist, quranStockData, quranRackData, requestRows, baselineStatus, assigneeRows] = await Promise.all([
         mosqueApi.fieldVisitSummary(),
         mosqueApi.fieldTours(),
         mosqueApi.fieldVisits(),
@@ -1163,12 +1171,14 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         mosqueApi.quranRackDashboard().catch(() => null as MosqueQuranRackDashboard | null),
         mosqueApi.requests().catch(() => [] as MosqueRequest[]),
         mosqueApi.quranOpeningBaselineStatus().catch(() => null as MosqueQuranOpeningBaselineStatus | null),
+        mosqueApi.fieldVisitAssignees().catch(() => [] as MosqueCompletionTaskAssignee[]),
       ]);
       setSummary(summaryData);
       setQuranStockDashboard(quranStockData);
       setQuranRackDashboard(quranRackData);
       setQuranOpeningBaselineStatus(baselineStatus);
       setQuranSupplyRequests(requestRows.filter(isQuranSupplyRequest));
+      setFieldVisitAssignees(assigneeRows);
       setTours(tourData);
       setVisits(visitData.map((visit) => ({ ...visit, items: normalizeQuranChecklistItems(visit.items || []) })));
       setTemplate(normalizeQuranChecklistItems(checklist));
@@ -1263,11 +1273,68 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     return map;
   }, [visits]);
 
+  const currentAssigneeId = React.useMemo(
+    () => fieldVisitAssignees.find((item) => item.username === currentUsername)?.id || '',
+    [fieldVisitAssignees, currentUsername]
+  );
+
+  const updateTourSiteSelection = (site: MosqueSite, checked: boolean) => {
+    setTourForm((current) => {
+      if (checked) {
+        const { [site.id]: _removed, ...remainingAssignments } = current.visitAssignments;
+        return {
+          ...current,
+          siteIds: current.siteIds.filter((id) => id !== site.id),
+          visitAssignments: remainingAssignments,
+        };
+      }
+      return {
+        ...current,
+        siteIds: [...current.siteIds, site.id],
+        visitAssignments: {
+          ...current.visitAssignments,
+          [site.id]: current.visitAssignments[site.id] || {
+            primaryAssigneeUserId: currentAssigneeId,
+            womenAssigneeUserId: '',
+          },
+        },
+      };
+    });
+  };
+
+  const updateTourAssignment = (siteId: string, patch: Partial<TourVisitAssignment>) => {
+    setTourForm((current) => ({
+      ...current,
+      visitAssignments: {
+        ...current.visitAssignments,
+        [siteId]: {
+          ...(current.visitAssignments[siteId] || { primaryAssigneeUserId: currentAssigneeId, womenAssigneeUserId: '' }),
+          ...patch,
+        },
+      },
+    }));
+  };
+
+  const selectAvailableTourSites = () => {
+    const available = filteredTourSites.filter((site) => !activeVisitBySite.has(site.id));
+    setTourForm((current) => ({
+      ...current,
+      siteIds: available.map((site) => site.id),
+      visitAssignments: Object.fromEntries(available.map((site) => [
+        site.id,
+        current.visitAssignments[site.id] || { primaryAssigneeUserId: currentAssigneeId, womenAssigneeUserId: '' },
+      ])),
+    }));
+  };
+
+  const clearTourSites = () => setTourForm((current) => ({ ...current, siteIds: [], visitAssignments: {} }));
+
   const openTour = () => {
     setTourForm({
       title: `جولة ميدانية - ${new Date().toLocaleDateString('ar-SA-u-ca-gregory')}`,
       scheduledDate: new Date().toISOString().slice(0, 10),
       scope: '', teamMembers: currentUsername || 'مستخدم', notes: '', siteIds: [],
+      visitAssignments: {},
     });
     setTourSearch('');
     setTourDialog(true);
@@ -1284,14 +1351,42 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       toast.error(`يوجد إجراء ميداني قائم للموقع ${conflictingVisit.site.name} برقم ${conflictingVisit.visitNumber}. افتح الزيارة القائمة بدل إنشاء زيارة مكررة.`);
       return;
     }
+
+    for (const siteId of tourForm.siteIds) {
+      const site = sites.find((item) => item.id === siteId);
+      const assignment = tourForm.visitAssignments[siteId];
+      if (!site || !assignment?.primaryAssigneeUserId) {
+        toast.error(`حدد منفذ الزيارة الرئيسية للموقع ${site?.name || ''}`);
+        return;
+      }
+      if (womenPrayerPresence(site) === 'present' && ['mosque', 'jami'].includes(site.siteType)) {
+        if (!assignment.womenAssigneeUserId) {
+          toast.error(`حدد مستخدمًا مستقلًا لزيارة مصلى النساء في ${site.name}`);
+          return;
+        }
+        if (assignment.womenAssigneeUserId === assignment.primaryAssigneeUserId) {
+          toast.error(`زيارة مصلى النساء في ${site.name} يجب أن تسند إلى مستخدم مختلف عن الزيارة الرئيسية`);
+          return;
+        }
+      }
+    }
+
     try {
       setSaving(true);
-      await mosqueApi.createFieldTour({
-        ...tourForm,
+      const created = await mosqueApi.createFieldTour({
+        title: tourForm.title,
         scheduledDate: new Date(`${tourForm.scheduledDate}T09:00:00`).toISOString(),
+        scope: tourForm.scope,
         teamMembers,
+        notes: tourForm.notes,
+        siteIds: tourForm.siteIds,
+        visitAssignments: tourForm.siteIds.map((siteId) => ({
+          siteId,
+          primaryAssigneeUserId: tourForm.visitAssignments[siteId]?.primaryAssigneeUserId,
+          womenAssigneeUserId: tourForm.visitAssignments[siteId]?.womenAssigneeUserId || null,
+        })),
       });
-      toast.success(`تم إنشاء الجولة وجدولة ${tourForm.siteIds.length} زيارة مرتبطة بالمواقع المحددة`);
+      toast.success(`تم إنشاء الجولة وجدولة ${created.visits?.length || tourForm.siteIds.length} زيارة مستقلة ضمن ${tourForm.siteIds.length} موقع`);
       setTourDialog(false);
       await load();
     } catch (error) {
