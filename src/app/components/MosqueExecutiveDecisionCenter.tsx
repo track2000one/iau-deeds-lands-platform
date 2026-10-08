@@ -3,6 +3,8 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import {
   AlertTriangle,
+  BellRing,
+  CalendarClock,
   CheckCircle2,
   Clock3,
   FileCheck2,
@@ -65,6 +67,17 @@ type ExecutiveItem = {
   detail?: string;
   goal?: MosqueImprovementGoal;
   suggestion?: MosqueImprovementGoalSuggestion;
+};
+
+type ExecutiveAlert = {
+  id: string;
+  kind: 'overdue' | 'due_soon' | 'stale' | 'unassigned' | 'evidence_waiting';
+  severity: 'critical' | 'warning' | 'attention';
+  title: string;
+  description: string;
+  detail: string;
+  goal: MosqueImprovementGoal;
+  priority: number;
 };
 
 type Props = {
@@ -229,6 +242,7 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
   const [filter, setFilter] = useState<QueueFilter>('all');
   const [trackingStatus, setTrackingStatus] = useState('all');
   const [trackingOwner, setTrackingOwner] = useState('all');
+  const [alertFilter, setAlertFilter] = useState<'all' | ExecutiveAlert['kind']>('all');
 
   const [reviewGoal, setReviewGoal] = useState<MosqueImprovementGoal | null>(null);
   const [reviewNote, setReviewNote] = useState('');
@@ -464,6 +478,151 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
     }).length;
     return { total, active, atRisk, completed, overdue };
   }, [goals]);
+
+  const executiveAlerts = useMemo<ExecutiveAlert[]>(() => {
+    const now = new Date();
+    const today = new Date(`${riyadhDateInput(now)}T00:00:00+03:00`).getTime();
+    const alerts: ExecutiveAlert[] = [];
+
+    goals.forEach((goal) => {
+      if (['closed', 'cancelled'].includes(goal.status)) return;
+
+      const dueAt = goal.dueDate
+        ? new Date(`${goal.dueDate.slice(0, 10)}T00:00:00+03:00`).getTime()
+        : null;
+      const daysToDue = dueAt === null || Number.isNaN(dueAt)
+        ? null
+        : Math.ceil((dueAt - today) / 86400000);
+      const updatedAt = new Date(goal.updatedAt).getTime();
+      const staleDays = Number.isNaN(updatedAt)
+        ? null
+        : Math.floor((now.getTime() - updatedAt) / 86400000);
+
+      if (
+        daysToDue !== null &&
+        daysToDue < 0 &&
+        !['achieved', 'evidence_review'].includes(goal.status)
+      ) {
+        alerts.push({
+          id: `overdue:${goal.id}`,
+          kind: 'overdue',
+          severity: 'critical',
+          title: `قرار متأخر عن موعده: ${goal.title}`,
+          description: `تجاوز الهدف ${goal.goalNumber} تاريخ الاستحقاق دون إغلاق التنفيذ.`,
+          detail: `التأخير ${Math.abs(daysToDue)} يوم — المسؤول: ${goal.ownerName || 'غير مسند'}`,
+          goal,
+          priority: 100 + Math.min(Math.abs(daysToDue), 30),
+        });
+      } else if (
+        daysToDue !== null &&
+        daysToDue >= 0 &&
+        daysToDue <= 7 &&
+        ['draft', 'active', 'at_risk'].includes(goal.status)
+      ) {
+        alerts.push({
+          id: `due-soon:${goal.id}`,
+          kind: 'due_soon',
+          severity: daysToDue <= 2 ? 'warning' : 'attention',
+          title: daysToDue === 0 ? `يستحق اليوم: ${goal.title}` : `موعد استحقاق قريب: ${goal.title}`,
+          description: daysToDue === 0
+            ? `الهدف ${goal.goalNumber} يستحق اليوم ويحتاج تحديث حالة التنفيذ.`
+            : `متبقي ${daysToDue} يوم على استحقاق الهدف ${goal.goalNumber}.`,
+          detail: `المسؤول: ${goal.ownerName || 'غير مسند'} — الإنجاز: ${Math.round(goal.progressPercent)}%`,
+          goal,
+          priority: 80 - daysToDue,
+        });
+      }
+
+      if (
+        staleDays !== null &&
+        staleDays >= 7 &&
+        ['active', 'at_risk'].includes(goal.status)
+      ) {
+        alerts.push({
+          id: `stale:${goal.id}`,
+          kind: 'stale',
+          severity: staleDays >= 14 ? 'warning' : 'attention',
+          title: `لم يتم تحديث التنفيذ: ${goal.title}`,
+          description: `لم يسجل تحديث على الهدف ${goal.goalNumber} منذ ${staleDays} يومًا.`,
+          detail: `آخر تحديث: ${formatDate(goal.updatedAt)} — المسؤول: ${goal.ownerName || 'غير مسند'}`,
+          goal,
+          priority: 65 + Math.min(staleDays, 20),
+        });
+      }
+
+      if (!goal.ownerName && ['draft', 'active', 'at_risk'].includes(goal.status)) {
+        alerts.push({
+          id: `unassigned:${goal.id}`,
+          kind: 'unassigned',
+          severity: 'warning',
+          title: `قرار دون مسؤول تنفيذ: ${goal.title}`,
+          description: `الهدف ${goal.goalNumber} ما زال دون مسؤول محدد، مما يضعف قابلية المتابعة والمساءلة.`,
+          detail: goal.dueDate ? `الاستحقاق: ${formatDate(goal.dueDate)}` : 'لا يوجد تاريخ استحقاق محدد',
+          goal,
+          priority: 85,
+        });
+      }
+
+      if (goal.status === 'evidence_review') {
+        const submittedAt = goal.evidenceSubmittedAt ? new Date(goal.evidenceSubmittedAt).getTime() : NaN;
+        const waitingDays = Number.isNaN(submittedAt)
+          ? 0
+          : Math.floor((now.getTime() - submittedAt) / 86400000);
+        if (waitingDays >= 3) {
+          alerts.push({
+            id: `evidence-waiting:${goal.id}`,
+            kind: 'evidence_waiting',
+            severity: waitingDays >= 7 ? 'warning' : 'attention',
+            title: `إثبات إغلاق ينتظر الاعتماد: ${goal.title}`,
+            description: `مضى ${waitingDays} يومًا على رفع إثبات الهدف ${goal.goalNumber} دون حسم المراجعة.`,
+            detail: `${Array.isArray(goal.closureEvidence) ? goal.closureEvidence.length : 0} مرفق — رفع بواسطة: ${goal.evidenceSubmittedName || 'المسؤول'}`,
+            goal,
+            priority: 70 + Math.min(waitingDays, 20),
+          });
+        }
+      }
+    });
+
+    return alerts.sort((a, b) => b.priority - a.priority || a.title.localeCompare(b.title, 'ar'));
+  }, [goals]);
+
+  const visibleExecutiveAlerts = useMemo(
+    () => alertFilter === 'all' ? executiveAlerts : executiveAlerts.filter((alert) => alert.kind === alertFilter),
+    [alertFilter, executiveAlerts]
+  );
+
+  const executiveAlertSummary = useMemo(() => ({
+    total: executiveAlerts.length,
+    overdue: executiveAlerts.filter((alert) => alert.kind === 'overdue').length,
+    dueSoon: executiveAlerts.filter((alert) => alert.kind === 'due_soon').length,
+    stale: executiveAlerts.filter((alert) => alert.kind === 'stale').length,
+    unassigned: executiveAlerts.filter((alert) => alert.kind === 'unassigned').length,
+    evidenceWaiting: executiveAlerts.filter((alert) => alert.kind === 'evidence_waiting').length,
+  }), [executiveAlerts]);
+
+  useEffect(() => {
+    if (!executiveAlerts.length) return;
+
+    const todayKey = riyadhDateInput();
+    const storageKey = `iau-mosques-executive-alerts:${todayKey}`;
+    try {
+      if (window.localStorage.getItem(storageKey)) return;
+      window.localStorage.setItem(storageKey, 'shown');
+    } catch {
+      // Local storage can be unavailable in restricted browser modes.
+    }
+
+    const criticalCount = executiveAlerts.filter((alert) => alert.severity === 'critical').length;
+    const warningCount = executiveAlerts.filter((alert) => alert.severity === 'warning').length;
+
+    if (criticalCount > 0) {
+      toast.error(`تنبيه تنفيذي: توجد ${criticalCount} حالة حرجة تحتاج تدخلاً، من أصل ${executiveAlerts.length} تنبيه.`);
+    } else if (warningCount > 0) {
+      toast.warning(`تنبيه تنفيذي: توجد ${warningCount} حالة ذات أولوية، من أصل ${executiveAlerts.length} تنبيه.`);
+    } else {
+      toast.info(`لديك ${executiveAlerts.length} تنبيه متابعة تنفيذي جديد.`);
+    }
+  }, [executiveAlerts]);
 
   const extendGoal = async (goal: MosqueImprovementGoal, reason: string) => {
     setActingId(goal.id);
@@ -918,7 +1077,111 @@ small { color: #64748b; }
       </Card>
 
       <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.06)]">
-        <Card className="overflow-hidden rounded-[26px] border border-[#d9c9a5] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.06)]">
+        <Card className="overflow-hidden rounded-[26px] border border-rose-200 bg-white shadow-[0_14px_34px_rgba(127,29,29,0.06)]">
+        <CardHeader className="border-b border-rose-100 bg-rose-50/40">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <Badge variant="outline" className="mb-2 border-rose-200 bg-white text-rose-800">تنبيهات آلية داخل المنصة</Badge>
+              <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]">
+                <BellRing className="h-5 w-5 text-rose-700" />
+                مركز تنبيهات تنفيذ القرارات
+              </CardTitle>
+              <CardDescription className="mt-1 max-w-4xl leading-6">
+                يراقب الاستحقاقات والتأخير وعدم التحديث وإسناد المسؤول واعتماد الإثباتات تلقائيًا، ويعرض الحالات الأعلى أولوية أولًا.
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className={executiveAlertSummary.total ? 'border-rose-200 bg-white text-rose-800' : 'border-emerald-200 bg-white text-emerald-800'}>
+              {executiveAlertSummary.total ? `${executiveAlertSummary.total} تنبيه نشط` : 'لا توجد تنبيهات نشطة'}
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4 p-4 sm:p-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <DecisionMetric label="متأخرة" value={executiveAlertSummary.overdue} icon={AlertTriangle} tone={executiveAlertSummary.overdue ? 'danger' : 'normal'} />
+            <DecisionMetric label="استحقاق خلال 7 أيام" value={executiveAlertSummary.dueSoon} icon={CalendarClock} tone={executiveAlertSummary.dueSoon ? 'warning' : 'normal'} />
+            <DecisionMetric label="دون تحديث 7+ أيام" value={executiveAlertSummary.stale} icon={RefreshCw} tone={executiveAlertSummary.stale ? 'warning' : 'normal'} />
+            <DecisionMetric label="دون مسؤول تنفيذ" value={executiveAlertSummary.unassigned} icon={UserRoundCheck} tone={executiveAlertSummary.unassigned ? 'warning' : 'normal'} />
+            <DecisionMetric label="إثباتات تنتظر الاعتماد" value={executiveAlertSummary.evidenceWaiting} icon={FileCheck2} tone={executiveAlertSummary.evidenceWaiting ? 'warning' : 'normal'} />
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-[1fr_auto] md:items-end">
+            <label className="space-y-1.5">
+              <span className="text-[11px] font-black text-slate-600">نوع التنبيه</span>
+              <NativeSelect value={alertFilter} onChange={(event) => setAlertFilter(event.target.value as 'all' | ExecutiveAlert['kind'])}>
+                <option value="all">جميع التنبيهات</option>
+                <option value="overdue">متأخر عن الاستحقاق</option>
+                <option value="due_soon">استحقاق قريب</option>
+                <option value="stale">لم يتم تحديثه</option>
+                <option value="unassigned">دون مسؤول تنفيذ</option>
+                <option value="evidence_waiting">إثبات ينتظر الاعتماد</option>
+              </NativeSelect>
+            </label>
+            <Button variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={onOpenImprovementPlan}>
+              فتح خطة التحسين
+            </Button>
+          </div>
+
+          {visibleExecutiveAlerts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 p-8 text-center">
+              <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" />
+              <p className="mt-3 text-sm font-black text-emerald-900">لا توجد تنبيهات مطابقة للتصفية الحالية.</p>
+              <p className="mt-1 text-xs text-emerald-700">سيظهر أي تأخير أو استحقاق قريب أو توقف في التحديث هنا تلقائيًا.</p>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {visibleExecutiveAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className={alert.severity === 'critical'
+                    ? 'rounded-2xl border border-rose-200 bg-rose-50/70 p-4'
+                    : alert.severity === 'warning'
+                      ? 'rounded-2xl border border-amber-200 bg-amber-50/70 p-4'
+                      : 'rounded-2xl border border-sky-200 bg-sky-50/60 p-4'}
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className={alert.severity === 'critical'
+                            ? 'border-rose-200 bg-white text-rose-800'
+                            : alert.severity === 'warning'
+                              ? 'border-amber-200 bg-white text-amber-800'
+                              : 'border-sky-200 bg-white text-sky-800'}
+                        >
+                          {alert.kind === 'overdue'
+                            ? 'متأخر'
+                            : alert.kind === 'due_soon'
+                              ? 'استحقاق قريب'
+                              : alert.kind === 'stale'
+                                ? 'توقف تحديث'
+                                : alert.kind === 'unassigned'
+                                  ? 'دون مسؤول'
+                                  : 'انتظار اعتماد'}
+                        </Badge>
+                        <span className="text-[10px] font-black text-slate-400">{alert.goal.goalNumber}</span>
+                      </div>
+                      <h3 className="mt-2 text-sm font-black text-slate-900">{alert.title}</h3>
+                      <p className="mt-1 text-xs leading-6 text-slate-600">{alert.description}</p>
+                      <p className="mt-1 text-[10px] font-bold leading-5 text-slate-400">{alert.detail}</p>
+                    </div>
+                    <Button size="sm" variant="outline" className="shrink-0 border-slate-200 bg-white text-slate-700" onClick={onOpenImprovementPlan}>
+                      معالجة الحالة
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-6 text-slate-600">
+            قواعد التنبيه الحالية: استحقاق خلال 7 أيام، تجاوز الموعد، عدم تحديث لمدة 7 أيام فأكثر، قرار دون مسؤول تنفيذ، أو إثبات إغلاق ينتظر الاعتماد 3 أيام فأكثر. يظهر ملخص تنبيهي مرة واحدة يوميًا عند فتح المركز.
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden rounded-[26px] border border-[#d9c9a5] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.06)]">
         <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8]">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
