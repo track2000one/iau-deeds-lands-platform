@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import { QRCodeSVG } from 'qrcode.react';
 import * as XLSX from 'xlsx';
@@ -599,6 +599,8 @@ const mediaImportSitePayload = (site: MosqueSite, images: MosqueSiteMediaLibrary
 
 export const MosquesUnitPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const handledNotificationQueryRef = useRef<string | null>(null);
   const { hasPermission, isAdmin } = usePermissions();
   const canAdd = isAdmin || hasPermission('mosques', 'canAdd');
   const canEdit = isAdmin || hasPermission('mosques', 'canEdit');
@@ -692,7 +694,7 @@ export const MosquesUnitPage: React.FC = () => {
   const [roleUserFilter, setRoleUserFilter] = useState<'all' | MosqueModuleRole>('all');
   const [notificationSearch, setNotificationSearch] = useState('');
   const [notificationReadFilter, setNotificationReadFilter] = useState<'all' | 'unread' | 'read'>('all');
-  const [notificationTypeFilter, setNotificationTypeFilter] = useState<'all' | 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other'>('all');
+  const [notificationTypeFilter, setNotificationTypeFilter] = useState<'all' | 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'improvement' | 'other'>('all');
 
   const [buildingDialog, setBuildingDialog] = useState(false);
   const [buildingCoverageReportOpen, setBuildingCoverageReportOpen] = useState(false);
@@ -2978,6 +2980,7 @@ ${quranStockMovementForm.notes}` : ''}`
       try {
         await mosqueApi.readNotification(notice.id);
         setNotifications((current) => current.map((item) => item.id === notice.id ? { ...item, isRead: true } : item));
+        window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
       } catch {
         // Navigation should still work even if marking the notification as read fails.
       }
@@ -3030,12 +3033,36 @@ ${quranStockMovementForm.notes}` : ''}`
     }
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const requestedTab = params.get('tab');
+    const noticeId = params.get('notice');
+    const allowedTabs = new Set([
+      'overview', 'sites', 'data-completeness', 'kpi-archive', 'kpi-annual',
+      'improvement-goals', 'executive-decisions', 'field-visits', 'requests',
+      'tickets', 'leaves', 'quran', 'reports', 'map', 'buildings', 'team',
+      'jobs', 'roles', 'notifications',
+    ]);
+
+    if (requestedTab && allowedTabs.has(requestedTab)) {
+      setActiveTab(requestedTab);
+    }
+
+    if (!noticeId || handledNotificationQueryRef.current === noticeId || !notifications.length) return;
+    const notice = notifications.find((item) => item.id === noticeId);
+    if (!notice) return;
+
+    handledNotificationQueryRef.current = noticeId;
+    void openNotificationTarget(notice);
+  }, [location.search, notifications]);
+
   const markAllNotificationsRead = async () => {
     const unread = notifications.filter((notice) => !notice.isRead);
     if (!unread.length) return;
     try {
       await Promise.all(unread.map((notice) => mosqueApi.readNotification(notice.id)));
       setNotifications((current) => current.map((notice) => ({ ...notice, isRead: true })));
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
       toast.success('تم تحديد جميع الإشعارات كمقروءة');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحديث جميع الإشعارات');
@@ -4481,7 +4508,7 @@ ${quranStockMovementForm.notes}` : ''}`
                 <div className="grid gap-3 md:grid-cols-[1fr_190px_230px_auto]">
                   <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0b5a49]" /><Input className="h-11 border-[#d9c9a5] bg-white pr-9" value={notificationSearch} onChange={(e) => setNotificationSearch(e.target.value)} placeholder="بحث في عنوان الإشعار أو محتواه..." /></div>
                   <NativeSelect className="h-11 bg-white" value={notificationReadFilter} onChange={(e) => setNotificationReadFilter(e.target.value as 'all' | 'unread' | 'read')}><option value="all">الكل</option><option value="unread">غير مقروء</option><option value="read">مقروء</option></NativeSelect>
-                  <NativeSelect className="h-11 bg-white" value={notificationTypeFilter} onChange={(e) => setNotificationTypeFilter(e.target.value as 'all' | 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'other')}><option value="all">جميع الأنواع</option><option value="request">طلبات الصيانة والاحتياج</option><option value="ticket">البلاغات</option><option value="site">المساجد والمصليات</option><option value="leave">الإجازات والاعتذارات</option><option value="quran">المصاحف</option><option value="other">إشعارات عامة</option></NativeSelect>
+                  <NativeSelect className="h-11 bg-white" value={notificationTypeFilter} onChange={(e) => setNotificationTypeFilter(e.target.value as 'all' | 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'improvement' | 'other')}><option value="all">جميع الأنواع</option><option value="request">طلبات الصيانة والاحتياج</option><option value="ticket">البلاغات</option><option value="site">المساجد والمصليات</option><option value="leave">الإجازات والاعتذارات</option><option value="quran">المصاحف</option><option value="completion">اكتمال البيانات</option><option value="improvement">خطة التحسين</option><option value="other">إشعارات عامة</option></NativeSelect>
                   <Button variant="outline" className="h-11 border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => { setNotificationSearch(''); setNotificationReadFilter('all'); setNotificationTypeFilter('all'); }}><X className="ml-1 h-4 w-4" />مسح</Button>
                 </div>
               </div>
@@ -4521,7 +4548,7 @@ ${quranStockMovementForm.notes}` : ''}`
                       </div>
 
                       <div className="flex shrink-0 flex-wrap gap-2">
-                        {!notice.isRead && <Button size="sm" variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={async () => { try { await mosqueApi.readNotification(notice.id); setNotifications((current) => current.map((item) => item.id === notice.id ? { ...item, isRead: true } : item)); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تحديث الإشعار'); } }}><CheckCircle2 className="ml-1 h-3.5 w-3.5" />مقروء</Button>}
+                        {!notice.isRead && <Button size="sm" variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={async () => { try { await mosqueApi.readNotification(notice.id); setNotifications((current) => current.map((item) => item.id === notice.id ? { ...item, isRead: true } : item)); window.dispatchEvent(new CustomEvent('iau-notifications-changed')); } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تحديث الإشعار'); } }}><CheckCircle2 className="ml-1 h-3.5 w-3.5" />مقروء</Button>}
                         {targetAvailable && <Button size="sm" className="border border-[#0b4a3f] bg-[#0b4a3f] text-white hover:bg-[#126152]" onClick={() => void openNotificationTarget(notice)}><ExternalLink className="ml-1 h-3.5 w-3.5" />فتح السجل</Button>}
                       </div>
                     </div>
