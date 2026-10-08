@@ -494,8 +494,11 @@ export type MosqueFieldVisit = {
   generalNotes?: string | null;
   recommendations?: string | null;
   attachments: MosqueFieldVisitAttachment[];
+  assignedToUserId?: string | null;
+  assignedToName?: string | null;
   createdBy?: string | null;
   isOwner?: boolean;
+  isAssignee?: boolean;
   hasStarted?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
@@ -523,7 +526,7 @@ export type MosqueFieldTour = {
   canCancel?: boolean;
   createdAt: string;
   updatedAt: string;
-  visits?: Array<Pick<MosqueFieldVisit, 'id' | 'visitNumber' | 'siteId' | 'visitDate' | 'workflowStatus' | 'overallStatus' | 'priority' | 'site'>>;
+  visits?: Array<Pick<MosqueFieldVisit, 'id' | 'visitNumber' | 'siteId' | 'visitScope' | 'visitDate' | 'workflowStatus' | 'overallStatus' | 'priority' | 'assignedToUserId' | 'assignedToName' | 'site'>>;
 };
 
 export type MosqueFieldVisitSummary = {
@@ -974,6 +977,7 @@ export const mosqueApi = {
     return apiJson<MosqueFieldVisitItem[]>(`/api/mosques/field-visits/checklist-template${suffix ? `?${suffix}` : ''}`);
   },
   fieldTours: () => apiJson<MosqueFieldTour[]>('/api/mosques/field-tours'),
+  fieldVisitAssignees: () => apiJson<MosqueCompletionTaskAssignee[]>('/api/mosques/field-visit-assignees'),
   createFieldTour: (input: Record<string, unknown>) => apiJson<MosqueFieldTour>('/api/mosques/field-tours', { method: 'POST', body: JSON.stringify(input) }),
   updateFieldTour: (id: string, input: Record<string, unknown>) => apiJson<MosqueFieldTour>(`/api/mosques/field-tours/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteFieldTour: (id: string) => apiJson<void>(`/api/mosques/field-tours/${id}`, { method: 'DELETE' }),
