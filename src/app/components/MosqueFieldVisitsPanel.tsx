@@ -20,6 +20,7 @@ import {
   Route,
   Save,
   Search,
+  ShieldCheck,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ import {
   mosqueApi,
   type MosqueFieldTour,
   type MosqueFieldVisit,
+  type MosqueCompletionTaskAssignee,
   type MosqueFieldVisitAttachment,
   type MosqueFieldVisitImage,
   type MosqueFieldVisitItem,
@@ -84,6 +86,11 @@ type Props = {
   canEdit: boolean;
   canDelete: boolean;
   canPrint: boolean;
+};
+
+type TourVisitAssignment = {
+  primaryAssigneeUserId: string;
+  womenAssigneeUserId: string;
 };
 
 type VisitForm = {
@@ -1120,9 +1127,11 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
 
   const [tourDialog, setTourDialog] = React.useState(false);
   const [tourSearch, setTourSearch] = React.useState('');
+  const [fieldVisitAssignees, setFieldVisitAssignees] = React.useState<MosqueCompletionTaskAssignee[]>([]);
   const [tourForm, setTourForm] = React.useState({
     title: '', scheduledDate: new Date().toISOString().slice(0, 10), scope: '',
     teamMembers: currentUsername || 'مستخدم', notes: '', siteIds: [] as string[],
+    visitAssignments: {} as Record<string, TourVisitAssignment>,
   });
 
   const [visitDialog, setVisitDialog] = React.useState(false);
@@ -1154,7 +1163,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryData, tourData, visitData, checklist, quranStockData, quranRackData, requestRows, baselineStatus] = await Promise.all([
+      const [summaryData, tourData, visitData, checklist, quranStockData, quranRackData, requestRows, baselineStatus, assigneeRows] = await Promise.all([
         mosqueApi.fieldVisitSummary(),
         mosqueApi.fieldTours(),
         mosqueApi.fieldVisits(),
@@ -1163,12 +1172,14 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         mosqueApi.quranRackDashboard().catch(() => null as MosqueQuranRackDashboard | null),
         mosqueApi.requests().catch(() => [] as MosqueRequest[]),
         mosqueApi.quranOpeningBaselineStatus().catch(() => null as MosqueQuranOpeningBaselineStatus | null),
+        mosqueApi.fieldVisitAssignees().catch(() => [] as MosqueCompletionTaskAssignee[]),
       ]);
       setSummary(summaryData);
       setQuranStockDashboard(quranStockData);
       setQuranRackDashboard(quranRackData);
       setQuranOpeningBaselineStatus(baselineStatus);
       setQuranSupplyRequests(requestRows.filter(isQuranSupplyRequest));
+      setFieldVisitAssignees(assigneeRows);
       setTours(tourData);
       setVisits(visitData.map((visit) => ({ ...visit, items: normalizeQuranChecklistItems(visit.items || []) })));
       setTemplate(normalizeQuranChecklistItems(checklist));
@@ -1263,11 +1274,68 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     return map;
   }, [visits]);
 
+  const currentAssigneeId = React.useMemo(
+    () => fieldVisitAssignees.find((item) => item.username === currentUsername)?.id || '',
+    [fieldVisitAssignees, currentUsername]
+  );
+
+  const updateTourSiteSelection = (site: MosqueSite, checked: boolean) => {
+    setTourForm((current) => {
+      if (checked) {
+        const { [site.id]: _removed, ...remainingAssignments } = current.visitAssignments;
+        return {
+          ...current,
+          siteIds: current.siteIds.filter((id) => id !== site.id),
+          visitAssignments: remainingAssignments,
+        };
+      }
+      return {
+        ...current,
+        siteIds: [...current.siteIds, site.id],
+        visitAssignments: {
+          ...current.visitAssignments,
+          [site.id]: current.visitAssignments[site.id] || {
+            primaryAssigneeUserId: currentAssigneeId,
+            womenAssigneeUserId: '',
+          },
+        },
+      };
+    });
+  };
+
+  const updateTourAssignment = (siteId: string, patch: Partial<TourVisitAssignment>) => {
+    setTourForm((current) => ({
+      ...current,
+      visitAssignments: {
+        ...current.visitAssignments,
+        [siteId]: {
+          ...(current.visitAssignments[siteId] || { primaryAssigneeUserId: currentAssigneeId, womenAssigneeUserId: '' }),
+          ...patch,
+        },
+      },
+    }));
+  };
+
+  const selectAvailableTourSites = () => {
+    const available = filteredTourSites.filter((site) => !activeVisitBySite.has(site.id));
+    setTourForm((current) => ({
+      ...current,
+      siteIds: available.map((site) => site.id),
+      visitAssignments: Object.fromEntries(available.map((site) => [
+        site.id,
+        current.visitAssignments[site.id] || { primaryAssigneeUserId: currentAssigneeId, womenAssigneeUserId: '' },
+      ])),
+    }));
+  };
+
+  const clearTourSites = () => setTourForm((current) => ({ ...current, siteIds: [], visitAssignments: {} }));
+
   const openTour = () => {
     setTourForm({
       title: `جولة ميدانية - ${new Date().toLocaleDateString('ar-SA-u-ca-gregory')}`,
       scheduledDate: new Date().toISOString().slice(0, 10),
       scope: '', teamMembers: currentUsername || 'مستخدم', notes: '', siteIds: [],
+      visitAssignments: {},
     });
     setTourSearch('');
     setTourDialog(true);
@@ -1284,14 +1352,42 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       toast.error(`يوجد إجراء ميداني قائم للموقع ${conflictingVisit.site.name} برقم ${conflictingVisit.visitNumber}. افتح الزيارة القائمة بدل إنشاء زيارة مكررة.`);
       return;
     }
+
+    for (const siteId of tourForm.siteIds) {
+      const site = sites.find((item) => item.id === siteId);
+      const assignment = tourForm.visitAssignments[siteId];
+      if (!site || !assignment?.primaryAssigneeUserId) {
+        toast.error(`حدد منفذ الزيارة الرئيسية للموقع ${site?.name || ''}`);
+        return;
+      }
+      if (womenPrayerPresence(site) === 'present' && ['mosque', 'jami'].includes(site.siteType)) {
+        if (!assignment.womenAssigneeUserId) {
+          toast.error(`حدد مستخدمًا مستقلًا لزيارة مصلى النساء في ${site.name}`);
+          return;
+        }
+        if (assignment.womenAssigneeUserId === assignment.primaryAssigneeUserId) {
+          toast.error(`زيارة مصلى النساء في ${site.name} يجب أن تسند إلى مستخدم مختلف عن الزيارة الرئيسية`);
+          return;
+        }
+      }
+    }
+
     try {
       setSaving(true);
-      await mosqueApi.createFieldTour({
-        ...tourForm,
+      const created = await mosqueApi.createFieldTour({
+        title: tourForm.title,
         scheduledDate: new Date(`${tourForm.scheduledDate}T09:00:00`).toISOString(),
+        scope: tourForm.scope,
         teamMembers,
+        notes: tourForm.notes,
+        siteIds: tourForm.siteIds,
+        visitAssignments: tourForm.siteIds.map((siteId) => ({
+          siteId,
+          primaryAssigneeUserId: tourForm.visitAssignments[siteId]?.primaryAssigneeUserId,
+          womenAssigneeUserId: tourForm.visitAssignments[siteId]?.womenAssigneeUserId || null,
+        })),
       });
-      toast.success(`تم إنشاء الجولة وجدولة ${tourForm.siteIds.length} زيارة مرتبطة بالمواقع المحددة`);
+      toast.success(`تم إنشاء الجولة وجدولة ${created.visits?.length || tourForm.siteIds.length} زيارة مستقلة ضمن ${tourForm.siteIds.length} موقع`);
       setTourDialog(false);
       await load();
     } catch (error) {
@@ -2873,6 +2969,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
           <InfoLine label="التاريخ" value={new Date(visit.visitDate).toLocaleString('ar-SA-u-ca-gregory')} />
           <InfoLine label="الموقع" value={visit.site.campusLocation || [visit.site.city, visit.site.district].filter(Boolean).join(' - ') || '-'} />
           <InfoLine label="الحالة العامة" value={overallLabels[visit.overallStatus]} />
+          <InfoLine label="منفذ الزيارة" value={visit.assignedToName || (visit.teamMembers || []).join('، ') || '-'} />
           <div className="flex flex-wrap gap-2"><Badge variant="outline">{visit.items.length} بند فحص</Badge>{visitIncludesWomenSection(visit) && <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-800">يشمل مصلى النساء</Badge>}{womenOpenItemCount(visit) > 0 && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-900">ملاحظات نساء: {womenOpenItemCount(visit)}</Badge>}<Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">{visit.items.filter((item) => item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length} ملاحظة مفتوحة</Badge>{visit.attachments?.length > 0 && <Badge variant="outline" className="gap-1 border-sky-200 bg-sky-50 text-sky-700"><Paperclip className="h-3 w-3" />{visit.attachments.length} مرفق</Badge>}{visit.items.some((item) => item.priority === 'urgent' && !['resolved', 'closed'].includes(item.resolutionStatus)) && <Badge className="bg-red-600">عاجل</Badge>}</div>
           <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
             <Button size="sm" variant="outline" className="border-sky-200 text-sky-700 hover:bg-sky-50" onClick={() => setViewingVisit(visit)}><Eye className="ml-1 h-4 w-4" />عرض</Button>
@@ -2886,7 +2983,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
     </div> : <div className={`${tourCardsVisible ? 'grid' : 'hidden'} gap-4 md:grid-cols-2 xl:grid-cols-3`}>
       {tours.map((tour) => <Card key={tour.id} className="overflow-hidden">
         <CardHeader className="border-b bg-gradient-to-l from-emerald-50/70 to-white"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{tour.title}</CardTitle><CardDescription className="mt-1">{tour.tourNumber}</CardDescription></div><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{tourStatusLabels[tour.status]}</Badge>{tour.canEdit !== true && <Badge variant="outline" className="border-slate-300 bg-slate-100 text-slate-700"><Eye className="ml-1 h-3 w-3" />عرض فقط</Badge>}</div></div></CardHeader>
-        <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-36 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between rounded-lg bg-white px-2 py-1.5 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) { if (canEdit && full.canEdit === true) openVisit(full); else setViewingVisit(full); } }}><span>{visit.site.name}</span><span className="text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && tour.canEdit === true && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).filter(([value]) => value !== 'cancelled' || tour.canCancel === true || tour.status === 'cancelled').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}{canPrint && tour.canEdit === true && <div className="grid gap-2 sm:grid-cols-2"><Button size="sm" className="w-full border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={() => exportTourTreatmentExcel(tour)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button><Button size="sm" variant="outline" className="w-full border-emerald-200 text-emerald-800" onClick={() => void printTourTreatmentReport(tour)}><ImageIcon className="ml-2 h-4 w-4" />تقرير المعالجة المصور قبل / بعد</Button></div>}{canDelete && tour.canDelete === true && <Button size="sm" variant="destructive" className="w-full !border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => setTourAction({ tour, action: 'delete' })}><Trash2 className="ml-2 h-4 w-4 text-white" />حذف الجولة</Button>}{canEdit && tour.canDelete !== true && tour.canCancel === true && tour.status !== 'cancelled' && <Button size="sm" variant="destructive" className="w-full !border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => setTourAction({ tour, action: 'cancel' })}><X className="ml-2 h-4 w-4 text-white" />إلغاء الجولة</Button>}</CardContent>
+        <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-44 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between gap-3 rounded-lg bg-white px-2 py-2 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) { if (canEdit && full.canEdit === true) openVisit(full); else setViewingVisit(full); } }}><span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{visit.site.name}</b><small className="mt-0.5 block truncate text-[10px] text-slate-500">{visitScopeLabels[visit.visitScope || 'whole_site'] || 'الموقع بالكامل'} — {visit.assignedToName || 'غير مسند'}</small></span><span className="shrink-0 text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && tour.canEdit === true && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).filter(([value]) => value !== 'cancelled' || tour.canCancel === true || tour.status === 'cancelled').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}{canPrint && tour.canEdit === true && <div className="grid gap-2 sm:grid-cols-2"><Button size="sm" className="w-full border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={() => exportTourTreatmentExcel(tour)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button><Button size="sm" variant="outline" className="w-full border-emerald-200 text-emerald-800" onClick={() => void printTourTreatmentReport(tour)}><ImageIcon className="ml-2 h-4 w-4" />تقرير المعالجة المصور قبل / بعد</Button></div>}{canDelete && tour.canDelete === true && <Button size="sm" variant="destructive" className="w-full !border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => setTourAction({ tour, action: 'delete' })}><Trash2 className="ml-2 h-4 w-4 text-white" />حذف الجولة</Button>}{canEdit && tour.canDelete !== true && tour.canCancel === true && tour.status !== 'cancelled' && <Button size="sm" variant="destructive" className="w-full !border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => setTourAction({ tour, action: 'cancel' })}><X className="ml-2 h-4 w-4 text-white" />إلغاء الجولة</Button>}</CardContent>
       </Card>)}
       {!tours.length && <Empty message="لم يتم إنشاء جولات ميدانية بعد" />}
     </div>}
@@ -3037,12 +3134,143 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
     </Dialog>
 
     <Dialog open={tourDialog} onOpenChange={setTourDialog}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[920px]" dir="rtl">
-        <DialogHeader className="text-right"><DialogTitle className="flex items-center gap-2"><Route className="h-5 w-5 text-emerald-700" />إنشاء جولة ميدانية</DialogTitle><DialogDescription>اختر المواقع المسجلة حاليًا؛ ستُنشأ زيارة مجدولة مستقلة لكل مسجد أو مصلى داخل الجولة.</DialogDescription></DialogHeader>
-        <div className="grid gap-4 md:grid-cols-2"><Field label="عنوان الجولة *"><Input value={tourForm.title} onChange={(event) => setTourForm({ ...tourForm, title: event.target.value })} /></Field><Field label="تاريخ الجولة *"><Input type="date" value={tourForm.scheduledDate} onChange={(event) => setTourForm({ ...tourForm, scheduledDate: event.target.value })} /></Field><div className="md:col-span-2"><Field label="منفذ الجولة"><Input value={tourForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field><p className="mt-1 text-[11px] text-slate-500">يُسجل اسم المستخدم الحالي تلقائيًا دون الحاجة لكتابة جميع أعضاء الفريق.</p></div><div className="md:col-span-2"><Field label="نطاق الجولة"><Input value={tourForm.scope} onChange={(event) => setTourForm({ ...tourForm, scope: event.target.value })} placeholder="مثال: الحرم الجامعي الشرقي - مباني الكليات الصحية" /></Field></div></div>
-        <div className="rounded-2xl border bg-slate-50 p-4"><div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black">المساجد والمصليات المشمولة</p><p className="text-xs text-slate-500">تم اختيار {tourForm.siteIds.length} موقع</p></div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setTourForm({ ...tourForm, siteIds: filteredTourSites.filter((site) => !activeVisitBySite.has(site.id)).map((site) => site.id) })}>تحديد المتاح</Button><Button size="sm" variant="outline" onClick={() => setTourForm({ ...tourForm, siteIds: [] })}>إلغاء التحديد</Button></div></div><div className="relative mb-3"><Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" /><Input className="pr-9" value={tourSearch} onChange={(event) => setTourSearch(event.target.value)} placeholder="ابحث عن موقع" /></div><div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">{filteredTourSites.map((site) => { const checked = tourForm.siteIds.includes(site.id); const activeVisit = activeVisitBySite.get(site.id); const unavailable = Boolean(activeVisit); return <div key={site.id} className={`rounded-xl border p-3 ${unavailable ? 'border-amber-200 bg-amber-50/70' : checked ? 'border-emerald-300 bg-emerald-50' : 'bg-white'}`}><label className={`flex items-start gap-3 ${unavailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}><input type="checkbox" className="mt-1 h-4 w-4 accent-emerald-700" checked={checked} disabled={unavailable} onChange={() => setTourForm((current) => ({ ...current, siteIds: checked ? current.siteIds.filter((id) => id !== site.id) : [...current.siteIds, site.id] }))} /><span className="min-w-0 flex-1"><b className="block text-sm">{site.name}</b><small className="block text-slate-500">{site.campusLocation || [site.city, site.district].filter(Boolean).join(' - ') || 'الموقع غير محدد'}</small>{activeVisit && <span className="mt-1 block text-[11px] font-bold text-amber-700">زيارة قائمة: {activeVisit.visitNumber} — {visitStatusLabels[activeVisit.workflowStatus]}</span>}</span></label>{activeVisit && <Button type="button" size="sm" variant="outline" className="mt-2 h-8 border-amber-300 bg-white text-xs text-amber-800" onClick={() => setViewingVisit(activeVisit)}><Eye className="ml-1 h-3.5 w-3.5" />فتح الزيارة القائمة</Button>}</div>; })}</div></div>
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[1040px]" dir="rtl">
+        <DialogHeader className="text-right">
+          <DialogTitle className="flex items-center gap-2"><Route className="h-5 w-5 text-emerald-700" />إنشاء جولة ميدانية</DialogTitle>
+          <DialogDescription>
+            اختر المواقع وحدد منفذ كل زيارة. المسجد أو الجامع الذي يوجد به مصلى نساء مؤكد سيُنشئ زيارتين مستقلتين داخل نفس الجولة، بإسناد منفصل لكل زيارة.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="عنوان الجولة *"><Input value={tourForm.title} onChange={(event) => setTourForm({ ...tourForm, title: event.target.value })} /></Field>
+          <Field label="تاريخ الجولة *"><Input type="date" value={tourForm.scheduledDate} onChange={(event) => setTourForm({ ...tourForm, scheduledDate: event.target.value })} /></Field>
+          <div className="md:col-span-2">
+            <Field label="منشئ الجولة"><Input value={tourForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field>
+            <p className="mt-1 text-[11px] text-slate-500">يُسجل منشئ الجولة تلقائيًا، بينما يتم إسناد كل زيارة فرعية إلى المستخدم المحدد أدناه.</p>
+          </div>
+          <div className="md:col-span-2">
+            <Field label="نطاق الجولة"><Input value={tourForm.scope} onChange={(event) => setTourForm({ ...tourForm, scope: event.target.value })} placeholder="مثال: الحرم الجامعي الشرقي - مباني الكليات الصحية" /></Field>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-slate-50 p-4">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-black">المساجد والمصليات المشمولة</p>
+              <p className="text-xs text-slate-500">تم اختيار {tourForm.siteIds.length} موقع — يتم توزيع الزيارات على المستخدمين بشكل مستقل.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={selectAvailableTourSites}>تحديد المتاح</Button>
+              <Button size="sm" variant="outline" onClick={clearTourSites}>إلغاء التحديد</Button>
+            </div>
+          </div>
+
+          {!fieldVisitAssignees.length && (
+            <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold leading-6 text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>لم يتم تحميل مستخدمين مؤهلين لإسناد الزيارات. حدّث الصفحة أو راجع صلاحيات مستخدمي الوحدة قبل حفظ الجولة.</span>
+            </div>
+          )}
+
+          <div className="relative mb-3"><Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" /><Input className="pr-9" value={tourSearch} onChange={(event) => setTourSearch(event.target.value)} placeholder="ابحث عن موقع" /></div>
+
+          <div className="grid max-h-[440px] gap-3 overflow-y-auto sm:grid-cols-2">
+            {filteredTourSites.map((site) => {
+              const checked = tourForm.siteIds.includes(site.id);
+              const activeVisit = activeVisitBySite.get(site.id);
+              const unavailable = Boolean(activeVisit);
+              const assignment = tourForm.visitAssignments[site.id] || { primaryAssigneeUserId: currentAssigneeId, womenAssigneeUserId: '' };
+              const splitWomenVisit = ['mosque', 'jami'].includes(site.siteType) && womenPrayerPresence(site) === 'present';
+              const standaloneWomenPrayerRoom = site.siteType === 'prayer_room' && site.prayerRoomGender === 'women';
+
+              return (
+                <div key={site.id} className={`rounded-xl border p-3 ${unavailable ? 'border-amber-200 bg-amber-50/70' : checked ? 'border-emerald-300 bg-emerald-50' : 'bg-white'}`}>
+                  <label className={`flex items-start gap-3 ${unavailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 accent-emerald-700"
+                      checked={checked}
+                      disabled={unavailable}
+                      onChange={() => updateTourSiteSelection(site, checked)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <b className="block text-sm">{site.name}</b>
+                        {splitWomenVisit && <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-800">زيارتان منفصلتان</Badge>}
+                        {standaloneWomenPrayerRoom && <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-800">مصلى نساء</Badge>}
+                      </span>
+                      <small className="block text-slate-500">{site.campusLocation || [site.city, site.district].filter(Boolean).join(' - ') || 'الموقع غير محدد'}</small>
+                      {['mosque', 'jami'].includes(site.siteType) && <small className="mt-0.5 block text-slate-500">{womenPrayerPresenceLabel(site)}</small>}
+                      {activeVisit && <span className="mt-1 block text-[11px] font-bold text-amber-700">زيارة قائمة: {activeVisit.visitNumber} — {visitStatusLabels[activeVisit.workflowStatus]}</span>}
+                    </span>
+                  </label>
+
+                  {activeVisit && (
+                    <Button type="button" size="sm" variant="outline" className="mt-2 h-8 border-amber-300 bg-white text-xs text-amber-800" onClick={() => setViewingVisit(activeVisit)}>
+                      <Eye className="ml-1 h-3.5 w-3.5" />فتح الزيارة القائمة
+                    </Button>
+                  )}
+
+                  {checked && !unavailable && (
+                    <div className="mt-3 space-y-3 border-t border-emerald-200 pt-3">
+                      {splitWomenVisit ? (
+                        <>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <Field label="منفذ القسم الرئيسي *">
+                              <NativeSelect
+                                value={assignment.primaryAssigneeUserId}
+                                onChange={(event) => {
+                                  const nextId = event.target.value;
+                                  updateTourAssignment(site.id, {
+                                    primaryAssigneeUserId: nextId,
+                                    womenAssigneeUserId: nextId === assignment.womenAssigneeUserId ? '' : assignment.womenAssigneeUserId,
+                                  });
+                                }}
+                              >
+                                <option value="">اختر المستخدم</option>
+                                {fieldVisitAssignees.map((user) => <option key={user.id} value={user.id}>{user.username} — {user.moduleRole === 'head' ? 'رئيس الوحدة' : 'مشرف'}</option>)}
+                              </NativeSelect>
+                            </Field>
+                            <Field label="منفذ مصلى النساء *">
+                              <NativeSelect
+                                value={assignment.womenAssigneeUserId}
+                                onChange={(event) => updateTourAssignment(site.id, { womenAssigneeUserId: event.target.value })}
+                              >
+                                <option value="">اختر مستخدمًا آخر</option>
+                                {fieldVisitAssignees.map((user) => <option key={user.id} value={user.id} disabled={user.id === assignment.primaryAssigneeUserId}>{user.username} — {user.moduleRole === 'head' ? 'رئيس الوحدة' : 'مشرف'}</option>)}
+                              </NativeSelect>
+                            </Field>
+                          </div>
+                          <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-[11px] font-bold leading-5 text-emerald-900">
+                            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                            <span>سيُنشئ النظام زيارة للقسم الرئيسي وزيارة أخرى لمصلى النساء برقمين مستقلين. يشترط مستخدم مختلف لكل نطاق، ولا تظهر زيارة مصلى النساء للمستخدم المسند إليه القسم الرئيسي.</span>
+                          </div>
+                        </>
+                      ) : (
+                        <Field label={standaloneWomenPrayerRoom ? 'منفذ زيارة مصلى النساء *' : 'منفذ الزيارة *'}>
+                          <NativeSelect value={assignment.primaryAssigneeUserId} onChange={(event) => updateTourAssignment(site.id, { primaryAssigneeUserId: event.target.value })}>
+                            <option value="">اختر المستخدم</option>
+                            {fieldVisitAssignees.map((user) => <option key={user.id} value={user.id}>{user.username} — {user.moduleRole === 'head' ? 'رئيس الوحدة' : 'مشرف'}</option>)}
+                          </NativeSelect>
+                        </Field>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         <Field label="ملاحظات الجولة"><Textarea rows={3} value={tourForm.notes} onChange={(event) => setTourForm({ ...tourForm, notes: event.target.value })} /></Field>
-        <DialogFooter><Button variant="outline" onClick={() => setTourDialog(false)}>إلغاء</Button><Button onClick={() => void saveTour()} disabled={saving}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}حفظ وجدولة الزيارات</Button></DialogFooter>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setTourDialog(false)}>إلغاء</Button>
+          <Button onClick={() => void saveTour()} disabled={saving || !fieldVisitAssignees.length}>
+            {saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+            حفظ وجدولة الزيارات
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
 
@@ -3063,6 +3291,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
             <InfoBox label="الحالة العامة" value={overallLabels[viewingVisit.overallStatus]} />
             <InfoBox label="الأولوية" value={priorityLabels[viewingVisit.priority]} />
             <InfoBox label="ممثل الموقع" value={viewingVisit.representativeName || '-'} />
+            <InfoBox label="منفذ الزيارة" value={viewingVisit.assignedToName || (viewingVisit.teamMembers || []).join('، ') || '-'} />
             <InfoBox label="الفريق الميداني" value={(viewingVisit.teamMembers || []).join('، ') || '-'} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
