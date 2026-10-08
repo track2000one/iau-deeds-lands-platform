@@ -126,7 +126,7 @@ const roleScopeLabel = (role: MosqueModuleRole) => role === 'head'
       ? 'وصول مقيد بالموقع المرتبط'
       : 'وصول خدمات منسوب الجامعة';
 
-const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'improvement' | 'other' => {
+const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'improvement' | 'field_visit' | 'other' => {
   const type = String(notice.entityType || '').toLowerCase();
   const text = `${notice.title || ''} ${notice.message || ''}`.toLowerCase();
   if (type.includes('request') || text.includes('طلب صيانة') || text.includes('طلب احتياج')) return 'request';
@@ -134,12 +134,13 @@ const notificationCategory = (notice: MosqueNotification): 'request' | 'ticket' 
   if (type.includes('leave') || text.includes('إجاز') || text.includes('اعتذار')) return 'leave';
   if (type.includes('quran') || text.includes('مصحف') || text.includes('مصاحف')) return 'quran';
   if (type.includes('improvement_goal') || type.includes('completion_kpi_approval_automation') || text.includes('هدف تحسين') || text.includes('تحقق هدف') || text.includes('أتمتة ما بعد اعتماد KPI')) return 'improvement';
+  if (type.includes('field_visit') || text.includes('زيارة ميدانية') || text.includes('جولة ميدانية')) return 'field_visit';
   if (type.includes('completion_task') || text.includes('مهمة استكمال') || text.includes('استكمال بيانات')) return 'completion';
   if (type.includes('site') || type.includes('mosque') || text.includes('مسجد') || text.includes('مصلى')) return 'site';
   return 'other';
 };
 
-const notificationCategoryLabel: Record<'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'improvement' | 'other', string> = {
+const notificationCategoryLabel: Record<'request' | 'ticket' | 'site' | 'leave' | 'quran' | 'completion' | 'improvement' | 'field_visit' | 'other', string> = {
   request: 'طلب صيانة / احتياج',
   ticket: 'بلاغ',
   site: 'مسجد / مصلى',
@@ -147,6 +148,7 @@ const notificationCategoryLabel: Record<'request' | 'ticket' | 'site' | 'leave' 
   quran: 'المصاحف',
   completion: 'متابعة اكتمال البيانات',
   improvement: 'خطة التحسين',
+  field_visit: 'زيارة ميدانية',
   other: 'إشعار عام',
 };
 const siteTypeLabels: Record<string, string> = { mosque: 'مسجد', jami: 'جامع', prayer_room: 'مصلى' };
@@ -3029,6 +3031,10 @@ ${quranStockMovementForm.notes}` : ''}`
     }
     if (category === 'improvement') {
       setActiveTab('improvement-goals');
+      return;
+    }
+    if (category === 'field_visit') {
+      setActiveTab('field-visits');
       return;
     }
   };
