@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionsContext';
 import { ThemeInitializer } from './ThemeInitializer';
+import { PlatformNotificationCenter } from './PlatformNotificationCenter';
 import { PLATFORM_LOGO_URL } from '../config/branding';
 import {
   Home,
@@ -22,7 +23,6 @@ import {
   Shield,
   Archive,
   Palette,
-  Bell,
   Mail,
   Globe2,
   CalendarDays,
@@ -232,10 +232,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Button title={ui('الحساب', 'Account')} aria-label={ui('الحساب', 'Account')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button" onClick={() => navigate(isAdmin ? '/admin' : defaultLandingPath)}>
                 <User className="h-4 w-4" />
               </Button>
+              <PlatformNotificationCenter />
               {(isAdmin || hasPermission('contracts_follow_up', 'canView')) && (
-                <Button title={ui('تنبيهات العقود', 'Contract Alerts')} aria-label={ui('تنبيهات العقود', 'Contract Alerts')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl relative" onClick={() => navigate('/contracts/follow-up')}>
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute top-2 end-2 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-background" />
+                <Button title={ui('متابعة العقود', 'Contract Follow-up')} aria-label={ui('متابعة العقود', 'Contract Follow-up')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={() => navigate('/contracts/follow-up')}>
+                  <FileClock className="h-4 w-4" />
                 </Button>
               )}
               <Button title={ui('إنشاء رسالة بريد', 'Compose Email')} aria-label={ui('إنشاء رسالة بريد', 'Compose Email')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={() => { window.location.href = `mailto:?subject=${encodeURIComponent(ui('منصة إدارة الأصول والأملاك والأوقاف الجامعية', 'University Assets, Properties and Endowments Management Platform'))}`; }}>
