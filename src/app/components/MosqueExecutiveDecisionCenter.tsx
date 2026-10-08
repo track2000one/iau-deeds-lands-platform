@@ -227,6 +227,8 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<QueueFilter>('all');
+  const [trackingStatus, setTrackingStatus] = useState('all');
+  const [trackingOwner, setTrackingOwner] = useState('all');
 
   const [reviewGoal, setReviewGoal] = useState<MosqueImprovementGoal | null>(null);
   const [reviewNote, setReviewNote] = useState('');
@@ -386,6 +388,82 @@ export const MosqueExecutiveDecisionCenter: React.FC<Props> = ({ onOpenImproveme
     suggestions: queue.filter((item) => item.kind === 'suggestion').length,
     sustained: queue.filter((item) => item.kind === 'sustained').length,
   }), [queue]);
+
+  const trackingOwners = useMemo(
+    () => Array.from(new Set(goals.map((goal) => goal.ownerName).filter((name): name is string => Boolean(name)))).sort((a, b) => a.localeCompare(b, 'ar')),
+    [goals]
+  );
+
+  const trackingRows = useMemo(() => {
+    const today = new Date(`${riyadhDateInput()}T00:00:00+03:00`).getTime();
+
+    return goals
+      .map((goal) => {
+        const dueAt = goal.dueDate ? new Date(`${goal.dueDate.slice(0, 10)}T00:00:00+03:00`).getTime() : null;
+        const daysDelta = dueAt === null || Number.isNaN(dueAt)
+          ? null
+          : Math.ceil((dueAt - today) / 86400000);
+        const isClosed = goal.status === 'closed' || goal.status === 'cancelled';
+        const isCompleted = goal.status === 'achieved' || goal.status === 'evidence_review' || goal.status === 'closed';
+        const isOverdue = !isClosed && !isCompleted && daysDelta !== null && daysDelta < 0;
+
+        const displayStatus = goal.status === 'draft'
+          ? 'لم يبدأ'
+          : goal.status === 'active'
+            ? 'جاري التنفيذ'
+            : goal.status === 'at_risk'
+              ? 'متعثر'
+              : goal.status === 'achieved'
+                ? 'مكتمل رقميًا'
+                : goal.status === 'evidence_review'
+                  ? 'مكتمل - بانتظار الاعتماد'
+                  : goal.status === 'closed'
+                    ? 'مغلق'
+                    : 'ملغى';
+
+        const statusGroup = goal.status === 'draft'
+          ? 'pending'
+          : goal.status === 'active'
+            ? 'active'
+            : goal.status === 'at_risk'
+              ? 'at_risk'
+              : isCompleted
+                ? 'completed'
+                : 'cancelled';
+
+        return {
+          goal,
+          daysDelta,
+          isOverdue,
+          isCompleted,
+          displayStatus,
+          statusGroup,
+          evidenceCount: Array.isArray(goal.closureEvidence) ? goal.closureEvidence.length : 0,
+        };
+      })
+      .filter((row) => trackingStatus === 'all' || row.statusGroup === trackingStatus)
+      .filter((row) => trackingOwner === 'all' || row.goal.ownerName === trackingOwner)
+      .sort((a, b) => {
+        if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+        if (a.goal.status === 'at_risk' && b.goal.status !== 'at_risk') return -1;
+        if (a.goal.status !== 'at_risk' && b.goal.status === 'at_risk') return 1;
+        return (a.daysDelta ?? 99999) - (b.daysDelta ?? 99999);
+      });
+  }, [goals, trackingOwner, trackingStatus]);
+
+  const trackingSummary = useMemo(() => {
+    const today = new Date(`${riyadhDateInput()}T00:00:00+03:00`).getTime();
+    const total = goals.length;
+    const active = goals.filter((goal) => goal.status === 'active').length;
+    const atRisk = goals.filter((goal) => goal.status === 'at_risk').length;
+    const completed = goals.filter((goal) => ['achieved', 'evidence_review', 'closed'].includes(goal.status)).length;
+    const overdue = goals.filter((goal) => {
+      if (!goal.dueDate || ['achieved', 'evidence_review', 'closed', 'cancelled'].includes(goal.status)) return false;
+      const dueAt = new Date(`${goal.dueDate.slice(0, 10)}T00:00:00+03:00`).getTime();
+      return !Number.isNaN(dueAt) && dueAt < today;
+    }).length;
+    return { total, active, atRisk, completed, overdue };
+  }, [goals]);
 
   const extendGoal = async (goal: MosqueImprovementGoal, reason: string) => {
     setActingId(goal.id);
@@ -840,7 +918,163 @@ small { color: #64748b; }
       </Card>
 
       <Card className="overflow-hidden rounded-[26px] border border-[#ded3b8] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.06)]">
+        <Card className="overflow-hidden rounded-[26px] border border-[#d9c9a5] bg-white shadow-[0_14px_34px_rgba(6,60,51,0.06)]">
         <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8]">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <Badge variant="outline" className="mb-2 border-emerald-200 bg-white text-emerald-800">متابعة التنفيذ بعد صدور القرار</Badge>
+              <CardTitle className="flex items-center gap-2 text-xl font-black text-[#0b4a3f]">
+                <ShieldCheck className="h-5 w-5" />
+                لوحة المتابعة التنفيذية للقرارات
+              </CardTitle>
+              <CardDescription className="mt-1 max-w-4xl leading-6">
+                تحول القرار من سجل توثيقي إلى متابعة تشغيلية: المسؤول، الاستحقاق، نسبة الإنجاز، التأخير، آخر تحديث، الإثباتات، والارتباط بمؤشر KPI.
+              </CardDescription>
+            </div>
+            <Button variant="outline" className="border-[#d9c9a5] bg-white text-[#0b4a3f]" onClick={() => void load()} disabled={loading}>
+              <RefreshCw className={loading ? 'ml-2 h-4 w-4 animate-spin' : 'ml-2 h-4 w-4'} />
+              تحديث المتابعة
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4 p-4 sm:p-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <DecisionMetric label="إجمالي القرارات المرتبطة بأهداف" value={trackingSummary.total} icon={Gavel} />
+            <DecisionMetric label="جاري التنفيذ" value={trackingSummary.active} icon={Clock3} />
+            <DecisionMetric label="المتأخرة" value={trackingSummary.overdue} icon={AlertTriangle} tone={trackingSummary.overdue ? 'danger' : 'normal'} />
+            <DecisionMetric label="المتعثرة" value={trackingSummary.atRisk} icon={TrendingDown} tone={trackingSummary.atRisk ? 'warning' : 'normal'} />
+            <DecisionMetric label="المكتملة / المغلقة" value={trackingSummary.completed} icon={CheckCircle2} tone="success" />
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-2">
+            <label className="space-y-1.5">
+              <span className="text-[11px] font-black text-slate-600">الحالة التنفيذية</span>
+              <NativeSelect value={trackingStatus} onChange={(event) => setTrackingStatus(event.target.value)}>
+                <option value="all">جميع الحالات</option>
+                <option value="pending">لم يبدأ</option>
+                <option value="active">جاري التنفيذ</option>
+                <option value="at_risk">متعثر</option>
+                <option value="completed">مكتمل / مغلق</option>
+              </NativeSelect>
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-[11px] font-black text-slate-600">المسؤول عن التنفيذ</span>
+              <NativeSelect value={trackingOwner} onChange={(event) => setTrackingOwner(event.target.value)}>
+                <option value="all">جميع المسؤولين</option>
+                {trackingOwners.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+              </NativeSelect>
+            </label>
+          </div>
+
+          {trackingRows.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <ShieldCheck className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-3 text-sm font-black text-slate-600">لا توجد عناصر متابعة مطابقة للتصفية الحالية.</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1500px] text-right text-xs">
+                  <thead className="bg-slate-50 text-[10px] font-black text-slate-500">
+                    <tr>
+                      <th className="px-3 py-3">رقم الهدف / القرار</th>
+                      <th className="px-3 py-3">الموضوع</th>
+                      <th className="px-3 py-3">الحالة</th>
+                      <th className="px-3 py-3">المسؤول</th>
+                      <th className="px-3 py-3">نسبة الإنجاز</th>
+                      <th className="px-3 py-3">الاستحقاق</th>
+                      <th className="px-3 py-3">المتبقي / التأخير</th>
+                      <th className="px-3 py-3">KPI المرتبط</th>
+                      <th className="px-3 py-3">الإثباتات</th>
+                      <th className="px-3 py-3">آخر تحديث</th>
+                      <th className="px-3 py-3">الملاحظات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {trackingRows.map(({ goal, daysDelta, isOverdue, displayStatus, evidenceCount }) => (
+                      <tr key={goal.id} className={isOverdue ? 'bg-rose-50/50 align-top' : 'align-top'}>
+                        <td className="px-3 py-3">
+                          <Badge variant="outline" className="border-[#d9c9a5] bg-[#fffdf8] text-[#0b4a3f]">{goal.goalNumber}</Badge>
+                          {goal.parentGoalId && <p className="mt-1 text-[10px] text-slate-400">متابعة لهدف سابق</p>}
+                        </td>
+                        <td className="max-w-[300px] px-3 py-3">
+                          <p className="font-black text-slate-800">{goal.title}</p>
+                          <p className="mt-1 text-[10px] text-slate-400">{goal.category === 'unit_metric' ? 'مؤشر الوحدة' : goal.category === 'assignee_metric' ? 'أداء مسؤول' : 'معالجة فجوة'}</p>
+                        </td>
+                        <td className="px-3 py-3">
+                          <Badge
+                            variant="outline"
+                            className={goal.status === 'at_risk'
+                              ? 'border-amber-200 bg-amber-50 text-amber-800'
+                              : isOverdue
+                                ? 'border-rose-200 bg-rose-50 text-rose-800'
+                                : goal.status === 'closed'
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                  : 'border-sky-200 bg-sky-50 text-sky-800'}
+                          >
+                            {displayStatus}
+                          </Badge>
+                          {isOverdue && <p className="mt-1 text-[10px] font-black text-rose-700">متأخر عن الموعد</p>}
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="font-black text-slate-800">{goal.ownerName || 'غير مسند'}</p>
+                          {goal.assigneeName && goal.assigneeName !== goal.ownerName && <p className="mt-1 text-[10px] text-slate-400">مرتبط: {goal.assigneeName}</p>}
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="font-black text-slate-800">{Math.round(goal.progressPercent)}%</p>
+                          <div className="mt-2 h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-[#0b4a3f]" style={{ width: `${Math.max(0, Math.min(100, goal.progressPercent))}%` }} />
+                          </div>
+                          <p className="mt-1 text-[10px] text-slate-400">الإجراءات: {Math.round(goal.actionProgressPercent)}%</p>
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap font-bold text-slate-700">{formatDate(goal.dueDate)}</td>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          {daysDelta === null ? (
+                            <span className="text-slate-400">غير محدد</span>
+                          ) : daysDelta < 0 ? (
+                            <span className="font-black text-rose-700">متأخر {Math.abs(daysDelta)} يوم</span>
+                          ) : daysDelta === 0 ? (
+                            <span className="font-black text-amber-700">يستحق اليوم</span>
+                          ) : (
+                            <span className={daysDelta <= 7 ? 'font-black text-amber-700' : 'font-bold text-slate-600'}>متبقي {daysDelta} يوم</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="font-black text-slate-700">{metricLabel[goal.metricKey] || goal.metricKey}</p>
+                          <p className="mt-1 text-[10px] text-slate-400">الحالي {goal.currentValue ?? '—'} / المستهدف {goal.targetValue}</p>
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="font-black text-slate-700">{evidenceCount} مرفق</p>
+                          <p className="mt-1 text-[10px] text-slate-400">{goal.evidenceStatus === 'approved' ? 'معتمد' : goal.evidenceStatus === 'submitted' ? 'مرفوع للمراجعة' : goal.evidenceStatus === 'returned' ? 'معاد للاستكمال' : 'لم يرفع'}</p>
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-slate-600">{formatDate(goal.updatedAt)}</td>
+                        <td className="max-w-[320px] px-3 py-3 leading-5 text-slate-500">
+                          {goal.measurementNote || goal.sustainabilityNote || goal.notes || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {(trackingSummary.overdue > 0 || trackingSummary.atRisk > 0) && (
+            <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="text-sm font-black">تنبيه تنفيذي</p>
+                <p className="mt-1 text-xs leading-6">
+                  توجد {trackingSummary.overdue} حالة متأخرة و{trackingSummary.atRisk} حالة متعثرة. تظهر هذه الحالات أعلى الجدول تلقائيًا لتسهيل التدخل الإداري.
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <CardHeader className="border-b border-[#e8ddc3] bg-[#fffdf8]">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <Badge variant="outline" className="mb-2 border-violet-200 bg-white text-violet-800">سجل تدقيق غير قابل للتجاوز</Badge>
