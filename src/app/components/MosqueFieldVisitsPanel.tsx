@@ -89,8 +89,6 @@ type Props = {
 };
 
 type TourVisitAssignment = {
-  primaryAssigneeUserId: string;
-  womenAssigneeUserId: string;
   includePrimary: boolean;
   includeWomen: boolean;
 };
@@ -1332,38 +1330,51 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     return map;
   }, [visits]);
 
+  const isVisitOwnedByCurrentUser = React.useCallback((visit?: MosqueFieldVisit) => {
+    if (!visit) return false;
+    if (currentAssigneeId && visit.assignedToUserId === currentAssigneeId) return true;
+    return Boolean(visit.assignedToName && visit.assignedToName === currentUsername);
+  }, [currentAssigneeId, currentUsername]);
+
   const defaultTourAssignmentForSite = React.useCallback((site: MosqueSite): TourVisitAssignment => {
     const splitWomenVisit = ['mosque', 'jami'].includes(site.siteType) && womenPrayerPresence(site) === 'present';
-    if (!splitWomenVisit) {
-      return {
-        primaryAssigneeUserId: currentAssigneeId,
-        womenAssigneeUserId: '',
-        includePrimary: true,
-        includeWomen: false,
-      };
-    }
+    if (!splitWomenVisit) return { includePrimary: true, includeWomen: false };
 
     const state = sectionVisitStateBySite.get(site.id);
     const hasPrimaryHistory = Boolean(state?.latestPrimary);
     const hasWomenHistory = Boolean(state?.latestWomen);
-    let includePrimary = !state?.activePrimary;
-    let includeWomen = !state?.activeWomen;
+    const sameUserAsLatestPrimary = isVisitOwnedByCurrentUser(state?.latestPrimary);
 
-    if (!state?.activePrimary && !state?.activeWomen) {
-      if (hasPrimaryHistory && !hasWomenHistory) includePrimary = false;
-      if (!hasPrimaryHistory && hasWomenHistory) includeWomen = false;
-    } else {
-      if (state?.activePrimary && hasWomenHistory) includeWomen = false;
-      if (state?.activeWomen && hasPrimaryHistory) includePrimary = false;
+    if (hasPrimaryHistory && !hasWomenHistory) {
+      return {
+        includePrimary: false,
+        includeWomen: !state?.activeWomen && !sameUserAsLatestPrimary,
+      };
+    }
+
+    if (!hasPrimaryHistory && hasWomenHistory) {
+      return {
+        includePrimary: !state?.activePrimary,
+        includeWomen: false,
+      };
+    }
+
+    if (!hasPrimaryHistory && !hasWomenHistory) {
+      return {
+        includePrimary: !state?.activePrimary,
+        includeWomen: false,
+      };
+    }
+
+    if (!state?.activePrimary) {
+      return { includePrimary: true, includeWomen: false };
     }
 
     return {
-      primaryAssigneeUserId: includePrimary ? currentAssigneeId : '',
-      womenAssigneeUserId: '',
-      includePrimary,
-      includeWomen,
+      includePrimary: false,
+      includeWomen: !state?.activeWomen && !sameUserAsLatestPrimary,
     };
-  }, [currentAssigneeId, sectionVisitStateBySite]);
+  }, [isVisitOwnedByCurrentUser, sectionVisitStateBySite]);
 
   const isTourSiteAvailable = React.useCallback((site: MosqueSite) => {
     const splitWomenVisit = ['mosque', 'jami'].includes(site.siteType) && womenPrayerPresence(site) === 'present';
@@ -1452,16 +1463,22 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
           toast.error(`يوجد إجراء ميداني قائم للموقع ${activeVisit.site.name} برقم ${activeVisit.visitNumber}. افتح الزيارة القائمة بدل إنشاء زيارة مكررة.`);
           return;
         }
-        if (!assignment.primaryAssigneeUserId) {
-          toast.error(`حدد منفذ الزيارة للموقع ${site.name}`);
-          return;
-        }
         continue;
       }
 
       const state = sectionVisitStateBySite.get(siteId);
       if (!assignment.includePrimary && !assignment.includeWomen) {
-        toast.error(`حدد القسم الرئيسي أو مصلى النساء لإنشاء زيارة في ${site.name}`);
+        const needsDifferentLogin =
+          Boolean(state?.latestPrimary)
+          && !state?.latestWomen
+          && isVisitOwnedByCurrentUser(state?.latestPrimary);
+        toast.error(needsDifferentLogin
+          ? `زيارة مصلى النساء في ${site.name} تتطلب تسجيل الدخول بحساب مستخدم آخر عن منفذ زيارة القسم الرئيسي`
+          : `حدد القسم الرئيسي أو مصلى النساء لإنشاء زيارة في ${site.name}`);
+        return;
+      }
+      if (assignment.includePrimary && assignment.includeWomen) {
+        toast.error(`كل مستخدم ينفذ نطاقًا واحدًا فقط في ${site.name}. اختر القسم الرئيسي أو مصلى النساء.`);
         return;
       }
       if (assignment.includePrimary && state?.activePrimary) {
@@ -1472,29 +1489,8 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
         toast.error(`توجد زيارة قائمة لمصلى النساء في ${site.name} برقم ${state.activeWomen.visitNumber}`);
         return;
       }
-      if (assignment.includePrimary && !assignment.primaryAssigneeUserId) {
-        toast.error(`حدد منفذ زيارة القسم الرئيسي للموقع ${site.name}`);
-        return;
-      }
-      if (assignment.includeWomen && !assignment.womenAssigneeUserId) {
-        toast.error(`حدد مستخدمًا مستقلًا لزيارة مصلى النساء في ${site.name}`);
-        return;
-      }
-      if (
-        assignment.includePrimary
-        && assignment.includeWomen
-        && assignment.primaryAssigneeUserId === assignment.womenAssigneeUserId
-      ) {
-        toast.error(`زيارة مصلى النساء في ${site.name} يجب أن تسند إلى مستخدم مختلف عن الزيارة الرئيسية`);
-        return;
-      }
-      if (
-        !assignment.includePrimary
-        && assignment.includeWomen
-        && state?.latestPrimary?.assignedToUserId
-        && state.latestPrimary.assignedToUserId === assignment.womenAssigneeUserId
-      ) {
-        toast.error(`زيارة مصلى النساء في ${site.name} يجب أن تسند إلى مستخدم مختلف عن منفذ آخر زيارة للقسم الرئيسي`);
+      if (assignment.includeWomen && isVisitOwnedByCurrentUser(state?.latestPrimary)) {
+        toast.error(`زيارة مصلى النساء في ${site.name} يجب أن ينفذها مستخدم مختلف. سجل الدخول بحساب المستخدم الآخر لإنشاء الزيارة.`);
         return;
       }
     }
@@ -1515,14 +1511,12 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
             : tourForm.visitAssignments[siteId];
           return {
             siteId,
-            primaryAssigneeUserId: assignment?.primaryAssigneeUserId || null,
-            womenAssigneeUserId: assignment?.womenAssigneeUserId || null,
             includePrimary: assignment?.includePrimary ?? true,
             includeWomen: assignment?.includeWomen ?? false,
           };
         }),
       });
-      toast.success(`تم إنشاء الجولة وجدولة ${created.visits?.length || tourForm.siteIds.length} زيارة مستقلة ضمن ${tourForm.siteIds.length} موقع`);
+      toast.success(`تم إنشاء الجولة وجدولة ${created.visits?.length || tourForm.siteIds.length} زيارة باسم المستخدم المسجل دخوله: ${currentUsername}`);
       setTourDialog(false);
       await load();
     } catch (error) {
@@ -3301,12 +3295,10 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
             </div>
           </div>
 
-          {!fieldVisitAssignees.length && (
-            <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold leading-6 text-amber-900">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>لم يتم تحميل مستخدمين مؤهلين لإسناد الزيارات. حدّث الصفحة أو راجع صلاحيات مستخدمي الوحدة قبل حفظ الجولة.</span>
-            </div>
-          )}
+          <div className="mb-3 flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold leading-6 text-sky-900">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>منفذ الزيارة يُحدد تلقائيًا حسب الحساب المسجل دخوله حاليًا: <b>{currentUsername}</b>. لا يمكن اختيار مستخدم آخر يدويًا.</span>
+          </div>
 
           <div className="relative mb-3"><Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" /><Input className="pr-9" value={tourSearch} onChange={(event) => setTourSearch(event.target.value)} placeholder="ابحث عن موقع" /></div>
 
@@ -3324,9 +3316,11 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                 : Boolean(activeVisit);
               const latestPrimary = sectionState?.latestPrimary;
               const latestWomen = sectionState?.latestWomen;
-              const blockedWomenAssigneeId = assignment.includePrimary
-                ? assignment.primaryAssigneeUserId
-                : (latestPrimary?.assignedToUserId || '');
+              const sameUserAsLatestPrimary = isVisitOwnedByCurrentUser(latestPrimary);
+              const womenNeedsDifferentLogin = splitWomenVisit
+                && Boolean(latestPrimary)
+                && !latestWomen
+                && sameUserAsLatestPrimary;
 
               const statusClass = (visit?: MosqueFieldVisit) => !visit
                 ? 'text-slate-500'
@@ -3395,35 +3389,17 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                                   className="h-4 w-4 accent-emerald-700"
                                   checked={assignment.includePrimary}
                                   disabled={Boolean(sectionState?.activePrimary)}
-                                  onChange={(event) => {
-                                    const includePrimary = event.target.checked;
-                                    updateTourAssignment(site.id, {
-                                      includePrimary,
-                                      primaryAssigneeUserId: includePrimary ? (assignment.primaryAssigneeUserId || currentAssigneeId) : '',
-                                      womenAssigneeUserId: includePrimary && assignment.womenAssigneeUserId === (assignment.primaryAssigneeUserId || currentAssigneeId)
-                                        ? ''
-                                        : assignment.womenAssigneeUserId,
-                                    });
-                                  }}
+                                  onChange={(event) => updateTourAssignment(site.id, {
+                                    includePrimary: event.target.checked,
+                                    includeWomen: event.target.checked ? false : assignment.includeWomen,
+                                  })}
                                 />
                                 إنشاء زيارة للقسم الرئيسي
                               </label>
                               {sectionState?.activePrimary && <p className="mb-2 text-[10px] font-bold text-amber-700">توجد زيارة قائمة لهذا النطاق ولا يمكن تكرارها الآن.</p>}
                               {assignment.includePrimary && (
-                                <Field label="منفذ القسم الرئيسي *">
-                                  <NativeSelect
-                                    value={assignment.primaryAssigneeUserId}
-                                    onChange={(event) => {
-                                      const nextId = event.target.value;
-                                      updateTourAssignment(site.id, {
-                                        primaryAssigneeUserId: nextId,
-                                        womenAssigneeUserId: nextId === assignment.womenAssigneeUserId ? '' : assignment.womenAssigneeUserId,
-                                      });
-                                    }}
-                                  >
-                                    <option value="">اختر المستخدم</option>
-                                    {fieldVisitAssignees.map((user) => <option key={user.id} value={user.id}>{user.username} — {user.moduleRole === 'head' ? 'رئيس الوحدة' : 'مشرف'}</option>)}
-                                  </NativeSelect>
+                                <Field label="منفذ القسم الرئيسي">
+                                  <Input value={currentUsername} readOnly className="bg-slate-100 font-semibold text-slate-700" />
                                 </Field>
                               )}
                             </div>
@@ -3434,28 +3410,23 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                                   type="checkbox"
                                   className="h-4 w-4 accent-emerald-700"
                                   checked={assignment.includeWomen}
-                                  disabled={Boolean(sectionState?.activeWomen)}
+                                  disabled={Boolean(sectionState?.activeWomen) || womenNeedsDifferentLogin}
                                   onChange={(event) => updateTourAssignment(site.id, {
                                     includeWomen: event.target.checked,
-                                    womenAssigneeUserId: event.target.checked ? assignment.womenAssigneeUserId : '',
+                                    includePrimary: event.target.checked ? false : assignment.includePrimary,
                                   })}
                                 />
                                 إنشاء زيارة لمصلى النساء
                               </label>
                               {sectionState?.activeWomen && <p className="mb-2 text-[10px] font-bold text-amber-700">توجد زيارة قائمة لمصلى النساء ولا يمكن تكرارها الآن.</p>}
+                              {womenNeedsDifferentLogin && (
+                                <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] font-bold leading-5 text-amber-800">
+                                  آخر زيارة للقسم الرئيسي نُفذت بهذا الحساب. لإنشاء زيارة مصلى النساء يجب تسجيل الدخول بحساب مستخدم آخر.
+                                </p>
+                              )}
                               {assignment.includeWomen && (
-                                <Field label="منفذ مصلى النساء *">
-                                  <NativeSelect
-                                    value={assignment.womenAssigneeUserId}
-                                    onChange={(event) => updateTourAssignment(site.id, { womenAssigneeUserId: event.target.value })}
-                                  >
-                                    <option value="">اختر مستخدمًا آخر</option>
-                                    {fieldVisitAssignees.map((user) => (
-                                      <option key={user.id} value={user.id} disabled={Boolean(blockedWomenAssigneeId && user.id === blockedWomenAssigneeId)}>
-                                        {user.username} — {user.moduleRole === 'head' ? 'رئيس الوحدة' : 'مشرف'}
-                                      </option>
-                                    ))}
-                                  </NativeSelect>
+                                <Field label="منفذ مصلى النساء">
+                                  <Input value={currentUsername} readOnly className="bg-slate-100 font-semibold text-slate-700" />
                                 </Field>
                               )}
                             </div>
@@ -3464,20 +3435,15 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                           <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-[11px] font-bold leading-5 text-emerald-900">
                             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
                             <span>
-                              {assignment.includeWomen && !assignment.includePrimary
-                                ? 'سيتم إنشاء زيارة مستقلة لمصلى النساء فقط، مع الاحتفاظ بزيارة وتقرير القسم الرئيسي السابقين كما هما.'
-                                : assignment.includePrimary && !assignment.includeWomen
-                                  ? 'سيتم إنشاء زيارة مستقلة للقسم الرئيسي فقط، مع الاحتفاظ بسجل مصلى النساء السابق كما هو.'
-                                  : 'سيُنشئ النظام زيارتين مستقلتين: واحدة للقسم الرئيسي وأخرى لمصلى النساء، ولكل زيارة مستخدم وتقرير مستقل.'}
+                              {assignment.includeWomen
+                                ? `سيتم إنشاء زيارة مستقلة لمصلى النساء باسم المستخدم المسجل دخوله (${currentUsername})، مع الاحتفاظ بزيارة وتقرير القسم الرئيسي السابقين كما هما.`
+                                : `سيتم إنشاء زيارة القسم الرئيسي باسم المستخدم المسجل دخوله (${currentUsername}). زيارة مصلى النساء تُنشأ لاحقًا عند دخول المستخدم الآخر بحسابه.`}
                             </span>
                           </div>
                         </>
                       ) : (
-                        <Field label={standaloneWomenPrayerRoom ? 'منفذ زيارة مصلى النساء *' : 'منفذ الزيارة *'}>
-                          <NativeSelect value={assignment.primaryAssigneeUserId} onChange={(event) => updateTourAssignment(site.id, { primaryAssigneeUserId: event.target.value })}>
-                            <option value="">اختر المستخدم</option>
-                            {fieldVisitAssignees.map((user) => <option key={user.id} value={user.id}>{user.username} — {user.moduleRole === 'head' ? 'رئيس الوحدة' : 'مشرف'}</option>)}
-                          </NativeSelect>
+                        <Field label={standaloneWomenPrayerRoom ? 'منفذ زيارة مصلى النساء' : 'منفذ الزيارة'}>
+                          <Input value={currentUsername} readOnly className="bg-slate-100 font-semibold text-slate-700" />
                         </Field>
                       )}
                     </div>
@@ -3491,7 +3457,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
         <Field label="ملاحظات الجولة"><Textarea rows={3} value={tourForm.notes} onChange={(event) => setTourForm({ ...tourForm, notes: event.target.value })} /></Field>
         <DialogFooter>
           <Button variant="outline" onClick={() => setTourDialog(false)}>إلغاء</Button>
-          <Button onClick={() => void saveTour()} disabled={saving || !fieldVisitAssignees.length}>
+          <Button onClick={() => void saveTour()} disabled={saving}>
             {saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
             حفظ وجدولة الزيارات
           </Button>
