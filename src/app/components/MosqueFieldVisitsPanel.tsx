@@ -3033,24 +3033,65 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
       </div>
     </section>
 
-{quranRackDashboard && <Card className="border-teal-200 bg-gradient-to-l from-teal-50/80 via-white to-emerald-50/50">
-  <CardHeader className="pb-3">
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-      <div><CardTitle className="text-lg text-teal-950">مخزون تجهيزات المصاحف</CardTitle><CardDescription className="mt-1">تم فصل الحامل الفردي الذي يحمل مصحفًا واحدًا عن الرف أو الدولاب الذي يستوعب عدة مصاحف. لكل نوع جرد وفائض وعجز ورصيد مركزي مستقل.</CardDescription></div>
-      <div className="flex flex-wrap gap-2"><Badge className="w-fit bg-emerald-700 text-white">الحوامل الفردية: {quranRackDashboard.summary.byType?.individual_stand?.centralStock ?? quranRackDashboard.summary.centralStockIndividualStands ?? 0}</Badge><Badge className="w-fit bg-teal-700 text-white">الرفوف والدواليب: {quranRackDashboard.summary.byType?.shelf_unit?.centralStock ?? quranRackDashboard.summary.centralStockShelfUnits ?? 0}</Badge></div>
+{quranRackDashboard && <Card className="overflow-hidden rounded-2xl border-teal-200 bg-gradient-to-l from-teal-50/70 via-white to-emerald-50/40 shadow-sm">
+  <CardHeader className="px-4 py-3">
+    <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+      <div className="min-w-0">
+        <CardTitle className="text-base font-black text-teal-950">مخزون تجهيزات المصاحف</CardTitle>
+        <CardDescription className="mt-0.5 text-[11px] leading-5">الحوامل الفردية والرفوف/الدواليب لها جرد وفائض وعجز ورصيد مركزي مستقل.</CardDescription>
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-1.5">
+        <Badge className="w-fit bg-emerald-700 px-2 py-0.5 text-[10px] text-white">الحوامل: {quranRackDashboard.summary.byType?.individual_stand?.centralStock ?? quranRackDashboard.summary.centralStockIndividualStands ?? 0}</Badge>
+        <Badge className="w-fit bg-teal-700 px-2 py-0.5 text-[10px] text-white">الرفوف والدواليب: {quranRackDashboard.summary.byType?.shelf_unit?.centralStock ?? quranRackDashboard.summary.centralStockShelfUnits ?? 0}</Badge>
+      </div>
     </div>
   </CardHeader>
-  <CardContent className="space-y-5">
+  <CardContent className="grid gap-3 px-4 pb-4 pt-0 xl:grid-cols-2">
     {(['individual_stand', 'shelf_unit'] as QuranEquipmentItemType[]).map((itemType) => {
       const label = quranEquipmentLabel(itemType);
       const typeSummary = quranRackDashboard.summary.byType?.[itemType];
       const rows = quranRackDashboard.sites.filter((row) => row.itemType === itemType);
       const issueRows = rows.filter((row) => row.surplusCount > 0 || row.shortageCount > 0);
       const centralStock = typeSummary?.centralStock ?? 0;
-      return <section key={itemType} className="rounded-2xl border border-teal-100 bg-white/80 p-4 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h4 className="font-black text-slate-900">{label}</h4><p className="mt-1 text-[11px] text-slate-500">{itemType === 'individual_stand' ? 'كل حامل فردي = مصحف واحد.' : 'عدد الرفوف/الدواليب منفصل عن عدد المصاحف التي تستوعبها.'}</p></div><Badge variant="outline" className="border-teal-300 bg-teal-50 text-teal-800">الرصيد المركزي: {centralStock}</Badge></div>
-        <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-xl border bg-white p-3 text-center"><small className="text-slate-500">المواقع المجردة</small><b className="mt-1 block text-xl">{typeSummary?.countedSites ?? 0}</b></div><div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center"><small className="text-emerald-700">فائض المواقع</small><b className="mt-1 block text-xl text-emerald-800">{typeSummary?.totalSurplus ?? 0}</b></div><div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center"><small className="text-amber-700">احتياج المواقع</small><b className="mt-1 block text-xl text-amber-800">{typeSummary?.totalShortage ?? 0}</b></div><div className="rounded-xl border bg-white p-3 text-center"><small className="text-slate-500">{itemType === 'shelf_unit' ? 'سعة المصاحف' : 'التالف'}</small><b className="mt-1 block text-xl">{itemType === 'shelf_unit' ? (typeSummary?.totalQuranCapacity ?? 0) : (typeSummary?.totalDamaged ?? 0)}</b></div></div>
-        {issueRows.length ? <div className="grid gap-3 lg:grid-cols-2">{issueRows.map((row) => { const capacityAllowance = row.remainingCapacity == null ? row.shortageCount : Math.min(row.shortageCount, row.remainingCapacity); const issueQty = Math.max(0, Math.min(row.shortageCount, centralStock, capacityAllowance)); const keyBase = `${row.site.id}-${itemType}`; return <div key={keyBase} className="rounded-2xl border bg-white p-3 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-2"><div><b className="text-sm text-slate-900">{row.site.name}</b><p className="mt-1 text-[11px] text-slate-500">الموجود {row.presentCount} · الصالح {row.goodCount} · المستهدف {row.targetCount} · حد الوحدات {row.capacityCount || 'غير محدد'}{itemType === 'shelf_unit' ? ` · سعة المصاحف ${row.quranCapacityCount || 0}` : ''}</p></div><div className="flex gap-1">{row.surplusCount > 0 && <Badge className="bg-emerald-100 text-emerald-800">فائض {row.surplusCount}</Badge>}{row.shortageCount > 0 && <Badge className="bg-amber-100 text-amber-800">عجز {row.shortageCount}</Badge>}</div></div>{canEdit && <div className="mt-3 flex flex-wrap gap-2">{row.surplusCount > 0 && <Button type="button" size="sm" className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" disabled={Boolean(rackMovementKey)} onClick={() => void applyQuranRackMovement(row.site.id, itemType, 'surplus_to_stock', row.surplusCount)}>{rackMovementKey === `${keyBase}-surplus_to_stock` && <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" />}ترحيل الفائض ({row.surplusCount})</Button>}{row.shortageCount > 0 && <Button type="button" size="sm" className="border border-teal-700 bg-teal-700 text-white hover:bg-teal-800 hover:text-white" disabled={Boolean(rackMovementKey) || issueQty <= 0} onClick={() => void applyQuranRackMovement(row.site.id, itemType, 'stock_to_site', issueQty)}>{rackMovementKey === `${keyBase}-stock_to_site` && <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" />}صرف من المخزون ({issueQty})</Button>}</div>}</div>; })}</div> : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">لا يوجد فائض أو عجز مسجل في {label} حاليًا.</div>}
+      return <section key={itemType} className="min-w-0 rounded-xl border border-teal-100 bg-white/85 p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h4 className="text-sm font-black text-slate-900">{label}</h4>
+            <p className="mt-0.5 truncate text-[10px] text-slate-500">{itemType === 'individual_stand' ? 'كل حامل فردي = مصحف واحد' : 'عدد الوحدات مستقل عن سعة المصاحف'}</p>
+          </div>
+          <Badge variant="outline" className="shrink-0 border-teal-300 bg-teal-50 px-2 py-0.5 text-[10px] text-teal-800">المركزي: {centralStock}</Badge>
+        </div>
+
+        <div className="mb-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          <div className="rounded-lg border bg-white px-2 py-1.5 text-center"><small className="block text-[9px] text-slate-500">المواقع</small><b className="block text-base leading-5">{typeSummary?.countedSites ?? 0}</b></div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-center"><small className="block text-[9px] text-emerald-700">الفائض</small><b className="block text-base leading-5 text-emerald-800">{typeSummary?.totalSurplus ?? 0}</b></div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-center"><small className="block text-[9px] text-amber-700">الاحتياج</small><b className="block text-base leading-5 text-amber-800">{typeSummary?.totalShortage ?? 0}</b></div>
+          <div className="rounded-lg border bg-white px-2 py-1.5 text-center"><small className="block text-[9px] text-slate-500">{itemType === 'shelf_unit' ? 'السعة' : 'التالف'}</small><b className="block text-base leading-5">{itemType === 'shelf_unit' ? (typeSummary?.totalQuranCapacity ?? 0) : (typeSummary?.totalDamaged ?? 0)}</b></div>
+        </div>
+
+        {issueRows.length ? <div className="max-h-56 space-y-1.5 overflow-y-auto pl-1">
+          {issueRows.map((row) => {
+            const capacityAllowance = row.remainingCapacity == null ? row.shortageCount : Math.min(row.shortageCount, row.remainingCapacity);
+            const issueQty = Math.max(0, Math.min(row.shortageCount, centralStock, capacityAllowance));
+            const keyBase = `${row.site.id}-${itemType}`;
+            return <div key={keyBase} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <b className="truncate text-xs text-slate-900">{row.site.name}</b>
+                    {row.surplusCount > 0 && <Badge className="bg-emerald-100 px-1.5 py-0 text-[9px] text-emerald-800">فائض {row.surplusCount}</Badge>}
+                    {row.shortageCount > 0 && <Badge className="bg-amber-100 px-1.5 py-0 text-[9px] text-amber-800">عجز {row.shortageCount}</Badge>}
+                  </div>
+                  <p className="mt-0.5 text-[9px] leading-4 text-slate-500">الموجود {row.presentCount} · الصالح {row.goodCount} · المستهدف {row.targetCount}{itemType === 'shelf_unit' ? ` · سعة المصاحف ${row.quranCapacityCount || 0}` : ''}</p>
+                </div>
+                {canEdit && <div className="flex shrink-0 flex-wrap gap-1.5">
+                  {row.surplusCount > 0 && <Button type="button" size="sm" className="h-7 border border-emerald-700 bg-emerald-600 px-2 text-[10px] text-white hover:bg-emerald-700 hover:text-white" disabled={Boolean(rackMovementKey)} onClick={() => void applyQuranRackMovement(row.site.id, itemType, 'surplus_to_stock', row.surplusCount)}>{rackMovementKey === `${keyBase}-surplus_to_stock` && <Loader2 className="ml-1 h-3 w-3 animate-spin" />}ترحيل ({row.surplusCount})</Button>}
+                  {row.shortageCount > 0 && <Button type="button" size="sm" className="h-7 border border-teal-700 bg-teal-700 px-2 text-[10px] text-white hover:bg-teal-800 hover:text-white" disabled={Boolean(rackMovementKey) || issueQty <= 0} onClick={() => void applyQuranRackMovement(row.site.id, itemType, 'stock_to_site', issueQty)}>{rackMovementKey === `${keyBase}-stock_to_site` && <Loader2 className="ml-1 h-3 w-3 animate-spin" />}صرف ({issueQty})</Button>}
+                </div>}
+              </div>
+            </div>;
+          })}
+        </div> : <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[10px] font-semibold text-emerald-800">لا يوجد فائض أو عجز مسجل حاليًا.</div>}
       </section>;
     })}
   </CardContent>
