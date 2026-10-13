@@ -1,0 +1,162 @@
+name: Fix accounting baseline row start and deed count
+
+on:
+  push:
+    branches:
+      - fix/accounting-baseline-row-start-deed-count
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/accounting-baseline-row-start-deed-count
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Patch baseline parser and preview
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f"Missing expected block: {label}")
+              if text.count(old) != 1:
+                  raise SystemExit(f"Expected exactly one block for {label}, found {text.count(old)}")
+              return text.replace(old, new, 1)
+
+          structural = Path("src/utils/accountingWorkbookStructuralIntake.ts")
+          text = structural.read_text(encoding="utf-8")
+
+          text = replace_once(
+              text,
+              "const HEADER_SCAN_ROWS = 16;\nconst MIN_HEADER_MATCHES = 3;",
+              "const HEADER_SCAN_ROWS = 16;\nconst OFFICIAL_TEMPLATE_HEADER_ROWS = 7;\nconst MIN_HEADER_MATCHES = 3;",
+              "official header rows constant",
+          )
+
+          text = replace_once(
+              text,
+              "const headerMatrixFor = (workbook: XLSX.WorkBook, sheetName: string) =>\n  sheetToResolvedMatrix(workbook, sheetName, HEADER_SCAN_ROWS);",
+              "const headerMatrixFor = (workbook: XLSX.WorkBook, sheetName: string, maxRows = HEADER_SCAN_ROWS) =>\n  sheetToResolvedMatrix(workbook, sheetName, maxRows);",
+              "headerMatrixFor optional row limit",
+          )
+
+          text = replace_once(
+              text,
+              "  const matrix = headerMatrixFor(officialWorkbook, best.sheetName);",
+              "  // The official MOF workbook has seven header/instruction rows and data starts at row 8.\n  // Never learn header aliases from rows 8+; values such as «المنطقة الشرقية» can\n  // otherwise be mistaken for the field label «المنطقة» and move dataStartRow to row 17.\n  const matrix = headerMatrixFor(officialWorkbook, best.sheetName, OFFICIAL_TEMPLATE_HEADER_ROWS);",
+              "official workbook header-only matrix",
+          )
+
+          structural.write_text(text, encoding="utf-8")
+
+          page = Path("src/app/pages/AccountingTransformationBaselineResetPage.tsx")
+          text = page.read_text(encoding="utf-8")
+
+          text = replace_once(
+              text,
+              "  typeCounts: { land: number; building: number; fixed_asset: number };\n};",
+              "  typeCounts: { land: number; building: number; fixed_asset: number };\n  deedBearingLand: number;\n};",
+              "analysis summary deed count",
+          )
+
+          text = replace_once(
+              text,
+              "const CONFIRMATION_PHRASE = 'إعادة تأسيس بيانات اللجنة';\n",
+              "const CONFIRMATION_PHRASE = 'إعادة تأسيس بيانات اللجنة';\n\nconst UNAVAILABLE_BASELINE_VALUES = new Set([\n  '',\n  'not available',\n  'not applicable',\n  'n/a',\n  'na',\n  'غير متوفر',\n  'غير متاح',\n  'لا يوجد',\n  '-',\n  '—',\n]);\n\nconst isAvailableBaselineValue = (value: unknown) =>\n  !UNAVAILABLE_BASELINE_VALUES.has(String(value ?? '').trim().toLowerCase());\n\nconst isDeedBearingLandItem = (item: AccountingBaselineResetItem) =>\n  item.recordType === 'land'\n  && isAvailableBaselineValue(item.payload?.AJ)\n  && isAvailableBaselineValue(item.payload?.AG);\n",
+              "deed helpers",
+          )
+
+          text = replace_once(
+              text,
+              "  const expectedUniversityBaseline = useMemo(\n    () => Boolean(serverPreview\n      && serverPreview.typeCounts.building === 626\n      && serverPreview.typeCounts.land === 11\n      && serverPreview.typeCounts.fixed_asset === 0\n      && serverPreview.willImport === 637),\n    [serverPreview],\n  );",
+              "  const expectedUniversityBaseline = useMemo(\n    () => Boolean(serverPreview\n      && summary\n      && serverPreview.typeCounts.building === 625\n      && serverPreview.typeCounts.land === 16\n      && serverPreview.typeCounts.fixed_asset === 0\n      && serverPreview.willImport === 641\n      && summary.deedBearingLand === 11),\n    [serverPreview, summary],\n  );",
+              "current Stage 6 expected baseline",
+          )
+
+          text = replace_once(
+              text,
+              "      const linkedSheets = Object.values(ACCOUNTING_BASELINE_SOURCE_SHEETS).length;",
+              "      const deedBearingLand = items.filter(isDeedBearingLandItem).length;\n      const linkedSheets = Object.values(ACCOUNTING_BASELINE_SOURCE_SHEETS).length;",
+              "compute deed count",
+          )
+
+          text = replace_once(
+              text,
+              "        items,\n        typeCounts,\n      };",
+              "        items,\n        typeCounts,\n        deedBearingLand,\n      };",
+              "store deed count",
+          )
+
+          text = replace_once(
+              text,
+              "        <div className=\"grid gap-3 sm:grid-cols-2 lg:grid-cols-5\">\n          <Metric label=\"سجلات الأساس المكتشفة\" value={summary.items.length} />\n          <Metric label=\"المباني\" value={summary.typeCounts.building} tone=\"text-sky-800\" />\n          <Metric label=\"الأراضي\" value={summary.typeCounts.land} tone=\"text-emerald-800\" />\n          <Metric label=\"أوراق البيانات المعتمدة\" value={summary.linkedSheets} tone=\"text-violet-800\" />\n          <Metric label=\"أوراق مرجعية مستبعدة\" value={summary.ignoredSheets} />\n        </div>",
+              "        <div className=\"grid gap-3 sm:grid-cols-2 lg:grid-cols-6\">\n          <Metric label=\"سجلات الأساس المكتشفة\" value={summary.items.length} />\n          <Metric label=\"المباني\" value={summary.typeCounts.building} tone=\"text-sky-800\" />\n          <Metric label=\"سجلات ورقة الأراضي\" value={summary.typeCounts.land} tone=\"text-emerald-800\" />\n          <Metric label=\"أراضٍ ذات صك جامعي\" value={summary.deedBearingLand} tone=\"text-amber-800\" />\n          <Metric label=\"أوراق البيانات المعتمدة\" value={summary.linkedSheets} tone=\"text-violet-800\" />\n          <Metric label=\"أوراق مرجعية مستبعدة\" value={summary.ignoredSheets} />\n        </div>",
+              "summary metrics",
+          )
+
+          text = replace_once(
+              text,
+              "          <strong>سياسة مصدر البيانات:</strong> تم تثبيت ورقة الأراضي وورقة المباني كمصدرَي السجلات فقط. الأوراق الأخرى مثل التعريفات والتصنيفات والأعمار والـValidation تبقى داخل Excel للاستدلال والتنسيق، ولا تُنشئ أصولًا في قاعدة البيانات.",
+              "          <strong>سياسة مصدر البيانات:</strong> تم تثبيت ورقة الأراضي وورقة المباني كمصدرَي السجلات فقط. الأوراق الأخرى مثل التعريفات والتصنيفات والأعمار والـValidation تبقى داخل Excel للاستدلال والتنسيق، ولا تُنشئ أصولًا في قاعدة البيانات. ويظهر عدد الأراضي ذات الصك الجامعي بشكل مستقل؛ لأن ورقة الأراضي تتضمن أيضًا عقارات تحت الانتفاع أو التخصيص أو بملكية جهات أخرى.",
+              "source policy explanation",
+          )
+
+          text = replace_once(
+              text,
+              "          ? <div className=\"flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-900\"><CheckCircle2 className=\"h-5 w-5\" />المعاينة الخادمية مطابقة لنقطة البداية الحالية: 637 سجلًا = 626 مبنى + 11 أرضًا.</div>\n          : <div className=\"rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-7 text-amber-950\"><strong>تنبيه مراجعة:</strong> الأعداد تختلف عن الفحص السابق للملف المرجعي (637 = 626 مبنى + 11 أرضًا). لا تنفذ الحذف إلا إذا كنت تتوقع هذا التغيير في ملف الأساس.</div>}",
+              "          ? <div className=\"flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-900\"><CheckCircle2 className=\"h-5 w-5\" />المعاينة الخادمية مطابقة لملف المرحلة السادسة: 641 سجلًا = 625 مبنى + 16 سجلًا في ورقة الأراضي، منها 11 أرضًا ذات صك جامعي.</div>\n          : <div className=\"rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-7 text-amber-950\"><strong>تنبيه مراجعة:</strong> الأعداد تختلف عن ملف المرحلة السادسة المعتمد (641 = 625 مبنى + 16 سجلًا في ورقة الأراضي، منها 11 أرضًا ذات صك جامعي). لا تنفذ الحذف إلا إذا كنت تتوقع هذا التغيير في ملف الأساس.</div>}",
+              "baseline status messaging",
+          )
+
+          text = replace_once(
+              text,
+              "              <Metric label=\"الأراضي\" value={serverPreview.typeCounts.land} tone=\"text-emerald-800\" />",
+              "              <Metric label=\"سجلات ورقة الأراضي\" value={serverPreview.typeCounts.land} tone=\"text-emerald-800\" />\n              <Metric label=\"أراضٍ ذات صك جامعي\" value={summary.deedBearingLand} tone=\"text-amber-800\" />",
+              "server preview deed metric",
+          )
+
+          text = replace_once(
+              text,
+              "      `المباني: ${serverPreview.typeCounts.building.toLocaleString('ar-SA')} · الأراضي: ${serverPreview.typeCounts.land.toLocaleString('ar-SA')}\n` +",
+              "      `المباني: ${serverPreview.typeCounts.building.toLocaleString('ar-SA')} · سجلات الأراضي: ${serverPreview.typeCounts.land.toLocaleString('ar-SA')} · الأراضي ذات الصك الجامعي: ${summary.deedBearingLand.toLocaleString('ar-SA')}\n` +",
+              "confirmation count details",
+          )
+
+          page.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Verify intended safeguards
+        shell: bash
+        run: |
+          grep -q "OFFICIAL_TEMPLATE_HEADER_ROWS = 7" src/utils/accountingWorkbookStructuralIntake.ts
+          grep -q "serverPreview.typeCounts.building === 625" src/app/pages/AccountingTransformationBaselineResetPage.tsx
+          grep -q "serverPreview.typeCounts.land === 16" src/app/pages/AccountingTransformationBaselineResetPage.tsx
+          grep -q "summary.deedBearingLand === 11" src/app/pages/AccountingTransformationBaselineResetPage.tsx
+          grep -q "أراضٍ ذات صك جامعي" src/app/pages/AccountingTransformationBaselineResetPage.tsx
+
+      - name: Remove temporary workflow and commit
+        shell: bash
+        run: |
+          rm -f .github/workflows/fix-accounting-baseline-row-start-deed-count.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/utils/accountingWorkbookStructuralIntake.ts src/app/pages/AccountingTransformationBaselineResetPage.tsx .github/workflows/fix-accounting-baseline-row-start-deed-count.yml
+          git commit -m "Fix accounting baseline row start and deed count"
+          git push origin HEAD:fix/accounting-baseline-row-start-deed-count
