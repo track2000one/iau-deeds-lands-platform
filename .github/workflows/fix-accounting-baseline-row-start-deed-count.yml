@@ -129,13 +129,6 @@ jobs:
               "server preview deed metric",
           )
 
-          text = replace_once(
-              text,
-              "      `المباني: ${serverPreview.typeCounts.building.toLocaleString('ar-SA')} · الأراضي: ${serverPreview.typeCounts.land.toLocaleString('ar-SA')}\n` +",
-              "      `المباني: ${serverPreview.typeCounts.building.toLocaleString('ar-SA')} · سجلات الأراضي: ${serverPreview.typeCounts.land.toLocaleString('ar-SA')} · الأراضي ذات الصك الجامعي: ${summary.deedBearingLand.toLocaleString('ar-SA')}\n` +",
-              "confirmation count details",
-          )
-
           page.write_text(text, encoding="utf-8")
           PY
 
