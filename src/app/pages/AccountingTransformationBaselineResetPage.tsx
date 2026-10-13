@@ -39,6 +39,27 @@ import {
 
 const CONFIRMATION_PHRASE = 'إعادة تأسيس بيانات اللجنة';
 
+const UNAVAILABLE_BASELINE_VALUES = new Set([
+  '',
+  'not available',
+  'not applicable',
+  'n/a',
+  'na',
+  'غير متوفر',
+  'غير متاح',
+  'لا يوجد',
+  '-',
+  '—',
+]);
+
+const isAvailableBaselineValue = (value: unknown) =>
+  !UNAVAILABLE_BASELINE_VALUES.has(String(value ?? '').trim().toLowerCase());
+
+const isDeedBearingLandItem = (item: AccountingBaselineResetItem) =>
+  item.recordType === 'land'
+  && isAvailableBaselineValue(item.payload?.AJ)
+  && isAvailableBaselineValue(item.payload?.AG);
+
 type IntakeRow = {
   recordType: AccountingRecordType;
   sourceSheet: string;
@@ -52,6 +73,7 @@ type AnalysisSummary = {
   ignoredSheets: number;
   items: AccountingBaselineResetItem[];
   typeCounts: { land: number; building: number; fixed_asset: number };
+  deedBearingLand: number;
 };
 
 const inferOwnership = (recordType: AccountingRecordType, payload: Record<string, unknown>) => {
@@ -100,11 +122,13 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
   const confirmationReady = confirmation.trim() === CONFIRMATION_PHRASE;
   const expectedUniversityBaseline = useMemo(
     () => Boolean(serverPreview
-      && serverPreview.typeCounts.building === 626
-      && serverPreview.typeCounts.land === 11
+      && summary
+      && serverPreview.typeCounts.building === 625
+      && serverPreview.typeCounts.land === 16
       && serverPreview.typeCounts.fixed_asset === 0
-      && serverPreview.willImport === 637),
-    [serverPreview],
+      && serverPreview.willImport === 641
+      && summary.deedBearingLand === 11),
+    [serverPreview, summary],
   );
 
   const requestServerPreview = async (nextSummary: AnalysisSummary, nextFileName: string) => {
@@ -188,6 +212,7 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
         },
         { land: 0, building: 0, fixed_asset: 0 } as AnalysisSummary['typeCounts'],
       );
+      const deedBearingLand = items.filter(isDeedBearingLandItem).length;
       const linkedSheets = Object.values(ACCOUNTING_BASELINE_SOURCE_SHEETS).length;
       const ignoredSheets = Math.max(0, analyzed.inspection.sheets.length - linkedSheets);
       const nextSummary: AnalysisSummary = {
@@ -196,6 +221,7 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
         ignoredSheets,
         items,
         typeCounts,
+        deedBearingLand,
       };
       setSummary(nextSummary);
       setMessage(
@@ -309,15 +335,16 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
       </Card>
 
       {summary && <>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <Metric label="سجلات الأساس المكتشفة" value={summary.items.length} />
           <Metric label="المباني" value={summary.typeCounts.building} tone="text-sky-800" />
-          <Metric label="الأراضي" value={summary.typeCounts.land} tone="text-emerald-800" />
+          <Metric label="سجلات ورقة الأراضي" value={summary.typeCounts.land} tone="text-emerald-800" />
+          <Metric label="أراضٍ ذات صك جامعي" value={summary.deedBearingLand} tone="text-amber-800" />
           <Metric label="أوراق البيانات المعتمدة" value={summary.linkedSheets} tone="text-violet-800" />
           <Metric label="أوراق مرجعية مستبعدة" value={summary.ignoredSheets} />
         </div>
         <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-xs leading-6 text-sky-950">
-          <strong>سياسة مصدر البيانات:</strong> تم تثبيت ورقة الأراضي وورقة المباني كمصدرَي السجلات فقط. الأوراق الأخرى مثل التعريفات والتصنيفات والأعمار والـValidation تبقى داخل Excel للاستدلال والتنسيق، ولا تُنشئ أصولًا في قاعدة البيانات.
+          <strong>سياسة مصدر البيانات:</strong> تم تثبيت ورقة الأراضي وورقة المباني كمصدرَي السجلات فقط. الأوراق الأخرى مثل التعريفات والتصنيفات والأعمار والـValidation تبقى داخل Excel للاستدلال والتنسيق، ولا تُنشئ أصولًا في قاعدة البيانات. ويظهر عدد الأراضي ذات الصك الجامعي بشكل مستقل؛ لأن ورقة الأراضي تتضمن أيضًا عقارات تحت الانتفاع أو التخصيص أو بملكية جهات أخرى.
         </div>
       </>}
 
@@ -330,8 +357,8 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
 
       {serverPreview && <>
         {expectedUniversityBaseline
-          ? <div className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"><CheckCircle2 className="h-5 w-5" />المعاينة الخادمية مطابقة لنقطة البداية الحالية: 637 سجلًا = 626 مبنى + 11 أرضًا.</div>
-          : <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-7 text-amber-950"><strong>تنبيه مراجعة:</strong> الأعداد تختلف عن الفحص السابق للملف المرجعي (637 = 626 مبنى + 11 أرضًا). لا تنفذ الحذف إلا إذا كنت تتوقع هذا التغيير في ملف الأساس.</div>}
+          ? <div className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"><CheckCircle2 className="h-5 w-5" />المعاينة الخادمية مطابقة لملف المرحلة السادسة: 641 سجلًا = 625 مبنى + 16 سجلًا في ورقة الأراضي، منها 11 أرضًا ذات صك جامعي.</div>
+          : <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-7 text-amber-950"><strong>تنبيه مراجعة:</strong> الأعداد تختلف عن ملف المرحلة السادسة المعتمد (641 = 625 مبنى + 16 سجلًا في ورقة الأراضي، منها 11 أرضًا ذات صك جامعي). لا تنفذ الحذف إلا إذا كنت تتوقع هذا التغيير في ملف الأساس.</div>}
 
         <div className="grid gap-4 lg:grid-cols-3">
           <Card className="rounded-[26px] border-red-200 bg-red-50/50">
@@ -350,7 +377,8 @@ export const AccountingTransformationBaselineResetPage: React.FC = () => {
               <Metric label="دورة أساس جديدة" value={1} tone="text-emerald-800" hint="#1 — معتمدة وحالية" />
               <Metric label="السجلات التي ستُعتمد" value={serverPreview.willImport} tone="text-emerald-800" />
               <Metric label="المباني" value={serverPreview.typeCounts.building} tone="text-sky-800" />
-              <Metric label="الأراضي" value={serverPreview.typeCounts.land} tone="text-emerald-800" />
+              <Metric label="سجلات ورقة الأراضي" value={serverPreview.typeCounts.land} tone="text-emerald-800" />
+              <Metric label="أراضٍ ذات صك جامعي" value={summary.deedBearingLand} tone="text-amber-800" />
               <div className="sm:col-span-2 rounded-2xl border border-emerald-200 bg-white p-3 text-xs leading-6 text-emerald-950">
                 <strong>مصادر السجلات:</strong> {serverPreview.baselineSourceSheets.land} ({(serverPreview.sourceSheetCounts[serverPreview.baselineSourceSheets.land] || 0).toLocaleString('ar-SA')}) · {serverPreview.baselineSourceSheets.building} ({(serverPreview.sourceSheetCounts[serverPreview.baselineSourceSheets.building] || 0).toLocaleString('ar-SA')})
               </div>

@@ -41,6 +41,7 @@ type CanonicalProfile = {
 };
 
 const HEADER_SCAN_ROWS = 16;
+const OFFICIAL_TEMPLATE_HEADER_ROWS = 7;
 const MIN_HEADER_MATCHES = 3;
 
 const normalizeText = (value: unknown) => String(value ?? '')
@@ -63,8 +64,8 @@ const meaningfulHeader = (value: unknown) => {
 
 const matrixFor = (workbook: XLSX.WorkBook, sheetName: string) => sheetToResolvedMatrix(workbook, sheetName);
 
-const headerMatrixFor = (workbook: XLSX.WorkBook, sheetName: string) =>
-  sheetToResolvedMatrix(workbook, sheetName, HEADER_SCAN_ROWS);
+const headerMatrixFor = (workbook: XLSX.WorkBook, sheetName: string, maxRows = HEADER_SCAN_ROWS) =>
+  sheetToResolvedMatrix(workbook, sheetName, maxRows);
 
 const sheetDimensions = (sheet: XLSX.WorkSheet) => {
   const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
@@ -122,7 +123,10 @@ const enrichProfileFromOfficialWorkbook = (profile: CanonicalProfile, officialWo
     return;
   }
 
-  const matrix = headerMatrixFor(officialWorkbook, best.sheetName);
+  // The official MOF workbook has seven header/instruction rows and data starts at row 8.
+  // Never learn header aliases from rows 8+; values such as «المنطقة الشرقية» can
+  // otherwise be mistaken for the field label «المنطقة» and move dataStartRow to row 17.
+  const matrix = headerMatrixFor(officialWorkbook, best.sheetName, OFFICIAL_TEMPLATE_HEADER_ROWS);
   let lastCanonicalHeaderRow = -1;
   for (const field of ACCOUNTING_FIELDS[profile.recordType]) {
     const columnIndex = excelColumnToIndex(field.c);
