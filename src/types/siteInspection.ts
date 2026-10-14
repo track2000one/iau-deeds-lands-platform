@@ -21,6 +21,8 @@ export type SiteInspection = {
   title: string;
   siteType: string;
   siteName: string;
+  deedId?: string | null;
+  buildingId?: string | null;
   visitDate: string;
   visitDateType?: 'gregorian' | 'hijri';
   visitPurpose?: string | null;
@@ -50,9 +52,46 @@ export type SiteInspection = {
   updatedAt: string;
   items: InspectionItem[];
   attachments: InspectionAttachment[];
+  deed?: SiteInspectionDeedReference | null;
+  building?: SiteInspectionBuildingReference | null;
+};
+
+export type SiteInspectionDeedReference = {
+  id: string;
+  deedNumber: string;
+  propertyDescription: string;
+  plotNumber?: string | null;
+  planNumber?: string | null;
+  area?: number | null;
+  region?: string | null;
+  city?: string | null;
+  district?: string | null;
+  coordinates?: unknown;
+};
+
+export type SiteInspectionBuildingReference = {
+  id: string;
+  buildingNumber: string;
+  name?: string | null;
+  campusLocation?: string | null;
+  region?: string | null;
+  city?: string | null;
+  district?: string | null;
+  buildingType?: string | null;
+  primaryUse?: string | null;
+  operationalStatus?: string | null;
+  floorsCount?: number | null;
+  builtUpArea?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+export type SiteInspectionReferences = {
+  deeds: SiteInspectionDeedReference[];
+  buildings: SiteInspectionBuildingReference[];
 };
 
 export type SiteInspectionInput = Omit<
   SiteInspection,
-  'id' | 'inspectionNumber' | 'createdAt' | 'updatedAt' | 'createdBy'
+  'id' | 'inspectionNumber' | 'createdAt' | 'updatedAt' | 'createdBy' | 'deed' | 'building'
 >;
