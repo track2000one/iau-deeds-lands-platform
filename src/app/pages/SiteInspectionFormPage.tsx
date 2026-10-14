@@ -15,10 +15,12 @@ import type {
   InspectionAttachment,
   InspectionItem,
   SiteInspectionInput,
+  SiteInspectionReferences,
 } from '../../types/siteInspection';
 import {
   createSiteInspection,
   getSiteInspection,
+  getSiteInspectionReferences,
   updateSiteInspection,
   uploadInspectionImage,
 } from '../api/siteInspections';
@@ -47,10 +49,36 @@ const categories = [
   'الاستخدام الحالي',
 ];
 
+const emptyReferences: SiteInspectionReferences = { deeds: [], buildings: [] };
+
+const parseReferenceCoordinates = (value: unknown): { latitude: number; longitude: number } | null => {
+  if (!value) return null;
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const latitude = Number(record.latitude ?? record.lat);
+    const longitude = Number(record.longitude ?? record.lng ?? record.lon);
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) return { latitude, longitude };
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    const fromJson = parseReferenceCoordinates(parsed);
+    if (fromJson) return fromJson;
+  } catch {}
+  const numbers = raw.match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
+  if (numbers.length >= 2 && Number.isFinite(numbers[0]) && Number.isFinite(numbers[1])) {
+    return { latitude: numbers[0], longitude: numbers[1] };
+  }
+  return null;
+};
+
 const emptyInput: SiteInspectionInput = {
   title: '',
   siteType: 'land',
   siteName: '',
+  deedId: null,
+  buildingId: null,
   visitDate: new Date().toISOString().slice(0, 10),
   visitDateType: 'gregorian',
   visitPurpose: '',
@@ -89,6 +117,15 @@ export const SiteInspectionFormPage: React.FC = () => {
   const [uploading, setUploading] = React.useState(false);
   const [showMap, setShowMap] = React.useState(true);
   const [visitTime, setVisitTime] = React.useState(new Date().toTimeString().slice(0, 5));
+  const [references, setReferences] = React.useState<SiteInspectionReferences>(emptyReferences);
+  const [referencesLoading, setReferencesLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    getSiteInspectionReferences()
+      .then(setReferences)
+      .catch((error) => toast.error(error instanceof Error ? error.message : 'تعذر تحميل الصكوك والمباني المرجعية'))
+      .finally(() => setReferencesLoading(false));
+  }, []);
 
   React.useEffect(() => {
     if (!inspectionId) return;
@@ -100,6 +137,8 @@ export const SiteInspectionFormPage: React.FC = () => {
           title: record.title,
           siteType: record.siteType,
           siteName: record.siteName,
+          deedId: record.deedId || null,
+          buildingId: record.buildingId || null,
           visitDate: normalizeFlexibleDateForInput(record.visitDate, record.visitDateType || 'gregorian'),
           visitDateType: record.visitDateType || 'gregorian',
           visitPurpose: record.visitPurpose || '',
@@ -138,6 +177,79 @@ export const SiteInspectionFormPage: React.FC = () => {
     key: K,
     value: SiteInspectionInput[K]
   ) => setForm((current) => ({ ...current, [key]: value }));
+
+  const referenceMode: 'none' | 'deed' | 'building' = form.deedId
+    ? 'deed'
+    : form.buildingId
+      ? 'building'
+      : 'none';
+
+  const changeReferenceMode = (mode: 'none' | 'deed' | 'building') => {
+    setForm((current) => ({
+      ...current,
+      deedId: mode === 'deed' ? current.deedId : null,
+      buildingId: mode === 'building' ? current.buildingId : null,
+    }));
+  };
+
+  const selectDeedReference = (deedId: string) => {
+    const deed = references.deeds.find((item) => item.id === deedId);
+    if (!deed) {
+      setForm((current) => ({ ...current, deedId: null }));
+      return;
+    }
+    const coordinates = parseReferenceCoordinates(deed.coordinates);
+    setForm((current) => ({
+      ...current,
+      deedId: deed.id,
+      buildingId: null,
+      siteType: 'land',
+      siteName: deed.propertyDescription || `صك رقم ${deed.deedNumber}`,
+      deedNumber: deed.deedNumber || '',
+      plotNumber: deed.plotNumber || '',
+      planNumber: deed.planNumber || '',
+      region: deed.region || current.region,
+      city: deed.city || current.city,
+      district: deed.district || current.district,
+      locationDescription: deed.propertyDescription || current.locationDescription,
+      latitude: coordinates?.latitude ?? current.latitude,
+      longitude: coordinates?.longitude ?? current.longitude,
+      mapUrl: coordinates
+        ? `https://www.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}`
+        : current.mapUrl,
+      title: current.title.trim() ? current.title : `معاينة ${deed.propertyDescription || `الصك ${deed.deedNumber}`}`,
+    }));
+  };
+
+  const selectBuildingReference = (buildingId: string) => {
+    const building = references.buildings.find((item) => item.id === buildingId);
+    if (!building) {
+      setForm((current) => ({ ...current, buildingId: null }));
+      return;
+    }
+    setForm((current) => ({
+      ...current,
+      buildingId: building.id,
+      deedId: null,
+      siteType: 'building',
+      siteName: building.name || `مبنى ${building.buildingNumber}`,
+      deedNumber: '',
+      plotNumber: '',
+      planNumber: '',
+      region: building.region || current.region,
+      city: building.city || current.city,
+      district: building.district || current.district,
+      locationDescription: building.campusLocation
+        ? [building.name || `مبنى ${building.buildingNumber}`, building.campusLocation].filter(Boolean).join(' — ')
+        : current.locationDescription,
+      latitude: building.latitude ?? current.latitude,
+      longitude: building.longitude ?? current.longitude,
+      mapUrl: building.latitude != null && building.longitude != null
+        ? `https://www.google.com/maps?q=${building.latitude},${building.longitude}`
+        : current.mapUrl,
+      title: current.title.trim() ? current.title : `معاينة ${building.name || `المبنى ${building.buildingNumber}`}`,
+    }));
+  };
 
   const addItem = () => {
     setField('items', [
@@ -275,6 +387,59 @@ export const SiteInspectionFormPage: React.FC = () => {
       </div>
 
       <SmartDocumentExtraction module="site_inspection" onApply={applySmartExtraction} />
+
+      <Card className="w-full min-w-0 overflow-hidden border-sky-200 bg-sky-50/30">
+        <CardHeader>
+          <CardTitle>الارتباط بالسجل المركزي</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Field label="مرجع المعاينة">
+            <NativeSelect
+              value={referenceMode}
+              onChange={(event) => changeReferenceMode(event.target.value as 'none' | 'deed' | 'building')}
+              disabled={referencesLoading}
+            >
+              <option value="none">غير مرتبطة بسجل مركزي</option>
+              <option value="deed">صك من سجل الصكوك</option>
+              <option value="building">مبنى من السجل المركزي للمباني</option>
+            </NativeSelect>
+          </Field>
+
+          {referenceMode === 'deed' && (
+            <div className="md:col-span-2">
+              <Field label="اختر الصك">
+                <NativeSelect value={form.deedId || ''} onChange={(event) => selectDeedReference(event.target.value)}>
+                  <option value="">اختر الصك...</option>
+                  {references.deeds.map((deed) => (
+                    <option key={deed.id} value={deed.id}>
+                      {deed.deedNumber} — {deed.propertyDescription || 'بدون وصف'}{deed.city ? ` — ${deed.city}` : ''}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+            </div>
+          )}
+
+          {referenceMode === 'building' && (
+            <div className="md:col-span-2">
+              <Field label="اختر المبنى">
+                <NativeSelect value={form.buildingId || ''} onChange={(event) => selectBuildingReference(event.target.value)}>
+                  <option value="">اختر المبنى...</option>
+                  {references.buildings.map((building) => (
+                    <option key={building.id} value={building.id}>
+                      {building.buildingNumber} — {building.name || 'مبنى بدون اسم'}{building.campusLocation ? ` — ${building.campusLocation}` : ''}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+            </div>
+          )}
+
+          <div className="md:col-span-2 lg:col-span-3 rounded-xl border border-sky-200 bg-white px-3 py-2 text-xs leading-6 text-slate-600">
+            عند اختيار صك أو مبنى يتم ربط المعاينة بالسجل الأصلي بمعرف ثابت، وتعبئة بيانات الموقع الأساسية تلقائيًا. يمكن تعديل تفاصيل الزيارة بعد الربط دون تكرار تعريف الأصل.
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="w-full min-w-0 overflow-hidden">
         <CardHeader><CardTitle>بيانات الزيارة والموقع</CardTitle></CardHeader>
