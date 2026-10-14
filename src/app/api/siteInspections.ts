@@ -3,6 +3,7 @@ import type {
   InspectionAttachment,
   SiteInspection,
   SiteInspectionInput,
+  SiteInspectionReferences,
 } from '../../types/siteInspection';
 
 export const getSiteInspections = () =>
@@ -10,6 +11,9 @@ export const getSiteInspections = () =>
 
 export const getSiteInspection = (id: string) =>
   apiJson<SiteInspection>(`/api/site-inspections/${id}`);
+
+export const getSiteInspectionReferences = () =>
+  apiJson<SiteInspectionReferences>('/api/site-inspections/references');
 
 export const createSiteInspection = (input: SiteInspectionInput) =>
   apiJson<SiteInspection>('/api/site-inspections', {
