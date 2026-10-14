@@ -72,6 +72,9 @@ export const SiteInspectionsPage: React.FC = () => {
         item.inspectionNumber,
         item.title,
         item.siteName,
+        item.deed?.deedNumber,
+        item.building?.buildingNumber,
+        item.building?.name,
         item.city,
         item.observations,
       ].some((value) => String(value || '').toLowerCase().includes(query))
@@ -155,6 +158,12 @@ export const SiteInspectionsPage: React.FC = () => {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {[item.city, item.district].filter(Boolean).join(' - ') || 'الموقع غير محدد'}
                   </p>
+                  {(item.deed || item.building) && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {item.deed && <Badge variant="outline">صك: {item.deed.deedNumber}</Badge>}
+                      {item.building && <Badge variant="outline">مبنى: {item.building.buildingNumber}</Badge>}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
