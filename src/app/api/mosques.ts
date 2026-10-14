@@ -23,10 +23,24 @@ export type MosqueSiteMediaLibrary = {
   documents: MosqueSiteDocumentItem[];
 };
 
+export type MosqueBuildingDeedReference = {
+  id: string;
+  deedNumber: string;
+  propertyDescription: string;
+  plotNumber?: string | null;
+  planNumber?: string | null;
+  area?: number | null;
+  region?: string | null;
+  city?: string | null;
+  district?: string | null;
+};
+
 export type MosqueBuilding = {
   id: string;
   buildingNumber: string;
   name?: string | null;
+  deedId?: string | null;
+  deed?: MosqueBuildingDeedReference | null;
   campusLocation?: string | null;
   region?: string | null;
   city?: string | null;
@@ -977,6 +991,7 @@ export const mosqueApi = {
   dashboard: () => apiJson<MosqueDashboard>('/api/mosques/dashboard'),
   sites: () => apiJson<MosqueSite[]>('/api/mosques/sites'),
   buildings: () => apiJson<MosqueBuilding[]>('/api/mosques/buildings'),
+  buildingDeeds: () => apiJson<MosqueBuildingDeedReference[]>('/api/mosques/building-deeds'),
   createBuilding: (input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>('/api/mosques/buildings', { method: 'POST', body: JSON.stringify(input) }),
   updateBuilding: (id: string, input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>(`/api/mosques/buildings/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteBuilding: (id: string) => apiJson<void>(`/api/mosques/buildings/${id}`, { method: 'DELETE' }),
