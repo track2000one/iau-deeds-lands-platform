@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
-import { mosqueApi, type MosqueBuilding } from '../api/mosques';
+import { mosqueApi, type MosqueBuilding, type MosqueBuildingDeedReference } from '../api/mosques';
 import { getAsset, getAssets, updateAsset } from '../api/assets';
 import { getAccountingTransformationRecords, updateAccountingTransformationRecord } from '../api/accountingTransformation';
 import {
@@ -74,6 +74,7 @@ import {
 type BuildingForm = {
   buildingNumber: string;
   name: string;
+  deedId: string;
   campusLocation: string;
   region: string;
   city: string;
@@ -100,6 +101,7 @@ type BuildingForm = {
 const EMPTY_FORM: BuildingForm = {
   buildingNumber: '',
   name: '',
+  deedId: '',
   campusLocation: '',
   region: 'المنطقة الشرقية',
   city: 'الدمام',
@@ -178,6 +180,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     isAdmin || hasPermission('accounting_transformation', 'canEdit');
 
   const [buildings, setBuildings] = useState<MosqueBuilding[]>([]);
+  const [buildingDeeds, setBuildingDeeds] = useState<MosqueBuildingDeedReference[]>([]);
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [accountingRecords, setAccountingRecords] = useState<
     AccountingTransformationRecord[]
@@ -204,14 +207,18 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
 
     let buildingLoadSucceeded = false;
     try {
-      const buildingResult = await mosqueApi.buildings();
+      const [buildingResult, deedResult] = await Promise.all([
+        mosqueApi.buildings(),
+        mosqueApi.buildingDeeds(),
+      ]);
       setBuildings(buildingResult || []);
+      setBuildingDeeds(deedResult || []);
       buildingLoadSucceeded = true;
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : 'تعذر تحميل السجل المركزي للمباني'
+          : 'تعذر تحميل السجل المركزي للمباني والصكوك'
       );
     } finally {
       setLoading(false);
@@ -303,6 +310,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
         pendingDraft?.district,
         building.buildingNumber,
         building.name,
+        building.deed?.deedNumber,
+        building.deed?.propertyDescription,
         building.campusLocation,
         building.region,
         building.city,
@@ -386,6 +395,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     setForm({
       buildingNumber: building.buildingNumber || '',
       name: building.name || '',
+      deedId: building.deedId || building.deed?.id || '',
       campusLocation: building.campusLocation || '',
       region: building.region || '',
       city: building.city || '',
@@ -410,6 +420,22 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     });
     setMapPickerOpen(false);
     setFormOpen(true);
+  };
+
+  const selectedDeed = useMemo(
+    () => buildingDeeds.find((deed) => deed.id === form.deedId) || null,
+    [buildingDeeds, form.deedId],
+  );
+
+  const applyDeedLocation = (deedId: string) => {
+    const deed = buildingDeeds.find((item) => item.id === deedId);
+    setForm((previous) => ({
+      ...previous,
+      deedId,
+      region: deed?.region || previous.region,
+      city: deed?.city || previous.city,
+      district: deed?.district || previous.district,
+    }));
   };
 
   const mapPosition = useMemo<[number, number] | null>(() => {
@@ -455,6 +481,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     const name = form.name.trim();
     if (!buildingNumber || !name) {
       toast.error('رقم المبنى واسم المبنى حقول مطلوبة');
+      return;
+    }
+    if (!form.deedId) {
+      toast.error('اختيار رقم الصك إلزامي لكل مبنى في السجل المركزي');
       return;
     }
 
@@ -509,6 +539,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     const commonPayload = {
       buildingNumber,
       name,
+      deedId: form.deedId,
       campusLocation: form.campusLocation.trim() || null,
       region: form.region.trim() || null,
       city: form.city.trim() || null,
@@ -855,6 +886,17 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                         .filter(Boolean)
                                         .join(' — ') || 'الموقع غير مكتمل'}
                                     </p>
+                                    <div className="mt-2">
+                                      {building.deed ? (
+                                        <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-800">
+                                          صك رقم {building.deed.deedNumber}
+                                        </Badge>
+                                      ) : !pendingEnvelope ? (
+                                        <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700">
+                                          غير مرتبط بصك — يلزم الاستكمال
+                                        </Badge>
+                                      ) : null}
+                                    </div>
                                   </div>
 
                                   <div className="flex gap-1">
@@ -930,7 +972,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               {editingBuilding ? 'تعديل المبنى المركزي' : 'تعريف مبنى جديد'}
             </DialogTitle>
             <DialogDescription>
-              هذه الحقول مشتركة بين جميع الوحدات. بيانات الاختصاص لا تُدخل هنا.
+              كل مبنى يجب ربطه بصك مسجل في سجل الصكوك؛ ويمكن أن يرتبط الصك الواحد بأكثر من مبنى.
             </DialogDescription>
           </DialogHeader>
 
@@ -945,6 +987,26 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
             <Field label="اسم المبنى *">
               <Input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
             </Field>
+            <div className="md:col-span-2">
+              <Field label="رقم الصك المرتبط بالمبنى *">
+                <NativeSelect value={form.deedId} onChange={(event) => applyDeedLocation(event.target.value)}>
+                  <option value="">اختر الصك من سجل الصكوك...</option>
+                  {buildingDeeds.map((deed) => (
+                    <option key={deed.id} value={deed.id}>
+                      {deed.deedNumber} — {deed.propertyDescription || 'بدون وصف'}{deed.city ? ` — ${deed.city}` : ''}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+              {selectedDeed && (
+                <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs leading-6 text-emerald-900">
+                  مرتبط بالصك رقم <b>{selectedDeed.deedNumber}</b>
+                  {selectedDeed.plotNumber ? <> · القطعة: <b>{selectedDeed.plotNumber}</b></> : null}
+                  {selectedDeed.planNumber ? <> · المخطط: <b>{selectedDeed.planNumber}</b></> : null}
+                  {selectedDeed.area != null ? <> · مساحة الصك: <b>{selectedDeed.area.toLocaleString('ar-SA')} م²</b></> : null}
+                </div>
+              )}
+            </div>
             <Field label="الحرم / الموقع الجامعي">
               <Input value={form.campusLocation} onChange={(event) => setForm((prev) => ({ ...prev, campusLocation: event.target.value }))} />
             </Field>
