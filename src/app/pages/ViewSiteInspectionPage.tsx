@@ -401,6 +401,7 @@ const buildInspectionReportHtml = (record: SiteInspection): string => {
       <div class="info-grid">
         ${infoRow('نوع الموقع', labels[record.siteType] || record.siteType)}
         ${infoRow('اسم الموقع', record.siteName)}
+        ${infoRow('السجل المرتبط', record.deed ? `صك رقم ${record.deed.deedNumber}` : record.building ? `مبنى رقم ${record.building.buildingNumber} — ${record.building.name || ''}` : '-')}
         ${infoRow('القائم بالمعاينة', record.inspectorName || '-')}
         ${infoRow('الجهة المرافقة', record.accompanyingEntity || '-')}
         ${infoRow('المنطقة', record.region || '-')}
@@ -551,6 +552,10 @@ export const ViewSiteInspectionPage: React.FC = () => {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Info label="نوع الموقع" value={labels[record.siteType] || record.siteType} />
         <Info label="اسم الموقع" value={record.siteName} />
+        <Info
+          label="السجل المرتبط"
+          value={record.deed ? `صك رقم ${record.deed.deedNumber}` : record.building ? `مبنى رقم ${record.building.buildingNumber}` : '-'}
+        />
         <Info label="تاريخ الزيارة" value={new Date(record.visitDate).toLocaleString('ar-SA')} />
         <Info label="القائم بالمعاينة" value={record.inspectorName || '-'} />
         <Info label="الحالة العامة" value={labels[record.overallStatus] || record.overallStatus} />
@@ -560,9 +565,11 @@ export const ViewSiteInspectionPage: React.FC = () => {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>بيانات الأرض أو الموقع</CardTitle></CardHeader>
+        <CardHeader><CardTitle>بيانات الأصل أو الموقع</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Info label="المنطقة" value={record.region || '-'} />
+          {record.deed && <Info label="مرجع الصك" value={`${record.deed.deedNumber} — ${record.deed.propertyDescription || ''}`} />}
+          {record.building && <Info label="مرجع المبنى" value={`${record.building.buildingNumber} — ${record.building.name || ''}`} />}
           <Info label="رقم الصك" value={record.deedNumber || '-'} />
           <Info label="رقم القطعة" value={record.plotNumber || '-'} />
           <Info label="رقم المخطط" value={record.planNumber || '-'} />
