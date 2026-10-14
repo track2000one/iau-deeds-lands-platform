@@ -28,8 +28,23 @@ export type MosqueBuilding = {
   buildingNumber: string;
   name?: string | null;
   campusLocation?: string | null;
+  region?: string | null;
   city?: string | null;
   district?: string | null;
+  buildingType?: string | null;
+  primaryUse?: string | null;
+  ownershipType?: string | null;
+  operationalStatus?: 'active' | 'maintenance' | 'under_construction' | 'temporarily_closed' | 'out_of_service';
+  constructionYear?: number | null;
+  floorsCount?: number | null;
+  basementFloorsCount?: number | null;
+  landArea?: number | null;
+  builtUpArea?: number | null;
+  roomsCount?: number | null;
+  entrancesCount?: number | null;
+  elevatorsCount?: number | null;
+  parkingSpaces?: number | null;
+  hasAccessibility?: boolean | null;
   latitude?: number | null;
   longitude?: number | null;
   expectedUsers?: number | null;
@@ -47,7 +62,7 @@ export type MosqueBuilding = {
     prayerRoomGender?: 'men' | 'women' | null;
     status: 'active' | 'maintenance' | 'temporarily_closed';
   }>;
-  _count?: { sites: number };
+  _count?: { sites: number; siteInspections?: number };
 };
 
 export type MosqueWomenPrayerArea = {
