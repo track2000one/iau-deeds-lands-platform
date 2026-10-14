@@ -48,6 +48,8 @@ import {
 } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { NativeSelect } from '../components/ui/native-select';
+import { Textarea } from '../components/ui/textarea';
 import { BuildingExcelImportManager, getPendingBuildingImport, isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { CentralBuildingsReports } from '../components/CentralBuildingsReports';
 import {
@@ -73,20 +75,52 @@ type BuildingForm = {
   buildingNumber: string;
   name: string;
   campusLocation: string;
+  region: string;
   city: string;
   district: string;
+  buildingType: string;
+  primaryUse: string;
+  ownershipType: string;
+  operationalStatus: 'active' | 'maintenance' | 'under_construction' | 'temporarily_closed' | 'out_of_service';
+  constructionYear: string;
+  floorsCount: string;
+  basementFloorsCount: string;
+  landArea: string;
+  builtUpArea: string;
+  roomsCount: string;
+  entrancesCount: string;
+  elevatorsCount: string;
+  parkingSpaces: string;
+  hasAccessibility: '' | 'yes' | 'no';
   latitude: string;
   longitude: string;
+  notes: string;
 };
 
 const EMPTY_FORM: BuildingForm = {
   buildingNumber: '',
   name: '',
   campusLocation: '',
+  region: 'المنطقة الشرقية',
   city: 'الدمام',
   district: '',
+  buildingType: '',
+  primaryUse: '',
+  ownershipType: '',
+  operationalStatus: 'active',
+  constructionYear: '',
+  floorsCount: '',
+  basementFloorsCount: '',
+  landArea: '',
+  builtUpArea: '',
+  roomsCount: '',
+  entrancesCount: '',
+  elevatorsCount: '',
+  parkingSpaces: '',
+  hasAccessibility: '',
   latitude: '',
   longitude: '',
+  notes: '',
 };
 
 const coverageLabels: Record<string, string> = {
@@ -121,6 +155,13 @@ const parseCoordinate = (value: string): number | null => {
 
 const isValidLatitude = (value: number) => value >= -90 && value <= 90;
 const isValidLongitude = (value: number) => value >= -180 && value <= 180;
+
+const parseOptionalNumber = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 export const CentralBuildingsRegistryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -211,7 +252,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const usage = useMemo(() => {
     const output = new Map<
       string,
-      { mosqueSites: number; mosqueProfile: boolean; assets: number; accounting: number }
+      { mosqueSites: number; mosqueProfile: boolean; assets: number; accounting: number; inspections: number }
     >();
     const assetCounts = new Map<string, number>();
     const accountingCounts = new Map<string, number>();
@@ -238,6 +279,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
           building.expectedUsers != null,
         assets: assetCounts.get(building.id) || 0,
         accounting: accountingCounts.get(building.id) || 0,
+        inspections: building._count?.siteInspections || 0,
       });
     });
 
@@ -262,8 +304,12 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
         building.buildingNumber,
         building.name,
         building.campusLocation,
+        building.region,
         building.city,
         building.district,
+        building.buildingType,
+        building.primaryUse,
+        building.ownershipType,
       ].some((value) => normalizeKey(value).includes(needle));
     });
   }, [buildings, search]);
@@ -341,10 +387,26 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       buildingNumber: building.buildingNumber || '',
       name: building.name || '',
       campusLocation: building.campusLocation || '',
+      region: building.region || '',
       city: building.city || '',
       district: building.district || '',
+      buildingType: building.buildingType || '',
+      primaryUse: building.primaryUse || '',
+      ownershipType: building.ownershipType || '',
+      operationalStatus: building.operationalStatus || 'active',
+      constructionYear: building.constructionYear == null ? '' : String(building.constructionYear),
+      floorsCount: building.floorsCount == null ? '' : String(building.floorsCount),
+      basementFloorsCount: building.basementFloorsCount == null ? '' : String(building.basementFloorsCount),
+      landArea: building.landArea == null ? '' : String(building.landArea),
+      builtUpArea: building.builtUpArea == null ? '' : String(building.builtUpArea),
+      roomsCount: building.roomsCount == null ? '' : String(building.roomsCount),
+      entrancesCount: building.entrancesCount == null ? '' : String(building.entrancesCount),
+      elevatorsCount: building.elevatorsCount == null ? '' : String(building.elevatorsCount),
+      parkingSpaces: building.parkingSpaces == null ? '' : String(building.parkingSpaces),
+      hasAccessibility: building.hasAccessibility == null ? '' : building.hasAccessibility ? 'yes' : 'no',
       latitude: building.latitude == null ? '' : String(building.latitude),
       longitude: building.longitude == null ? '' : String(building.longitude),
+      notes: building.notes || '',
     });
     setMapPickerOpen(false);
     setFormOpen(true);
@@ -417,14 +479,57 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       return;
     }
 
+    const numericFields = {
+      constructionYear: parseOptionalNumber(form.constructionYear),
+      floorsCount: parseOptionalNumber(form.floorsCount),
+      basementFloorsCount: parseOptionalNumber(form.basementFloorsCount),
+      landArea: parseOptionalNumber(form.landArea),
+      builtUpArea: parseOptionalNumber(form.builtUpArea),
+      roomsCount: parseOptionalNumber(form.roomsCount),
+      entrancesCount: parseOptionalNumber(form.entrancesCount),
+      elevatorsCount: parseOptionalNumber(form.elevatorsCount),
+      parkingSpaces: parseOptionalNumber(form.parkingSpaces),
+    };
+    const invalidNumeric = Object.entries({
+      'سنة الإنشاء': [form.constructionYear, numericFields.constructionYear],
+      'عدد الأدوار': [form.floorsCount, numericFields.floorsCount],
+      'أدوار القبو': [form.basementFloorsCount, numericFields.basementFloorsCount],
+      'مساحة الأرض': [form.landArea, numericFields.landArea],
+      'المساحة المبنية': [form.builtUpArea, numericFields.builtUpArea],
+      'عدد الغرف': [form.roomsCount, numericFields.roomsCount],
+      'عدد المداخل': [form.entrancesCount, numericFields.entrancesCount],
+      'عدد المصاعد': [form.elevatorsCount, numericFields.elevatorsCount],
+      'مواقف السيارات': [form.parkingSpaces, numericFields.parkingSpaces],
+    }).find(([, value]) => String(value[0] || '').trim() && (value[1] == null || Number(value[1]) < 0));
+    if (invalidNumeric) {
+      toast.error(`قيمة ${invalidNumeric[0]} غير صحيحة`);
+      return;
+    }
+
     const commonPayload = {
       buildingNumber,
       name,
       campusLocation: form.campusLocation.trim() || null,
+      region: form.region.trim() || null,
       city: form.city.trim() || null,
       district: form.district.trim() || null,
+      buildingType: form.buildingType || null,
+      primaryUse: form.primaryUse.trim() || null,
+      ownershipType: form.ownershipType || null,
+      operationalStatus: form.operationalStatus,
+      constructionYear: numericFields.constructionYear,
+      floorsCount: numericFields.floorsCount,
+      basementFloorsCount: numericFields.basementFloorsCount,
+      landArea: numericFields.landArea,
+      builtUpArea: numericFields.builtUpArea,
+      roomsCount: numericFields.roomsCount,
+      entrancesCount: numericFields.entrancesCount,
+      elevatorsCount: numericFields.elevatorsCount,
+      parkingSpaces: numericFields.parkingSpaces,
+      hasAccessibility: form.hasAccessibility === '' ? null : form.hasAccessibility === 'yes',
       latitude,
       longitude,
+      notes: form.notes.trim() || null,
     };
 
     try {
@@ -529,7 +634,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     if (!deleteTarget) return;
     const item = usage.get(deleteTarget.id);
     const references =
-      (item?.mosqueSites || 0) + (item?.assets || 0) + (item?.accounting || 0);
+      (item?.mosqueSites || 0) + (item?.assets || 0) + (item?.accounting || 0) + (item?.inspections || 0);
 
     if (references > 0) {
       toast.error('لا يمكن حذف مبنى مرتبط بسجلات تشغيلية. أزل الارتباطات أولًا.');
@@ -728,7 +833,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                             const references =
                               (item?.mosqueSites || 0) +
                               (item?.assets || 0) +
-                              (item?.accounting || 0);
+                              (item?.accounting || 0) +
+                              (item?.inspections || 0);
                             return (
                               <article
                                 key={building.id}
@@ -771,7 +877,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                   </div>
                                 </div>
 
-                                <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+                                <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
                                   <UsageBox
                                     label="العناية"
                                     value={item?.mosqueProfile ? Math.max(item.mosqueSites, 1) : 0}
@@ -779,7 +885,16 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                   />
                                   <UsageBox label="الأصول" value={item?.assets || 0} hint={usageLoading ? 'جاري التحقق...' : 'أصل مرتبط'} />
                                   <UsageBox label="المحاسبي" value={item?.accounting || 0} hint={usageLoading ? 'جاري التحقق...' : 'سجل مرتبط'} />
+                                  <UsageBox label="المعاينات" value={item?.inspections || 0} hint="معاينة ميدانية" />
                                 </div>
+
+                                {(building.floorsCount != null || building.builtUpArea != null || building.primaryUse) && (
+                                  <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                                    {building.floorsCount != null && <Badge variant="outline">الأدوار: {building.floorsCount}</Badge>}
+                                    {building.builtUpArea != null && <Badge variant="outline">المساحة المبنية: {building.builtUpArea.toLocaleString('ar-SA')} م²</Badge>}
+                                    {building.primaryUse && <Badge variant="outline">{building.primaryUse}</Badge>}
+                                  </div>
+                                )}
 
                                 {(building.latitude != null || building.longitude != null) && (
                                   <div className="mt-3 rounded-xl border bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
@@ -809,7 +924,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       </Card>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl" dir="rtl">
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl" dir="rtl">
           <DialogHeader className="text-right sm:text-right">
             <DialogTitle>
               {editingBuilding ? 'تعديل المبنى المركزي' : 'تعريف مبنى جديد'}
@@ -820,52 +935,119 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
           </DialogHeader>
 
           <div className="grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2 border-b pb-2">
+              <p className="font-black text-foreground">التعريف والموقع</p>
+              <p className="mt-1 text-xs text-muted-foreground">البيانات المرجعية الأساسية للمبنى.</p>
+            </div>
             <Field label="رقم المبنى *">
-              <Input
-                value={form.buildingNumber}
-                onChange={(event) => setForm((prev) => ({ ...prev, buildingNumber: event.target.value }))}
-              />
+              <Input value={form.buildingNumber} onChange={(event) => setForm((prev) => ({ ...prev, buildingNumber: event.target.value }))} />
             </Field>
             <Field label="اسم المبنى *">
-              <Input
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-              />
+              <Input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
             </Field>
             <Field label="الحرم / الموقع الجامعي">
-              <Input
-                value={form.campusLocation}
-                onChange={(event) => setForm((prev) => ({ ...prev, campusLocation: event.target.value }))}
-              />
+              <Input value={form.campusLocation} onChange={(event) => setForm((prev) => ({ ...prev, campusLocation: event.target.value }))} />
+            </Field>
+            <Field label="المنطقة">
+              <Input value={form.region} onChange={(event) => setForm((prev) => ({ ...prev, region: event.target.value }))} />
             </Field>
             <Field label="المدينة">
-              <Input
-                value={form.city}
-                onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
-              />
+              <Input value={form.city} onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))} />
             </Field>
             <Field label="الحي">
-              <Input
-                value={form.district}
-                onChange={(event) => setForm((prev) => ({ ...prev, district: event.target.value }))}
-              />
+              <Input value={form.district} onChange={(event) => setForm((prev) => ({ ...prev, district: event.target.value }))} />
             </Field>
-            <div className="hidden md:block" />
+
+            <div className="md:col-span-2 mt-2 border-b pb-2">
+              <p className="font-black text-foreground">التصنيف والحالة</p>
+              <p className="mt-1 text-xs text-muted-foreground">نوع المبنى واستخدامه ووضعه التشغيلي والملكية.</p>
+            </div>
+            <Field label="نوع المبنى">
+              <NativeSelect value={form.buildingType} onChange={(event) => setForm((prev) => ({ ...prev, buildingType: event.target.value }))}>
+                <option value="">غير محدد</option>
+                <option value="academic">أكاديمي / تعليمي</option>
+                <option value="administrative">إداري</option>
+                <option value="healthcare">صحي</option>
+                <option value="residential">سكني</option>
+                <option value="service">خدمات ومرافق</option>
+                <option value="warehouse">مستودع</option>
+                <option value="parking">مواقف</option>
+                <option value="mixed">متعدد الاستخدام</option>
+                <option value="other">أخرى</option>
+              </NativeSelect>
+            </Field>
+            <Field label="الاستخدام الرئيسي">
+              <Input value={form.primaryUse} onChange={(event) => setForm((prev) => ({ ...prev, primaryUse: event.target.value }))} placeholder="مثال: كلية، إدارة، عيادات، سكن..." />
+            </Field>
+            <Field label="صفة الإشغال / الملكية">
+              <NativeSelect value={form.ownershipType} onChange={(event) => setForm((prev) => ({ ...prev, ownershipType: event.target.value }))}>
+                <option value="">غير محدد</option>
+                <option value="owned">مملوك للجامعة</option>
+                <option value="allocated">مخصص للجامعة</option>
+                <option value="leased">مستأجر</option>
+                <option value="operated">تحت التشغيل / الإدارة</option>
+                <option value="other">أخرى</option>
+              </NativeSelect>
+            </Field>
+            <Field label="الحالة التشغيلية">
+              <NativeSelect value={form.operationalStatus} onChange={(event) => setForm((prev) => ({ ...prev, operationalStatus: event.target.value as BuildingForm['operationalStatus'] }))}>
+                <option value="active">عامل / مستخدم</option>
+                <option value="maintenance">تحت الصيانة</option>
+                <option value="under_construction">تحت الإنشاء</option>
+                <option value="temporarily_closed">مغلق مؤقتًا</option>
+                <option value="out_of_service">خارج الخدمة</option>
+              </NativeSelect>
+            </Field>
+            <Field label="سنة الإنشاء">
+              <Input inputMode="numeric" value={form.constructionYear} onChange={(event) => setForm((prev) => ({ ...prev, constructionYear: event.target.value }))} placeholder="مثال: 2018" />
+            </Field>
+            <Field label="تهيئة الوصول لذوي الإعاقة">
+              <NativeSelect value={form.hasAccessibility} onChange={(event) => setForm((prev) => ({ ...prev, hasAccessibility: event.target.value as BuildingForm['hasAccessibility'] }))}>
+                <option value="">غير محدد</option>
+                <option value="yes">مهيأ</option>
+                <option value="no">غير مهيأ</option>
+              </NativeSelect>
+            </Field>
+
+            <div className="md:col-span-2 mt-2 border-b pb-2">
+              <p className="font-black text-foreground">المساحات والتكوين</p>
+              <p className="mt-1 text-xs text-muted-foreground">البيانات الكمية اللازمة للحصر وإدارة المبنى والتقارير.</p>
+            </div>
+            <Field label="عدد الأدوار">
+              <Input type="number" min={0} value={form.floorsCount} onChange={(event) => setForm((prev) => ({ ...prev, floorsCount: event.target.value }))} />
+            </Field>
+            <Field label="عدد أدوار القبو">
+              <Input type="number" min={0} value={form.basementFloorsCount} onChange={(event) => setForm((prev) => ({ ...prev, basementFloorsCount: event.target.value }))} />
+            </Field>
+            <Field label="مساحة الأرض (م²)">
+              <Input type="number" min={0} step="0.01" value={form.landArea} onChange={(event) => setForm((prev) => ({ ...prev, landArea: event.target.value }))} />
+            </Field>
+            <Field label="المساحة المبنية الإجمالية (م²)">
+              <Input type="number" min={0} step="0.01" value={form.builtUpArea} onChange={(event) => setForm((prev) => ({ ...prev, builtUpArea: event.target.value }))} />
+            </Field>
+            <Field label="عدد الغرف / الوحدات">
+              <Input type="number" min={0} value={form.roomsCount} onChange={(event) => setForm((prev) => ({ ...prev, roomsCount: event.target.value }))} />
+            </Field>
+            <Field label="عدد المداخل">
+              <Input type="number" min={0} value={form.entrancesCount} onChange={(event) => setForm((prev) => ({ ...prev, entrancesCount: event.target.value }))} />
+            </Field>
+            <Field label="عدد المصاعد">
+              <Input type="number" min={0} value={form.elevatorsCount} onChange={(event) => setForm((prev) => ({ ...prev, elevatorsCount: event.target.value }))} />
+            </Field>
+            <Field label="عدد مواقف السيارات">
+              <Input type="number" min={0} value={form.parkingSpaces} onChange={(event) => setForm((prev) => ({ ...prev, parkingSpaces: event.target.value }))} />
+            </Field>
+            <div className="md:col-span-2">
+              <Field label="ملاحظات عامة عن المبنى">
+                <Textarea rows={3} value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} />
+              </Field>
+            </div>
+
             <Field label="خط العرض">
-              <Input
-                dir="ltr"
-                inputMode="decimal"
-                value={form.latitude}
-                onChange={(event) => setForm((prev) => ({ ...prev, latitude: event.target.value }))}
-              />
+              <Input dir="ltr" inputMode="decimal" value={form.latitude} onChange={(event) => setForm((prev) => ({ ...prev, latitude: event.target.value }))} />
             </Field>
             <Field label="خط الطول">
-              <Input
-                dir="ltr"
-                inputMode="decimal"
-                value={form.longitude}
-                onChange={(event) => setForm((prev) => ({ ...prev, longitude: event.target.value }))}
-              />
+              <Input dir="ltr" inputMode="decimal" value={form.longitude} onChange={(event) => setForm((prev) => ({ ...prev, longitude: event.target.value }))} />
             </Field>
 
             <div className="md:col-span-2 rounded-2xl border bg-muted/20 p-3">
