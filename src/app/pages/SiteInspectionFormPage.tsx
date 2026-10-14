@@ -119,6 +119,7 @@ export const SiteInspectionFormPage: React.FC = () => {
   const [visitTime, setVisitTime] = React.useState(new Date().toTimeString().slice(0, 5));
   const [references, setReferences] = React.useState<SiteInspectionReferences>(emptyReferences);
   const [referencesLoading, setReferencesLoading] = React.useState(true);
+  const [referenceMode, setReferenceMode] = React.useState<'none' | 'deed' | 'building'>('none');
 
   React.useEffect(() => {
     getSiteInspectionReferences()
@@ -133,6 +134,7 @@ export const SiteInspectionFormPage: React.FC = () => {
     getSiteInspection(inspectionId)
       .then((record) => {
         setVisitTime(record.visitDate?.slice(11, 16) || '09:00');
+        setReferenceMode(record.deedId ? 'deed' : record.buildingId ? 'building' : 'none');
         setForm({
           title: record.title,
           siteType: record.siteType,
@@ -178,13 +180,8 @@ export const SiteInspectionFormPage: React.FC = () => {
     value: SiteInspectionInput[K]
   ) => setForm((current) => ({ ...current, [key]: value }));
 
-  const referenceMode: 'none' | 'deed' | 'building' = form.deedId
-    ? 'deed'
-    : form.buildingId
-      ? 'building'
-      : 'none';
-
   const changeReferenceMode = (mode: 'none' | 'deed' | 'building') => {
+    setReferenceMode(mode);
     setForm((current) => ({
       ...current,
       deedId: mode === 'deed' ? current.deedId : null,
