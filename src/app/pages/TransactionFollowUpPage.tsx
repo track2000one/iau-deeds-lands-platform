@@ -433,12 +433,19 @@ export const TransactionFollowUpPage: React.FC = () => {
       return;
     }
     const title = `تقرير متابعة المعاملات ${reportFrom} إلى ${reportTo}`;
+    const styleAssets = [
+      ...Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(
+        (link) => `<link rel="stylesheet" href="${(link as HTMLLinkElement).href}" />`,
+      ),
+      ...Array.from(document.querySelectorAll('style')).map((style) => style.outerHTML),
+    ].join('\n');
     popup.document.open();
     popup.document.write(`<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8" />
 <title>${title}</title>
+${styleAssets}
 <style>
   @page { size: A4 portrait; margin: 12mm; }
   * { box-sizing: border-box; }
@@ -458,7 +465,7 @@ export const TransactionFollowUpPage: React.FC = () => {
     popup.focus();
     window.setTimeout(() => {
       popup.print();
-    }, 350);
+    }, 700);
   };
 
   const exportExecutiveReportPdf = async () => {
