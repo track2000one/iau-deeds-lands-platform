@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   AlertTriangle,
+  Building2,
   CalendarPlus,
   CheckCircle2,
   CircleDot,
@@ -48,6 +49,7 @@ const EMPTY: TransactionFollowUpWorkQueue = {
     overdue: 0,
     urgent_today: 0,
     extension_requests: 0,
+    external_follow_up_due: 0,
     due_3_days: 0,
     awaiting_review: 0,
     waiting_external: 0,
@@ -59,6 +61,7 @@ const EMPTY: TransactionFollowUpWorkQueue = {
     overdue: [],
     urgent_today: [],
     extension_requests: [],
+    external_follow_up_due: [],
     due_3_days: [],
     awaiting_review: [],
     waiting_external: [],
@@ -98,6 +101,13 @@ const bucketMeta: Record<
     description: 'طلبات تغيير تاريخ الاستحقاق التي تنتظر مراجعة واعتماد المدير.',
     icon: CalendarPlus,
     className: 'border-indigo-300 bg-indigo-50 text-indigo-900',
+  },
+  external_follow_up_due: {
+    label: 'متابعة جهة مستحقة',
+    shortLabel: 'متابعة جهة',
+    description: 'حان موعد المتابعة مع الجهة المنتظر منها الرد أو تجاوز موعد المتابعة المحدد.',
+    icon: Building2,
+    className: 'border-cyan-300 bg-cyan-50 text-cyan-900',
   },
   due_3_days: {
     label: 'تستحق خلال 3 أيام',
@@ -147,6 +157,7 @@ const bucketOrder: TransactionFollowUpWorkQueueBucket[] = [
   'overdue',
   'urgent_today',
   'extension_requests',
+  'external_follow_up_due',
   'due_3_days',
   'awaiting_review',
   'waiting_external',
@@ -233,6 +244,13 @@ const minimumExtensionDate = (item: TransactionFollowUpWorkQueueItem) => {
   return toInputDate(afterDue > tomorrow ? afterDue : tomorrow);
 };
 
+const dateAfterDays = (days: number) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return toInputDate(date);
+};
+
 type Props = {
   mine: boolean;
   supervisor: boolean;
@@ -253,6 +271,15 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
   const [extensionItem, setExtensionItem] = React.useState<TransactionFollowUpWorkQueueItem | null>(null);
   const [extensionDate, setExtensionDate] = React.useState('');
   const [extensionReason, setExtensionReason] = React.useState('');
+  const [externalMode, setExternalMode] = React.useState<'start' | 'followup' | 'response' | null>(null);
+  const [externalItem, setExternalItem] = React.useState<TransactionFollowUpWorkQueueItem | null>(null);
+  const [externalEntity, setExternalEntity] = React.useState('');
+  const [externalReference, setExternalReference] = React.useState('');
+  const [externalSentAt, setExternalSentAt] = React.useState(toInputDate(new Date()));
+  const [externalNextFollowUp, setExternalNextFollowUp] = React.useState(dateAfterDays(3));
+  const [externalNote, setExternalNote] = React.useState('');
+  const [externalResponseDate, setExternalResponseDate] = React.useState(toInputDate(new Date()));
+  const [externalResponseReference, setExternalResponseReference] = React.useState('');
   const [selectedBucket, setSelectedBucket] = React.useState<TransactionFollowUpWorkQueueBucket>('in_progress');
   const userChangedBucket = React.useRef(false);
 
@@ -282,6 +309,22 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
     item: TransactionFollowUpWorkQueueItem,
     action: TransactionFollowUpWorkQueueAction,
   ) => {
+    if (action === 'waiting_external') {
+      setExternalItem(item);
+      setExternalMode('start');
+      setExternalEntity('');
+      setExternalReference('');
+      setExternalSentAt(toInputDate(new Date()));
+      setExternalNextFollowUp(dateAfterDays(3));
+      setExternalNote('');
+      return;
+    }
+
+    if (action === 'resume' && item.activeExternalWait) {
+      toast.error('سجل ورود الرد أو ألغِ حالة الانتظار أولًا حتى يعود العمل إلى التنفيذ');
+      return;
+    }
+
     let note: string | null = null;
 
     if (action === 'return_to_employee') {
@@ -316,6 +359,97 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
       await onChanged?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تنفيذ الإجراء السريع');
+    } finally {
+      setRunningAction(null);
+    }
+  };
+
+  const openExternalFollowUp = (item: TransactionFollowUpWorkQueueItem) => {
+    setExternalItem(item);
+    setExternalMode('followup');
+    setExternalNextFollowUp(dateAfterDays(3));
+    setExternalNote('');
+  };
+
+  const openExternalResponse = (item: TransactionFollowUpWorkQueueItem) => {
+    setExternalItem(item);
+    setExternalMode('response');
+    setExternalResponseDate(toInputDate(new Date()));
+    setExternalResponseReference('');
+    setExternalNote('');
+  };
+
+  const saveExternalWait = async () => {
+    if (!externalItem || !externalMode) return;
+
+    try {
+      setRunningAction(externalItem.id + ':external');
+      if (externalMode === 'start') {
+        if (externalEntity.trim().length < 2 || !externalSentAt || !externalNextFollowUp) {
+          toast.error('أكمل الجهة وتاريخ الإرسال وتاريخ المتابعة القادمة');
+          return;
+        }
+        await transactionFollowUpApi.startExternalWait(externalItem.id, {
+          externalEntity: externalEntity.trim(),
+          outboundReferenceNumber: externalReference.trim() || null,
+          sentAt: externalSentAt,
+          nextFollowUpDate: externalNextFollowUp,
+          notes: externalNote.trim() || null,
+        });
+        toast.success('تم تسجيل المعاملة بانتظار رد من الجهة المحددة');
+      } else if (externalMode === 'followup') {
+        if (!externalItem.activeExternalWait || !externalNextFollowUp || externalNote.trim().length < 2) {
+          toast.error('اكتب نتيجة المتابعة وحدد موعد المتابعة القادمة');
+          return;
+        }
+        await transactionFollowUpApi.recordExternalFollowUp(externalItem.activeExternalWait.id, {
+          nextFollowUpDate: externalNextFollowUp,
+          note: externalNote.trim(),
+        });
+        toast.success('تم تسجيل المتابعة وتحديد الموعد القادم');
+      } else {
+        if (!externalItem.activeExternalWait || !externalResponseDate || externalNote.trim().length < 2) {
+          toast.error('حدد تاريخ ورود الرد واكتب ملخص الرد');
+          return;
+        }
+        await transactionFollowUpApi.recordExternalResponse(externalItem.activeExternalWait.id, {
+          responseReceivedAt: externalResponseDate,
+          responseReferenceNumber: externalResponseReference.trim() || null,
+          responseNote: externalNote.trim(),
+        });
+        toast.success('تم تسجيل ورود الرد وإعادة المعاملة إلى التنفيذ');
+      }
+
+      setExternalMode(null);
+      setExternalItem(null);
+      setExternalNote('');
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
+      await load();
+      await onChanged?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ متابعة الجهة الخارجية');
+    } finally {
+      setRunningAction(null);
+    }
+  };
+
+  const cancelExternalWait = async (item: TransactionFollowUpWorkQueueItem) => {
+    if (!item.activeExternalWait) return;
+    const entered = window.prompt('اكتب سبب إلغاء انتظار الجهة واستئناف العمل:');
+    if (entered == null) return;
+    if (!entered.trim()) {
+      toast.error('سبب إلغاء الانتظار مطلوب');
+      return;
+    }
+    try {
+      setRunningAction(item.id + ':external-cancel');
+      await transactionFollowUpApi.cancelExternalWait(item.activeExternalWait.id, entered.trim());
+      toast.success('تم إلغاء الانتظار وإعادة المعاملة إلى التنفيذ');
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
+      await load();
+      await onChanged?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إلغاء انتظار الجهة');
     } finally {
       setRunningAction(null);
     }
@@ -436,7 +570,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
       </CardHeader>
 
       <CardContent className="space-y-4 p-4 sm:p-5">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 2xl:grid-cols-9">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 2xl:grid-cols-10">
           {visibleBuckets.map((bucket) => {
             const meta = bucketMeta[bucket];
             const Icon = meta.icon;
@@ -530,6 +664,33 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                         <p className="mt-1"><b>السبب:</b> {item.pendingExtension.reason}</p>
                       </div>
                     )}
+                    {item.activeExternalWait && (
+                      <div className={
+                        'mt-2 rounded-xl border px-3 py-2 text-[11px] leading-5 ' +
+                        (item.activeExternalWait.followUpDue
+                          ? 'border-red-200 bg-red-50/70 text-red-950'
+                          : 'border-sky-200 bg-sky-50/70 text-sky-950')
+                      }>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <b>بانتظار:</b>
+                          <span>{item.activeExternalWait.externalEntity}</span>
+                          {item.activeExternalWait.outboundReferenceNumber && (
+                            <span>المرجع: {item.activeExternalWait.outboundReferenceNumber}</span>
+                          )}
+                          <span>منذ {Number(item.activeExternalWait.waitingDays || 0).toLocaleString('ar-SA')} يوم</span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                          <span>أرسل بتاريخ {formatDate(item.activeExternalWait.sentAt)}</span>
+                          <span>
+                            المتابعة القادمة: <b>{formatDate(item.activeExternalWait.nextFollowUpDate)}</b>
+                          </span>
+                          <span>عدد المتابعات: {item.activeExternalWait.followUpCount.toLocaleString('ar-SA')}</span>
+                        </div>
+                        {item.activeExternalWait.lastFollowUpNote && (
+                          <p className="mt-1"><b>آخر متابعة:</b> {item.activeExternalWait.lastFollowUpNote}</p>
+                        )}
+                      </div>
+                    )}
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                       {supervisor && (
                         <span>
@@ -617,7 +778,44 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                     </Button>
                   )}
 
-                  {item.quickActions.map((action) => {
+                  {item.activeExternalWait && (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-cyan-300 text-cyan-900 hover:bg-cyan-50"
+                        disabled={Boolean(runningAction)}
+                        onClick={() => openExternalFollowUp(item)}
+                      >
+                        <CircleDot className="ml-1 h-3.5 w-3.5" />
+                        تسجيل متابعة
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-sky-700 text-white hover:bg-sky-800"
+                        disabled={Boolean(runningAction)}
+                        onClick={() => openExternalResponse(item)}
+                      >
+                        <CheckCircle2 className="ml-1 h-3.5 w-3.5" />
+                        تم ورود الرد
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={Boolean(runningAction)}
+                        onClick={() => void cancelExternalWait(item)}
+                      >
+                        إلغاء الانتظار
+                      </Button>
+                    </>
+                  )}
+
+                  {item.quickActions
+                    .filter((action) => !(item.activeExternalWait && action === 'resume'))
+                    .map((action) => {
                     const meta = actionMeta[action];
                     const Icon = meta.icon;
                     const busy = runningAction === item.id + ':' + action;
@@ -650,6 +848,163 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
           </div>
         )}
       </CardContent>
+
+      <Dialog
+        open={Boolean(externalMode)}
+        onOpenChange={(open) => {
+          if (runningAction) return;
+          if (!open) {
+            setExternalMode(null);
+            setExternalItem(null);
+            setExternalNote('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[680px]" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle>
+              {externalMode === 'start'
+                ? 'تسجيل المعاملة بانتظار جهة أخرى'
+                : externalMode === 'followup'
+                  ? 'تسجيل متابعة مع الجهة'
+                  : 'تسجيل ورود الرد'}
+            </DialogTitle>
+            <DialogDescription>
+              {externalItem
+                ? `المعاملة ${externalItem.transactionNumber} — ${externalItem.subject}`
+                : 'توثيق انتظار الجهة والمتابعة حتى ورود الرد.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {externalMode === 'start' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>الجهة المنتظر منها الرد *</Label>
+                <Input
+                  value={externalEntity}
+                  onChange={(event) => setExternalEntity(event.target.value)}
+                  placeholder="مثال: الهيئة العامة لعقارات الدولة"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>رقم الخطاب / المعاملة الصادرة</Label>
+                  <Input
+                    value={externalReference}
+                    onChange={(event) => setExternalReference(event.target.value)}
+                    placeholder="اختياري"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>تاريخ إرسال الطلب *</Label>
+                  <Input
+                    type="date"
+                    max={toInputDate(new Date())}
+                    value={externalSentAt}
+                    onChange={(event) => setExternalSentAt(event.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>تاريخ المتابعة القادمة *</Label>
+                <Input
+                  type="date"
+                  min={dateAfterDays(1)}
+                  value={externalNextFollowUp}
+                  onChange={(event) => setExternalNextFollowUp(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>ملاحظات</Label>
+                <Textarea
+                  rows={4}
+                  value={externalNote}
+                  onChange={(event) => setExternalNote(event.target.value)}
+                  placeholder="المطلوب من الجهة أو أي تفاصيل مساندة..."
+                />
+              </div>
+            </div>
+          )}
+
+          {externalMode === 'followup' && externalItem?.activeExternalWait && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-6 text-sky-950">
+                الجهة: <b>{externalItem.activeExternalWait.externalEntity}</b>
+                {' · '}مدة الانتظار: <b>{Number(externalItem.activeExternalWait.waitingDays || 0).toLocaleString('ar-SA')} يوم</b>
+                {' · '}عدد المتابعات السابقة: <b>{externalItem.activeExternalWait.followUpCount.toLocaleString('ar-SA')}</b>
+              </div>
+              <div className="space-y-2">
+                <Label>نتيجة المتابعة *</Label>
+                <Textarea
+                  rows={5}
+                  value={externalNote}
+                  onChange={(event) => setExternalNote(event.target.value)}
+                  placeholder="مثال: تمت مخاطبة الجهة وأفادت بأن الطلب تحت الإجراء..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>المتابعة القادمة *</Label>
+                <Input
+                  type="date"
+                  min={dateAfterDays(1)}
+                  value={externalNextFollowUp}
+                  onChange={(event) => setExternalNextFollowUp(event.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {externalMode === 'response' && externalItem?.activeExternalWait && (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>تاريخ ورود الرد *</Label>
+                  <Input
+                    type="date"
+                    max={toInputDate(new Date())}
+                    value={externalResponseDate}
+                    onChange={(event) => setExternalResponseDate(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>رقم مرجع الرد</Label>
+                  <Input
+                    value={externalResponseReference}
+                    onChange={(event) => setExternalResponseReference(event.target.value)}
+                    placeholder="اختياري"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>ملخص الرد *</Label>
+                <Textarea
+                  rows={5}
+                  value={externalNote}
+                  onChange={(event) => setExternalNote(event.target.value)}
+                  placeholder="اختصر الرد الوارد وما الإجراء التالي المطلوب..."
+                />
+              </div>
+              <p className="text-[10px] leading-5 text-muted-foreground">
+                بعد الحفظ ستعود المعاملة تلقائيًا إلى «تحت التنفيذ» مع حفظ بيانات الرد في السجل.
+              </p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 border-t pt-4">
+            <Button variant="outline" disabled={Boolean(runningAction)} onClick={() => setExternalMode(null)}>
+              إلغاء
+            </Button>
+            <Button disabled={Boolean(runningAction)} onClick={() => void saveExternalWait()}>
+              {runningAction?.endsWith(':external') && <RefreshCw className="ml-1 h-4 w-4 animate-spin" />}
+              {externalMode === 'start'
+                ? 'بدء الانتظار'
+                : externalMode === 'followup'
+                  ? 'حفظ المتابعة'
+                  : 'تسجيل الرد واستئناف العمل'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={extensionOpen} onOpenChange={(open) => {
         if (runningAction) return;
