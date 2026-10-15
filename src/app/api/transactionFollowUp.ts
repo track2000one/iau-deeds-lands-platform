@@ -12,6 +12,25 @@ export type TransactionFollowUpStatus =
 export type TransactionFollowUpPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type TransactionFollowUpType = 'incoming' | 'outgoing' | 'internal';
 
+export type TransactionFollowUpWorkQueueBucket =
+  | 'overdue'
+  | 'urgent_today'
+  | 'due_3_days'
+  | 'awaiting_review'
+  | 'waiting_external'
+  | 'in_progress'
+  | 'completed_today'
+  | 'unassigned';
+
+export type TransactionFollowUpWorkQueueAction =
+  | 'start'
+  | 'waiting_external'
+  | 'resume'
+  | 'needs_follow_up'
+  | 'submit_completion'
+  | 'approve_close'
+  | 'return_to_employee';
+
 export type TransactionFollowUpIndicator =
   | 'unassigned'
   | 'overdue'
@@ -629,6 +648,23 @@ export type TransactionFollowUpRecord = {
   daysWithoutAction: number;
 };
 
+export type TransactionFollowUpWorkQueueItem = TransactionFollowUpRecord & {
+  queueBucket: TransactionFollowUpWorkQueueBucket;
+  daysUntilDue?: number | null;
+  overdueDays: number;
+  ageDays: number;
+  quickActions: TransactionFollowUpWorkQueueAction[];
+};
+
+export type TransactionFollowUpWorkQueue = {
+  generatedAt: string;
+  scope: 'mine' | 'all';
+  supervisor: boolean;
+  focusBucket: TransactionFollowUpWorkQueueBucket;
+  counts: Record<TransactionFollowUpWorkQueueBucket, number>;
+  buckets: Record<TransactionFollowUpWorkQueueBucket, TransactionFollowUpWorkQueueItem[]>;
+};
+
 export type TransactionFollowUpAssignee = {
   id: string;
   username: string;
@@ -919,6 +955,26 @@ export const transactionFollowUpApi = {
   dashboard: (mine = false) =>
     apiJson<TransactionFollowUpDashboard>(
       `/api/transaction-follow-up/dashboard${mine ? '?mine=true' : ''}`,
+    ),
+
+  workQueue: (mine = false) =>
+    apiJson<TransactionFollowUpWorkQueue>(
+      `/api/transaction-follow-up/work-queue${mine ? '?mine=true' : ''}`,
+    ),
+
+  workQueueAction: (
+    id: string,
+    input: {
+      action: TransactionFollowUpWorkQueueAction;
+      note?: string | null;
+    },
+  ) =>
+    apiJson<TransactionFollowUpRecord>(
+      `/api/transaction-follow-up/${id}/work-queue-action`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
     ),
 
   executiveInbox: (mine = false) =>
