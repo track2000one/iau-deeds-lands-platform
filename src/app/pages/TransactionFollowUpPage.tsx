@@ -1606,6 +1606,41 @@ const Info = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
+const ComparisonMetric = ({
+  label,
+  value,
+  suffix = '',
+  inverse = false,
+}: {
+  label: string;
+  value: number | null;
+  suffix?: string;
+  inverse?: boolean;
+}) => {
+  const isPositive = (value || 0) > 0;
+  const isNegative = (value || 0) < 0;
+  const favorable = value == null || value === 0
+    ? null
+    : inverse
+      ? isNegative
+      : isPositive;
+
+  return (
+    <div className="rounded-xl border bg-white p-3">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className={`mt-1 text-lg font-black ${
+        favorable === true
+          ? 'text-emerald-700'
+          : favorable === false
+            ? 'text-red-700'
+            : 'text-slate-900'
+      }`}>
+        {value == null ? '—' : `${value > 0 ? '+' : ''}${value}${suffix}`}
+      </p>
+    </div>
+  );
+};
+
 const MetricTile = ({
   title,
   value,
