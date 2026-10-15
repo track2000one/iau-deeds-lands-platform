@@ -5,6 +5,7 @@ import {
   Gauge,
   RefreshCw,
   ShieldAlert,
+  ShieldCheck,
   TrendingDown,
   TrendingUp,
   UsersRound,
@@ -26,6 +27,7 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { NativeSelect } from './ui/native-select';
+import type { PreventiveActionSeed } from './TransactionPreventiveActionsDialog';
 
 const riskLabel: Record<TransactionFollowUpEarlyWarningMetric['riskLevel'], string> = {
   low: 'منخفض',
@@ -74,11 +76,13 @@ const formatTarget = (metric: TransactionFollowUpEarlyWarningMetric) =>
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenPreventiveActions?: (seed: PreventiveActionSeed) => void;
 };
 
 export const TransactionEarlyWarningDialog: React.FC<Props> = ({
   open,
   onOpenChange,
+  onOpenPreventiveActions,
 }) => {
   const [data, setData] = React.useState<TransactionFollowUpEarlyWarning | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -181,6 +185,7 @@ export const TransactionEarlyWarningDialog: React.FC<Props> = ({
                           <th className="p-3 text-center">الخطر</th>
                           <th className="p-3 text-center">الثقة</th>
                           <th className="p-3 text-right">الإجراء الوقائي المقترح</th>
+                          <th className="p-3 text-center">التدخل</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -227,6 +232,37 @@ export const TransactionEarlyWarningDialog: React.FC<Props> = ({
                               </td>
                               <td className="p-3 text-center">{confidenceLabel[metric.confidence]}</td>
                               <td className="max-w-[310px] p-3 leading-5 text-slate-700">{metric.recommendation}</td>
+                              <td className="p-3 text-center">
+                                {onOpenPreventiveActions && metric.riskScore >= 40 ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                                    onClick={() => onOpenPreventiveActions({
+                                      sourceType: 'metric',
+                                      metricKey: metric.metricKey,
+                                      metricLabel: metric.metricLabel,
+                                      scopeType: 'global',
+                                      actionText: metric.recommendation,
+                                      expectedOutcome: 'إعادة المؤشر إلى المستوى الآمن قبل الوصول إلى الانحراف الأحمر.',
+                                      periodDays: data.periodDays,
+                                      baselineValue: metric.currentValue,
+                                      projectedValue: metric.projectedValue,
+                                      targetValue: metric.target,
+                                      direction: metric.direction,
+                                      sourceRiskScore: metric.riskScore,
+                                      sourceRiskLevel: metric.riskLevel,
+                                      sourceReasons: metric.reasons,
+                                    })}
+                                  >
+                                    <ShieldCheck className="ml-1 h-3.5 w-3.5" />
+                                    اتخذ إجراء وقائي
+                                  </Button>
+                                ) : (
+                                  <span className="text-[9px] text-muted-foreground">المؤشر مستقر</span>
+                                )}
+                              </td>
                             </tr>
                           );
                         })}
@@ -263,6 +299,7 @@ export const TransactionEarlyWarningDialog: React.FC<Props> = ({
                             <th className="p-3 text-center">تجاوزات متوقعة</th>
                             <th className="p-3 text-right">أهم سبب</th>
                             <th className="p-3 text-right">التدخل المقترح</th>
+                            <th className="p-3 text-center">الإجراء</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -290,6 +327,39 @@ export const TransactionEarlyWarningDialog: React.FC<Props> = ({
                               </td>
                               <td className="max-w-[260px] p-3 leading-5">{employee.reasons[0] || '—'}</td>
                               <td className="max-w-[300px] p-3 leading-5 text-slate-700">{employee.recommendation}</td>
+                              <td className="p-3 text-center">
+                                {onOpenPreventiveActions && ['critical', 'high', 'medium'].includes(employee.riskLevel) ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                                    onClick={() => onOpenPreventiveActions({
+                                      sourceType: 'employee',
+                                      metricKey: employee.topMetric?.metricKey,
+                                      metricLabel: employee.topMetric?.metricLabel,
+                                      scopeType: 'employee',
+                                      assigneeUserId: employee.userId,
+                                      assigneeName: employee.username,
+                                      actionText: employee.recommendation,
+                                      expectedOutcome: 'خفض مستوى المخاطر التشغيلية ومنع وصول المؤشر إلى المستوى الأحمر.',
+                                      periodDays: data.periodDays,
+                                      baselineValue: employee.topMetric?.currentValue ?? null,
+                                      projectedValue: employee.topMetric?.projectedValue ?? null,
+                                      targetValue: employee.topMetric?.target ?? null,
+                                      direction: employee.topMetric?.direction ?? null,
+                                      sourceRiskScore: employee.riskScore,
+                                      sourceRiskLevel: employee.riskLevel,
+                                      sourceReasons: employee.reasons,
+                                    })}
+                                  >
+                                    <ShieldCheck className="ml-1 h-3.5 w-3.5" />
+                                    تدخل وقائي
+                                  </Button>
+                                ) : (
+                                  <span className="text-[9px] text-muted-foreground">لا يتطلب تدخلًا</span>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
