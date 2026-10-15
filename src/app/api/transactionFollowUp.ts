@@ -200,6 +200,71 @@ export type TransactionFollowUpKpiEvaluation = {
   avgApprovalHours: TransactionFollowUpKpiEvaluationItem;
 };
 
+export type TransactionFollowUpImprovementPlanEvent = {
+  id: string;
+  planId: string;
+  action: string;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  note?: string | null;
+  resultValue?: number | null;
+  resultMetTarget?: boolean | null;
+  changedById?: string | null;
+  changedByName?: string | null;
+  createdAt: string;
+};
+
+export type TransactionFollowUpImprovementPlan = {
+  id: string;
+  metricKey: 'firstPassRate' | 'onTimeRate' | 'reworkRate' | 'avgExecutionHours' | 'avgApprovalHours';
+  metricLabel: string;
+  scopeType: 'global' | 'employee';
+  assigneeUserId?: string | null;
+  assigneeName?: string | null;
+  baselineValue?: number | null;
+  targetValue: number;
+  direction: 'min' | 'max';
+  periodDays: number;
+  rootCause: string;
+  correctiveAction: string;
+  preventiveAction?: string | null;
+  ownerUserId?: string | null;
+  ownerName?: string | null;
+  dueDate: string;
+  status: 'open' | 'in_progress' | 'monitoring' | 'completed' | 'cancelled';
+  progressNote?: string | null;
+  resultValue?: number | null;
+  resultMetTarget?: boolean | null;
+  startedAt?: string | null;
+  monitoringAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  verifiedAt?: string | null;
+  verifiedById?: string | null;
+  verifiedByName?: string | null;
+  createdById?: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isOverdue?: boolean;
+  events?: TransactionFollowUpImprovementPlanEvent[];
+};
+
+export type TransactionFollowUpImprovementPlanPage = {
+  generatedAt: string;
+  summary: {
+    open: number;
+    overdue: number;
+    monitoring: number;
+    completed30d: number;
+  };
+  items: TransactionFollowUpImprovementPlan[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
 export type TransactionFollowUpDirectiveKpiMetrics = {
   reviewCount: number;
   reviewedDirectives: number;
@@ -834,6 +899,78 @@ export const transactionFollowUpApi = {
       `/api/transaction-follow-up/directives/dashboard${suffix ? `?${suffix}` : ''}`,
     );
   },
+
+  improvementPlans: (input: {
+    page?: number;
+    pageSize?: number;
+    status?: string;
+    metricKey?: string;
+    assigneeUserId?: string;
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (input.page) query.set('page', String(input.page));
+    if (input.pageSize) query.set('pageSize', String(input.pageSize));
+    if (input.status) query.set('status', input.status);
+    if (input.metricKey) query.set('metricKey', input.metricKey);
+    if (input.assigneeUserId) query.set('assigneeUserId', input.assigneeUserId);
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpImprovementPlanPage>(
+      `/api/transaction-follow-up/directives/improvement-plans${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  createImprovementPlan: (input: {
+    metricKey: TransactionFollowUpImprovementPlan['metricKey'];
+    scopeType: 'global' | 'employee';
+    assigneeUserId?: string | null;
+    baselineValue?: number | null;
+    targetValue: number;
+    direction: 'min' | 'max';
+    periodDays: number;
+    rootCause: string;
+    correctiveAction: string;
+    preventiveAction?: string | null;
+    ownerUserId?: string | null;
+    dueDate: string;
+  }) =>
+    apiJson<TransactionFollowUpImprovementPlan>('/api/transaction-follow-up/directives/improvement-plans', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  updateImprovementPlan: (
+    id: string,
+    input: {
+      status?: TransactionFollowUpImprovementPlan['status'];
+      rootCause?: string;
+      correctiveAction?: string;
+      preventiveAction?: string | null;
+      ownerUserId?: string | null;
+      dueDate?: string;
+      progressNote?: string | null;
+    },
+  ) =>
+    apiJson<TransactionFollowUpImprovementPlan>(
+      `/api/transaction-follow-up/directives/improvement-plans/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  verifyImprovementPlan: (id: string) =>
+    apiJson<TransactionFollowUpImprovementPlan & {
+      verification: {
+        value: number;
+        target: number;
+        direction: 'min' | 'max';
+        metTarget: boolean;
+        status: 'green' | 'yellow' | 'red' | 'neutral';
+      };
+    }>(`/api/transaction-follow-up/directives/improvement-plans/${id}/verify`, {
+      method: 'PATCH',
+      body: JSON.stringify({}),
+    }),
 
   kpiTargets: () =>
     apiJson<TransactionFollowUpKpiTargets>('/api/transaction-follow-up/directives/kpi-targets'),
