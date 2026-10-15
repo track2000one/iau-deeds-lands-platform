@@ -8,6 +8,7 @@ import {
   ExternalLink,
   ListTodo,
   RefreshCw,
+  ShieldCheck,
   Target,
 } from 'lucide-react';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -46,9 +47,11 @@ const normalizeFollowUpAlert = (alert: TransactionFollowUpAlert): PlatformNotice
   source: 'follow_up',
   title: alert.title,
   message: alert.message,
-  entityType: alert.kind.startsWith('early_warning_')
-    ? 'follow_up_early_warning'
-    : alert.kind.startsWith('capa_')
+  entityType: alert.kind.startsWith('preventive_action_')
+    ? 'follow_up_preventive'
+    : alert.kind.startsWith('early_warning_')
+      ? 'follow_up_early_warning'
+      : alert.kind.startsWith('capa_')
       ? 'follow_up_capa'
       : alert.kind === 'kpi_target_breach'
         ? 'follow_up_kpi'
@@ -60,6 +63,7 @@ const normalizeFollowUpAlert = (alert: TransactionFollowUpAlert): PlatformNotice
 });
 
 const notificationCategory = (notice: PlatformNotice) => {
+  if (notice.source === 'follow_up' && notice.entityType === 'follow_up_preventive') return 'follow_up_preventive';
   if (notice.source === 'follow_up' && notice.entityType === 'follow_up_early_warning') return 'follow_up_early_warning';
   if (notice.source === 'follow_up' && notice.entityType === 'follow_up_capa') return 'follow_up_capa';
   if (notice.source === 'follow_up' && notice.entityType === 'follow_up_kpi') return 'follow_up_kpi';
@@ -196,7 +200,9 @@ export const PlatformNotificationCenter: React.FC = () => {
 
     setOpen(false);
     if (notice.source === 'follow_up') {
-      if (notice.entityType === 'follow_up_early_warning') {
+      if (notice.entityType === 'follow_up_preventive') {
+        navigate(`/follow-up?preventive=1&alert=${encodeURIComponent(notice.id)}`);
+      } else if (notice.entityType === 'follow_up_early_warning') {
         navigate(`/follow-up?earlyWarning=1&alert=${encodeURIComponent(notice.id)}`);
       } else if (notice.entityType === 'follow_up_capa') {
         navigate(`/follow-up?capa=1&alert=${encodeURIComponent(notice.id)}`);
@@ -288,8 +294,10 @@ export const PlatformNotificationCenter: React.FC = () => {
           <div className="divide-y divide-slate-100">
             {ordered.slice(0, 30).map((notice) => {
               const category = notificationCategory(notice);
-              const Icon = category === 'follow_up_early_warning'
-                ? AlertTriangle
+              const Icon = category === 'follow_up_preventive'
+                ? ShieldCheck
+                : category === 'follow_up_early_warning'
+                  ? AlertTriangle
                 : category === 'follow_up_capa' || category === 'follow_up_kpi'
                   ? Target
                 : category === 'follow_up'
