@@ -180,6 +180,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     isAdmin || hasPermission('accounting_transformation', 'canEdit');
 
   const [buildings, setBuildings] = useState<MosqueBuilding[]>([]);
+  const [pendingBuildingTotal, setPendingBuildingTotal] = useState(0);
   const [buildingDeeds, setBuildingDeeds] = useState<MosqueBuildingDeedReference[]>([]);
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [accountingRecords, setAccountingRecords] = useState<
@@ -293,8 +294,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     return output;
   }, [accountingRecords, assets, buildings]);
 
-  const approvedBuildings = useMemo(() => buildings.filter((building) => !isPendingImportedBuilding(building)), [buildings]);
-  const pendingBuildings = useMemo(() => buildings.filter((building) => isPendingImportedBuilding(building)), [buildings]);
+  const approvedBuildings = buildings;
 
   const filteredBuildings = useMemo(() => {
     const needle = normalizeKey(search);
@@ -737,13 +737,14 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
         canEdit={canEdit}
         canDelete={canDelete}
         onReload={loadData}
+        onPendingTotalChange={setPendingBuildingTotal}
         context="central"
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <StatCard icon={Database} label="إجمالي السجلات" value={buildings.length} />
+        <StatCard icon={Database} label="إجمالي السجلات" value={buildings.length + pendingBuildingTotal} />
         <StatCard icon={Building2} label="مباني معتمدة" value={approvedBuildings.length} />
-        <StatCard icon={RefreshCw} label="معلق للمراجعة" value={pendingBuildings.length} />
+        <StatCard icon={RefreshCw} label="معلق للمراجعة" value={pendingBuildingTotal} />
         <StatCard icon={Landmark} label="العناية بالمساجد" value={usageLoading ? '…' : totals.mosque} />
         <StatCard icon={Boxes} label="وحدة الأصول" value={usageLoading ? '…' : totals.asset} />
         <StatCard icon={ShieldCheck} label="التحول المحاسبي" value={usageLoading ? '…' : totals.accounting} />
