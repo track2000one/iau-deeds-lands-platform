@@ -167,6 +167,48 @@ export type TransactionFollowUpApprovalHistoryPage = {
   totalPages: number;
 };
 
+export type TransactionFollowUpDirectiveKpiMetrics = {
+  reviewCount: number;
+  reviewedDirectives: number;
+  approvedDirectives: number;
+  approvedReviews: number;
+  returnedReviews: number;
+  modificationReviews: number;
+  firstPassRate: number | null;
+  reworkRate: number | null;
+  avgExecutionHours: number | null;
+  avgApprovalHours: number | null;
+  onTimeRate: number | null;
+};
+
+export type TransactionFollowUpDirectiveKpi = {
+  generatedAt: string;
+  periodDays: number | null;
+  assigneeUserId?: string | null;
+  summary: TransactionFollowUpDirectiveKpiMetrics & {
+    openDirectives: number;
+    overdueOpen: number;
+    urgentOpen: number;
+  };
+  previousSummary: (TransactionFollowUpDirectiveKpiMetrics & {
+    openDirectives: number | null;
+    overdueOpen: number | null;
+    urgentOpen: number | null;
+  }) | null;
+  employees: Array<TransactionFollowUpDirectiveKpiMetrics & {
+    userId: string;
+    username: string;
+    openDirectives: number;
+    overdueOpen: number;
+    urgentOpen: number;
+  }>;
+  monthlyTrend: Array<TransactionFollowUpDirectiveKpiMetrics & {
+    key: string;
+    year: number;
+    month: number;
+  }>;
+};
+
 export type TransactionFollowUpDirectiveEvidence = {
   id: string;
   entityType: 'transaction_follow_up_directive';
@@ -754,6 +796,19 @@ export const transactionFollowUpApi = {
     const suffix = query.toString();
     return apiJson<TransactionFollowUpDirectivesDashboard>(
       `/api/transaction-follow-up/directives/dashboard${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  directiveKpi: (input: {
+    periodDays?: number | 'all';
+    assigneeUserId?: string;
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (input.periodDays) query.set('periodDays', String(input.periodDays));
+    if (input.assigneeUserId) query.set('assigneeUserId', input.assigneeUserId);
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpDirectiveKpi>(
+      `/api/transaction-follow-up/directives/kpi${suffix ? `?${suffix}` : ''}`,
     );
   },
 
