@@ -362,6 +362,11 @@ export const TransactionFollowUpPage: React.FC = () => {
     void openDetails(transactionId);
   }, [searchParams]);
 
+  React.useEffect(() => {
+    if (searchParams.get('kpi') !== '1' || !(isAdmin || canDelete)) return;
+    setDirectiveKpiOpen(true);
+  }, [searchParams, isAdmin, canDelete]);
+
   const createTransaction = async () => {
     if (!createForm.transactionNumber.trim() || !createForm.subject.trim() || !createForm.transactionDate) {
       toast.error('أكمل رقم المعاملة وتاريخها وموضوعها');
@@ -1118,7 +1123,15 @@ ${styleAssets}
       {(isAdmin || canDelete) && (
         <TransactionDirectiveKpiDialog
           open={directiveKpiOpen}
-          onOpenChange={setDirectiveKpiOpen}
+          onOpenChange={(open) => {
+            setDirectiveKpiOpen(open);
+            if (!open && searchParams.get('kpi') === '1') {
+              const next = new URLSearchParams(searchParams);
+              next.delete('kpi');
+              next.delete('alert');
+              setSearchParams(next);
+            }
+          }}
           assignees={assignees}
         />
       )}
