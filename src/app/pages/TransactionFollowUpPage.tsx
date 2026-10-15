@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import {
   AlertTriangle,
   Archive,
@@ -229,6 +229,7 @@ const emptyCreate = (): TransactionFollowUpCreateInput => ({
 });
 
 export const TransactionFollowUpPage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const openedFromUrlRef = React.useRef<string | null>(null);
   const { currentUser } = useAuth();
@@ -909,6 +910,24 @@ ${styleAssets}
               <ShieldCheck className="ml-2 h-4 w-4" />
               التدخلات الوقائية
             </Button>
+            <Button
+              variant="outline"
+              className="border-red-300 bg-red-50 text-red-900 hover:bg-red-100"
+              onClick={() => navigate('/follow-up/risks')}
+            >
+              <ShieldAlert className="ml-2 h-4 w-4" />
+              سجل المخاطر
+            </Button>
+            {(isAdmin || canDelete) && (
+              <Button
+                variant="outline"
+                className="border-slate-300 bg-slate-50 text-slate-900 hover:bg-slate-100"
+                onClick={() => navigate('/follow-up/risks/executive')}
+              >
+                <Gauge className="ml-2 h-4 w-4" />
+                لوحة المخاطر التنفيذية
+              </Button>
+            )}
             {canPrint && (
               <Button variant="outline" onClick={() => void openExecutiveReport()}>
                 <FileText className="ml-2 h-4 w-4" />
