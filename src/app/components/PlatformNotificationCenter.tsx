@@ -46,7 +46,11 @@ const normalizeFollowUpAlert = (alert: TransactionFollowUpAlert): PlatformNotice
   source: 'follow_up',
   title: alert.title,
   message: alert.message,
-  entityType: alert.kind === 'kpi_target_breach' ? 'follow_up_kpi' : 'transaction_follow_up',
+  entityType: alert.kind.startsWith('capa_')
+    ? 'follow_up_capa'
+    : alert.kind === 'kpi_target_breach'
+      ? 'follow_up_kpi'
+      : 'transaction_follow_up',
   entityId: alert.transactionId || null,
   severity: alert.severity,
   isRead: alert.isRead,
@@ -54,6 +58,7 @@ const normalizeFollowUpAlert = (alert: TransactionFollowUpAlert): PlatformNotice
 });
 
 const notificationCategory = (notice: PlatformNotice) => {
+  if (notice.source === 'follow_up' && notice.entityType === 'follow_up_capa') return 'follow_up_capa';
   if (notice.source === 'follow_up' && notice.entityType === 'follow_up_kpi') return 'follow_up_kpi';
   if (notice.source === 'follow_up') return 'follow_up';
   const type = String(notice.entityType || '').toLowerCase();
@@ -188,7 +193,9 @@ export const PlatformNotificationCenter: React.FC = () => {
 
     setOpen(false);
     if (notice.source === 'follow_up') {
-      if (notice.entityType === 'follow_up_kpi') {
+      if (notice.entityType === 'follow_up_capa') {
+        navigate(`/follow-up?capa=1&alert=${encodeURIComponent(notice.id)}`);
+      } else if (notice.entityType === 'follow_up_kpi') {
         navigate(`/follow-up?kpi=1&alert=${encodeURIComponent(notice.id)}`);
       } else {
         navigate(`/follow-up?transaction=${encodeURIComponent(notice.entityId || '')}&alert=${encodeURIComponent(notice.id)}`);
@@ -276,7 +283,7 @@ export const PlatformNotificationCenter: React.FC = () => {
           <div className="divide-y divide-slate-100">
             {ordered.slice(0, 30).map((notice) => {
               const category = notificationCategory(notice);
-              const Icon = category === 'follow_up_kpi'
+              const Icon = category === 'follow_up_capa' || category === 'follow_up_kpi'
                 ? Target
                 : category === 'follow_up'
                   ? notice.severity === 'danger' ? AlertTriangle : ListTodo
