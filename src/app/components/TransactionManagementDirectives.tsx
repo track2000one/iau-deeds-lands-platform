@@ -5,9 +5,12 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Gavel,
+  PencilLine,
   Play,
   Plus,
   RefreshCw,
+  RotateCcw,
+  ShieldCheck,
   UserRound,
   XCircle,
 } from 'lucide-react';
@@ -29,7 +32,9 @@ import { Textarea } from './ui/textarea';
 const statusLabels: Record<TransactionFollowUpDirective['status'], string> = {
   pending: 'بانتظار التنفيذ',
   in_progress: 'قيد التنفيذ',
-  completed: 'منجز',
+  awaiting_approval: 'بانتظار اعتماد الإدارة',
+  returned: 'معاد للاستكمال',
+  completed: 'منجز ومعتمد',
   cancelled: 'ملغى',
 };
 
@@ -37,6 +42,12 @@ const priorityLabels: Record<TransactionFollowUpDirective['priority'], string> =
   normal: 'عادية',
   high: 'عالية',
   urgent: 'عاجلة',
+};
+
+const reviewDecisionLabels: Record<NonNullable<TransactionFollowUpDirective['reviewDecision']>, string> = {
+  approved: 'اعتمدت الإدارة الإنجاز',
+  return_for_completion: 'أعيد للاستكمال',
+  request_modification: 'طُلب تعديل النتيجة',
 };
 
 const formatDate = (value?: string | null) =>
@@ -86,8 +97,13 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
   const [completionId, setCompletionId] = React.useState<string | null>(null);
   const [completionResponse, setCompletionResponse] = React.useState('');
   const [completionNote, setCompletionNote] = React.useState('');
+  const [reviewId, setReviewId] = React.useState<string | null>(null);
+  const [reviewNote, setReviewNote] = React.useState('');
 
-  const openCount = directives.filter((item) => ['pending', 'in_progress'].includes(item.status)).length;
+  const openCount = directives.filter((item) =>
+    ['pending', 'in_progress', 'awaiting_approval', 'returned'].includes(item.status)
+  ).length;
+  const awaitingApprovalCount = directives.filter((item) => item.status === 'awaiting_approval').length;
   const overdueCount = directives.filter((item) => item.isOverdue).length;
   const completedCount = directives.filter((item) => item.status === 'completed').length;
 
@@ -129,11 +145,11 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
 
   const updateStatus = async (
     directive: TransactionFollowUpDirective,
-    status: 'pending' | 'in_progress' | 'completed' | 'cancelled',
+    status: 'pending' | 'in_progress' | 'awaiting_approval' | 'cancelled',
   ) => {
     if (status === 'cancelled' && !window.confirm('إلغاء هذا التوجيه أو القرار؟')) return;
-    if (status === 'completed' && !completionResponse.trim()) {
-      toast.error('اكتب نتيجة التنفيذ أولًا');
+    if (status === 'awaiting_approval' && !completionResponse.trim()) {
+      toast.error('اكتب نتيجة التنفيذ قبل رفعها للاعتماد');
       return;
     }
 
@@ -141,14 +157,16 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
       setSaving(true);
       await transactionFollowUpApi.updateDirective(record.id, directive.id, {
         status,
-        completionResponse: status === 'completed' ? completionResponse.trim() : null,
-        completionNote: status === 'completed' ? completionNote.trim() || null : null,
+        completionResponse: status === 'awaiting_approval' ? completionResponse.trim() : undefined,
+        completionNote: status === 'awaiting_approval' ? completionNote.trim() || null : undefined,
       });
       toast.success(
-        status === 'completed'
-          ? 'تم تسجيل نتيجة التنفيذ وإنجاز التوجيه'
+        status === 'awaiting_approval'
+          ? 'تم رفع نتيجة التنفيذ للإدارة لاعتمادها'
           : status === 'in_progress'
-            ? 'تم بدء تنفيذ التوجيه'
+            ? directive.status === 'returned'
+              ? 'تم استئناف تنفيذ التوجيه'
+              : 'تم بدء تنفيذ التوجيه'
             : status === 'cancelled'
               ? 'تم إلغاء التوجيه'
               : 'تم تحديث حالة التوجيه',
@@ -165,6 +183,39 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
     }
   };
 
+  const reviewDirective = async (
+    directive: TransactionFollowUpDirective,
+    decision: 'approved' | 'return_for_completion' | 'request_modification',
+  ) => {
+    if (decision !== 'approved' && !reviewNote.trim()) {
+      toast.error('اكتب ملاحظة الإدارة قبل إعادة التوجيه أو طلب التعديل');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await transactionFollowUpApi.reviewDirective(record.id, directive.id, {
+        decision,
+        reviewNote: reviewNote.trim() || null,
+      });
+      toast.success(
+        decision === 'approved'
+          ? 'تم اعتماد نتيجة التنفيذ وإغلاق التوجيه'
+          : decision === 'return_for_completion'
+            ? 'تمت إعادة التوجيه للموظف لاستكمال التنفيذ'
+            : 'تم طلب تعديل نتيجة التنفيذ من الموظف',
+      );
+      setReviewId(null);
+      setReviewNote('');
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
+      await onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر اعتماد نتيجة التوجيه');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Card className="border-indigo-200 bg-indigo-50/20">
       <CardHeader className="border-b border-indigo-100 pb-4">
@@ -175,7 +226,7 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
               توجيهات وقرارات الإدارة
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              كل توجيه له موظف مكلف وموعد وحالة تنفيذ مستقلة عن حالة المعاملة.
+              الموظف يرفع نتيجة التنفيذ، ولا يُغلق التوجيه نهائيًا إلا بعد اعتماد الإدارة.
             </p>
           </div>
           {supervisor && !['completed', 'closed'].includes(record.status) && (
@@ -193,10 +244,11 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
       </CardHeader>
 
       <CardContent className="space-y-4 p-4">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <DirectiveMetric title="قيد المتابعة" value={openCount} />
+          <DirectiveMetric title="بانتظار الاعتماد" value={awaitingApprovalCount} warning={awaitingApprovalCount > 0} />
           <DirectiveMetric title="متأخرة" value={overdueCount} danger={overdueCount > 0} />
-          <DirectiveMetric title="منجزة" value={completedCount} success={completedCount > 0} />
+          <DirectiveMetric title="منجزة ومعتمدة" value={completedCount} success={completedCount > 0} />
         </div>
 
         {creating && supervisor && (
@@ -255,9 +307,12 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
           <div className="space-y-3">
             {directives.map((directive) => {
               const mine = directive.assigneeUserId === currentUserId;
-              const canUpdate = supervisor || mine;
+              const canExecute = supervisor || mine;
               const isFinal = ['completed', 'cancelled'].includes(directive.status);
               const completing = completionId === directive.id;
+              const reviewing = reviewId === directive.id;
+              const awaitingApproval = directive.status === 'awaiting_approval';
+              const returned = directive.status === 'returned';
 
               return (
                 <div
@@ -265,11 +320,15 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
                   className={`rounded-2xl border bg-white p-4 ${
                     directive.isOverdue
                       ? 'border-red-300'
-                      : directive.isDueToday
-                        ? 'border-amber-300'
-                        : directive.status === 'completed'
-                          ? 'border-emerald-200'
-                          : 'border-indigo-100'
+                      : awaitingApproval
+                        ? 'border-violet-300'
+                        : returned
+                          ? 'border-amber-300'
+                          : directive.isDueToday
+                            ? 'border-amber-300'
+                            : directive.status === 'completed'
+                              ? 'border-emerald-200'
+                              : 'border-indigo-100'
                   }`}
                 >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -278,7 +337,20 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
                         <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-800">
                           {directive.directiveType === 'decision' ? 'قرار إداري' : 'توجيه إداري'}
                         </Badge>
-                        <Badge variant="outline">{statusLabels[directive.status]}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={
+                            awaitingApproval
+                              ? 'border-violet-300 bg-violet-50 text-violet-800'
+                              : returned
+                                ? 'border-amber-300 bg-amber-50 text-amber-800'
+                                : directive.status === 'completed'
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                  : ''
+                          }
+                        >
+                          {statusLabels[directive.status]}
+                        </Badge>
                         <Badge
                           variant="outline"
                           className={directive.priority === 'urgent'
@@ -319,25 +391,54 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
                       </div>
 
                       {directive.completionResponse && (
-                        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
-                          <p className="text-[11px] font-black text-emerald-800">نتيجة التنفيذ</p>
+                        <div className={`mt-3 rounded-xl border p-3 ${
+                          directive.status === 'completed'
+                            ? 'border-emerald-200 bg-emerald-50/60'
+                            : 'border-violet-200 bg-violet-50/50'
+                        }`}>
+                          <p className={`text-[11px] font-black ${
+                            directive.status === 'completed' ? 'text-emerald-800' : 'text-violet-800'
+                          }`}>
+                            {directive.status === 'completed' ? 'نتيجة التنفيذ المعتمدة' : 'نتيجة التنفيذ المرفوعة'}
+                          </p>
                           <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{directive.completionResponse}</p>
                           {directive.completionNote && (
-                            <p className="mt-2 text-xs text-muted-foreground">ملاحظة: {directive.completionNote}</p>
+                            <p className="mt-2 text-xs text-muted-foreground">ملاحظة الموظف: {directive.completionNote}</p>
                           )}
                           <p className="mt-2 text-[10px] text-muted-foreground">
-                            تم الإنجاز: {formatDateTime(directive.completedAt)}
+                            رُفعت للاعتماد: {formatDateTime(directive.completionSubmittedAt)}
+                            {directive.completionSubmittedByName ? <> · بواسطة {directive.completionSubmittedByName}</> : null}
+                          </p>
+                        </div>
+                      )}
+
+                      {directive.reviewDecision && (
+                        <div className={`mt-3 rounded-xl border p-3 ${
+                          directive.reviewDecision === 'approved'
+                            ? 'border-emerald-200 bg-emerald-50/50'
+                            : 'border-amber-200 bg-amber-50/50'
+                        }`}>
+                          <p className="flex items-center gap-1.5 text-[11px] font-black">
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            {reviewDecisionLabels[directive.reviewDecision]}
+                          </p>
+                          {directive.reviewNote && (
+                            <p className="mt-1 whitespace-pre-wrap text-xs leading-6 text-slate-700">{directive.reviewNote}</p>
+                          )}
+                          <p className="mt-2 text-[10px] text-muted-foreground">
+                            مراجعة الإدارة: {formatDateTime(directive.reviewedAt)}
+                            {directive.reviewedByName ? <> · {directive.reviewedByName}</> : null}
                           </p>
                         </div>
                       )}
                     </div>
 
-                    {canUpdate && !isFinal && (
+                    {canExecute && !isFinal && !awaitingApproval && (
                       <div className="flex shrink-0 flex-wrap gap-2">
-                        {directive.status === 'pending' && (
+                        {(directive.status === 'pending' || returned) && (
                           <Button size="sm" variant="outline" disabled={saving} onClick={() => void updateStatus(directive, 'in_progress')}>
-                            <Play className="ml-1 h-3.5 w-3.5" />
-                            بدء التنفيذ
+                            {returned ? <RotateCcw className="ml-1 h-3.5 w-3.5" /> : <Play className="ml-1 h-3.5 w-3.5" />}
+                            {returned ? 'استكمال التنفيذ' : 'بدء التنفيذ'}
                           </Button>
                         )}
                         <Button
@@ -346,12 +447,12 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
                           disabled={saving}
                           onClick={() => {
                             setCompletionId(completing ? null : directive.id);
-                            setCompletionResponse('');
-                            setCompletionNote('');
+                            setCompletionResponse(completing ? '' : directive.completionResponse || '');
+                            setCompletionNote(completing ? '' : directive.completionNote || '');
                           }}
                         >
                           <CheckCircle2 className="ml-1 h-3.5 w-3.5" />
-                          تسجيل الإنجاز
+                          رفع الإنجاز للاعتماد
                         </Button>
                         {supervisor && (
                           <Button
@@ -366,17 +467,37 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
                         )}
                       </div>
                     )}
+
+                    {supervisor && awaitingApproval && (
+                      <Button
+                        size="sm"
+                        variant={reviewing ? 'default' : 'outline'}
+                        onClick={() => {
+                          setReviewId(reviewing ? null : directive.id);
+                          setReviewNote(reviewing ? '' : directive.reviewNote || '');
+                        }}
+                      >
+                        <ShieldCheck className="ml-1 h-3.5 w-3.5" />
+                        مراجعة الإنجاز
+                      </Button>
+                    )}
                   </div>
 
-                  {completing && canUpdate && !isFinal && (
-                    <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/30 p-3">
+                  {awaitingApproval && !supervisor && (
+                    <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50/50 p-3 text-xs leading-6 text-violet-900">
+                      تم رفع نتيجة التنفيذ، وهي الآن بانتظار مراجعة واعتماد الإدارة.
+                    </div>
+                  )}
+
+                  {completing && canExecute && !isFinal && !awaitingApproval && (
+                    <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50/30 p-3">
                       <div className="grid gap-3">
                         <Field label="نتيجة التنفيذ *">
                           <Textarea
                             rows={3}
                             value={completionResponse}
                             onChange={(e) => setCompletionResponse(e.target.value)}
-                            placeholder="اكتب ما تم تنفيذه والنتيجة..."
+                            placeholder="اكتب ما تم تنفيذه والنتيجة لرفعها إلى الإدارة..."
                           />
                         </Field>
                         <Field label="ملاحظة إضافية">
@@ -387,9 +508,52 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
                         <Button
                           size="sm"
                           disabled={saving || !completionResponse.trim()}
-                          onClick={() => void updateStatus(directive, 'completed')}
+                          onClick={() => void updateStatus(directive, 'awaiting_approval')}
                         >
-                          {saving ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="ml-1 h-3.5 w-3.5" />}
+                          {saving ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="ml-1 h-3.5 w-3.5" />}
+                          رفع للإدارة للاعتماد
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {reviewing && supervisor && awaitingApproval && (
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                      <Field label="ملاحظة الإدارة">
+                        <Textarea
+                          rows={3}
+                          value={reviewNote}
+                          onChange={(e) => setReviewNote(e.target.value)}
+                          placeholder="اختياري عند الاعتماد، وإلزامي عند الإعادة أو طلب التعديل..."
+                        />
+                      </Field>
+                      <div className="mt-3 flex flex-wrap justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-amber-300 bg-amber-50 text-amber-900"
+                          disabled={saving || !reviewNote.trim()}
+                          onClick={() => void reviewDirective(directive, 'return_for_completion')}
+                        >
+                          <RotateCcw className="ml-1 h-3.5 w-3.5" />
+                          إعادته للاستكمال
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-orange-300 bg-orange-50 text-orange-900"
+                          disabled={saving || !reviewNote.trim()}
+                          onClick={() => void reviewDirective(directive, 'request_modification')}
+                        >
+                          <PencilLine className="ml-1 h-3.5 w-3.5" />
+                          طلب تعديل
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={saving}
+                          onClick={() => void reviewDirective(directive, 'approved')}
+                        >
+                          {saving ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="ml-1 h-3.5 w-3.5" />}
                           اعتماد الإنجاز
                         </Button>
                       </div>
@@ -416,24 +580,30 @@ const DirectiveMetric = ({
   title,
   value,
   danger = false,
+  warning = false,
   success = false,
 }: {
   title: string;
   value: number;
   danger?: boolean;
+  warning?: boolean;
   success?: boolean;
 }) => (
   <div
     className={`rounded-xl border px-3 py-2 text-center ${
       danger
         ? 'border-red-200 bg-red-50'
-        : success
-          ? 'border-emerald-200 bg-emerald-50'
-          : 'border-indigo-100 bg-white'
+        : warning
+          ? 'border-violet-200 bg-violet-50'
+          : success
+            ? 'border-emerald-200 bg-emerald-50'
+            : 'border-indigo-100 bg-white'
     }`}
   >
     <p className="text-[10px] text-muted-foreground">{title}</p>
-    <p className={`mt-0.5 text-xl font-black ${danger ? 'text-red-700' : success ? 'text-emerald-700' : 'text-slate-900'}`}>
+    <p className={`mt-0.5 text-xl font-black ${
+      danger ? 'text-red-700' : warning ? 'text-violet-800' : success ? 'text-emerald-700' : 'text-slate-900'
+    }`}>
       {value.toLocaleString('ar-SA')}
     </p>
   </div>
