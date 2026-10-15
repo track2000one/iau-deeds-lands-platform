@@ -250,6 +250,82 @@ export type TransactionFollowUpImprovementPlan = {
   events?: TransactionFollowUpImprovementPlanEvent[];
 };
 
+export type TransactionFollowUpPreventiveActionEvent = {
+  id: string;
+  actionId: string;
+  action: string;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  note?: string | null;
+  resultValue?: number | null;
+  resultRiskScore?: number | null;
+  resultStatus?: string | null;
+  resultMetTarget?: boolean | null;
+  changedById?: string | null;
+  changedByName?: string | null;
+  createdAt: string;
+};
+
+export type TransactionFollowUpPreventiveAction = {
+  id: string;
+  sourceType: 'metric' | 'employee';
+  metricKey?: TransactionFollowUpImprovementPlan['metricKey'] | null;
+  metricLabel?: string | null;
+  scopeType: 'global' | 'employee';
+  assigneeUserId?: string | null;
+  assigneeName?: string | null;
+  ownerUserId: string;
+  ownerName: string;
+  actionText: string;
+  expectedOutcome?: string | null;
+  periodDays: number;
+  baselineValue?: number | null;
+  projectedValue?: number | null;
+  targetValue?: number | null;
+  direction?: 'min' | 'max' | null;
+  sourceRiskScore?: number | null;
+  sourceRiskLevel?: 'low' | 'medium' | 'high' | 'critical' | null;
+  sourceReasons?: string[] | null;
+  dueDate: string;
+  status: 'open' | 'in_progress' | 'monitoring' | 'effective' | 'failed' | 'cancelled';
+  progressNote?: string | null;
+  resultValue?: number | null;
+  resultRiskScore?: number | null;
+  resultStatus?: string | null;
+  resultMetTarget?: boolean | null;
+  verifiedAt?: string | null;
+  verifiedById?: string | null;
+  verifiedByName?: string | null;
+  completedAt?: string | null;
+  failedAt?: string | null;
+  cancelledAt?: string | null;
+  improvementPlanId?: string | null;
+  escalatedAt?: string | null;
+  createdById?: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isOverdue?: boolean;
+  events?: TransactionFollowUpPreventiveActionEvent[];
+};
+
+export type TransactionFollowUpPreventiveActionPage = {
+  generatedAt: string;
+  supervisor: boolean;
+  summary: {
+    open: number;
+    overdue: number;
+    monitoring: number;
+    effective30d: number;
+    failed: number;
+  };
+  items: TransactionFollowUpPreventiveAction[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
 export type TransactionFollowUpEarlyWarningMetric = {
   metricKey: 'firstPassRate' | 'onTimeRate' | 'reworkRate' | 'avgExecutionHours' | 'avgApprovalHours';
   metricLabel: string;
@@ -1026,6 +1102,89 @@ export const transactionFollowUpApi = {
       `/api/transaction-follow-up/directives/early-warning${suffix ? `?${suffix}` : ''}`,
     );
   },
+
+  preventiveActions: (input: {
+    page?: number;
+    pageSize?: number;
+    status?: string;
+    metricKey?: string;
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (input.page) query.set('page', String(input.page));
+    if (input.pageSize) query.set('pageSize', String(input.pageSize));
+    if (input.status) query.set('status', input.status);
+    if (input.metricKey) query.set('metricKey', input.metricKey);
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpPreventiveActionPage>(
+      `/api/transaction-follow-up/directives/preventive-actions${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  createPreventiveAction: (input: {
+    sourceType: 'metric' | 'employee';
+    metricKey?: TransactionFollowUpImprovementPlan['metricKey'] | null;
+    scopeType: 'global' | 'employee';
+    assigneeUserId?: string | null;
+    ownerUserId: string;
+    actionText: string;
+    expectedOutcome?: string | null;
+    periodDays: number;
+    baselineValue?: number | null;
+    projectedValue?: number | null;
+    targetValue?: number | null;
+    direction?: 'min' | 'max' | null;
+    sourceRiskScore?: number | null;
+    sourceRiskLevel?: 'low' | 'medium' | 'high' | 'critical' | null;
+    sourceReasons?: string[];
+    dueDate: string;
+  }) =>
+    apiJson<TransactionFollowUpPreventiveAction>('/api/transaction-follow-up/directives/preventive-actions', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  updatePreventiveAction: (
+    id: string,
+    input: {
+      status?: 'open' | 'in_progress' | 'monitoring' | 'cancelled';
+      ownerUserId?: string | null;
+      actionText?: string;
+      expectedOutcome?: string | null;
+      dueDate?: string;
+      progressNote?: string | null;
+    },
+  ) =>
+    apiJson<TransactionFollowUpPreventiveAction>(
+      `/api/transaction-follow-up/directives/preventive-actions/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  verifyPreventiveAction: (id: string) =>
+    apiJson<TransactionFollowUpPreventiveAction & {
+      verification: {
+        resultValue?: number | null;
+        resultRiskScore?: number | null;
+        resultStatus?: string | null;
+        metTarget?: boolean;
+        effective: boolean;
+        capaRecommended: boolean;
+      };
+    }>(`/api/transaction-follow-up/directives/preventive-actions/${id}/verify`, {
+      method: 'PATCH',
+      body: JSON.stringify({}),
+    }),
+
+  linkPreventiveActionCapa: (id: string, improvementPlanId: string) =>
+    apiJson<TransactionFollowUpPreventiveAction>(
+      `/api/transaction-follow-up/directives/preventive-actions/${id}/link-capa`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ improvementPlanId }),
+      },
+    ),
 
   improvementEffectiveness: (input: { periodDays?: number | 'all' } = {}) => {
     const query = new URLSearchParams();
