@@ -35,6 +35,14 @@ export type MosqueBuildingDeedReference = {
   district?: string | null;
 };
 
+export type MosqueBuildingPendingPage = {
+  items: MosqueBuilding[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
 export type MosqueBuilding = {
   id: string;
   buildingNumber: string;
@@ -991,6 +999,13 @@ export const mosqueApi = {
   dashboard: () => apiJson<MosqueDashboard>('/api/mosques/dashboard'),
   sites: () => apiJson<MosqueSite[]>('/api/mosques/sites'),
   buildings: () => apiJson<MosqueBuilding[]>('/api/mosques/buildings'),
+  pendingBuildings: (input: { page?: number; pageSize?: number; search?: string } = {}) => {
+    const query = new URLSearchParams({ pending: 'true' });
+    if (input.page) query.set('page', String(input.page));
+    if (input.pageSize) query.set('pageSize', String(input.pageSize));
+    if (input.search?.trim()) query.set('search', input.search.trim());
+    return apiJson<MosqueBuildingPendingPage>(`/api/mosques/buildings?${query.toString()}`);
+  },
   buildingDeeds: () => apiJson<MosqueBuildingDeedReference[]>('/api/mosques/building-deeds'),
   createBuilding: (input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>('/api/mosques/buildings', { method: 'POST', body: JSON.stringify(input) }),
   updateBuilding: (id: string, input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>(`/api/mosques/buildings/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
