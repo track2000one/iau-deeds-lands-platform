@@ -88,6 +88,7 @@ type Props = {
   canEdit: boolean;
   canDelete: boolean;
   onReload: () => Promise<void> | void;
+  onPendingTotalChange?: (total: number) => void;
   context?: 'mosque' | 'central';
 };
 
@@ -252,7 +253,7 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
   </div>
 );
 
-export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, canAdd, canEdit, canDelete, onReload, context = 'mosque' }) => {
+export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, canAdd, canEdit, canDelete, onReload, onPendingTotalChange, context = 'mosque' }) => {
   const isCentral = context === 'central';
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -266,46 +267,55 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
   const [locatingReview, setLocatingReview] = useState(false);
   const [pendingSearch, setPendingSearch] = useState('');
   const [pendingPage, setPendingPage] = useState(1);
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
+  const [pendingResultTotal, setPendingResultTotal] = useState(0);
+  const [pendingOverallTotal, setPendingOverallTotal] = useState(0);
+  const [pendingTotalPages, setPendingTotalPages] = useState(0);
+  const [pendingLoading, setPendingLoading] = useState(false);
   const PENDING_PAGE_SIZE = 24;
 
-  const pendingBuildings = useMemo(
-    () => buildings.filter((building) => isPendingImportedBuilding(building)),
-    [buildings],
-  );
-
-  const filteredPendingBuildings = useMemo(() => {
-    const needle = pendingSearch.trim().toLowerCase();
-    if (!needle) return pendingBuildings;
-    return pendingBuildings.filter((building) => [
-      building.buildingNumber,
-      building.name,
-      building.campusLocation,
-      building.city,
-      building.district,
-      building.notes,
-    ].some((value) => String(value || '').toLowerCase().includes(needle)));
-  }, [pendingBuildings, pendingSearch]);
-
-  const pendingTotalPages = Math.max(1, Math.ceil(filteredPendingBuildings.length / PENDING_PAGE_SIZE));
-  const pendingItems = useMemo<PendingItem[]>(() => {
-    const start = (pendingPage - 1) * PENDING_PAGE_SIZE;
-    return filteredPendingBuildings
-      .slice(start, start + PENDING_PAGE_SIZE)
-      .flatMap((building) => {
+  const loadPendingPage = React.useCallback(async (
+    page = pendingPage,
+    search = pendingSearch,
+  ) => {
+    try {
+      setPendingLoading(true);
+      const result = await mosqueApi.pendingBuildings({
+        page,
+        pageSize: PENDING_PAGE_SIZE,
+        search,
+      });
+      const parsedItems = (result.items || []).flatMap((building) => {
         const envelope = getPendingBuildingImport(building);
         return envelope ? [{ building, envelope }] : [];
       });
-  }, [filteredPendingBuildings, pendingPage]);
+      setPendingItems(parsedItems);
+      setPendingResultTotal(result.total || 0);
+      setPendingTotalPages(result.totalPages || 0);
+      if (result.page && result.page !== pendingPage) setPendingPage(result.page);
+      if (!search.trim()) {
+        setPendingOverallTotal(result.total || 0);
+        onPendingTotalChange?.(result.total || 0);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل السجلات المعلقة');
+    } finally {
+      setPendingLoading(false);
+    }
+  }, [onPendingTotalChange, pendingPage, pendingSearch]);
 
   useEffect(() => {
-    setPendingPage((current) => Math.min(Math.max(1, current), pendingTotalPages));
-  }, [pendingTotalPages]);
+    const timer = window.setTimeout(
+      () => void loadPendingPage(pendingPage, pendingSearch),
+      pendingSearch.trim() ? 300 : 0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [loadPendingPage, pendingPage, pendingSearch]);
 
-  useEffect(() => {
-    setPendingPage(1);
-  }, [pendingSearch]);
-
-  const officialBuildings = useMemo(() => buildings.filter((building) => !isPendingImportedBuilding(building)), [buildings]);
+  const officialBuildings = useMemo(
+    () => buildings.filter((building) => !isPendingImportedBuilding(building)),
+    [buildings],
+  );
 
   const openReview = (item: PendingItem) => {
     setReviewItem(item);
@@ -456,7 +466,11 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
     }
 
     setImporting(false);
-    if (importedCount) await onReload();
+    if (importedCount) {
+      await onReload();
+      setPendingPage(1);
+      await loadPendingPage(1, pendingSearch);
+    }
 
     if (!failed.length) {
       setImportDialogOpen(false);
@@ -483,7 +497,7 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
       toast.success('تم حفظ التصحيحات وسيبقى السجل معلقًا حتى الاعتماد.');
       setReviewItem(null);
       setReviewDraft(null);
-      await onReload();
+      await loadPendingPage(pendingPage, pendingSearch);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر حفظ التصحيحات');
     } finally {
@@ -516,6 +530,7 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
       setReviewItem(null);
       setReviewDraft(null);
       await onReload();
+      await loadPendingPage(pendingPage, pendingSearch);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر اعتماد السجل');
     } finally {
@@ -528,7 +543,7 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
     try {
       await mosqueApi.deleteBuilding(item.building.id);
       toast.success('تم حذف السجل المعلق');
-      await onReload();
+      await loadPendingPage(pendingPage, pendingSearch);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر حذف السجل المعلق');
     }
@@ -553,7 +568,7 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
         </div>
       )}
 
-      {pendingBuildings.length > 0 && (
+      {(pendingOverallTotal > 0 || pendingLoading || pendingSearch.trim()) && (
         <Card className="border-amber-300 bg-gradient-to-b from-amber-50/90 to-white shadow-[0_6px_0_rgba(180,83,9,0.10),0_13px_26px_rgba(15,23,42,0.06)]">
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -567,7 +582,7 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
                 </CardDescription>
               </div>
               <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800">
-                {pendingBuildings.length.toLocaleString('ar-SA')} معلق
+                {pendingOverallTotal.toLocaleString('ar-SA')} معلق
               </Badge>
             </div>
           </CardHeader>
@@ -577,18 +592,21 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
                 <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   value={pendingSearch}
-                  onChange={(event) => setPendingSearch(event.target.value)}
+                  onChange={(event) => {
+                    setPendingSearch(event.target.value);
+                    setPendingPage(1);
+                  }}
                   placeholder="ابحث في السجلات المعلقة..."
                   className="pr-10"
                 />
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                 <span>
-                  عرض {filteredPendingBuildings.length ? ((pendingPage - 1) * PENDING_PAGE_SIZE) + 1 : 0}
+                  عرض {pendingResultTotal ? ((pendingPage - 1) * PENDING_PAGE_SIZE) + 1 : 0}
                   {' - '}
-                  {Math.min(pendingPage * PENDING_PAGE_SIZE, filteredPendingBuildings.length)}
+                  {Math.min(pendingPage * PENDING_PAGE_SIZE, pendingResultTotal)}
                   {' من '}
-                  {filteredPendingBuildings.length.toLocaleString('ar-SA')}
+                  {pendingResultTotal.toLocaleString('ar-SA')}
                 </span>
                 <Button
                   type="button"
@@ -599,20 +617,25 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
                 >
                   السابق
                 </Button>
-                <Badge variant="outline">صفحة {pendingPage.toLocaleString('ar-SA')} / {pendingTotalPages.toLocaleString('ar-SA')}</Badge>
+                <Badge variant="outline">صفحة {pendingPage.toLocaleString('ar-SA')} / {Math.max(1, pendingTotalPages).toLocaleString('ar-SA')}</Badge>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={pendingPage >= pendingTotalPages}
-                  onClick={() => setPendingPage((page) => Math.min(pendingTotalPages, page + 1))}
+                  disabled={pendingTotalPages === 0 || pendingPage >= pendingTotalPages}
+                  onClick={() => setPendingPage((page) => Math.min(Math.max(1, pendingTotalPages), page + 1))}
                 >
                   التالي
                 </Button>
               </div>
             </div>
 
-            {filteredPendingBuildings.length === 0 ? (
+            {pendingLoading ? (
+              <div className="rounded-xl border border-amber-200 bg-white py-10 text-center text-sm text-amber-900">
+                <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                جارٍ تحميل الصفحة المطلوبة...
+              </div>
+            ) : pendingResultTotal === 0 ? (
               <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/40 py-10 text-center text-sm text-amber-900">
                 لا توجد سجلات معلقة مطابقة للبحث.
               </div>
