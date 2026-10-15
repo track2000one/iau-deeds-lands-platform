@@ -116,6 +116,52 @@ export type TransactionFollowUpDashboard = {
   needsAction: number;
 };
 
+export type TransactionFollowUpExecutiveInbox = {
+  generatedAt: string;
+  scope: 'mine' | 'all';
+  counters: {
+    totalOpen: number;
+    attention: number;
+    overdue: number;
+    dueToday: number;
+    unassigned: number;
+    inactive: number;
+    needsFollowUp: number;
+    urgent: number;
+    staleWaiting: number;
+  };
+  attentionItems: Array<{
+    id: string;
+    trackingNumber: string;
+    transactionNumber: string;
+    transactionDate: string;
+    subject: string;
+    priority: TransactionFollowUpPriority;
+    status: TransactionFollowUpStatus;
+    currentAssigneeUserId?: string | null;
+    currentAssigneeName?: string | null;
+    dueDate?: string | null;
+    requiredAction?: string | null;
+    lastActionAt?: string | null;
+    daysWithoutAction: number;
+    daysOverdue: number;
+    reasons: string[];
+    primaryReason: string;
+    score: number;
+  }>;
+  employeeLoad: Array<{
+    userId: string;
+    username: string;
+    open: number;
+    overdue: number;
+    needsAction: number;
+    urgent: number;
+    highLoad: boolean;
+    riskScore: number;
+  }>;
+  highLoadThreshold: number;
+};
+
 export type TransactionFollowUpAnalytics = {
   periodDays: number | null;
   generatedAt: string;
@@ -320,6 +366,11 @@ export const transactionFollowUpApi = {
   dashboard: (mine = false) =>
     apiJson<TransactionFollowUpDashboard>(
       `/api/transaction-follow-up/dashboard${mine ? '?mine=true' : ''}`,
+    ),
+
+  executiveInbox: (mine = false) =>
+    apiJson<TransactionFollowUpExecutiveInbox>(
+      `/api/transaction-follow-up/executive-inbox${mine ? '?mine=true' : ''}`,
     ),
 
   analytics: (input: { mine?: boolean; periodDays?: number | 'all' } = {}) => {
