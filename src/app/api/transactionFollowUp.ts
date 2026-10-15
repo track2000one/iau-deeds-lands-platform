@@ -83,6 +83,90 @@ export type TransactionFollowUpDirectivesDashboard = {
   totalItems: number;
 };
 
+export type TransactionFollowUpDirectiveReview = {
+  id: string;
+  directiveId: string;
+  decision: 'approved' | 'return_for_completion' | 'request_modification';
+  previousStatus: string;
+  nextStatus: string;
+  reviewNote?: string | null;
+  completionResponse?: string | null;
+  completionNote?: string | null;
+  submittedAt?: string | null;
+  evidenceSnapshot?: Array<{
+    id?: string;
+    title?: string;
+    driveUrl?: string;
+    driveFileId?: string | null;
+    mimeType?: string | null;
+    notes?: string | null;
+    createdBy?: string | null;
+    createdAt?: string;
+  }> | null;
+  reviewedById?: string | null;
+  reviewedByName?: string | null;
+  reviewedAt: string;
+};
+
+export type TransactionFollowUpApprovalHistoryPage = {
+  generatedAt: string;
+  periodDays: number | null;
+  summary: {
+    total: number;
+    approved: number;
+    returned: number;
+    modificationRequested: number;
+    uniqueDirectives: number;
+    averageReviewHours: number | null;
+  };
+  employees: Array<{
+    userId: string;
+    username: string;
+    reviews: number;
+    approved: number;
+    returned: number;
+    modificationRequested: number;
+    reworkCount: number;
+    approvalRate: number | null;
+  }>;
+  reviewers: Array<{
+    userId?: string | null;
+    username: string;
+    reviews: number;
+    approved: number;
+    returned: number;
+    modificationRequested: number;
+  }>;
+  items: Array<TransactionFollowUpDirectiveReview & {
+    directive: {
+      id: string;
+      directiveType: 'directive' | 'decision';
+      title: string;
+      instruction: string;
+      priority: 'normal' | 'high' | 'urgent';
+      status: TransactionFollowUpDirective['status'];
+      assigneeUserId: string;
+      assigneeName: string;
+      dueDate?: string | null;
+      issuedByName?: string | null;
+      issuedAt: string;
+      transaction: {
+        id: string;
+        transactionNumber: string;
+        trackingNumber: string;
+        transactionDate: string;
+        subject: string;
+        status: TransactionFollowUpStatus;
+        currentAssigneeName?: string | null;
+      };
+    };
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
 export type TransactionFollowUpDirectiveEvidence = {
   id: string;
   entityType: 'transaction_follow_up_directive';
@@ -133,6 +217,7 @@ export type TransactionFollowUpDirective = {
   daysOverdue: number;
   evidence?: TransactionFollowUpDirectiveEvidence[];
   evidenceCount?: number;
+  reviews?: TransactionFollowUpDirectiveReview[];
 };
 
 export type TransactionFollowUpApprovalCenter = {
@@ -669,6 +754,29 @@ export const transactionFollowUpApi = {
     const suffix = query.toString();
     return apiJson<TransactionFollowUpDirectivesDashboard>(
       `/api/transaction-follow-up/directives/dashboard${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  approvalHistory: (input: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    decision?: string;
+    assigneeUserId?: string;
+    reviewerUserId?: string;
+    periodDays?: number | 'all';
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (input.page) query.set('page', String(input.page));
+    if (input.pageSize) query.set('pageSize', String(input.pageSize));
+    if (input.search?.trim()) query.set('search', input.search.trim());
+    if (input.decision) query.set('decision', input.decision);
+    if (input.assigneeUserId) query.set('assigneeUserId', input.assigneeUserId);
+    if (input.reviewerUserId) query.set('reviewerUserId', input.reviewerUserId);
+    if (input.periodDays) query.set('periodDays', String(input.periodDays));
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpApprovalHistoryPage>(
+      `/api/transaction-follow-up/directives/approval-history${suffix ? `?${suffix}` : ''}`,
     );
   },
 
