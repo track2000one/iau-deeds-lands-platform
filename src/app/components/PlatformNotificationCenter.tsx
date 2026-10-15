@@ -18,7 +18,43 @@ import { Button } from './ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { ScrollArea } from './ui/scroll-area';
 
-const notificationCategory = (notice: MosqueNotification) => {
+type PlatformNotice = {
+  id: string;
+  source: 'mosques' | 'follow_up';
+  title: string;
+  message: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  severity?: 'info' | 'warning' | 'danger';
+  isRead: boolean;
+  createdAt: string;
+};
+
+const normalizeMosqueNotice = (notice: MosqueNotification): PlatformNotice => ({
+  id: notice.id,
+  source: 'mosques',
+  title: notice.title,
+  message: notice.message,
+  entityType: notice.entityType,
+  entityId: notice.entityId,
+  isRead: notice.isRead,
+  createdAt: notice.createdAt,
+});
+
+const normalizeFollowUpAlert = (alert: TransactionFollowUpAlert): PlatformNotice => ({
+  id: alert.id,
+  source: 'follow_up',
+  title: alert.title,
+  message: alert.message,
+  entityType: 'transaction_follow_up',
+  entityId: alert.transactionId,
+  severity: alert.severity,
+  isRead: alert.isRead,
+  createdAt: alert.createdAt,
+});
+
+const notificationCategory = (notice: PlatformNotice) => {
+  if (notice.source === 'follow_up') return 'follow_up';
   const type = String(notice.entityType || '').toLowerCase();
   const text = `${notice.title || ''} ${notice.message || ''}`.toLowerCase();
 
@@ -38,7 +74,7 @@ const notificationCategory = (notice: MosqueNotification) => {
   return 'other';
 };
 
-const notificationTargetTab = (notice: MosqueNotification) => {
+const notificationTargetTab = (notice: PlatformNotice) => {
   const category = notificationCategory(notice);
   if (category === 'request') return 'requests';
   if (category === 'ticket') return 'tickets';
@@ -67,29 +103,37 @@ export const PlatformNotificationCenter: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, hasPermission } = usePermissions();
   const canViewMosques = isAdmin || hasPermission('mosques', 'canView');
+  const canViewFollowUp = isAdmin || hasPermission('transaction_follow_up', 'canView');
+  const canViewNotifications = canViewMosques || canViewFollowUp;
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<MosqueNotification[]>([]);
+  const [notifications, setNotifications] = useState<PlatformNotice[]>([]);
   const [loading, setLoading] = useState(false);
 
   const loadNotifications = useCallback(async () => {
-    if (!canViewMosques) {
+    if (!canViewNotifications) {
       setNotifications([]);
       return;
     }
 
     setLoading(true);
     try {
-      const rows = await mosqueApi.notifications();
-      setNotifications(Array.isArray(rows) ? rows : []);
+      const [mosqueRows, followUpRows] = await Promise.all([
+        canViewMosques ? mosqueApi.notifications().catch(() => []) : Promise.resolve([]),
+        canViewFollowUp ? transactionFollowUpApi.alerts().catch(() => []) : Promise.resolve([]),
+      ]);
+      setNotifications([
+        ...(Array.isArray(mosqueRows) ? mosqueRows.map(normalizeMosqueNotice) : []),
+        ...(Array.isArray(followUpRows) ? followUpRows.map(normalizeFollowUpAlert) : []),
+      ]);
     } catch (error) {
       console.warn('Unable to load platform notifications:', error);
     } finally {
       setLoading(false);
     }
-  }, [canViewMosques]);
+  }, [canViewFollowUp, canViewMosques, canViewNotifications]);
 
   useEffect(() => {
-    if (!canViewMosques) return;
+    if (!canViewNotifications) return;
 
     void loadNotifications();
 
@@ -103,7 +147,7 @@ export const PlatformNotificationCenter: React.FC = () => {
       window.removeEventListener('focus', handleRefresh);
       window.removeEventListener('iau-notifications-changed', handleRefresh);
     };
-  }, [canViewMosques, loadNotifications]);
+  }, [canViewNotifications, loadNotifications]);
 
   useEffect(() => {
     if (open) void loadNotifications();
