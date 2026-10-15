@@ -578,7 +578,6 @@ export const TransactionRiskRegisterDialog: React.FC<Props> = ({
                                     variant="outline"
                                     className="border-slate-300 bg-white"
                                     onClick={() => {
-                                      onOpenChange(false);
                                       navigate('/follow-up/risks/acceptance', {
                                         state: {
                                           riskAcceptanceSeed: {
