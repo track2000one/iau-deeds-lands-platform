@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   AlertTriangle,
+  CalendarPlus,
   CheckCircle2,
   CircleDot,
   Clock3,
@@ -14,6 +15,7 @@ import {
   Send,
   TimerReset,
   UserRound,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -26,6 +28,16 @@ import {
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
 
 const EMPTY: TransactionFollowUpWorkQueue = {
   generatedAt: new Date(0).toISOString(),
@@ -35,6 +47,7 @@ const EMPTY: TransactionFollowUpWorkQueue = {
   counts: {
     overdue: 0,
     urgent_today: 0,
+    extension_requests: 0,
     due_3_days: 0,
     awaiting_review: 0,
     waiting_external: 0,
@@ -45,6 +58,7 @@ const EMPTY: TransactionFollowUpWorkQueue = {
   buckets: {
     overdue: [],
     urgent_today: [],
+    extension_requests: [],
     due_3_days: [],
     awaiting_review: [],
     waiting_external: [],
@@ -77,6 +91,13 @@ const bucketMeta: Record<
     description: 'معاملة عاجلة أو مستحقة خلال اليوم.',
     icon: Clock3,
     className: 'border-orange-300 bg-orange-50 text-orange-900',
+  },
+  extension_requests: {
+    label: 'طلبات التمديد',
+    shortLabel: 'طلبات تمديد',
+    description: 'طلبات تغيير تاريخ الاستحقاق التي تنتظر مراجعة واعتماد المدير.',
+    icon: CalendarPlus,
+    className: 'border-indigo-300 bg-indigo-50 text-indigo-900',
   },
   due_3_days: {
     label: 'تستحق خلال 3 أيام',
@@ -125,6 +146,7 @@ const bucketMeta: Record<
 const bucketOrder: TransactionFollowUpWorkQueueBucket[] = [
   'overdue',
   'urgent_today',
+  'extension_requests',
   'due_3_days',
   'awaiting_review',
   'waiting_external',
@@ -192,6 +214,25 @@ const formatTime = (value?: string | null) =>
       }).format(new Date(value))
     : '—';
 
+const toInputDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const minimumExtensionDate = (item: TransactionFollowUpWorkQueueItem) => {
+  const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (!item.dueDate) return toInputDate(tomorrow);
+  const afterDue = new Date(item.dueDate);
+  afterDue.setHours(0, 0, 0, 0);
+  afterDue.setDate(afterDue.getDate() + 1);
+  return toInputDate(afterDue > tomorrow ? afterDue : tomorrow);
+};
+
 type Props = {
   mine: boolean;
   supervisor: boolean;
@@ -208,6 +249,10 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
   const [data, setData] = React.useState<TransactionFollowUpWorkQueue>(EMPTY);
   const [loading, setLoading] = React.useState(true);
   const [runningAction, setRunningAction] = React.useState<string | null>(null);
+  const [extensionOpen, setExtensionOpen] = React.useState(false);
+  const [extensionItem, setExtensionItem] = React.useState<TransactionFollowUpWorkQueueItem | null>(null);
+  const [extensionDate, setExtensionDate] = React.useState('');
+  const [extensionReason, setExtensionReason] = React.useState('');
   const [selectedBucket, setSelectedBucket] = React.useState<TransactionFollowUpWorkQueueBucket>('in_progress');
   const userChangedBucket = React.useRef(false);
 
@@ -276,8 +321,95 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
     }
   };
 
+  const openExtensionRequest = (item: TransactionFollowUpWorkQueueItem) => {
+    setExtensionItem(item);
+    setExtensionDate(minimumExtensionDate(item));
+    setExtensionReason('');
+    setExtensionOpen(true);
+  };
+
+  const submitExtensionRequest = async () => {
+    if (!extensionItem || !extensionDate || extensionReason.trim().length < 5) {
+      toast.error('حدد تاريخ التمديد واكتب سببًا واضحًا للطلب');
+      return;
+    }
+    try {
+      setRunningAction(extensionItem.id + ':extension');
+      await transactionFollowUpApi.requestExtension(extensionItem.id, {
+        requestedDueDate: extensionDate,
+        reason: extensionReason.trim(),
+      });
+      toast.success('تم رفع طلب التمديد للمدير لاعتماده');
+      setExtensionOpen(false);
+      setExtensionItem(null);
+      setExtensionReason('');
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
+      await load();
+      await onChanged?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر رفع طلب التمديد');
+    } finally {
+      setRunningAction(null);
+    }
+  };
+
+  const decideExtension = async (
+    item: TransactionFollowUpWorkQueueItem,
+    decision: 'approved' | 'rejected',
+  ) => {
+    const request = item.pendingExtension;
+    if (!request) return;
+
+    let reviewNote: string | null = null;
+    if (decision === 'approved') {
+      if (!window.confirm(
+        `اعتماد تمديد المعاملة ${item.transactionNumber} من ${formatDate(request.currentDueDate)} إلى ${formatDate(request.requestedDueDate)}؟`,
+      )) return;
+    } else {
+      const entered = window.prompt('اكتب سبب رفض طلب التمديد:');
+      if (entered == null) return;
+      if (!entered.trim()) {
+        toast.error('سبب الرفض مطلوب');
+        return;
+      }
+      reviewNote = entered.trim();
+    }
+
+    try {
+      setRunningAction(item.id + ':extension-decision');
+      await transactionFollowUpApi.decideExtensionRequest(request.id, {
+        decision,
+        reviewNote,
+      });
+      toast.success(decision === 'approved' ? 'تم اعتماد التمديد وتحديث تاريخ الاستحقاق' : 'تم رفض طلب التمديد');
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
+      await load();
+      await onChanged?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ قرار طلب التمديد');
+    } finally {
+      setRunningAction(null);
+    }
+  };
+
+  const cancelExtension = async (item: TransactionFollowUpWorkQueueItem) => {
+    if (!item.pendingExtension) return;
+    if (!window.confirm('إلغاء طلب التمديد المعلق؟')) return;
+    try {
+      setRunningAction(item.id + ':extension-cancel');
+      await transactionFollowUpApi.cancelExtensionRequest(item.pendingExtension.id);
+      toast.success('تم إلغاء طلب التمديد');
+      await load();
+      await onChanged?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إلغاء طلب التمديد');
+    } finally {
+      setRunningAction(null);
+    }
+  };
+
   const visibleBuckets = bucketOrder.filter(
-    (bucket) => bucket !== 'unassigned' || supervisor,
+    (bucket) => (bucket !== 'unassigned' && bucket !== 'extension_requests') || supervisor,
   );
   const items = data.buckets[selectedBucket] || [];
   const selectedMeta = bucketMeta[selectedBucket];
@@ -304,7 +436,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
       </CardHeader>
 
       <CardContent className="space-y-4 p-4 sm:p-5">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 2xl:grid-cols-8">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 2xl:grid-cols-9">
           {visibleBuckets.map((bucket) => {
             const meta = bucketMeta[bucket];
             const Icon = meta.icon;
@@ -374,6 +506,11 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                           مستحقة اليوم
                         </Badge>
                       )}
+                      {item.pendingExtension && (
+                        <Badge variant="outline" className="border-indigo-300 bg-indigo-50 text-indigo-900">
+                          تمديد معلق إلى {formatDate(item.pendingExtension.requestedDueDate)}
+                        </Badge>
+                      )}
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-800">
                       {item.subject}
@@ -382,6 +519,16 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                       <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-700">
                         <b>المطلوب:</b> {item.requiredAction}
                       </p>
+                    )}
+                    {item.pendingExtension && (
+                      <div className="mt-2 rounded-xl border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-[11px] leading-5 text-indigo-950">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <b>طلب تمديد:</b>
+                          <span>{formatDate(item.pendingExtension.currentDueDate)} ← {formatDate(item.pendingExtension.requestedDueDate)}</span>
+                          <span>بواسطة {item.pendingExtension.requestedByName}</span>
+                        </div>
+                        <p className="mt-1"><b>السبب:</b> {item.pendingExtension.reason}</p>
+                      </div>
                     )}
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                       {supervisor && (
@@ -416,6 +563,60 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                     فتح المعاملة
                   </Button>
 
+                  {item.dueDate &&
+                    !item.pendingExtension &&
+                    !['completed', 'closed'].includes(item.status) && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-indigo-300 text-indigo-800 hover:bg-indigo-50"
+                        disabled={Boolean(runningAction)}
+                        onClick={() => openExtensionRequest(item)}
+                      >
+                        <CalendarPlus className="ml-1 h-3.5 w-3.5" />
+                        طلب تمديد
+                      </Button>
+                    )}
+
+                  {item.pendingExtension && supervisor && (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-emerald-700 text-white hover:bg-emerald-800"
+                        disabled={Boolean(runningAction)}
+                        onClick={() => void decideExtension(item, 'approved')}
+                      >
+                        <CheckCircle2 className="ml-1 h-3.5 w-3.5" />
+                        اعتماد التمديد
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-red-300 text-red-800 hover:bg-red-50"
+                        disabled={Boolean(runningAction)}
+                        onClick={() => void decideExtension(item, 'rejected')}
+                      >
+                        <XCircle className="ml-1 h-3.5 w-3.5" />
+                        رفض
+                      </Button>
+                    </>
+                  )}
+
+                  {item.pendingExtension && !supervisor && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={Boolean(runningAction)}
+                      onClick={() => void cancelExtension(item)}
+                    >
+                      إلغاء طلب التمديد
+                    </Button>
+                  )}
+
                   {item.quickActions.map((action) => {
                     const meta = actionMeta[action];
                     const Icon = meta.icon;
@@ -449,6 +650,64 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
           </div>
         )}
       </CardContent>
+
+      <Dialog open={extensionOpen} onOpenChange={(open) => {
+        if (runningAction) return;
+        setExtensionOpen(open);
+        if (!open) {
+          setExtensionItem(null);
+          setExtensionReason('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-[620px]" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle>طلب تمديد تاريخ استحقاق المعاملة</DialogTitle>
+            <DialogDescription>
+              {extensionItem
+                ? `المعاملة ${extensionItem.transactionNumber} — الموعد الحالي ${formatDate(extensionItem.dueDate)}`
+                : 'يرفع الطلب للمدير ولا يتغير تاريخ الاستحقاق إلا بعد الاعتماد.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>التاريخ المقترح الجديد *</Label>
+              <Input
+                type="date"
+                min={extensionItem ? minimumExtensionDate(extensionItem) : undefined}
+                value={extensionDate}
+                onChange={(event) => setExtensionDate(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>سبب طلب التمديد *</Label>
+              <Textarea
+                rows={5}
+                value={extensionReason}
+                onChange={(event) => setExtensionReason(event.target.value)}
+                placeholder="مثال: انتظار إفادة من جهة خارجية، الحاجة إلى استكمال مستندات، أو وجود إجراء مرتبط لم يكتمل بعد..."
+              />
+              <p className="text-[10px] leading-5 text-muted-foreground">
+                سيحفظ النظام الموعد الحالي والموعد المقترح والسبب ومقدم الطلب وقرار المدير في سجل المعاملة.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t pt-4">
+            <Button variant="outline" disabled={Boolean(runningAction)} onClick={() => setExtensionOpen(false)}>
+              إلغاء
+            </Button>
+            <Button disabled={Boolean(runningAction)} onClick={() => void submitExtensionRequest()}>
+              {runningAction?.endsWith(':extension') ? (
+                <RefreshCw className="ml-1 h-4 w-4 animate-spin" />
+              ) : (
+                <CalendarPlus className="ml-1 h-4 w-4" />
+              )}
+              رفع طلب التمديد
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
