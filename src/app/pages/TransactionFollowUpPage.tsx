@@ -9,6 +9,7 @@ import {
   Gavel,
   History,
   CheckCircle2,
+  ClipboardCheck,
   CircleDot,
   Clock3,
   FileClock,
@@ -55,6 +56,10 @@ import { TransactionDirectivesDashboardDialog } from '../components/TransactionD
 import { TransactionApprovalCenterDialog } from '../components/TransactionApprovalCenterDialog';
 import { TransactionApprovalHistoryDialog } from '../components/TransactionApprovalHistoryDialog';
 import { TransactionDirectiveKpiDialog } from '../components/TransactionDirectiveKpiDialog';
+import {
+  TransactionImprovementPlansDialog,
+  type ImprovementPlanSeed,
+} from '../components/TransactionImprovementPlansDialog';
 import {
   transactionFollowUpApi,
   type TransactionFollowUpAnalytics,
@@ -247,6 +252,8 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [approvalCenterOpen, setApprovalCenterOpen] = React.useState(false);
   const [approvalHistoryOpen, setApprovalHistoryOpen] = React.useState(false);
   const [directiveKpiOpen, setDirectiveKpiOpen] = React.useState(false);
+  const [improvementPlansOpen, setImprovementPlansOpen] = React.useState(false);
+  const [improvementPlanSeed, setImprovementPlanSeed] = React.useState<ImprovementPlanSeed | null>(null);
   const [createForm, setCreateForm] = React.useState<TransactionFollowUpCreateInput>(emptyCreate());
   const [selected, setSelected] = React.useState<TransactionFollowUpRecord | null>(null);
   const [actionText, setActionText] = React.useState('');
@@ -365,6 +372,12 @@ export const TransactionFollowUpPage: React.FC = () => {
   React.useEffect(() => {
     if (searchParams.get('kpi') !== '1' || !(isAdmin || canDelete)) return;
     setDirectiveKpiOpen(true);
+  }, [searchParams, isAdmin, canDelete]);
+
+  React.useEffect(() => {
+    if (searchParams.get('capa') !== '1' || !(isAdmin || canDelete)) return;
+    setImprovementPlanSeed(null);
+    setImprovementPlansOpen(true);
   }, [searchParams, isAdmin, canDelete]);
 
   const createTransaction = async () => {
@@ -840,6 +853,19 @@ ${styleAssets}
                 KPI التوجيهات
               </Button>
             )}
+            {(isAdmin || canDelete) && (
+              <Button
+                variant="outline"
+                className="border-teal-300 bg-teal-50 text-teal-900 hover:bg-teal-100"
+                onClick={() => {
+                  setImprovementPlanSeed(null);
+                  setImprovementPlansOpen(true);
+                }}
+              >
+                <ClipboardCheck className="ml-2 h-4 w-4" />
+                خطط التحسين CAPA
+              </Button>
+            )}
             {canPrint && (
               <Button variant="outline" onClick={() => void openExecutiveReport()}>
                 <FileText className="ml-2 h-4 w-4" />
@@ -1133,6 +1159,31 @@ ${styleAssets}
             }
           }}
           assignees={assignees}
+          onOpenImprovementPlans={(seed) => {
+            setDirectiveKpiOpen(false);
+            setImprovementPlanSeed(seed || null);
+            setImprovementPlansOpen(true);
+          }}
+        />
+      )}
+
+      {(isAdmin || canDelete) && (
+        <TransactionImprovementPlansDialog
+          open={improvementPlansOpen}
+          onOpenChange={(open) => {
+            setImprovementPlansOpen(open);
+            if (!open) {
+              setImprovementPlanSeed(null);
+              if (searchParams.get('capa') === '1') {
+                const next = new URLSearchParams(searchParams);
+                next.delete('capa');
+                next.delete('alert');
+                setSearchParams(next);
+              }
+            }
+          }}
+          assignees={assignees}
+          seed={improvementPlanSeed}
         />
       )}
 
