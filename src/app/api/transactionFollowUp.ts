@@ -51,6 +51,7 @@ export type TransactionFollowUpDirectivesDashboard = {
     dueToday: number;
     dueSoon: number;
     completed7d: number;
+    issuedToday: number;
     urgentOpen: number;
     decisions: number;
     directives: number;
