@@ -39,6 +39,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { NativeSelect } from '../components/ui/native-select';
 import { Textarea } from '../components/ui/textarea';
+import { TransactionExecutiveReport } from '../components/TransactionExecutiveReport';
 import {
   transactionFollowUpApi,
   type TransactionFollowUpAnalytics,
@@ -577,6 +578,12 @@ export const TransactionFollowUpPage: React.FC = () => {
               <RefreshCw className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               تحديث
             </Button>
+            {canPrint && (
+              <Button variant="outline" onClick={() => void openExecutiveReport()}>
+                <FileText className="ml-2 h-4 w-4" />
+                التقارير التنفيذية
+              </Button>
+            )}
             {canAdd && (
               <Button onClick={() => { setCreateForm(emptyCreate()); setCreateOpen(true); }}>
                 <Plus className="ml-2 h-4 w-4" />
