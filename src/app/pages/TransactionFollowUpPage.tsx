@@ -823,6 +823,119 @@ export const TransactionFollowUpPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      <Dialog open={reportOpen} onOpenChange={(open) => !reportExporting && setReportOpen(open)}>
+        <DialogContent className="max-h-[96dvh] overflow-hidden sm:max-w-[1180px]" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle>التقارير التنفيذية لمتابعة المعاملات</DialogTitle>
+            <DialogDescription>
+              إعداد تقرير أسبوعي أو شهري أو لفترة مخصصة، مع إمكانية الطباعة أو الحفظ بصيغة PDF.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 rounded-2xl border bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-6">
+            <Field label="نوع التقرير">
+              <NativeSelect
+                value={reportMode}
+                onChange={(event) => void applyReportMode(event.target.value as 'weekly' | 'monthly' | 'custom')}
+              >
+                <option value="weekly">أسبوعي</option>
+                <option value="monthly">شهري</option>
+                <option value="custom">فترة مخصصة</option>
+              </NativeSelect>
+            </Field>
+            <Field label="من تاريخ">
+              <Input
+                type="date"
+                value={reportFrom}
+                onChange={(event) => {
+                  setReportMode('custom');
+                  setReportFrom(event.target.value);
+                }}
+              />
+            </Field>
+            <Field label="إلى تاريخ">
+              <Input
+                type="date"
+                value={reportTo}
+                onChange={(event) => {
+                  setReportMode('custom');
+                  setReportTo(event.target.value);
+                }}
+              />
+            </Field>
+            {(isAdmin || canDelete) && (
+              <Field label="الموظف">
+                <NativeSelect value={reportAssigneeId} onChange={(event) => setReportAssigneeId(event.target.value)}>
+                  <option value="">جميع الموظفين</option>
+                  {assignees.map((user) => (
+                    <option key={user.id} value={user.id}>{user.username}</option>
+                  ))}
+                </NativeSelect>
+              </Field>
+            )}
+            <div className="flex items-end">
+              <Button
+                className="w-full"
+                variant="outline"
+                disabled={reportLoading}
+                onClick={() => void loadExecutiveReport()}
+              >
+                <RefreshCw className={`ml-2 h-4 w-4 ${reportLoading ? 'animate-spin' : ''}`} />
+                تحديث التقرير
+              </Button>
+            </div>
+            <div className="flex items-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                disabled={!reportData || reportLoading || reportExporting}
+                onClick={printExecutiveReport}
+              >
+                <Printer className="ml-2 h-4 w-4" />
+                طباعة
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                disabled={!reportData || reportLoading || reportExporting}
+                onClick={() => void exportExecutiveReportPdf()}
+              >
+                {reportExporting
+                  ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" />
+                  : <FileDown className="ml-2 h-4 w-4" />}
+                PDF
+              </Button>
+            </div>
+          </div>
+
+          <div className="max-h-[70dvh] overflow-auto rounded-2xl border bg-slate-100 p-2 sm:p-4">
+            {reportLoading && !reportData ? (
+              <div className="py-24 text-center text-sm text-muted-foreground">
+                <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />
+                جارٍ إعداد التقرير التنفيذي...
+              </div>
+            ) : reportData ? (
+              <TransactionExecutiveReport
+                ref={reportRef}
+                report={reportData}
+                assigneeLabel={
+                  reportAssigneeId
+                    ? assignees.find((user) => user.id === reportAssigneeId)?.username || null
+                    : !(isAdmin || canDelete)
+                      ? currentUser?.username || null
+                      : null
+                }
+              />
+            ) : (
+              <div className="py-24 text-center text-sm text-muted-foreground">
+                حدد فترة التقرير ثم اضغط «تحديث التقرير».
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={createOpen} onOpenChange={(open) => !saving && setCreateOpen(open)}>
         <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-3xl" dir="rtl">
           <DialogHeader className="text-right">
