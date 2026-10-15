@@ -24,7 +24,7 @@ export type TransactionFollowUpIndicator =
 
 export type TransactionFollowUpEvent = {
   id: string;
-  transactionId: string;
+  transactionId?: string | null;
   eventType: string;
   fromStatus?: string | null;
   toStatus?: string | null;
@@ -167,6 +167,39 @@ export type TransactionFollowUpApprovalHistoryPage = {
   totalPages: number;
 };
 
+export type TransactionFollowUpKpiTargets = {
+  id?: string;
+  scope: 'global' | string;
+  firstPassRateMin: number;
+  onTimeRateMin: number;
+  reworkRateMax: number;
+  avgExecutionHoursMax: number;
+  avgApprovalHoursMax: number;
+  warningTolerancePercent: number;
+  alertPeriodDays: number;
+  alertsEnabled: boolean;
+  updatedById?: string | null;
+  updatedByName?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TransactionFollowUpKpiEvaluationItem = {
+  status: 'green' | 'yellow' | 'red' | 'neutral';
+  met: boolean | null;
+  value: number | null;
+  target: number;
+  direction: 'min' | 'max';
+};
+
+export type TransactionFollowUpKpiEvaluation = {
+  firstPassRate: TransactionFollowUpKpiEvaluationItem;
+  onTimeRate: TransactionFollowUpKpiEvaluationItem;
+  reworkRate: TransactionFollowUpKpiEvaluationItem;
+  avgExecutionHours: TransactionFollowUpKpiEvaluationItem;
+  avgApprovalHours: TransactionFollowUpKpiEvaluationItem;
+};
+
 export type TransactionFollowUpDirectiveKpiMetrics = {
   reviewCount: number;
   reviewedDirectives: number;
@@ -185,6 +218,8 @@ export type TransactionFollowUpDirectiveKpi = {
   generatedAt: string;
   periodDays: number | null;
   assigneeUserId?: string | null;
+  targets: TransactionFollowUpKpiTargets;
+  evaluation: TransactionFollowUpKpiEvaluation;
   summary: TransactionFollowUpDirectiveKpiMetrics & {
     openDirectives: number;
     overdueOpen: number;
@@ -201,6 +236,7 @@ export type TransactionFollowUpDirectiveKpi = {
     openDirectives: number;
     overdueOpen: number;
     urgentOpen: number;
+    evaluation: TransactionFollowUpKpiEvaluation;
   }>;
   monthlyTrend: Array<TransactionFollowUpDirectiveKpiMetrics & {
     key: string;
@@ -353,7 +389,7 @@ export type TransactionFollowUpAlert = {
   isRead: boolean;
   readAt?: string | null;
   createdAt: string;
-  transaction: {
+  transaction?: {
     id: string;
     transactionNumber: string;
     trackingNumber: string;
@@ -361,7 +397,7 @@ export type TransactionFollowUpAlert = {
     status: TransactionFollowUpStatus;
     currentAssigneeName?: string | null;
     dueDate?: string | null;
-  };
+  } | null;
 };
 
 export type TransactionFollowUpDashboard = {
@@ -798,6 +834,15 @@ export const transactionFollowUpApi = {
       `/api/transaction-follow-up/directives/dashboard${suffix ? `?${suffix}` : ''}`,
     );
   },
+
+  kpiTargets: () =>
+    apiJson<TransactionFollowUpKpiTargets>('/api/transaction-follow-up/directives/kpi-targets'),
+
+  saveKpiTargets: (input: Omit<TransactionFollowUpKpiTargets, 'id' | 'scope' | 'updatedById' | 'updatedByName' | 'createdAt' | 'updatedAt'>) =>
+    apiJson<TransactionFollowUpKpiTargets>('/api/transaction-follow-up/directives/kpi-targets', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
 
   directiveKpi: (input: {
     periodDays?: number | 'all';
