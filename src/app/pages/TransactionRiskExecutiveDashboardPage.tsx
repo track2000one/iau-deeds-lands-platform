@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BarChart3,
   CheckCircle2,
+  FileCheck2,
   Gauge,
   RefreshCw,
   ShieldAlert,
@@ -94,6 +95,14 @@ const EMPTY: TransactionRiskDashboard = {
   capa: {
     open: 0,
     overdue: 0,
+  },
+  acceptance: {
+    pending: 0,
+    activeApproved: 0,
+    expiringSoon: 0,
+    rejected30d: 0,
+    expired30d: 0,
+    acceptedOutsideAppetite: 0,
   },
 };
 
