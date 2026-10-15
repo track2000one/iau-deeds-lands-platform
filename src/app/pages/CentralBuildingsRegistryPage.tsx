@@ -298,30 +298,22 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
 
   const filteredBuildings = useMemo(() => {
     const needle = normalizeKey(search);
-    if (!needle) return buildings;
+    if (!needle) return approvedBuildings;
 
-    return buildings.filter((building) => {
-      const pendingDraft = getPendingBuildingImport(building)?.draft;
-      return [
-        pendingDraft?.buildingNumber,
-        pendingDraft?.name,
-        pendingDraft?.campusLocation,
-        pendingDraft?.city,
-        pendingDraft?.district,
-        building.buildingNumber,
-        building.name,
-        building.deed?.deedNumber,
-        building.deed?.propertyDescription,
-        building.campusLocation,
-        building.region,
-        building.city,
-        building.district,
-        building.buildingType,
-        building.primaryUse,
-        building.ownershipType,
-      ].some((value) => normalizeKey(value).includes(needle));
-    });
-  }, [buildings, search]);
+    return approvedBuildings.filter((building) => [
+      building.buildingNumber,
+      building.name,
+      building.deed?.deedNumber,
+      building.deed?.propertyDescription,
+      building.campusLocation,
+      building.region,
+      building.city,
+      building.district,
+      building.buildingType,
+      building.primaryUse,
+      building.ownershipType,
+    ].some((value) => normalizeKey(value).includes(needle)));
+  }, [approvedBuildings, search]);
 
   const buildingGroups = useMemo(() => {
     const groups = new Map<
