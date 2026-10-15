@@ -135,6 +135,40 @@ export type TransactionFollowUpDirective = {
   evidenceCount?: number;
 };
 
+export type TransactionFollowUpApprovalCenter = {
+  generatedAt: string;
+  summary: {
+    awaitingApproval: number;
+    urgent: number;
+    overdue: number;
+    withoutEvidence: number;
+    waitingOver2Days: number;
+  };
+  employees: Array<{
+    userId: string;
+    username: string;
+    awaitingApproval: number;
+    urgent: number;
+    withoutEvidence: number;
+    maxWaitingDays: number;
+  }>;
+  items: Array<TransactionFollowUpDirective & {
+    waitingDays: number;
+    evidence: TransactionFollowUpDirectiveEvidence[];
+    transaction: {
+      id: string;
+      transactionNumber: string;
+      trackingNumber: string;
+      transactionDate: string;
+      subject: string;
+      priority: TransactionFollowUpPriority;
+      status: TransactionFollowUpStatus;
+      currentAssigneeName?: string | null;
+    };
+  }>;
+  totalItems: number;
+};
+
 export type TransactionFollowUpRecord = {
   id: string;
   trackingNumber: string;
@@ -635,6 +669,21 @@ export const transactionFollowUpApi = {
     const suffix = query.toString();
     return apiJson<TransactionFollowUpDirectivesDashboard>(
       `/api/transaction-follow-up/directives/dashboard${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  approvalCenter: (input: {
+    search?: string;
+    priority?: string;
+    assigneeUserId?: string;
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (input.search?.trim()) query.set('search', input.search.trim());
+    if (input.priority) query.set('priority', input.priority);
+    if (input.assigneeUserId) query.set('assigneeUserId', input.assigneeUserId);
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpApprovalCenter>(
+      `/api/transaction-follow-up/directives/approval-center${suffix ? `?${suffix}` : ''}`,
     );
   },
 
