@@ -1,11 +1,15 @@
 import React from 'react';
 import {
   AlertTriangle,
+  BellRing,
   CalendarCheck2,
   Clock3,
   Gauge,
   RefreshCw,
   RotateCcw,
+  Save,
+  Settings2,
+  Target,
   TimerReset,
   TrendingUp,
   UsersRound,
@@ -15,7 +19,8 @@ import {
   transactionFollowUpApi,
   type TransactionFollowUpAssignee,
   type TransactionFollowUpDirectiveKpi,
-  type TransactionFollowUpDirectiveKpiMetrics,
+  type TransactionFollowUpKpiEvaluationItem,
+  type TransactionFollowUpKpiTargets,
 } from '../api/transactionFollowUp';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -27,12 +32,42 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
+
+const DEFAULT_TARGETS: TransactionFollowUpKpiTargets = {
+  scope: 'global',
+  firstPassRateMin: 90,
+  onTimeRateMin: 95,
+  reworkRateMax: 10,
+  avgExecutionHoursMax: 72,
+  avgApprovalHoursMax: 24,
+  warningTolerancePercent: 10,
+  alertPeriodDays: 30,
+  alertsEnabled: true,
+};
+
+const NEUTRAL_EVALUATION: TransactionFollowUpKpiEvaluationItem = {
+  status: 'neutral',
+  met: null,
+  value: null,
+  target: 0,
+  direction: 'min',
+};
 
 const EMPTY: TransactionFollowUpDirectiveKpi = {
   generatedAt: new Date(0).toISOString(),
   periodDays: 90,
   assigneeUserId: null,
+  targets: DEFAULT_TARGETS,
+  evaluation: {
+    firstPassRate: { ...NEUTRAL_EVALUATION },
+    onTimeRate: { ...NEUTRAL_EVALUATION },
+    reworkRate: { ...NEUTRAL_EVALUATION, direction: 'max' },
+    avgExecutionHours: { ...NEUTRAL_EVALUATION, direction: 'max' },
+    avgApprovalHours: { ...NEUTRAL_EVALUATION, direction: 'max' },
+  },
   summary: {
     reviewCount: 0,
     reviewedDirectives: 0,
@@ -84,6 +119,54 @@ const deltaText = (
   return `${improved ? 'تحسن' : 'تراجع'} ${amount} ${suffix} عن الفترة السابقة`;
 };
 
+const evaluationClass = (status: TransactionFollowUpKpiEvaluationItem['status']) => {
+  if (status === 'green') return 'border-emerald-300 bg-emerald-50/70';
+  if (status === 'yellow') return 'border-amber-300 bg-amber-50/70';
+  if (status === 'red') return 'border-red-300 bg-red-50/70';
+  return 'border-slate-200 bg-white';
+};
+
+const evaluationTextClass = (status: TransactionFollowUpKpiEvaluationItem['status']) => {
+  if (status === 'green') return 'text-emerald-700';
+  if (status === 'yellow') return 'text-amber-800';
+  if (status === 'red') return 'text-red-700';
+  return 'text-slate-700';
+};
+
+const statusLabel = (status: TransactionFollowUpKpiEvaluationItem['status']) => {
+  if (status === 'green') return 'ضمن المستهدف';
+  if (status === 'yellow') return 'قريب من المستهدف';
+  if (status === 'red') return 'دون المستهدف';
+  return 'بيانات غير كافية';
+};
+
+const targetText = (
+  evaluation: TransactionFollowUpKpiEvaluationItem,
+  unit: 'rate' | 'hours',
+) => {
+  const symbol = evaluation.direction === 'min' ? '≥' : '≤';
+  const formatted = unit === 'rate'
+    ? `${evaluation.target.toLocaleString('ar-SA')}%`
+    : formatHours(evaluation.target);
+  return `المستهدف ${symbol} ${formatted}`;
+};
+
+type EditableTargets = Omit<
+  TransactionFollowUpKpiTargets,
+  'id' | 'scope' | 'updatedById' | 'updatedByName' | 'createdAt' | 'updatedAt'
+>;
+
+const editableTargets = (targets: TransactionFollowUpKpiTargets): EditableTargets => ({
+  firstPassRateMin: targets.firstPassRateMin,
+  onTimeRateMin: targets.onTimeRateMin,
+  reworkRateMax: targets.reworkRateMax,
+  avgExecutionHoursMax: targets.avgExecutionHoursMax,
+  avgApprovalHoursMax: targets.avgApprovalHoursMax,
+  warningTolerancePercent: targets.warningTolerancePercent,
+  alertPeriodDays: targets.alertPeriodDays,
+  alertsEnabled: targets.alertsEnabled,
+});
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -97,8 +180,11 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
 }) => {
   const [data, setData] = React.useState<TransactionFollowUpDirectiveKpi>(EMPTY);
   const [loading, setLoading] = React.useState(false);
+  const [savingTargets, setSavingTargets] = React.useState(false);
+  const [showTargets, setShowTargets] = React.useState(false);
   const [periodDays, setPeriodDays] = React.useState<'30' | '90' | '365' | 'all'>('90');
   const [assigneeUserId, setAssigneeUserId] = React.useState('');
+  const [targets, setTargets] = React.useState<EditableTargets>(editableTargets(DEFAULT_TARGETS));
 
   const load = React.useCallback(async () => {
     try {
@@ -108,6 +194,7 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
         assigneeUserId: assigneeUserId || undefined,
       });
       setData(result);
+      setTargets(editableTargets(result.targets || DEFAULT_TARGETS));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل مؤشرات أداء التوجيهات');
     } finally {
@@ -119,7 +206,25 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
     if (open) void load();
   }, [open, load]);
 
+  const saveTargets = async () => {
+    try {
+      setSavingTargets(true);
+      const saved = await transactionFollowUpApi.saveKpiTargets(targets);
+      setTargets(editableTargets(saved));
+      toast.success('تم حفظ مستهدفات الأداء وتفعيل قواعد التقييم');
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ مستهدفات الأداء');
+    } finally {
+      setSavingTargets(false);
+    }
+  };
+
   const previous = data.previousSummary;
+  const evaluations = Object.values(data.evaluation || {});
+  const redCount = evaluations.filter((item) => item.status === 'red').length;
+  const yellowCount = evaluations.filter((item) => item.status === 'yellow').length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -130,7 +235,7 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
             مؤشرات أداء التوجيهات والاعتمادات KPI
           </DialogTitle>
           <DialogDescription>
-            قياس جودة وسرعة تنفيذ التوجيهات، ونسبة الإنجاز من أول مرة، وإعادة العمل، والالتزام بالمواعيد، مع مقارنة الموظفين والفترات.
+            قياس الأداء مقابل مستهدفات معتمدة، مع تصنيف أخضر / أصفر / أحمر وإصدار تنبيه للإدارة عند انخفاض الأداء.
           </DialogDescription>
         </DialogHeader>
 
@@ -158,10 +263,20 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
                 ))}
               </NativeSelect>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground">
-                {assigneeUserId ? 'عرض موظف محدد' : 'عرض الإدارة بالكامل'}
-              </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-800">
+                أخضر: محقق
+              </Badge>
+              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                أصفر: قريب
+              </Badge>
+              <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800">
+                أحمر: دون المستهدف
+              </Badge>
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowTargets((value) => !value)}>
+                <Settings2 className="ml-1 h-3.5 w-3.5" />
+                {showTargets ? 'إخفاء المستهدفات' : 'إعداد المستهدفات'}
+              </Button>
               <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void load()}>
                 <RefreshCw className={`ml-1 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
                 تحديث
@@ -169,36 +284,159 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
             </div>
           </div>
 
+          {showTargets && (
+            <Card className="border-emerald-200 bg-emerald-50/20 shadow-none">
+              <CardHeader className="border-b border-emerald-100 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Target className="h-4 w-4 text-emerald-700" />
+                  مستهدفات الأداء المعتمدة
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 p-4">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <TargetField
+                    label="الإنجاز من أول مرة ≥"
+                    value={targets.firstPassRateMin}
+                    suffix="%"
+                    onChange={(value) => setTargets((current) => ({ ...current, firstPassRateMin: value }))}
+                  />
+                  <TargetField
+                    label="الالتزام بالمواعيد ≥"
+                    value={targets.onTimeRateMin}
+                    suffix="%"
+                    onChange={(value) => setTargets((current) => ({ ...current, onTimeRateMin: value }))}
+                  />
+                  <TargetField
+                    label="إعادة العمل ≤"
+                    value={targets.reworkRateMax}
+                    suffix="%"
+                    onChange={(value) => setTargets((current) => ({ ...current, reworkRateMax: value }))}
+                  />
+                  <TargetField
+                    label="زمن التنفيذ ≤"
+                    value={targets.avgExecutionHoursMax}
+                    suffix="ساعة"
+                    max={8760}
+                    onChange={(value) => setTargets((current) => ({ ...current, avgExecutionHoursMax: value }))}
+                  />
+                  <TargetField
+                    label="زمن الاعتماد ≤"
+                    value={targets.avgApprovalHoursMax}
+                    suffix="ساعة"
+                    max={8760}
+                    onChange={(value) => setTargets((current) => ({ ...current, avgApprovalHoursMax: value }))}
+                  />
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <TargetField
+                    label="هامش المنطقة الصفراء"
+                    value={targets.warningTolerancePercent}
+                    suffix="%"
+                    onChange={(value) => setTargets((current) => ({ ...current, warningTolerancePercent: value }))}
+                  />
+                  <TargetField
+                    label="فترة قياس التنبيه"
+                    value={targets.alertPeriodDays}
+                    suffix="يوم"
+                    min={7}
+                    max={365}
+                    onChange={(value) => setTargets((current) => ({ ...current, alertPeriodDays: Math.round(value) }))}
+                  />
+                  <label className="flex items-center justify-between rounded-xl border bg-white px-4 py-3">
+                    <div>
+                      <p className="text-xs font-black text-slate-800">تنبيهات انخفاض KPI</p>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        إشعار يومي للإدارة عند بقاء المؤشر أصفر أو أحمر.
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={targets.alertsEnabled}
+                      onChange={(event) => setTargets((current) => ({ ...current, alertsEnabled: event.target.checked }))}
+                      className="h-4 w-4 accent-emerald-700"
+                    />
+                  </label>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-[10px] leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                  <span>
+                    المنطقة الصفراء تسمح بهامش تنبيه قبل الوصول إلى الأحمر؛ أما الأحمر فيعني ابتعادًا أكبر عن المستهدف ويظهر كتنبيه عالي الأهمية.
+                  </span>
+                  <Button type="button" size="sm" onClick={() => void saveTargets()} disabled={savingTargets}>
+                    {savingTargets
+                      ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" />
+                      : <Save className="ml-1 h-3.5 w-3.5" />}
+                    حفظ المستهدفات
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {(redCount > 0 || yellowCount > 0) && (
+            <div className={`flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+              redCount > 0 ? 'border-red-300 bg-red-50' : 'border-amber-300 bg-amber-50'
+            }`}>
+              <div className="flex items-start gap-2">
+                {redCount > 0
+                  ? <AlertTriangle className="mt-0.5 h-4 w-4 text-red-700" />
+                  : <BellRing className="mt-0.5 h-4 w-4 text-amber-700" />}
+                <div>
+                  <p className={`text-xs font-black ${redCount > 0 ? 'text-red-800' : 'text-amber-900'}`}>
+                    يوجد أداء يحتاج متابعة مقابل المستهدف
+                  </p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    {redCount.toLocaleString('ar-SA')} مؤشر أحمر، و{yellowCount.toLocaleString('ar-SA')} مؤشر أصفر.
+                    {data.targets.alertsEnabled ? ' التنبيهات الآلية مفعلة.' : ' التنبيهات الآلية متوقفة.'}
+                  </p>
+                </div>
+              </div>
+              <Badge variant="outline">
+                فترة التنبيه: {data.targets.alertPeriodDays.toLocaleString('ar-SA')} يوم
+              </Badge>
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <KpiCard
               title="الإنجاز من أول مرة"
               value={formatRate(data.summary.firstPassRate)}
               hint={deltaText(data.summary.firstPassRate, previous?.firstPassRate, 'point')}
+              target={targetText(data.evaluation.firstPassRate, 'rate')}
+              evaluation={data.evaluation.firstPassRate}
               icon={<TrendingUp className="h-5 w-5 text-emerald-700" />}
             />
             <KpiCard
               title="معدل إعادة العمل"
               value={formatRate(data.summary.reworkRate)}
               hint={deltaText(data.summary.reworkRate, previous?.reworkRate, 'point', true)}
+              target={targetText(data.evaluation.reworkRate, 'rate')}
+              evaluation={data.evaluation.reworkRate}
               icon={<RotateCcw className="h-5 w-5 text-amber-700" />}
-              warning={(data.summary.reworkRate || 0) >= 25}
             />
             <KpiCard
               title="متوسط زمن التنفيذ"
               value={formatHours(data.summary.avgExecutionHours)}
               hint={deltaText(data.summary.avgExecutionHours, previous?.avgExecutionHours, 'hour', true)}
+              target={targetText(data.evaluation.avgExecutionHours, 'hours')}
+              evaluation={data.evaluation.avgExecutionHours}
               icon={<TimerReset className="h-5 w-5 text-sky-700" />}
             />
             <KpiCard
               title="متوسط زمن الاعتماد"
               value={formatHours(data.summary.avgApprovalHours)}
               hint={deltaText(data.summary.avgApprovalHours, previous?.avgApprovalHours, 'hour', true)}
+              target={targetText(data.evaluation.avgApprovalHours, 'hours')}
+              evaluation={data.evaluation.avgApprovalHours}
               icon={<Clock3 className="h-5 w-5 text-violet-700" />}
             />
             <KpiCard
               title="الالتزام بالمواعيد"
               value={formatRate(data.summary.onTimeRate)}
               hint={deltaText(data.summary.onTimeRate, previous?.onTimeRate, 'point')}
+              target={targetText(data.evaluation.onTimeRate, 'rate')}
+              evaluation={data.evaluation.onTimeRate}
               icon={<CalendarCheck2 className="h-5 w-5 text-emerald-700" />}
             />
           </div>
@@ -258,7 +496,7 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
               <CardContent className="p-0">
                 {data.employees.length ? (
                   <div className="max-h-[560px] overflow-auto">
-                    <table className="w-full min-w-[900px] border-collapse text-xs">
+                    <table className="w-full min-w-[930px] border-collapse text-xs">
                       <thead className="sticky top-0 z-10 bg-slate-50">
                         <tr className="border-b text-right">
                           <th className="p-3">الموظف</th>
@@ -286,11 +524,11 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
                                 {employee.openDirectives.toLocaleString('ar-SA')} توجيه مفتوح
                               </p>
                             </td>
-                            <MetricCell value={formatRate(employee.firstPassRate)} good={(employee.firstPassRate || 0) >= 80} />
-                            <MetricCell value={formatRate(employee.reworkRate)} danger={(employee.reworkRate || 0) >= 25} />
-                            <MetricCell value={formatHours(employee.avgExecutionHours)} />
-                            <MetricCell value={formatHours(employee.avgApprovalHours)} />
-                            <MetricCell value={formatRate(employee.onTimeRate)} good={(employee.onTimeRate || 0) >= 80} />
+                            <MetricCell value={formatRate(employee.firstPassRate)} evaluation={employee.evaluation.firstPassRate} />
+                            <MetricCell value={formatRate(employee.reworkRate)} evaluation={employee.evaluation.reworkRate} />
+                            <MetricCell value={formatHours(employee.avgExecutionHours)} evaluation={employee.evaluation.avgExecutionHours} />
+                            <MetricCell value={formatHours(employee.avgApprovalHours)} evaluation={employee.evaluation.avgApprovalHours} />
+                            <MetricCell value={formatRate(employee.onTimeRate)} evaluation={employee.evaluation.onTimeRate} />
                             <td className="p-3 text-center font-bold">{employee.reviewedDirectives.toLocaleString('ar-SA')}</td>
                             <td className={`p-3 text-center font-black ${employee.overdueOpen ? 'text-red-700' : 'text-slate-700'}`}>
                               {employee.overdueOpen.toLocaleString('ar-SA')}
@@ -320,27 +558,69 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
   );
 };
 
+const TargetField = ({
+  label,
+  value,
+  suffix,
+  min = 0,
+  max = 100,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  suffix: string;
+  min?: number;
+  max?: number;
+  onChange: (value: number) => void;
+}) => (
+  <div className="space-y-1.5">
+    <Label className="text-[11px]">{label}</Label>
+    <div className="relative">
+      <Input
+        type="number"
+        min={min}
+        max={max}
+        step="0.1"
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="pe-14"
+      />
+      <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+        {suffix}
+      </span>
+    </div>
+  </div>
+);
+
 const KpiCard = ({
   title,
   value,
   hint,
+  target,
   icon,
-  warning = false,
+  evaluation,
 }: {
   title: string;
   value: string;
   hint: string;
+  target: string;
   icon: React.ReactNode;
-  warning?: boolean;
+  evaluation: TransactionFollowUpKpiEvaluationItem;
 }) => (
-  <Card className={`shadow-none ${warning ? 'border-amber-300 bg-amber-50/40' : ''}`}>
+  <Card className={`shadow-none ${evaluationClass(evaluation.status)}`}>
     <CardContent className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold text-muted-foreground">{title}</p>
-          <p className="mt-1 text-xl font-black text-slate-900">{value}</p>
+          <p className={`mt-1 text-xl font-black ${evaluationTextClass(evaluation.status)}`}>{value}</p>
         </div>
         <div className="rounded-xl border bg-white p-2">{icon}</div>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <Badge variant="outline" className={evaluationClass(evaluation.status)}>
+          {statusLabel(evaluation.status)}
+        </Badge>
+        <Badge variant="outline">{target}</Badge>
       </div>
       <p className="mt-2 text-[10px] leading-5 text-muted-foreground">{hint}</p>
     </CardContent>
@@ -392,17 +672,17 @@ const TrendBar = ({
 
 const MetricCell = ({
   value,
-  good = false,
-  danger = false,
+  evaluation,
 }: {
   value: string;
-  good?: boolean;
-  danger?: boolean;
+  evaluation: TransactionFollowUpKpiEvaluationItem;
 }) => (
-  <td className={`p-3 text-center font-bold ${
-    danger ? 'text-red-700' : good ? 'text-emerald-700' : 'text-slate-700'
-  }`}>
-    {value}
+  <td className="p-3 text-center">
+    <span className={`inline-flex min-w-16 justify-center rounded-lg border px-2 py-1 font-black ${
+      evaluationClass(evaluation.status)
+    } ${evaluationTextClass(evaluation.status)}`}>
+      {value}
+    </span>
   </td>
 );
 
