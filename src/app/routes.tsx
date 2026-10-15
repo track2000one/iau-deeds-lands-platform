@@ -64,6 +64,7 @@ const AssetCyclesPage = lazy(() => import('./pages/AssetCyclesPage').then((m) =>
 const ContractsFollowUpPage = lazy(() => import('./pages/ContractsFollowUpPage').then((m) => ({ default: m.ContractsFollowUpPage })));
 const TransactionFollowUpPage = lazy(() => import('./pages/TransactionFollowUpPage').then((m) => ({ default: m.TransactionFollowUpPage })));
 const TransactionRiskRegisterPage = lazy(() => import('./pages/TransactionRiskRegisterPage').then((m) => ({ default: m.TransactionRiskRegisterPage })));
+const TransactionRiskExecutiveDashboardPage = lazy(() => import('./pages/TransactionRiskExecutiveDashboardPage').then((m) => ({ default: m.TransactionRiskExecutiveDashboardPage })));
 const MosquesWorkspacePage = lazy(() => import('./pages/MosquesWorkspacePage').then((m) => ({ default: m.MosquesWorkspacePage })));
 const MosqueJobsImportPage = lazy(() => import('./pages/MosqueJobsImportPage').then((m) => ({ default: m.MosqueJobsImportPage })));
 const MosquesPublicPage = lazy(() => import('./pages/MosquesPublicPage').then((m) => ({ default: m.MosquesPublicPage })));
@@ -239,6 +240,7 @@ export const router = createHashRouter([
       },
       { path: 'follow-up', element: <PermissionGuard module="transaction_follow_up" action="canView">{page(<TransactionFollowUpPage />)}</PermissionGuard> },
       { path: 'follow-up/risks', element: <PermissionGuard module="transaction_follow_up" action="canView">{page(<TransactionRiskRegisterPage />)}</PermissionGuard> },
+      { path: 'follow-up/risks/executive', element: <PermissionGuard module="transaction_follow_up" action="canDelete">{page(<TransactionRiskExecutiveDashboardPage />)}</PermissionGuard> },
       { path: 'contracts/follow-up', element: <PermissionGuard module="contracts_follow_up" action="canView">{page(<ContractsFollowUpPage />)}</PermissionGuard> },
       { path: 'reports', element: page(<ReportsPage />) },
       { path: 'archive', element: page(<ArchivePage />) },
