@@ -10,6 +10,7 @@ export type ModuleName =
   | 'leased_buildings_out'
   | 'leased_buildings_in'
   | 'central_buildings'
+  | 'transaction_follow_up'
   | 'contracts_follow_up'
   | 'assets'
   | 'accounting_transformation'
@@ -59,6 +60,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   leased_buildings_out: 'المباني المؤجرة',
   leased_buildings_in: 'المباني المستأجرة',
   central_buildings: 'السجل المركزي للمباني',
+  transaction_follow_up: 'نظام المتابعة',
   contracts_follow_up: 'متابعة العقود',
   assets: 'وحدة الأصول',
   accounting_transformation: 'لجنة متابعة متطلبات التحول المحاسبي',
@@ -80,6 +82,7 @@ export const MODULE_LABELS_EN: Record<ModuleName, string> = {
   leased_buildings_out: 'Leased Buildings (Out)',
   leased_buildings_in: 'Leased Buildings (In)',
   central_buildings: 'Central Building Registry',
+  transaction_follow_up: 'Transaction Follow-up System',
   contracts_follow_up: 'Contract Follow-up',
   assets: 'Assets Unit',
   accounting_transformation: 'Accounting Transformation Requirements Committee',
@@ -123,6 +126,7 @@ export const createEmptyPermissions = (): UserPermissions => ({
   leased_buildings_out: { ...NONE },
   leased_buildings_in: { ...NONE },
   central_buildings: { ...NONE },
+  transaction_follow_up: { ...NONE },
   contracts_follow_up: { ...NONE },
   assets: { ...NONE },
   accounting_transformation: { ...NONE },
@@ -144,6 +148,7 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   leased_buildings_out: { ...FULL },
   leased_buildings_in: { ...FULL },
   central_buildings: { ...FULL },
+  transaction_follow_up: { ...FULL },
   contracts_follow_up: { ...FULL },
   assets: { ...FULL },
   accounting_transformation: { ...FULL },
