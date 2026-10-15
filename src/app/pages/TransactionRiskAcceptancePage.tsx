@@ -44,6 +44,7 @@ export type RiskAcceptanceSeed = {
   title: string;
   residualScore: number;
   residualLevel: TransactionRiskLevel;
+  appetiteLimit?: number;
   controls?: string[] | null;
 };
 
@@ -189,8 +190,9 @@ export const TransactionRiskAcceptancePage: React.FC = () => {
       return;
     }
     const controlRows = controls.split('\n').map((item) => item.trim()).filter(Boolean);
-    if (navigationSeed.residualScore > 9 && !controlRows.length) {
-      toast.error('الخطر خارج شهية المخاطر؛ أضف ضابطًا تعويضيًا واحدًا على الأقل');
+    const appetiteLimit = navigationSeed.appetiteLimit ?? 9;
+    if (navigationSeed.residualScore > appetiteLimit && !controlRows.length) {
+      toast.error(`الخطر خارج شهية المخاطر المعتمدة لفئته (الحد ${appetiteLimit}/25)؛ أضف ضابطًا تعويضيًا واحدًا على الأقل`);
       return;
     }
 
@@ -466,10 +468,11 @@ export const TransactionRiskAcceptancePage: React.FC = () => {
 
           {navigationSeed && (
             <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-4">
                 <InfoBox label="الخطر المتبقي" value={navigationSeed.residualScore + '/25'} />
                 <InfoBox label="المستوى" value={levelLabels[navigationSeed.residualLevel]} />
-                <InfoBox label="داخل الشهية" value={navigationSeed.residualScore <= 9 ? 'نعم' : 'لا'} />
+                <InfoBox label="داخل الشهية" value={navigationSeed.residualScore <= (navigationSeed.appetiteLimit ?? 9) ? 'نعم' : 'لا'} />
+                <InfoBox label="حد الفئة" value={(navigationSeed.appetiteLimit ?? 9) + '/25'} />
               </div>
               <div className="space-y-2">
                 <Label>مبررات قبول الخطر *</Label>

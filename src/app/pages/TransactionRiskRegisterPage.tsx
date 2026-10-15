@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, FileCheck2, Gauge, ShieldAlert } from 'lucide-react';
+import { ArrowRight, FileCheck2, Gauge, Settings2, ShieldAlert } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -42,6 +42,10 @@ export const TransactionRiskRegisterPage: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => navigate('/follow-up/risks/policy')}>
+              <Settings2 className="ml-2 h-4 w-4" />
+              شهية المخاطر وKRI
+            </Button>
             <Button variant="outline" onClick={() => navigate('/follow-up/risks/acceptance')}>
               <FileCheck2 className="ml-2 h-4 w-4" />
               حوكمة قبول المخاطر

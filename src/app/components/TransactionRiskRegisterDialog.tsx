@@ -514,6 +514,11 @@ export const TransactionRiskRegisterDialog: React.FC<Props> = ({
                                 <Badge variant="outline" className={levelClass[risk.residualLevel]}>
                                   {levelLabels[risk.residualLevel]} · {risk.residualScore}/25
                                 </Badge>
+                                {risk.outsideAppetite && (
+                                  <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800">
+                                    خارج الشهية · الحد {risk.appetiteLimit ?? 9}/25
+                                  </Badge>
+                                )}
                                 <Badge variant="outline" className={statusClass[risk.status]}>
                                   {statusLabels[risk.status]}
                                 </Badge>
@@ -586,6 +591,7 @@ export const TransactionRiskRegisterDialog: React.FC<Props> = ({
                                             title: risk.title,
                                             residualScore: risk.residualScore,
                                             residualLevel: risk.residualLevel,
+                                            appetiteLimit: risk.appetiteLimit ?? 9,
                                             controls: risk.controls || [],
                                           },
                                         },

@@ -9,6 +9,7 @@ import {
   FileCheck2,
   ListTodo,
   RefreshCw,
+  Settings2,
   ShieldCheck,
   Target,
 } from 'lucide-react';
@@ -48,9 +49,11 @@ const normalizeFollowUpAlert = (alert: TransactionFollowUpAlert): PlatformNotice
   source: 'follow_up',
   title: alert.title,
   message: alert.message,
-  entityType: alert.kind.startsWith('risk_acceptance_')
-    ? 'follow_up_risk_acceptance'
-    : alert.kind.startsWith('risk_')
+  entityType: alert.kind.startsWith('risk_policy_')
+    ? 'follow_up_risk_policy'
+    : alert.kind.startsWith('risk_acceptance_')
+      ? 'follow_up_risk_acceptance'
+      : alert.kind.startsWith('risk_')
       ? 'follow_up_risk'
     : alert.kind.startsWith('preventive_action_')
       ? 'follow_up_preventive'
@@ -68,6 +71,7 @@ const normalizeFollowUpAlert = (alert: TransactionFollowUpAlert): PlatformNotice
 });
 
 const notificationCategory = (notice: PlatformNotice) => {
+  if (notice.source === 'follow_up' && notice.entityType === 'follow_up_risk_policy') return 'follow_up_risk_policy';
   if (notice.source === 'follow_up' && notice.entityType === 'follow_up_risk_acceptance') return 'follow_up_risk_acceptance';
   if (notice.source === 'follow_up' && notice.entityType === 'follow_up_risk') return 'follow_up_risk';
   if (notice.source === 'follow_up' && notice.entityType === 'follow_up_preventive') return 'follow_up_preventive';
@@ -207,7 +211,9 @@ export const PlatformNotificationCenter: React.FC = () => {
 
     setOpen(false);
     if (notice.source === 'follow_up') {
-      if (notice.entityType === 'follow_up_risk_acceptance') {
+      if (notice.entityType === 'follow_up_risk_policy') {
+        navigate(`/follow-up/risks/policy?alert=${encodeURIComponent(notice.id)}`);
+      } else if (notice.entityType === 'follow_up_risk_acceptance') {
         navigate(`/follow-up/risks/acceptance?alert=${encodeURIComponent(notice.id)}`);
       } else if (notice.entityType === 'follow_up_risk') {
         navigate(`/follow-up/risks?alert=${encodeURIComponent(notice.id)}`);
@@ -305,8 +311,10 @@ export const PlatformNotificationCenter: React.FC = () => {
           <div className="divide-y divide-slate-100">
             {ordered.slice(0, 30).map((notice) => {
               const category = notificationCategory(notice);
-              const Icon = category === 'follow_up_risk_acceptance'
-                ? FileCheck2
+              const Icon = category === 'follow_up_risk_policy'
+                ? Settings2
+                : category === 'follow_up_risk_acceptance'
+                  ? FileCheck2
                 : category === 'follow_up_risk'
                   ? AlertTriangle
                 : category === 'follow_up_preventive'

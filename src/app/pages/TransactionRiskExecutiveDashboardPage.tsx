@@ -8,6 +8,7 @@ import {
   FileCheck2,
   Gauge,
   RefreshCw,
+  Settings2,
   ShieldAlert,
   ShieldCheck,
   Target,
@@ -40,7 +41,22 @@ import {
 const EMPTY: TransactionRiskDashboard = {
   generatedAt: '',
   appetite: {
+    policyId: null,
+    versionNumber: 0,
+    policyName: 'السياسة الافتراضية',
+    effectiveFrom: null,
     maxResidualScore: 9,
+    categoryLimits: {
+      operational: 9,
+      process: 9,
+      workload: 9,
+      compliance: 9,
+      technology: 9,
+      data: 9,
+      financial: 9,
+      reputational: 9,
+      other: 9,
+    },
     level: 'medium',
     status: 'within',
     withinCount: 0,
@@ -257,6 +273,10 @@ export const TransactionRiskExecutiveDashboardPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => navigate('/follow-up/risks/policy')}>
+            <Settings2 className="me-2 h-4 w-4" />
+            شهية المخاطر وKRI
+          </Button>
           <Button variant="outline" onClick={() => navigate('/follow-up/risks/acceptance')}>
             <FileCheck2 className="me-2 h-4 w-4" />
             حوكمة قبول المخاطر
@@ -291,8 +311,10 @@ export const TransactionRiskExecutiveDashboardPage: React.FC = () => {
                 {data.appetite.statement || 'جارٍ تحميل سياسة شهية المخاطر...'}
               </p>
               <p className="mt-1 text-xs opacity-80">
-                آخر تحديث: {formatDateTime(data.generatedAt)}
+                السياسة: {data.appetite.policyName} · الإصدار {data.appetite.versionNumber}
+                {data.appetite.effectiveFrom ? ' · السريان ' + formatDate(data.appetite.effectiveFrom) : ''}
               </p>
+              <p className="mt-1 text-[10px] opacity-70">تحديث اللوحة: {formatDateTime(data.generatedAt)}</p>
             </div>
           </div>
           <div className="rounded-2xl border border-current/20 bg-white/60 p-4 text-center">

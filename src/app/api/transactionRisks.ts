@@ -23,6 +23,70 @@ export type TransactionRiskStatus = 'open' | 'monitoring' | 'controlled' | 'acce
 export type TransactionRiskTreatmentStrategy = 'reduce' | 'avoid' | 'transfer' | 'accept';
 export type TransactionRiskSourceType = 'manual' | 'early_warning' | 'preventive_action' | 'capa';
 export type TransactionRiskAcceptanceStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'expired';
+export type TransactionRiskPolicyStatus = 'default' | 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type TransactionRiskKriKey =
+  | 'outsideAppetiteRate'
+  | 'criticalRisks'
+  | 'overdueReviewRate'
+  | 'recurringRiskRate'
+  | 'riskReduction'
+  | 'preventiveFailureRate'
+  | 'predictedBreaches'
+  | 'capaOverdue'
+  | 'pendingRiskAcceptances'
+  | 'expiringRiskAcceptances';
+
+export type TransactionRiskKriThreshold = {
+  direction: 'max' | 'min';
+  target: number;
+  warning: number;
+  danger: number;
+};
+
+export type TransactionRiskCategoryAppetite = Record<TransactionRiskCategory, number>;
+
+export type TransactionRiskPolicy = {
+  id: string | null;
+  versionNumber: number;
+  name: string;
+  statement: string;
+  appetiteMaxScore: number;
+  categoryAppetite: TransactionRiskCategoryAppetite;
+  kriThresholds: Record<TransactionRiskKriKey, TransactionRiskKriThreshold>;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  status: TransactionRiskPolicyStatus;
+  changeReason: string;
+  proposedById?: string | null;
+  proposedByName: string;
+  reviewedById?: string | null;
+  reviewedByName?: string | null;
+  reviewComment?: string | null;
+  submittedAt?: string | null;
+  decisionAt?: string | null;
+  cancelledAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type TransactionRiskPolicyResponse = {
+  generatedAt: string;
+  supervisor: boolean;
+  current: TransactionRiskPolicy;
+  pending: TransactionRiskPolicy[];
+  history: TransactionRiskPolicy[];
+  defaults: TransactionRiskPolicy;
+};
+
+export type TransactionRiskPolicyProposalInput = {
+  name: string;
+  statement: string;
+  appetiteMaxScore: number;
+  categoryAppetite: TransactionRiskCategoryAppetite;
+  kriThresholds: Record<TransactionRiskKriKey, TransactionRiskKriThreshold>;
+  effectiveFrom: string;
+  changeReason: string;
+};
 
 export type TransactionRiskEvent = {
   id: string;
@@ -132,6 +196,8 @@ export type TransactionRiskRecord = {
   acceptanceReason?: string | null;
   latestAcceptance?: TransactionRiskAcceptanceRequest | null;
   acceptanceExpiresSoon?: boolean;
+  appetiteLimit?: number;
+  outsideAppetite?: boolean;
   createdById?: string | null;
   createdByName?: string | null;
   updatedById?: string | null;
@@ -155,6 +221,14 @@ export type TransactionRiskPage = {
   levels: Array<{ level: TransactionRiskLevel; count: number }>;
   matrix: Array<{ probability: number; impact: number; count: number }>;
   categories: Array<{ category: TransactionRiskCategory; count: number }>;
+  policy?: {
+    id: string | null;
+    versionNumber: number;
+    name: string;
+    appetiteMaxScore: number;
+    categoryAppetite: TransactionRiskCategoryAppetite;
+    effectiveFrom?: string | null;
+  };
   items: TransactionRiskRecord[];
   total: number;
   page: number;
@@ -165,8 +239,13 @@ export type TransactionRiskPage = {
 export type TransactionRiskDashboard = {
   generatedAt: string;
   appetite: {
+    policyId?: string | null;
+    versionNumber: number;
+    policyName: string;
+    effectiveFrom?: string | null;
     maxResidualScore: number;
-    level: 'medium';
+    categoryLimits: TransactionRiskCategoryAppetite;
+    level: TransactionRiskLevel;
     status: 'within' | 'watch' | 'breached';
     withinCount: number;
     outsideCount: number;
@@ -196,6 +275,7 @@ export type TransactionRiskDashboard = {
     unit: string;
     status: 'green' | 'yellow' | 'red' | 'neutral';
     target: string;
+    threshold?: TransactionRiskKriThreshold;
     description: string;
   }>;
   topRisks: Array<Pick<
@@ -345,6 +425,35 @@ export const transactionRiskApi = {
   dashboard: () =>
     apiJson<TransactionRiskDashboard>('/api/transaction-follow-up/directives/risk-dashboard'),
 
+  policy: () =>
+    apiJson<TransactionRiskPolicyResponse>('/api/transaction-follow-up/directives/risk-policy'),
+
+  proposePolicy: (input: TransactionRiskPolicyProposalInput) =>
+    apiJson<TransactionRiskPolicy>('/api/transaction-follow-up/directives/risk-policy/proposals', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  decidePolicy: (
+    proposalId: string,
+    input: { decision: 'approved' | 'rejected'; reviewComment: string },
+  ) =>
+    apiJson<TransactionRiskPolicy>(
+      `/api/transaction-follow-up/directives/risk-policy/proposals/${proposalId}/decision`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  cancelPolicy: (proposalId: string) =>
+    apiJson<TransactionRiskPolicy>(
+      `/api/transaction-follow-up/directives/risk-policy/proposals/${proposalId}/cancel`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({}),
+      },
+    ),
 
   acceptances: (input: {
     page?: number;

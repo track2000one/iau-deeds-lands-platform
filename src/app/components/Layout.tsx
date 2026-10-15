@@ -163,6 +163,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'transaction-risk-register', path: '/follow-up/risks', icon: ShieldAlert, label: ui('سجل المخاطر التشغيلية', 'Operational Risk Register'), module: 'transaction_follow_up', action: 'canView' },
     { id: 'transaction-risk-executive', path: '/follow-up/risks/executive', icon: Gauge, label: ui('لوحة المخاطر التنفيذية', 'Executive Risk Dashboard'), module: 'transaction_follow_up', action: 'canDelete' },
     { id: 'transaction-risk-acceptance', path: '/follow-up/risks/acceptance', icon: FileCheck2, label: ui('حوكمة قبول المخاطر', 'Risk Acceptance Governance'), module: 'transaction_follow_up', action: 'canView' },
+    { id: 'transaction-risk-policy', path: '/follow-up/risks/policy', icon: Settings, label: ui('شهية المخاطر وKRI', 'Risk Appetite & KRI'), module: 'transaction_follow_up', action: 'canView' },
     { id: 'contracts-followup', path: '/contracts/follow-up', icon: FileClock, label: ui('متابعة العقود', 'Contract Follow-up'), module: 'contracts_follow_up', action: 'canView' },
     { id: 'assets', path: '/assets', icon: Package, label: ui('وحدة الأصول', 'Assets Unit'), module: 'assets', action: 'canView' },
     { id: 'accounting-transformation', path: '/accounting-transformation', icon: Scale, label: ui('لجنة متابعة متطلبات التحول المحاسبي', 'Accounting Transformation Requirements Committee'), module: 'accounting_transformation', action: 'canView' },
@@ -193,6 +194,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/buildings/leased-in')) return 'leased-buildings-in';
     if (path.startsWith('/follow-up/risks/executive')) return 'transaction-risk-executive';
     if (path.startsWith('/follow-up/risks/acceptance')) return 'transaction-risk-acceptance';
+    if (path.startsWith('/follow-up/risks/policy')) return 'transaction-risk-policy';
     if (path.startsWith('/follow-up/risks')) return 'transaction-risk-register';
     if (path.startsWith('/follow-up')) return 'transaction-followup';
     if (path.startsWith('/contracts/follow-up')) return 'contracts-followup';
