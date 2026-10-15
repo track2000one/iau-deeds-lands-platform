@@ -13,6 +13,7 @@ import {
   TimerReset,
   TrendingUp,
   UsersRound,
+  ClipboardCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -21,7 +22,9 @@ import {
   type TransactionFollowUpDirectiveKpi,
   type TransactionFollowUpKpiEvaluationItem,
   type TransactionFollowUpKpiTargets,
+  type TransactionFollowUpImprovementPlan,
 } from '../api/transactionFollowUp';
+import type { ImprovementPlanSeed } from './TransactionImprovementPlansDialog';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -171,12 +174,14 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   assignees: TransactionFollowUpAssignee[];
+  onOpenImprovementPlans?: (seed?: ImprovementPlanSeed) => void;
 };
 
 export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
   open,
   onOpenChange,
   assignees,
+  onOpenImprovementPlans,
 }) => {
   const [data, setData] = React.useState<TransactionFollowUpDirectiveKpi>(EMPTY);
   const [loading, setLoading] = React.useState(false);
@@ -219,6 +224,28 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
     } finally {
       setSavingTargets(false);
     }
+  };
+
+  const openCapa = (
+    metricKey: TransactionFollowUpImprovementPlan['metricKey'],
+    baselineValue: number | null,
+    evaluation: TransactionFollowUpKpiEvaluationItem,
+    employee?: { userId: string; username: string },
+  ) => {
+    onOpenImprovementPlans?.({
+      metricKey,
+      metricLabel:
+        metricKey === 'firstPassRate' ? 'الإنجاز من أول مرة' :
+        metricKey === 'onTimeRate' ? 'الالتزام بالمواعيد' :
+        metricKey === 'reworkRate' ? 'معدل إعادة العمل' :
+        metricKey === 'avgExecutionHours' ? 'متوسط زمن التنفيذ' :
+        'متوسط زمن الاعتماد',
+      baselineValue,
+      targetValue: evaluation.target,
+      direction: evaluation.direction,
+      assigneeUserId: employee?.userId || null,
+      assigneeName: employee?.username || null,
+    });
   };
 
   const previous = data.previousSummary;
@@ -277,6 +304,12 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
                 <Settings2 className="ml-1 h-3.5 w-3.5" />
                 {showTargets ? 'إخفاء المستهدفات' : 'إعداد المستهدفات'}
               </Button>
+              {onOpenImprovementPlans && (
+                <Button type="button" variant="outline" size="sm" onClick={() => onOpenImprovementPlans()}>
+                  <ClipboardCheck className="ml-1 h-3.5 w-3.5" />
+                  خطط التحسين CAPA
+                </Button>
+              )}
               <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void load()}>
                 <RefreshCw className={`ml-1 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
                 تحديث
@@ -405,6 +438,7 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
               hint={deltaText(data.summary.firstPassRate, previous?.firstPassRate, 'point')}
               target={targetText(data.evaluation.firstPassRate, 'rate')}
               evaluation={data.evaluation.firstPassRate}
+              onCreatePlan={data.evaluation.firstPassRate.status === 'red' ? () => openCapa('firstPassRate', data.summary.firstPassRate, data.evaluation.firstPassRate) : undefined}
               icon={<TrendingUp className="h-5 w-5 text-emerald-700" />}
             />
             <KpiCard
@@ -413,6 +447,7 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
               hint={deltaText(data.summary.reworkRate, previous?.reworkRate, 'point', true)}
               target={targetText(data.evaluation.reworkRate, 'rate')}
               evaluation={data.evaluation.reworkRate}
+              onCreatePlan={data.evaluation.reworkRate.status === 'red' ? () => openCapa('reworkRate', data.summary.reworkRate, data.evaluation.reworkRate) : undefined}
               icon={<RotateCcw className="h-5 w-5 text-amber-700" />}
             />
             <KpiCard
@@ -421,6 +456,7 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
               hint={deltaText(data.summary.avgExecutionHours, previous?.avgExecutionHours, 'hour', true)}
               target={targetText(data.evaluation.avgExecutionHours, 'hours')}
               evaluation={data.evaluation.avgExecutionHours}
+              onCreatePlan={data.evaluation.avgExecutionHours.status === 'red' ? () => openCapa('avgExecutionHours', data.summary.avgExecutionHours, data.evaluation.avgExecutionHours) : undefined}
               icon={<TimerReset className="h-5 w-5 text-sky-700" />}
             />
             <KpiCard
@@ -429,6 +465,7 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
               hint={deltaText(data.summary.avgApprovalHours, previous?.avgApprovalHours, 'hour', true)}
               target={targetText(data.evaluation.avgApprovalHours, 'hours')}
               evaluation={data.evaluation.avgApprovalHours}
+              onCreatePlan={data.evaluation.avgApprovalHours.status === 'red' ? () => openCapa('avgApprovalHours', data.summary.avgApprovalHours, data.evaluation.avgApprovalHours) : undefined}
               icon={<Clock3 className="h-5 w-5 text-violet-700" />}
             />
             <KpiCard
@@ -437,6 +474,7 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
               hint={deltaText(data.summary.onTimeRate, previous?.onTimeRate, 'point')}
               target={targetText(data.evaluation.onTimeRate, 'rate')}
               evaluation={data.evaluation.onTimeRate}
+              onCreatePlan={data.evaluation.onTimeRate.status === 'red' ? () => openCapa('onTimeRate', data.summary.onTimeRate, data.evaluation.onTimeRate) : undefined}
               icon={<CalendarCheck2 className="h-5 w-5 text-emerald-700" />}
             />
           </div>
@@ -524,11 +562,41 @@ export const TransactionDirectiveKpiDialog: React.FC<Props> = ({
                                 {employee.openDirectives.toLocaleString('ar-SA')} توجيه مفتوح
                               </p>
                             </td>
-                            <MetricCell value={formatRate(employee.firstPassRate)} evaluation={employee.evaluation.firstPassRate} />
-                            <MetricCell value={formatRate(employee.reworkRate)} evaluation={employee.evaluation.reworkRate} />
-                            <MetricCell value={formatHours(employee.avgExecutionHours)} evaluation={employee.evaluation.avgExecutionHours} />
-                            <MetricCell value={formatHours(employee.avgApprovalHours)} evaluation={employee.evaluation.avgApprovalHours} />
-                            <MetricCell value={formatRate(employee.onTimeRate)} evaluation={employee.evaluation.onTimeRate} />
+                            <MetricCell
+                              value={formatRate(employee.firstPassRate)}
+                              evaluation={employee.evaluation.firstPassRate}
+                              onCreatePlan={employee.evaluation.firstPassRate.status === 'red'
+                                ? () => openCapa('firstPassRate', employee.firstPassRate, employee.evaluation.firstPassRate, employee)
+                                : undefined}
+                            />
+                            <MetricCell
+                              value={formatRate(employee.reworkRate)}
+                              evaluation={employee.evaluation.reworkRate}
+                              onCreatePlan={employee.evaluation.reworkRate.status === 'red'
+                                ? () => openCapa('reworkRate', employee.reworkRate, employee.evaluation.reworkRate, employee)
+                                : undefined}
+                            />
+                            <MetricCell
+                              value={formatHours(employee.avgExecutionHours)}
+                              evaluation={employee.evaluation.avgExecutionHours}
+                              onCreatePlan={employee.evaluation.avgExecutionHours.status === 'red'
+                                ? () => openCapa('avgExecutionHours', employee.avgExecutionHours, employee.evaluation.avgExecutionHours, employee)
+                                : undefined}
+                            />
+                            <MetricCell
+                              value={formatHours(employee.avgApprovalHours)}
+                              evaluation={employee.evaluation.avgApprovalHours}
+                              onCreatePlan={employee.evaluation.avgApprovalHours.status === 'red'
+                                ? () => openCapa('avgApprovalHours', employee.avgApprovalHours, employee.evaluation.avgApprovalHours, employee)
+                                : undefined}
+                            />
+                            <MetricCell
+                              value={formatRate(employee.onTimeRate)}
+                              evaluation={employee.evaluation.onTimeRate}
+                              onCreatePlan={employee.evaluation.onTimeRate.status === 'red'
+                                ? () => openCapa('onTimeRate', employee.onTimeRate, employee.evaluation.onTimeRate, employee)
+                                : undefined}
+                            />
                             <td className="p-3 text-center font-bold">{employee.reviewedDirectives.toLocaleString('ar-SA')}</td>
                             <td className={`p-3 text-center font-black ${employee.overdueOpen ? 'text-red-700' : 'text-slate-700'}`}>
                               {employee.overdueOpen.toLocaleString('ar-SA')}
@@ -599,6 +667,7 @@ const KpiCard = ({
   target,
   icon,
   evaluation,
+  onCreatePlan,
 }: {
   title: string;
   value: string;
@@ -606,6 +675,7 @@ const KpiCard = ({
   target: string;
   icon: React.ReactNode;
   evaluation: TransactionFollowUpKpiEvaluationItem;
+  onCreatePlan?: () => void;
 }) => (
   <Card className={`shadow-none ${evaluationClass(evaluation.status)}`}>
     <CardContent className="p-4">
@@ -623,6 +693,12 @@ const KpiCard = ({
         <Badge variant="outline">{target}</Badge>
       </div>
       <p className="mt-2 text-[10px] leading-5 text-muted-foreground">{hint}</p>
+      {onCreatePlan && (
+        <Button type="button" variant="outline" size="sm" className="mt-2 w-full border-red-200 bg-white text-red-800" onClick={onCreatePlan}>
+          <ClipboardCheck className="ml-1 h-3.5 w-3.5" />
+          إنشاء خطة تحسين
+        </Button>
+      )}
     </CardContent>
   </Card>
 );
@@ -673,16 +749,25 @@ const TrendBar = ({
 const MetricCell = ({
   value,
   evaluation,
+  onCreatePlan,
 }: {
   value: string;
   evaluation: TransactionFollowUpKpiEvaluationItem;
+  onCreatePlan?: () => void;
 }) => (
   <td className="p-3 text-center">
-    <span className={`inline-flex min-w-16 justify-center rounded-lg border px-2 py-1 font-black ${
-      evaluationClass(evaluation.status)
-    } ${evaluationTextClass(evaluation.status)}`}>
-      {value}
-    </span>
+    <div className="flex flex-col items-center gap-1">
+      <span className={`inline-flex min-w-16 justify-center rounded-lg border px-2 py-1 font-black ${
+        evaluationClass(evaluation.status)
+      } ${evaluationTextClass(evaluation.status)}`}>
+        {value}
+      </span>
+      {onCreatePlan && (
+        <button type="button" className="text-[9px] font-bold text-red-700 underline-offset-2 hover:underline" onClick={onCreatePlan}>
+          خطة تحسين
+        </button>
+      )}
+    </div>
   </td>
 );
 
