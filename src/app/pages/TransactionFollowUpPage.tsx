@@ -918,6 +918,14 @@ ${styleAssets}
               <ShieldAlert className="ml-2 h-4 w-4" />
               سجل المخاطر
             </Button>
+            <Button
+              variant="outline"
+              className="border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+              onClick={() => navigate('/follow-up/risks/acceptance')}
+            >
+              <FileCheck2 className="ml-2 h-4 w-4" />
+              قبول المخاطر
+            </Button>
             {(isAdmin || canDelete) && (
               <Button
                 variant="outline"
