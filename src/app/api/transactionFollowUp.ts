@@ -132,6 +132,7 @@ export type TransactionFollowUpDirective = {
   isDueToday: boolean;
   daysOverdue: number;
   evidence?: TransactionFollowUpDirectiveEvidence[];
+  evidenceCount?: number;
 };
 
 export type TransactionFollowUpRecord = {
