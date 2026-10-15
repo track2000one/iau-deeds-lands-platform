@@ -231,6 +231,22 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [reportTo, setReportTo] = React.useState(reportRange('monthly').to);
   const [reportAssigneeId, setReportAssigneeId] = React.useState('');
   const [reportData, setReportData] = React.useState<TransactionFollowUpExecutiveReport | null>(null);
+  const [reportSection, setReportSection] = React.useState<'preview' | 'archive' | 'schedule'>('preview');
+  const [reportArchives, setReportArchives] = React.useState<TransactionFollowUpReportArchive[]>([]);
+  const [reportArchiveLoading, setReportArchiveLoading] = React.useState(false);
+  const [reportArchivePage, setReportArchivePage] = React.useState(1);
+  const [reportArchiveTotalPages, setReportArchiveTotalPages] = React.useState(0);
+  const [compareLeftId, setCompareLeftId] = React.useState('');
+  const [compareRightId, setCompareRightId] = React.useState('');
+  const [reportComparison, setReportComparison] = React.useState<TransactionFollowUpReportComparison | null>(null);
+  const [reportSchedules, setReportSchedules] = React.useState<TransactionFollowUpReportSchedule[]>([]);
+  const [reportScheduleLoading, setReportScheduleLoading] = React.useState(false);
+  const [scheduleName, setScheduleName] = React.useState('التقرير الأسبوعي للمتابعة');
+  const [scheduleFrequency, setScheduleFrequency] = React.useState<'weekly' | 'monthly'>('weekly');
+  const [scheduleDayOfWeek, setScheduleDayOfWeek] = React.useState(0);
+  const [scheduleDayOfMonth, setScheduleDayOfMonth] = React.useState(1);
+  const [scheduleRunHour, setScheduleRunHour] = React.useState(8);
+  const [scheduleAssigneeId, setScheduleAssigneeId] = React.useState('');
 
   const load = React.useCallback(async () => {
     try {
