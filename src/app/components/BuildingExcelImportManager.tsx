@@ -272,6 +272,7 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
   const [pendingOverallTotal, setPendingOverallTotal] = useState(0);
   const [pendingTotalPages, setPendingTotalPages] = useState(0);
   const [pendingLoading, setPendingLoading] = useState(false);
+  const [deletingAllPending, setDeletingAllPending] = useState(false);
   const PENDING_PAGE_SIZE = 24;
 
   const loadPendingPage = React.useCallback(async (
@@ -549,6 +550,46 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
     }
   };
 
+  const deleteAllPending = async () => {
+    if (!pendingOverallTotal || deletingAllPending) return;
+
+    const confirmed = window.confirm(
+      `سيتم حذف جميع السجلات المستوردة المعلقة فقط وعددها ${pendingOverallTotal.toLocaleString('ar-SA')} سجلًا.\n\nلن يتم حذف أي مبنى معتمد. هل تريد الاستمرار؟`,
+    );
+    if (!confirmed) return;
+
+    const verification = window.prompt('للتأكيد النهائي اكتب: حذف الجميع');
+    if (verification?.trim() !== 'حذف الجميع') {
+      toast.error('لم يتم الحذف؛ عبارة التأكيد غير مطابقة.');
+      return;
+    }
+
+    try {
+      setDeletingAllPending(true);
+      const result = await mosqueApi.deleteAllPendingBuildings();
+      setPendingPage(1);
+      setPendingSearch('');
+      setPendingItems([]);
+      setPendingResultTotal(0);
+      setPendingTotalPages(0);
+      setPendingOverallTotal(result.skippedCount || 0);
+      onPendingTotalChange?.(result.skippedCount || 0);
+
+      if (result.skippedCount > 0) {
+        toast.warning(
+          `تم حذف ${result.deletedCount.toLocaleString('ar-SA')} سجلًا معلقًا، وتم الإبقاء على ${result.skippedCount.toLocaleString('ar-SA')} سجل مرتبط ببيانات أخرى للحماية.`,
+        );
+        await loadPendingPage(1, '');
+      } else {
+        toast.success(`تم حذف جميع السجلات المعلقة وعددها ${result.deletedCount.toLocaleString('ar-SA')} سجلًا.`);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حذف السجلات المعلقة');
+    } finally {
+      setDeletingAllPending(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {role === 'head' && canAdd && (
@@ -581,9 +622,26 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
                   النقص أو عدم تطابق البيانات لا يرفض السجل. يبقى معلقًا، ويقوم المسؤول بتصحيحه ثم اعتماده.
                 </CardDescription>
               </div>
-              <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800">
-                {pendingOverallTotal.toLocaleString('ar-SA')} معلق
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800">
+                  {pendingOverallTotal.toLocaleString('ar-SA')} معلق
+                </Badge>
+                {role === 'head' && canDelete && pendingOverallTotal > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800"
+                    disabled={deletingAllPending}
+                    onClick={() => void deleteAllPending()}
+                  >
+                    {deletingAllPending
+                      ? <RefreshCw className="ml-1 h-4 w-4 animate-spin" />
+                      : <Trash2 className="ml-1 h-4 w-4" />}
+                    حذف جميع السجلات المعلقة
+                  </Button>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
