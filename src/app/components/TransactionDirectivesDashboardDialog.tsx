@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Clock3,
   Gavel,
+  Paperclip,
   RefreshCw,
   Search,
   UserRound,
@@ -249,6 +250,12 @@ export const TransactionDirectivesDashboardDialog: React.FC<Props> = ({
                               >
                                 {priorityLabel[item.priority]}
                               </Badge>
+                              {(item.evidenceCount || 0) > 0 && (
+                                <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-800">
+                                  <Paperclip className="ml-1 h-3 w-3" />
+                                  {(item.evidenceCount || 0).toLocaleString('ar-SA')} مرفق
+                                </Badge>
+                              )}
                               {item.isOverdue && (
                                 <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700">
                                   متأخر {item.daysOverdue.toLocaleString('ar-SA')} يوم
