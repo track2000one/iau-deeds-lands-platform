@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
+import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -123,6 +124,7 @@ const emptyCreate = (): TransactionFollowUpCreateInput => ({
 });
 
 export const TransactionFollowUpPage: React.FC = () => {
+  const { currentUser } = useAuth();
   const { isAdmin, hasPermission } = usePermissions();
   const canAdd = isAdmin || hasPermission('transaction_follow_up', 'canAdd');
   const canEdit = isAdmin || hasPermission('transaction_follow_up', 'canEdit');
@@ -303,6 +305,17 @@ export const TransactionFollowUpPage: React.FC = () => {
     }
   };
 
+  const canManageSelected = Boolean(
+    selected &&
+    canEdit &&
+    (
+      isAdmin ||
+      canDelete ||
+      selected.createdById === currentUser?.uid ||
+      selected.currentAssigneeUserId === currentUser?.uid
+    )
+  );
+
   return (
     <div className="mx-auto w-full max-w-[1750px] space-y-5">
       <section className="rounded-[28px] border border-white/60 bg-white/80 p-5 shadow-[0_16px_48px_rgba(15,23,42,.08)] backdrop-blur-xl sm:p-6">
@@ -482,7 +495,7 @@ export const TransactionFollowUpPage: React.FC = () => {
                 </Card>
               </div>
 
-              {canEdit && !['completed', 'closed'].includes(selected.status) && (
+              {canManageSelected && !['completed', 'closed'].includes(selected.status) && (
                 <div className="grid gap-4 xl:grid-cols-2">
                   <Card className="border-violet-200">
                     <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ArrowLeftRight className="h-4 w-4" />إسناد / تحويل</CardTitle></CardHeader>
