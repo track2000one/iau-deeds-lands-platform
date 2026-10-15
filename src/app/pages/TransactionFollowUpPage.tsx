@@ -47,6 +47,7 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Textarea } from '../components/ui/textarea';
 import { TransactionExecutiveReport } from '../components/TransactionExecutiveReport';
 import { TransactionExecutiveInbox } from '../components/TransactionExecutiveInbox';
+import { TransactionManagementDirectives } from '../components/TransactionManagementDirectives';
 import {
   transactionFollowUpApi,
   type TransactionFollowUpAnalytics,
@@ -1586,6 +1587,16 @@ ${styleAssets}
                   </Card>
                 </div>
               )}
+
+              <TransactionManagementDirectives
+                record={selected}
+                assignees={assignees}
+                currentUserId={currentUser?.uid || null}
+                supervisor={isAdmin || canDelete}
+                onChanged={async () => {
+                  await Promise.all([openDetails(selected.id), load()]);
+                }}
+              />
 
               <Card>
                 <CardHeader><CardTitle className="text-base">سجل الإجراءات والتحويلات</CardTitle></CardHeader>
