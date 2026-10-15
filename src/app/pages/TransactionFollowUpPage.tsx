@@ -11,6 +11,7 @@ import {
   CircleDot,
   Clock3,
   FileClock,
+  FileCheck2,
   FileDown,
   FileText,
   Printer,
@@ -50,6 +51,7 @@ import { TransactionExecutiveReport } from '../components/TransactionExecutiveRe
 import { TransactionExecutiveInbox } from '../components/TransactionExecutiveInbox';
 import { TransactionManagementDirectives } from '../components/TransactionManagementDirectives';
 import { TransactionDirectivesDashboardDialog } from '../components/TransactionDirectivesDashboardDialog';
+import { TransactionApprovalCenterDialog } from '../components/TransactionApprovalCenterDialog';
 import {
   transactionFollowUpApi,
   type TransactionFollowUpAnalytics,
@@ -239,6 +241,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [mine, setMine] = React.useState(false);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [directivesDashboardOpen, setDirectivesDashboardOpen] = React.useState(false);
+  const [approvalCenterOpen, setApprovalCenterOpen] = React.useState(false);
   const [createForm, setCreateForm] = React.useState<TransactionFollowUpCreateInput>(emptyCreate());
   const [selected, setSelected] = React.useState<TransactionFollowUpRecord | null>(null);
   const [actionText, setActionText] = React.useState('');
@@ -801,6 +804,16 @@ ${styleAssets}
               <Gavel className="ml-2 h-4 w-4" />
               لوحة التوجيهات
             </Button>
+            {(isAdmin || canDelete) && (
+              <Button
+                variant="outline"
+                className="border-violet-300 bg-violet-50 text-violet-900 hover:bg-violet-100"
+                onClick={() => setApprovalCenterOpen(true)}
+              >
+                <FileCheck2 className="ml-2 h-4 w-4" />
+                مركز الاعتمادات
+              </Button>
+            )}
             {canPrint && (
               <Button variant="outline" onClick={() => void openExecutiveReport()}>
                 <FileText className="ml-2 h-4 w-4" />
@@ -1061,6 +1074,16 @@ ${styleAssets}
         assignees={assignees}
         onOpenTransaction={(id) => void openDetails(id)}
       />
+
+      {(isAdmin || canDelete) && (
+        <TransactionApprovalCenterDialog
+          open={approvalCenterOpen}
+          onOpenChange={setApprovalCenterOpen}
+          assignees={assignees}
+          onOpenTransaction={(id) => void openDetails(id)}
+          onChanged={() => void load()}
+        />
+      )}
 
       <Dialog open={reportOpen} onOpenChange={(open) => !reportExporting && setReportOpen(open)}>
         <DialogContent className="max-h-[96dvh] overflow-hidden sm:max-w-[1180px]" dir="rtl">
