@@ -46,12 +46,14 @@ import { Label } from '../components/ui/label';
 import { NativeSelect } from '../components/ui/native-select';
 import { Textarea } from '../components/ui/textarea';
 import { TransactionExecutiveReport } from '../components/TransactionExecutiveReport';
+import { TransactionExecutiveInbox } from '../components/TransactionExecutiveInbox';
 import {
   transactionFollowUpApi,
   type TransactionFollowUpAnalytics,
   type TransactionFollowUpAssignee,
   type TransactionFollowUpCreateInput,
   type TransactionFollowUpDashboard,
+  type TransactionFollowUpExecutiveInbox,
   type TransactionFollowUpExecutiveReport,
   type TransactionFollowUpReportArchive,
   type TransactionFollowUpReportComparison,
@@ -70,6 +72,25 @@ const EMPTY_DASHBOARD: TransactionFollowUpDashboard = {
   completed: 0,
   unassigned: 0,
   needsAction: 0,
+};
+
+const EMPTY_EXECUTIVE_INBOX: TransactionFollowUpExecutiveInbox = {
+  generatedAt: new Date(0).toISOString(),
+  scope: 'all',
+  counters: {
+    totalOpen: 0,
+    attention: 0,
+    overdue: 0,
+    dueToday: 0,
+    unassigned: 0,
+    inactive: 0,
+    needsFollowUp: 0,
+    urgent: 0,
+    staleWaiting: 0,
+  },
+  attentionItems: [],
+  employeeLoad: [],
+  highLoadThreshold: 3,
 };
 
 const EMPTY_ANALYTICS: TransactionFollowUpAnalytics = {
@@ -198,6 +219,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const canPrint = isAdmin || hasPermission('transaction_follow_up', 'canPrint');
 
   const [dashboard, setDashboard] = React.useState<TransactionFollowUpDashboard>(EMPTY_DASHBOARD);
+  const [executiveInbox, setExecutiveInbox] = React.useState<TransactionFollowUpExecutiveInbox>(EMPTY_EXECUTIVE_INBOX);
   const [analytics, setAnalytics] = React.useState<TransactionFollowUpAnalytics>(EMPTY_ANALYTICS);
   const [analyticsPeriod, setAnalyticsPeriod] = React.useState<'30' | '90' | '365' | 'all'>('90');
   const [records, setRecords] = React.useState<TransactionFollowUpRecord[]>([]);
@@ -251,7 +273,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const load = React.useCallback(async () => {
     try {
       setLoading(true);
-      const [pageResult, dashboardResult, analyticsResult] = await Promise.all([
+      const [pageResult, dashboardResult, executiveInboxResult, analyticsResult] = await Promise.all([
         transactionFollowUpApi.list({
           page,
           pageSize: 30,
@@ -261,6 +283,7 @@ export const TransactionFollowUpPage: React.FC = () => {
           mine,
         }),
         transactionFollowUpApi.dashboard(mine),
+        transactionFollowUpApi.executiveInbox(mine),
         transactionFollowUpApi.analytics({
           mine,
           periodDays: analyticsPeriod === 'all' ? 'all' : Number(analyticsPeriod),
@@ -270,6 +293,7 @@ export const TransactionFollowUpPage: React.FC = () => {
       setTotal(pageResult.total || 0);
       setTotalPages(pageResult.totalPages || 0);
       setDashboard(dashboardResult);
+      setExecutiveInbox(executiveInboxResult);
       setAnalytics(analyticsResult);
       if (pageResult.totalPages && page > pageResult.totalPages) setPage(pageResult.totalPages);
     } catch (error) {
@@ -793,6 +817,14 @@ ${styleAssets}
         <Summary title="غير مسندة" value={dashboard.unassigned} icon={<UserRound className="h-5 w-5 text-amber-700" />} />
         <Summary title="منجزة / مغلقة" value={dashboard.completed} icon={<CheckCircle2 className="h-5 w-5 text-emerald-700" />} />
       </div>
+
+      <TransactionExecutiveInbox
+        data={executiveInbox}
+        loading={loading}
+        supervisor={isAdmin || canDelete}
+        onRefresh={() => void load()}
+        onOpenTransaction={(id) => void openDetails(id)}
+      />
 
       <Card className="rounded-[28px] border-slate-200 bg-white/90 shadow-md">
         <CardHeader className="border-b">
