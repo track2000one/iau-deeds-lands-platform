@@ -1,0 +1,456 @@
+import React from 'react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleDot,
+  Clock3,
+  ExternalLink,
+  FileCheck2,
+  Hourglass,
+  Inbox,
+  PlayCircle,
+  RefreshCw,
+  RotateCcw,
+  Send,
+  TimerReset,
+  UserRound,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import {
+  transactionFollowUpApi,
+  type TransactionFollowUpWorkQueue,
+  type TransactionFollowUpWorkQueueAction,
+  type TransactionFollowUpWorkQueueBucket,
+  type TransactionFollowUpWorkQueueItem,
+} from '../api/transactionFollowUp';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+
+const EMPTY: TransactionFollowUpWorkQueue = {
+  generatedAt: new Date(0).toISOString(),
+  scope: 'mine',
+  supervisor: false,
+  focusBucket: 'in_progress',
+  counts: {
+    overdue: 0,
+    urgent_today: 0,
+    due_3_days: 0,
+    awaiting_review: 0,
+    waiting_external: 0,
+    in_progress: 0,
+    completed_today: 0,
+    unassigned: 0,
+  },
+  buckets: {
+    overdue: [],
+    urgent_today: [],
+    due_3_days: [],
+    awaiting_review: [],
+    waiting_external: [],
+    in_progress: [],
+    completed_today: [],
+    unassigned: [],
+  },
+};
+
+const bucketMeta: Record<
+  TransactionFollowUpWorkQueueBucket,
+  {
+    label: string;
+    shortLabel: string;
+    description: string;
+    icon: React.ComponentType<{ className?: string }>;
+    className: string;
+  }
+> = {
+  overdue: {
+    label: 'المعاملات المتأخرة',
+    shortLabel: 'متأخر',
+    description: 'تجاوزت تاريخ الاستحقاق وتتطلب إجراءً فوريًا.',
+    icon: AlertTriangle,
+    className: 'border-red-300 bg-red-50 text-red-900',
+  },
+  urgent_today: {
+    label: 'عاجل اليوم',
+    shortLabel: 'عاجل اليوم',
+    description: 'معاملة عاجلة أو مستحقة خلال اليوم.',
+    icon: Clock3,
+    className: 'border-orange-300 bg-orange-50 text-orange-900',
+  },
+  due_3_days: {
+    label: 'تستحق خلال 3 أيام',
+    shortLabel: 'خلال 3 أيام',
+    description: 'اقترب تاريخ الاستحقاق ويجب إنهاء الإجراء قبل التأخير.',
+    icon: TimerReset,
+    className: 'border-amber-300 bg-amber-50 text-amber-900',
+  },
+  awaiting_review: {
+    label: 'بانتظار الاعتماد',
+    shortLabel: 'بانتظار اعتماد',
+    description: 'رفع الموظف الإنجاز وتنتظر المعاملة مراجعة واعتماد الإقفال.',
+    icon: FileCheck2,
+    className: 'border-violet-300 bg-violet-50 text-violet-900',
+  },
+  waiting_external: {
+    label: 'بانتظار جهة أخرى',
+    shortLabel: 'بانتظار جهة',
+    description: 'توقفت المعاملة مؤقتًا لحين ورود رد أو مستند من جهة أخرى.',
+    icon: Hourglass,
+    className: 'border-sky-300 bg-sky-50 text-sky-900',
+  },
+  in_progress: {
+    label: 'تحت التنفيذ',
+    shortLabel: 'تحت التنفيذ',
+    description: 'معاملات مسندة ويجري العمل عليها ضمن المسار الطبيعي.',
+    icon: PlayCircle,
+    className: 'border-emerald-300 bg-emerald-50 text-emerald-900',
+  },
+  completed_today: {
+    label: 'مكتمل اليوم',
+    shortLabel: 'مكتمل اليوم',
+    description: 'معاملات تم اعتماد إنجازها وإقفالها اليوم.',
+    icon: CheckCircle2,
+    className: 'border-emerald-300 bg-white text-emerald-800',
+  },
+  unassigned: {
+    label: 'غير مسندة',
+    shortLabel: 'غير مسند',
+    description: 'معاملات جديدة لم يتم تحديد الموظف المختص لها.',
+    icon: UserRound,
+    className: 'border-slate-300 bg-slate-50 text-slate-800',
+  },
+};
+
+const bucketOrder: TransactionFollowUpWorkQueueBucket[] = [
+  'overdue',
+  'urgent_today',
+  'due_3_days',
+  'awaiting_review',
+  'waiting_external',
+  'in_progress',
+  'completed_today',
+  'unassigned',
+];
+
+const actionMeta: Record<
+  TransactionFollowUpWorkQueueAction,
+  { label: string; icon: React.ComponentType<{ className?: string }>; className?: string }
+> = {
+  start: { label: 'بدء التنفيذ', icon: PlayCircle },
+  waiting_external: { label: 'بانتظار جهة أخرى', icon: Hourglass },
+  resume: { label: 'استئناف العمل', icon: RotateCcw },
+  needs_follow_up: { label: 'تحتاج متابعة', icon: CircleDot },
+  submit_completion: {
+    label: 'رفع للمراجعة',
+    icon: Send,
+    className: 'bg-violet-700 text-white hover:bg-violet-800',
+  },
+  approve_close: {
+    label: 'اعتماد وإغلاق',
+    icon: CheckCircle2,
+    className: 'bg-emerald-700 text-white hover:bg-emerald-800',
+  },
+  return_to_employee: {
+    label: 'إعادة للاستكمال',
+    icon: RotateCcw,
+    className: 'border-red-300 text-red-800 hover:bg-red-50',
+  },
+};
+
+const priorityLabel: Record<string, string> = {
+  low: 'منخفضة',
+  normal: 'عادية',
+  high: 'عالية',
+  urgent: 'عاجلة',
+};
+
+const statusLabel: Record<string, string> = {
+  new: 'جديدة',
+  assigned: 'مسندة',
+  in_progress: 'تحت الإجراء',
+  waiting_response: 'بانتظار رد',
+  needs_follow_up: 'تحتاج متابعة',
+  completed: 'بانتظار الاعتماد',
+  closed: 'مغلقة',
+};
+
+const formatDate = (value?: string | null) =>
+  value
+    ? new Intl.DateTimeFormat('ar-SA-u-ca-gregory', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date(value))
+    : '—';
+
+const formatTime = (value?: string | null) =>
+  value
+    ? new Intl.DateTimeFormat('ar-SA', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(value))
+    : '—';
+
+type Props = {
+  mine: boolean;
+  supervisor: boolean;
+  onOpenTransaction: (id: string) => void;
+  onChanged?: () => void | Promise<void>;
+};
+
+export const TransactionDailyWorkCenter: React.FC<Props> = ({
+  mine,
+  supervisor,
+  onOpenTransaction,
+  onChanged,
+}) => {
+  const [data, setData] = React.useState<TransactionFollowUpWorkQueue>(EMPTY);
+  const [loading, setLoading] = React.useState(true);
+  const [runningAction, setRunningAction] = React.useState<string | null>(null);
+  const [selectedBucket, setSelectedBucket] = React.useState<TransactionFollowUpWorkQueueBucket>('in_progress');
+  const userChangedBucket = React.useRef(false);
+
+  const load = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await transactionFollowUpApi.workQueue(mine);
+      setData(result);
+      if (!userChangedBucket.current) {
+        setSelectedBucket(result.focusBucket);
+      } else if (!result.buckets[selectedBucket]) {
+        setSelectedBucket(result.focusBucket);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل مركز المتابعة اليومي');
+    } finally {
+      setLoading(false);
+    }
+  }, [mine, selectedBucket]);
+
+  React.useEffect(() => {
+    userChangedBucket.current = false;
+    void load();
+  }, [mine]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const runAction = async (
+    item: TransactionFollowUpWorkQueueItem,
+    action: TransactionFollowUpWorkQueueAction,
+  ) => {
+    let note: string | null = null;
+
+    if (action === 'return_to_employee') {
+      const entered = window.prompt('اكتب ملاحظة مختصرة للموظف توضح المطلوب استكماله:');
+      if (entered == null) return;
+      if (!entered.trim()) {
+        toast.error('ملاحظة الإعادة مطلوبة');
+        return;
+      }
+      note = entered.trim();
+    }
+
+    if (action === 'approve_close' && !window.confirm('اعتماد إنجاز المعاملة وإقفالها نهائيًا؟')) {
+      return;
+    }
+
+    try {
+      setRunningAction(item.id + ':' + action);
+      await transactionFollowUpApi.workQueueAction(item.id, { action, note });
+      const messages: Record<TransactionFollowUpWorkQueueAction, string> = {
+        start: 'تم بدء تنفيذ المعاملة',
+        waiting_external: 'تم تحويل المعاملة إلى انتظار رد من جهة أخرى',
+        resume: 'تم استئناف العمل على المعاملة',
+        needs_follow_up: 'تم تحديد المعاملة كحالة تحتاج متابعة',
+        submit_completion: 'تم رفع المعاملة للمراجعة والاعتماد',
+        approve_close: 'تم اعتماد الإنجاز وإقفال المعاملة',
+        return_to_employee: 'تمت إعادة المعاملة للموظف لاستكمال المطلوب',
+      };
+      toast.success(messages[action]);
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
+      await load();
+      await onChanged?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تنفيذ الإجراء السريع');
+    } finally {
+      setRunningAction(null);
+    }
+  };
+
+  const visibleBuckets = bucketOrder.filter(
+    (bucket) => bucket !== 'unassigned' || supervisor,
+  );
+  const items = data.buckets[selectedBucket] || [];
+  const selectedMeta = bucketMeta[selectedBucket];
+
+  return (
+    <Card className="rounded-[28px] border-slate-200 bg-white/95 shadow-md">
+      <CardHeader className="border-b pb-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Inbox className="h-5 w-5 text-primary" />
+              مركز المتابعة اليومي
+            </CardTitle>
+            <p className="mt-1 text-xs leading-6 text-muted-foreground">
+              صندوق العمل اليومي {data.scope === 'mine' ? 'لمهامك المسندة' : 'للإدارة بالكامل'}؛
+              يعرض الأولويات بحسب الاستحقاق والحالة ويتيح تنفيذ الإجراءات التشغيلية مباشرة.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" disabled={loading} onClick={() => void load()}>
+            <RefreshCw className={'ml-2 h-4 w-4 ' + (loading ? 'animate-spin' : '')} />
+            تحديث الصندوق
+          </Button>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4 p-4 sm:p-5">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 2xl:grid-cols-8">
+          {visibleBuckets.map((bucket) => {
+            const meta = bucketMeta[bucket];
+            const Icon = meta.icon;
+            const active = selectedBucket === bucket;
+            return (
+              <button
+                key={bucket}
+                type="button"
+                onClick={() => {
+                  userChangedBucket.current = true;
+                  setSelectedBucket(bucket);
+                }}
+                className={
+                  'rounded-2xl border p-3 text-right transition ' +
+                  (active
+                    ? meta.className + ' ring-2 ring-offset-1'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50')
+                }
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Icon className="h-4 w-4" />
+                  <b className="text-xl">{(data.counts[bucket] || 0).toLocaleString('ar-SA')}</b>
+                </div>
+                <p className="mt-2 text-[11px] font-black">{meta.shortLabel}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className={'rounded-2xl border px-4 py-3 ' + selectedMeta.className}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-black">{selectedMeta.label}</p>
+              <p className="mt-1 text-[11px] opacity-80">{selectedMeta.description}</p>
+            </div>
+            <Badge variant="outline" className="border-current">
+              {items.length.toLocaleString('ar-SA')} معاملة معروضة
+            </Badge>
+          </div>
+        </div>
+
+        {loading && !items.length ? (
+          <div className="py-12 text-center text-xs text-muted-foreground">
+            <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin" />
+            جارٍ تحميل صندوق العمل...
+          </div>
+        ) : items.length ? (
+          <div className="grid gap-3 xl:grid-cols-2">
+            {items.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <b className="text-sm">معاملة {item.transactionNumber}</b>
+                      <Badge variant="outline">{priorityLabel[item.priority] || item.priority}</Badge>
+                      <Badge variant="outline">{statusLabel[item.status] || item.status}</Badge>
+                      {item.overdueDays > 0 && (
+                        <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800">
+                          متأخرة {item.overdueDays.toLocaleString('ar-SA')} يوم
+                        </Badge>
+                      )}
+                      {item.daysUntilDue === 0 && (
+                        <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-900">
+                          مستحقة اليوم
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-800">
+                      {item.subject}
+                    </p>
+                    {item.requiredAction && (
+                      <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-700">
+                        <b>المطلوب:</b> {item.requiredAction}
+                      </p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+                      {supervisor && (
+                        <span>
+                          الموظف: <b className="text-foreground">{item.currentAssigneeName || 'غير مسندة'}</b>
+                        </span>
+                      )}
+                      <span>
+                        الاستحقاق: <b className="text-foreground">{formatDate(item.dueDate)}</b>
+                      </span>
+                      <span>
+                        عمر المعاملة: <b className="text-foreground">{item.ageDays.toLocaleString('ar-SA')} يوم</b>
+                      </span>
+                      <span>
+                        آخر إجراء: <b className="text-foreground">{formatTime(item.lastActionAt)}</b>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="font-mono text-[10px] text-muted-foreground">
+                    {item.trackingNumber}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onOpenTransaction(item.id)}
+                  >
+                    <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                    فتح المعاملة
+                  </Button>
+
+                  {item.quickActions.map((action) => {
+                    const meta = actionMeta[action];
+                    const Icon = meta.icon;
+                    const busy = runningAction === item.id + ':' + action;
+                    return (
+                      <Button
+                        key={action}
+                        type="button"
+                        size="sm"
+                        variant={meta.className ? 'default' : 'outline'}
+                        className={meta.className}
+                        disabled={Boolean(runningAction)}
+                        onClick={() => void runAction(item, action)}
+                      >
+                        {busy ? (
+                          <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Icon className="ml-1 h-3.5 w-3.5" />
+                        )}
+                        {meta.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed py-10 text-center text-xs text-muted-foreground">
+            لا توجد معاملات في فئة «{selectedMeta.label}» حاليًا.
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default TransactionDailyWorkCenter;
