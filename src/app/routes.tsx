@@ -65,6 +65,7 @@ const ContractsFollowUpPage = lazy(() => import('./pages/ContractsFollowUpPage')
 const TransactionFollowUpPage = lazy(() => import('./pages/TransactionFollowUpPage').then((m) => ({ default: m.TransactionFollowUpPage })));
 const TransactionRiskRegisterPage = lazy(() => import('./pages/TransactionRiskRegisterPage').then((m) => ({ default: m.TransactionRiskRegisterPage })));
 const TransactionRiskExecutiveDashboardPage = lazy(() => import('./pages/TransactionRiskExecutiveDashboardPage').then((m) => ({ default: m.TransactionRiskExecutiveDashboardPage })));
+const TransactionRiskAcceptancePage = lazy(() => import('./pages/TransactionRiskAcceptancePage').then((m) => ({ default: m.TransactionRiskAcceptancePage })));
 const MosquesWorkspacePage = lazy(() => import('./pages/MosquesWorkspacePage').then((m) => ({ default: m.MosquesWorkspacePage })));
 const MosqueJobsImportPage = lazy(() => import('./pages/MosqueJobsImportPage').then((m) => ({ default: m.MosqueJobsImportPage })));
 const MosquesPublicPage = lazy(() => import('./pages/MosquesPublicPage').then((m) => ({ default: m.MosquesPublicPage })));
@@ -241,6 +242,7 @@ export const router = createHashRouter([
       { path: 'follow-up', element: <PermissionGuard module="transaction_follow_up" action="canView">{page(<TransactionFollowUpPage />)}</PermissionGuard> },
       { path: 'follow-up/risks', element: <PermissionGuard module="transaction_follow_up" action="canView">{page(<TransactionRiskRegisterPage />)}</PermissionGuard> },
       { path: 'follow-up/risks/executive', element: <PermissionGuard module="transaction_follow_up" action="canDelete">{page(<TransactionRiskExecutiveDashboardPage />)}</PermissionGuard> },
+      { path: 'follow-up/risks/acceptance', element: <PermissionGuard module="transaction_follow_up" action="canView">{page(<TransactionRiskAcceptancePage />)}</PermissionGuard> },
       { path: 'contracts/follow-up', element: <PermissionGuard module="contracts_follow_up" action="canView">{page(<ContractsFollowUpPage />)}</PermissionGuard> },
       { path: 'reports', element: page(<ReportsPage />) },
       { path: 'archive', element: page(<ArchivePage />) },
