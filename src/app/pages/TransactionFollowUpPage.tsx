@@ -7,6 +7,9 @@ import {
   CircleDot,
   Clock3,
   FileClock,
+  FileDown,
+  FileText,
+  Printer,
   Inbox,
   ListTodo,
   Gauge,
@@ -42,6 +45,7 @@ import {
   type TransactionFollowUpAssignee,
   type TransactionFollowUpCreateInput,
   type TransactionFollowUpDashboard,
+  type TransactionFollowUpExecutiveReport,
   type TransactionFollowUpPriority,
   type TransactionFollowUpRecord,
   type TransactionFollowUpStatus,
@@ -138,6 +142,27 @@ const formatDateTime = (value?: string | null) =>
       }).format(new Date(value))
     : '—';
 
+const toInputDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const reportRange = (mode: 'weekly' | 'monthly') => {
+  const today = new Date();
+  if (mode === 'weekly') {
+    const start = new Date(today);
+    start.setDate(today.getDate() - today.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { from: toInputDate(start), to: toInputDate(end) };
+  }
+  const start = new Date(today.getFullYear(), today.getMonth(), 1);
+  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  return { from: toInputDate(start), to: toInputDate(end) };
+};
+
 const emptyCreate = (): TransactionFollowUpCreateInput => ({
   transactionNumber: '',
   transactionDate: new Date().toISOString().slice(0, 10),
@@ -160,6 +185,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const canAdd = isAdmin || hasPermission('transaction_follow_up', 'canAdd');
   const canEdit = isAdmin || hasPermission('transaction_follow_up', 'canEdit');
   const canDelete = isAdmin || hasPermission('transaction_follow_up', 'canDelete');
+  const canPrint = isAdmin || hasPermission('transaction_follow_up', 'canPrint');
 
   const [dashboard, setDashboard] = React.useState<TransactionFollowUpDashboard>(EMPTY_DASHBOARD);
   const [analytics, setAnalytics] = React.useState<TransactionFollowUpAnalytics>(EMPTY_ANALYTICS);
@@ -186,6 +212,15 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [nextDueDate, setNextDueDate] = React.useState('');
   const [assignUserId, setAssignUserId] = React.useState('');
   const [assignNote, setAssignNote] = React.useState('');
+  const reportRef = React.useRef<HTMLDivElement | null>(null);
+  const [reportOpen, setReportOpen] = React.useState(false);
+  const [reportLoading, setReportLoading] = React.useState(false);
+  const [reportExporting, setReportExporting] = React.useState(false);
+  const [reportMode, setReportMode] = React.useState<'weekly' | 'monthly' | 'custom'>('monthly');
+  const [reportFrom, setReportFrom] = React.useState(reportRange('monthly').from);
+  const [reportTo, setReportTo] = React.useState(reportRange('monthly').to);
+  const [reportAssigneeId, setReportAssigneeId] = React.useState('');
+  const [reportData, setReportData] = React.useState<TransactionFollowUpExecutiveReport | null>(null);
 
   const load = React.useCallback(async () => {
     try {
