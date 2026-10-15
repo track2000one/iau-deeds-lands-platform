@@ -54,6 +54,7 @@ import { TransactionManagementDirectives } from '../components/TransactionManage
 import { TransactionDirectivesDashboardDialog } from '../components/TransactionDirectivesDashboardDialog';
 import { TransactionApprovalCenterDialog } from '../components/TransactionApprovalCenterDialog';
 import { TransactionApprovalHistoryDialog } from '../components/TransactionApprovalHistoryDialog';
+import { TransactionDirectiveKpiDialog } from '../components/TransactionDirectiveKpiDialog';
 import {
   transactionFollowUpApi,
   type TransactionFollowUpAnalytics,
@@ -245,6 +246,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [directivesDashboardOpen, setDirectivesDashboardOpen] = React.useState(false);
   const [approvalCenterOpen, setApprovalCenterOpen] = React.useState(false);
   const [approvalHistoryOpen, setApprovalHistoryOpen] = React.useState(false);
+  const [directiveKpiOpen, setDirectiveKpiOpen] = React.useState(false);
   const [createForm, setCreateForm] = React.useState<TransactionFollowUpCreateInput>(emptyCreate());
   const [selected, setSelected] = React.useState<TransactionFollowUpRecord | null>(null);
   const [actionText, setActionText] = React.useState('');
@@ -823,6 +825,16 @@ ${styleAssets}
                 سجل الاعتمادات
               </Button>
             )}
+            {(isAdmin || canDelete) && (
+              <Button
+                variant="outline"
+                className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                onClick={() => setDirectiveKpiOpen(true)}
+              >
+                <Gauge className="ml-2 h-4 w-4" />
+                KPI التوجيهات
+              </Button>
+            )}
             {canPrint && (
               <Button variant="outline" onClick={() => void openExecutiveReport()}>
                 <FileText className="ml-2 h-4 w-4" />
@@ -1100,6 +1112,14 @@ ${styleAssets}
           onOpenChange={setApprovalHistoryOpen}
           assignees={assignees}
           onOpenTransaction={(id) => void openDetails(id)}
+        />
+      )}
+
+      {(isAdmin || canDelete) && (
+        <TransactionDirectiveKpiDialog
+          open={directiveKpiOpen}
+          onOpenChange={setDirectiveKpiOpen}
+          assignees={assignees}
         />
       )}
 
