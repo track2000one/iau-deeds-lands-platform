@@ -488,6 +488,46 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
                         </div>
                       )}
 
+                      {(directive.reviews || []).length > 0 && (
+                        <details className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+                          <summary className="cursor-pointer text-[11px] font-black text-slate-800">
+                            سجل مراجعات الإدارة ({(directive.reviews || []).length.toLocaleString('ar-SA')})
+                          </summary>
+                          <div className="mt-3 space-y-2">
+                            {(directive.reviews || []).map((review, index) => (
+                              <div key={review.id} className="rounded-lg border bg-slate-50/70 p-2.5">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      review.decision === 'approved'
+                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                        : 'border-amber-300 bg-amber-50 text-amber-800'
+                                    }
+                                  >
+                                    {reviewDecisionLabels[review.decision]}
+                                  </Badge>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    المراجعة رقم {(directive.reviews!.length - index).toLocaleString('ar-SA')}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {formatDateTime(review.reviewedAt)}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-[10px] text-muted-foreground">
+                                  بواسطة <b className="text-foreground">{review.reviewedByName || '—'}</b>
+                                  {' · '}
+                                  الأدلة وقت المراجعة: <b className="text-foreground">{(review.evidenceSnapshot || []).length.toLocaleString('ar-SA')}</b>
+                                </p>
+                                {review.reviewNote && (
+                                  <p className="mt-1 whitespace-pre-wrap text-xs leading-6 text-slate-700">{review.reviewNote}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+
                       <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
