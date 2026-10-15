@@ -5,12 +5,16 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Gavel,
+  ExternalLink,
+  Paperclip,
   PencilLine,
   Play,
   Plus,
   RefreshCw,
   RotateCcw,
   ShieldCheck,
+  Trash2,
+  Upload,
   UserRound,
   XCircle,
 } from 'lucide-react';
@@ -99,6 +103,7 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
   const [completionNote, setCompletionNote] = React.useState('');
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const [reviewNote, setReviewNote] = React.useState('');
+  const [evidenceUploadingId, setEvidenceUploadingId] = React.useState<string | null>(null);
 
   const openCount = directives.filter((item) =>
     ['pending', 'in_progress', 'awaiting_approval', 'returned'].includes(item.status)
@@ -213,6 +218,57 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
       toast.error(error instanceof Error ? error.message : 'تعذر اعتماد نتيجة التوجيه');
     } finally {
       setSaving(false);
+    }
+  };
+
+
+  const uploadEvidence = async (directive: TransactionFollowUpDirective, files: FileList | null) => {
+    if (!files?.length) return;
+    const selected = Array.from(files);
+    const oversized = selected.find((file) => file.size > 20 * 1024 * 1024);
+    if (oversized) {
+      toast.error(`حجم الملف «${oversized.name}» يتجاوز الحد المسموح 20 ميجابايت`);
+      return;
+    }
+
+    try {
+      setEvidenceUploadingId(directive.id);
+      for (const file of selected) {
+        await transactionFollowUpApi.uploadDirectiveEvidence(
+          record.id,
+          directive.id,
+          file,
+          'دليل تنفيذ التوجيه أو القرار',
+        );
+      }
+      toast.success(
+        selected.length === 1
+          ? 'تم إرفاق دليل التنفيذ'
+          : `تم إرفاق ${selected.length.toLocaleString('ar-SA')} ملفات كأدلة تنفيذ`,
+      );
+      await onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر رفع دليل التنفيذ');
+    } finally {
+      setEvidenceUploadingId(null);
+    }
+  };
+
+  const deleteEvidence = async (
+    directive: TransactionFollowUpDirective,
+    attachmentId: string,
+    title: string,
+  ) => {
+    if (!window.confirm(`حذف المرفق «${title}» من أدلة التنفيذ؟`)) return;
+    try {
+      setEvidenceUploadingId(directive.id);
+      await transactionFollowUpApi.deleteDirectiveEvidence(record.id, directive.id, attachmentId);
+      toast.success('تم حذف دليل التنفيذ');
+      await onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حذف دليل التنفيذ');
+    } finally {
+      setEvidenceUploadingId(null);
     }
   };
 
@@ -431,6 +487,104 @@ export const TransactionManagementDirectives: React.FC<Props> = ({
                           </p>
                         </div>
                       )}
+
+                      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="flex items-center gap-1.5 text-[11px] font-black text-slate-800">
+                              <Paperclip className="h-3.5 w-3.5" />
+                              مرفقات وأدلة التنفيذ
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-muted-foreground">
+                              PDF، Word، Excel، PowerPoint، صور أو فيديو — بحد أقصى 20 ميجابايت للملف.
+                            </p>
+                          </div>
+                          {canExecute && !['awaiting_approval', 'completed', 'cancelled'].includes(directive.status) && (
+                            <div>
+                              <input
+                                id={`directive-evidence-${directive.id}`}
+                                type="file"
+                                multiple
+                                className="hidden"
+                                accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,video/mp4"
+                                onChange={(event) => {
+                                  const files = event.currentTarget.files;
+                                  void uploadEvidence(directive, files);
+                                  event.currentTarget.value = '';
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={evidenceUploadingId === directive.id}
+                                onClick={() => document.getElementById(`directive-evidence-${directive.id}`)?.click()}
+                              >
+                                {evidenceUploadingId === directive.id
+                                  ? <RefreshCw className="ml-1 h-3.5 w-3.5 animate-spin" />
+                                  : <Upload className="ml-1 h-3.5 w-3.5" />}
+                                إضافة دليل
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+
+                        {(directive.evidence || []).length ? (
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            {(directive.evidence || []).map((attachment) => (
+                              <div
+                                key={attachment.id}
+                                className="flex items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-xs font-bold text-slate-800">{attachment.title}</p>
+                                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                    {attachment.mimeType || 'مرفق'}
+                                    {attachment.createdBy ? <> · {attachment.createdBy}</> : null}
+                                    {' · '}
+                                    {formatDateTime(attachment.createdAt)}
+                                  </p>
+                                </div>
+                                <div className="flex shrink-0 gap-1">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0"
+                                    onClick={() => window.open(attachment.driveUrl, '_blank', 'noopener,noreferrer')}
+                                    title="فتح المرفق"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </Button>
+                                  {canExecute && !['awaiting_approval', 'completed', 'cancelled'].includes(directive.status) && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-red-700"
+                                      disabled={evidenceUploadingId === directive.id}
+                                      onClick={() => void deleteEvidence(directive, attachment.id, attachment.title)}
+                                      title="حذف المرفق"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="mt-3 rounded-lg border border-dashed bg-white py-5 text-center text-[11px] text-muted-foreground">
+                            لا توجد أدلة تنفيذ مرفقة حتى الآن.
+                          </div>
+                        )}
+
+                        {awaitingApproval && (
+                          <p className="mt-2 text-[10px] font-semibold text-violet-700">
+                            تم تثبيت الأدلة المرفوعة مؤقتًا أثناء مراجعة الإدارة، ولا يمكن تعديلها حتى انتهاء المراجعة.
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     {canExecute && !isFinal && !awaitingApproval && (
