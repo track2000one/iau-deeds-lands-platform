@@ -2,7 +2,10 @@ import React from 'react';
 import { useSearchParams } from 'react-router';
 import {
   AlertTriangle,
+  Archive,
   ArrowLeftRight,
+  CalendarClock,
+  GitCompareArrows,
   CheckCircle2,
   CircleDot,
   Clock3,
@@ -20,6 +23,9 @@ import {
   RefreshCw,
   Search,
   Send,
+  Save,
+  Play,
+  Trash2,
   UserRound,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -47,6 +53,9 @@ import {
   type TransactionFollowUpCreateInput,
   type TransactionFollowUpDashboard,
   type TransactionFollowUpExecutiveReport,
+  type TransactionFollowUpReportArchive,
+  type TransactionFollowUpReportComparison,
+  type TransactionFollowUpReportSchedule,
   type TransactionFollowUpPriority,
   type TransactionFollowUpRecord,
   type TransactionFollowUpStatus,
