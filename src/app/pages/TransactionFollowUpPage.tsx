@@ -375,6 +375,162 @@ export const TransactionFollowUpPage: React.FC = () => {
     }
   };
 
+  const loadExecutiveReport = async (
+    from = reportFrom,
+    to = reportTo,
+    assigneeUserId = reportAssigneeId,
+  ) => {
+    if (!from || !to) {
+      toast.error('حدد بداية ونهاية فترة التقرير');
+      return;
+    }
+    if (new Date(from).getTime() > new Date(to).getTime()) {
+      toast.error('بداية فترة التقرير يجب أن تسبق نهايتها');
+      return;
+    }
+
+    try {
+      setReportLoading(true);
+      const data = await transactionFollowUpApi.executiveReport({
+        from,
+        to,
+        assigneeUserId: isAdmin || canDelete ? assigneeUserId || undefined : undefined,
+        mine: !(isAdmin || canDelete),
+      });
+      setReportData(data);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إعداد التقرير التنفيذي');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const openExecutiveReport = async () => {
+    const range = reportRange('monthly');
+    setReportMode('monthly');
+    setReportFrom(range.from);
+    setReportTo(range.to);
+    setReportAssigneeId('');
+    setReportOpen(true);
+    await loadExecutiveReport(range.from, range.to, '');
+  };
+
+  const applyReportMode = async (mode: 'weekly' | 'monthly' | 'custom') => {
+    setReportMode(mode);
+    if (mode === 'custom') return;
+    const range = reportRange(mode);
+    setReportFrom(range.from);
+    setReportTo(range.to);
+    await loadExecutiveReport(range.from, range.to, reportAssigneeId);
+  };
+
+  const printExecutiveReport = () => {
+    if (!reportRef.current || !reportData) return;
+    const popup = window.open('', '_blank', 'width=1200,height=900');
+    if (!popup) {
+      toast.error('تعذر فتح نافذة الطباعة. تحقق من السماح بالنوافذ المنبثقة.');
+      return;
+    }
+    const title = `تقرير متابعة المعاملات ${reportFrom} إلى ${reportTo}`;
+    popup.document.open();
+    popup.document.write(`<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>${title}</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, Tahoma, sans-serif; color: #17202a; background: #fff; }
+  .report-sheet { width: 100% !important; max-width: none !important; padding: 0 !important; box-shadow: none !important; border: 0 !important; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #d5d9dd; padding: 6px 7px; font-size: 10px; vertical-align: top; }
+  th { background: #f2f5f4; font-weight: 700; }
+  h1, h2, h3, p { margin-top: 0; }
+  .no-print { display: none !important; }
+  .break-inside-avoid { break-inside: avoid; }
+</style>
+</head>
+<body>${reportRef.current.outerHTML}</body>
+</html>`);
+    popup.document.close();
+    popup.focus();
+    window.setTimeout(() => {
+      popup.print();
+    }, 350);
+  };
+
+  const exportExecutiveReportPdf = async () => {
+    if (!reportRef.current || !reportData) return;
+    try {
+      setReportExporting(true);
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false,
+      });
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const margin = 8;
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const printableWidth = pageWidth - margin * 2;
+      const printableHeight = pageHeight - margin * 2;
+      const pxPerMm = canvas.width / printableWidth;
+      const pageHeightPx = Math.max(1, Math.floor(printableHeight * pxPerMm));
+
+      let pageIndex = 0;
+      for (let offsetY = 0; offsetY < canvas.height; offsetY += pageHeightPx) {
+        const sliceHeight = Math.min(pageHeightPx, canvas.height - offsetY);
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+        const context = pageCanvas.getContext('2d');
+        if (!context) continue;
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        context.drawImage(
+          canvas,
+          0,
+          offsetY,
+          canvas.width,
+          sliceHeight,
+          0,
+          0,
+          canvas.width,
+          sliceHeight,
+        );
+
+        if (pageIndex > 0) pdf.addPage();
+        const imageHeightMm = sliceHeight / pxPerMm;
+        pdf.addImage(
+          pageCanvas.toDataURL('image/jpeg', 0.92),
+          'JPEG',
+          margin,
+          margin,
+          printableWidth,
+          imageHeightMm,
+          undefined,
+          'FAST',
+        );
+        pageIndex += 1;
+      }
+
+      pdf.save(`تقرير-متابعة-المعاملات-${reportFrom}-إلى-${reportTo}.pdf`);
+      toast.success('تم إنشاء ملف PDF للتقرير التنفيذي');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء ملف PDF');
+    } finally {
+      setReportExporting(false);
+    }
+  };
+
   const remove = async (record: TransactionFollowUpRecord) => {
     if (!window.confirm(`حذف المعاملة رقم ${record.transactionNumber} من نظام المتابعة نهائيًا؟`)) return;
     try {
