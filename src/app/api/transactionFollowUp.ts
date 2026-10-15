@@ -83,6 +83,29 @@ export type TransactionFollowUpAssignee = {
   role: 'admin' | 'employee';
 };
 
+export type TransactionFollowUpAlert = {
+  id: string;
+  alertKey: string;
+  transactionId: string;
+  userId: string;
+  kind: string;
+  severity: 'info' | 'warning' | 'danger';
+  title: string;
+  message: string;
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+  transaction: {
+    id: string;
+    transactionNumber: string;
+    trackingNumber: string;
+    subject: string;
+    status: TransactionFollowUpStatus;
+    currentAssigneeName?: string | null;
+    dueDate?: string | null;
+  };
+};
+
 export type TransactionFollowUpDashboard = {
   total: number;
   open: number;
@@ -146,6 +169,19 @@ export const transactionFollowUpApi = {
 
   assignees: () =>
     apiJson<TransactionFollowUpAssignee[]>('/api/transaction-follow-up/assignees'),
+
+  alerts: () =>
+    apiJson<TransactionFollowUpAlert[]>('/api/transaction-follow-up/alerts'),
+
+  readAlert: (id: string) =>
+    apiJson<TransactionFollowUpAlert>(`/api/transaction-follow-up/alerts/${id}/read`, {
+      method: 'PATCH',
+    }),
+
+  readAllAlerts: () =>
+    apiJson<{ updated: number }>('/api/transaction-follow-up/alerts/read-all', {
+      method: 'PATCH',
+    }),
 
   get: (id: string) =>
     apiJson<TransactionFollowUpRecord>(`/api/transaction-follow-up/${id}`),
