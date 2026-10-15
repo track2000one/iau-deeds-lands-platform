@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRight, ShieldAlert } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
 import {
@@ -8,13 +8,18 @@ import {
   type TransactionFollowUpAssignee,
 } from '../api/transactionFollowUp';
 import { Button } from '../components/ui/button';
-import { TransactionRiskRegisterDialog } from '../components/TransactionRiskRegisterDialog';
+import {
+  TransactionRiskRegisterDialog,
+  type RiskRegisterSeed,
+} from '../components/TransactionRiskRegisterDialog';
 
 export const TransactionRiskRegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAdmin, hasPermission } = usePermissions();
   const supervisor = isAdmin || hasPermission('transaction_follow_up', 'canDelete');
   const [assignees, setAssignees] = React.useState<TransactionFollowUpAssignee[]>([]);
+  const navigationSeed = (location.state as { riskSeed?: RiskRegisterSeed } | null)?.riskSeed || null;
 
   React.useEffect(() => {
     transactionFollowUpApi.assignees()
@@ -54,6 +59,7 @@ export const TransactionRiskRegisterPage: React.FC = () => {
         }}
         assignees={assignees}
         supervisor={supervisor}
+        seed={navigationSeed}
       />
     </div>
   );
