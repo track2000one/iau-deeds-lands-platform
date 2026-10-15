@@ -250,6 +250,74 @@ export type TransactionFollowUpImprovementPlan = {
   events?: TransactionFollowUpImprovementPlanEvent[];
 };
 
+export type TransactionFollowUpImprovementEffectiveness = {
+  generatedAt: string;
+  periodDays: number | null;
+  recurrenceWindowDays: number;
+  summary: {
+    plans: number;
+    open: number;
+    overdue: number;
+    verified: number;
+    successful: number;
+    unsuccessful: number;
+    effectivenessRate: number | null;
+    avgRecoveryDays: number | null;
+    avgImprovementPercent: number | null;
+    recurrenceEligible: number;
+    recurrenceCount: number;
+    recurrenceRate90d: number | null;
+    sustainedSuccessRate90d: number | null;
+  };
+  metricBreakdown: Array<{
+    metricKey: TransactionFollowUpImprovementPlan['metricKey'];
+    metricLabel: string;
+    plans: number;
+    verified: number;
+    successful: number;
+    effectivenessRate: number | null;
+    avgRecoveryDays: number | null;
+    recurrenceRate90d: number | null;
+  }>;
+  topRootCauses: Array<{
+    text: string;
+    plans: number;
+    verified: number;
+    successful: number;
+    open: number;
+    effectivenessRate: number | null;
+    avgRecoveryDays: number | null;
+  }>;
+  topCorrectiveActions: Array<{
+    text: string;
+    plans: number;
+    verified: number;
+    successful: number;
+    open: number;
+    effectivenessRate: number | null;
+    avgRecoveryDays: number | null;
+  }>;
+  owners: Array<{
+    userId?: string | null;
+    username: string;
+    plans: number;
+    open: number;
+    overdue: number;
+    verified: number;
+    successful: number;
+    effectivenessRate: number | null;
+    avgRecoveryDays: number | null;
+  }>;
+  monthlyTrend: Array<{
+    key: string;
+    year: number;
+    month: number;
+    created: number;
+    verified: number;
+    successful: number;
+  }>;
+};
+
 export type TransactionFollowUpImprovementPlanPage = {
   generatedAt: string;
   summary: {
@@ -897,6 +965,15 @@ export const transactionFollowUpApi = {
     const suffix = query.toString();
     return apiJson<TransactionFollowUpDirectivesDashboard>(
       `/api/transaction-follow-up/directives/dashboard${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  improvementEffectiveness: (input: { periodDays?: number | 'all' } = {}) => {
+    const query = new URLSearchParams();
+    if (input.periodDays) query.set('periodDays', String(input.periodDays));
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpImprovementEffectiveness>(
+      `/api/transaction-follow-up/directives/improvement-plans/effectiveness${suffix ? `?${suffix}` : ''}`,
     );
   },
 
