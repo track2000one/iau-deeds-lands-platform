@@ -1,4 +1,4 @@
-import { apiJson } from '../../lib/http';
+import { apiJson, authenticatedFetch } from '../../lib/http';
 
 export type TransactionFollowUpStatus =
   | 'new'
@@ -83,6 +83,21 @@ export type TransactionFollowUpDirectivesDashboard = {
   totalItems: number;
 };
 
+export type TransactionFollowUpDirectiveEvidence = {
+  id: string;
+  entityType: 'transaction_follow_up_directive';
+  entityId: string;
+  attachmentType: string;
+  title: string;
+  driveUrl: string;
+  driveFileId?: string | null;
+  mimeType?: string | null;
+  notes?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TransactionFollowUpDirective = {
   id: string;
   transactionId: string;
@@ -116,6 +131,7 @@ export type TransactionFollowUpDirective = {
   isOverdue: boolean;
   isDueToday: boolean;
   daysOverdue: number;
+  evidence?: TransactionFollowUpDirectiveEvidence[];
 };
 
 export type TransactionFollowUpRecord = {
@@ -668,6 +684,61 @@ export const transactionFollowUpApi = {
         method: 'PATCH',
         body: JSON.stringify(input),
       },
+    ),
+
+  uploadDirectiveEvidence: async (
+    transactionId: string,
+    directiveId: string,
+    file: File,
+    notes?: string | null,
+  ) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('fileName', file.name);
+
+    const uploadResponse = await authenticatedFetch('/api/uploads', {
+      method: 'POST',
+      headers: { 'x-upload-module': 'transaction_follow_up' },
+      body: formData,
+    });
+    const uploaded = await uploadResponse.json().catch(() => ({}));
+    if (!uploadResponse.ok) {
+      throw new Error(uploaded?.message || 'تعذر رفع ملف دليل التنفيذ');
+    }
+
+    try {
+      return await apiJson<TransactionFollowUpDirectiveEvidence>(
+        `/api/transaction-follow-up/${transactionId}/directives/${directiveId}/evidence`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            title: file.name,
+            driveUrl: uploaded.driveUrl,
+            driveFileId: uploaded.driveFileId || null,
+            mimeType: uploaded.mimeType || file.type || null,
+            notes: notes || null,
+          }),
+        },
+      );
+    } catch (error) {
+      if (uploaded.driveFileId) {
+        void authenticatedFetch(`/api/uploads/${uploaded.driveFileId}`, {
+          method: 'DELETE',
+          headers: { 'x-upload-module': 'transaction_follow_up' },
+        }).catch(() => undefined);
+      }
+      throw error;
+    }
+  },
+
+  deleteDirectiveEvidence: (
+    transactionId: string,
+    directiveId: string,
+    attachmentId: string,
+  ) =>
+    apiJson<void>(
+      `/api/transaction-follow-up/${transactionId}/directives/${directiveId}/evidence/${attachmentId}`,
+      { method: 'DELETE' },
     ),
 
   recordAction: (
