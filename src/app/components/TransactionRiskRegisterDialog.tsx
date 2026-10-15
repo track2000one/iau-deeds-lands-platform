@@ -1,9 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router';
 import {
   Activity,
   AlertTriangle,
   CalendarClock,
   CheckCircle2,
+  FileCheck2,
   Plus,
   RefreshCw,
   Save,
@@ -12,6 +14,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../../context/AuthContext';
 import type { TransactionFollowUpAssignee } from '../api/transactionFollowUp';
 import {
   transactionRiskApi,
@@ -247,6 +250,8 @@ export const TransactionRiskRegisterDialog: React.FC<Props> = ({
   supervisor,
   seed,
 }) => {
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [data, setData] = React.useState<TransactionRiskPage>(EMPTY_PAGE);
   const [loading, setLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -490,6 +495,16 @@ export const TransactionRiskRegisterDialog: React.FC<Props> = ({
                     {data.items.map((risk) => {
                       const state = edits[risk.id] || editState(risk);
                       const residualScore = Number(state.residualProbability) * Number(state.residualImpact);
+                      const latestAcceptance = risk.latestAcceptance || null;
+                      const canRequestAcceptance =
+                        risk.status !== 'closed' &&
+                        risk.status !== 'accepted' &&
+                        latestAcceptance?.status !== 'pending' &&
+                        (
+                          supervisor ||
+                          risk.ownerUserId === currentUser?.uid ||
+                          risk.assigneeUserId === currentUser?.uid
+                        );
                       return (
                         <div key={risk.id} className="space-y-3 p-4">
                           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -506,6 +521,19 @@ export const TransactionRiskRegisterDialog: React.FC<Props> = ({
                                 {risk.isReviewOverdue && (
                                   <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800">
                                     مراجعة متأخرة
+                                  </Badge>
+                                )}
+                                {latestAcceptance?.status === 'pending' && (
+                                  <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-900">
+                                    طلب قبول بانتظار الاعتماد
+                                  </Badge>
+                                )}
+                                {risk.status === 'accepted' && risk.acceptanceExpiresAt && (
+                                  <Badge variant="outline" className={risk.acceptanceExpiresSoon
+                                    ? 'border-red-300 bg-red-50 text-red-800'
+                                    : 'border-slate-300 bg-slate-50 text-slate-800'}
+                                  >
+                                    قبول معتمد حتى {formatDate(risk.acceptanceExpiresAt)}
                                   </Badge>
                                 )}
                               </div>
@@ -536,6 +564,40 @@ export const TransactionRiskRegisterDialog: React.FC<Props> = ({
                                   </div>
                                 </div>
                               ) : null}
+                              {latestAcceptance?.status === 'rejected' && (
+                                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[10px] leading-5 text-red-900">
+                                  آخر طلب قبول مرفوض
+                                  {latestAcceptance.reviewComment ? ': ' + latestAcceptance.reviewComment : ''}
+                                </div>
+                              )}
+                              {canRequestAcceptance && (
+                                <div className="mt-3">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-slate-300 bg-white"
+                                    onClick={() => {
+                                      onOpenChange(false);
+                                      navigate('/follow-up/risks/acceptance', {
+                                        state: {
+                                          riskAcceptanceSeed: {
+                                            id: risk.id,
+                                            riskNumber: risk.riskNumber,
+                                            title: risk.title,
+                                            residualScore: risk.residualScore,
+                                            residualLevel: risk.residualLevel,
+                                            controls: risk.controls || [],
+                                          },
+                                        },
+                                      });
+                                    }}
+                                  >
+                                    <FileCheck2 className="ml-1 h-3.5 w-3.5" />
+                                    طلب قبول الخطر
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -575,10 +637,16 @@ export const TransactionRiskRegisterDialog: React.FC<Props> = ({
                                     ...current,
                                     [risk.id]: { ...state, status: event.target.value as TransactionRiskStatus },
                                   }))}
+                                  disabled={risk.status === 'accepted'}
                                 >
-                                  {Object.entries(statusLabels).map(([value, label]) => (
-                                    <option key={value} value={value}>{label}</option>
-                                  ))}
+                                  {risk.status === 'accepted' && (
+                                    <option value="accepted">مقبول — عبر مسار الاعتماد</option>
+                                  )}
+                                  {Object.entries(statusLabels)
+                                    .filter(([value]) => value !== 'accepted')
+                                    .map(([value, label]) => (
+                                      <option key={value} value={value}>{label}</option>
+                                    ))}
                                 </NativeSelect>
                               </Field>
                               <Field label="المراجعة القادمة">
