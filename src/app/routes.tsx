@@ -62,6 +62,7 @@ const AssetReportsPage = lazy(() => import('./pages/AssetReportsPage').then((m) 
 const AssetExcelImportPage = lazy(() => import('./pages/AssetCycleImportPage').then((m) => ({ default: m.AssetCycleImportPage })));
 const AssetCyclesPage = lazy(() => import('./pages/AssetCyclesPage').then((m) => ({ default: m.AssetCyclesPage })));
 const ContractsFollowUpPage = lazy(() => import('./pages/ContractsFollowUpPage').then((m) => ({ default: m.ContractsFollowUpPage })));
+const TransactionFollowUpPage = lazy(() => import('./pages/TransactionFollowUpPage').then((m) => ({ default: m.TransactionFollowUpPage })));
 const MosquesWorkspacePage = lazy(() => import('./pages/MosquesWorkspacePage').then((m) => ({ default: m.MosquesWorkspacePage })));
 const MosqueJobsImportPage = lazy(() => import('./pages/MosqueJobsImportPage').then((m) => ({ default: m.MosqueJobsImportPage })));
 const MosquesPublicPage = lazy(() => import('./pages/MosquesPublicPage').then((m) => ({ default: m.MosquesPublicPage })));
@@ -97,6 +98,7 @@ const SCOPED_LANDING_ROUTES = [
   ['assets', '/assets'],
   ['accounting_transformation', '/accounting-transformation'],
   ['mosques', '/mosques'],
+  ['transaction_follow_up', '/follow-up'],
   ['contracts_follow_up', '/contracts/follow-up'],
   ['site_inspections', '/site-inspections'],
   ['reports', '/reports'],
@@ -234,6 +236,7 @@ export const router = createHashRouter([
           { path: 'import-jobs', element: mosquePermission(<MosqueJobsImportPage />, 'canAdd') },
         ],
       },
+      { path: 'follow-up', element: <PermissionGuard module="transaction_follow_up" action="canView">{page(<TransactionFollowUpPage />)}</PermissionGuard> },
       { path: 'contracts/follow-up', element: <PermissionGuard module="contracts_follow_up" action="canView">{page(<ContractsFollowUpPage />)}</PermissionGuard> },
       { path: 'reports', element: page(<ReportsPage />) },
       { path: 'archive', element: page(<ArchivePage />) },
