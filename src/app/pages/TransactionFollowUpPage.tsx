@@ -9,6 +9,10 @@ import {
   FileClock,
   Inbox,
   ListTodo,
+  Gauge,
+  TimerReset,
+  TrendingUp,
+  UsersRound,
   Plus,
   RefreshCw,
   Search,
@@ -34,6 +38,7 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Textarea } from '../components/ui/textarea';
 import {
   transactionFollowUpApi,
+  type TransactionFollowUpAnalytics,
   type TransactionFollowUpAssignee,
   type TransactionFollowUpCreateInput,
   type TransactionFollowUpDashboard,
@@ -51,6 +56,29 @@ const EMPTY_DASHBOARD: TransactionFollowUpDashboard = {
   completed: 0,
   unassigned: 0,
   needsAction: 0,
+};
+
+const EMPTY_ANALYTICS: TransactionFollowUpAnalytics = {
+  periodDays: 90,
+  generatedAt: new Date(0).toISOString(),
+  summary: {
+    tracked: 0,
+    open: 0,
+    completed: 0,
+    overdueOpen: 0,
+    needsAction: 0,
+    onTimeRate: null,
+    avgCompletionDays: null,
+    avgFirstActionHours: null,
+  },
+  ageBuckets: {
+    upTo2Days: 0,
+    from3To7Days: 0,
+    from8To14Days: 0,
+    over14Days: 0,
+  },
+  employees: [],
+  oldestOverdue: [],
 };
 
 const statusLabels: Record<TransactionFollowUpStatus, string> = {
@@ -134,6 +162,8 @@ export const TransactionFollowUpPage: React.FC = () => {
   const canDelete = isAdmin || hasPermission('transaction_follow_up', 'canDelete');
 
   const [dashboard, setDashboard] = React.useState<TransactionFollowUpDashboard>(EMPTY_DASHBOARD);
+  const [analytics, setAnalytics] = React.useState<TransactionFollowUpAnalytics>(EMPTY_ANALYTICS);
+  const [analyticsPeriod, setAnalyticsPeriod] = React.useState<'30' | '90' | '365' | 'all'>('90');
   const [records, setRecords] = React.useState<TransactionFollowUpRecord[]>([]);
   const [assignees, setAssignees] = React.useState<TransactionFollowUpAssignee[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -160,7 +190,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const load = React.useCallback(async () => {
     try {
       setLoading(true);
-      const [pageResult, dashboardResult] = await Promise.all([
+      const [pageResult, dashboardResult, analyticsResult] = await Promise.all([
         transactionFollowUpApi.list({
           page,
           pageSize: 30,
@@ -170,18 +200,23 @@ export const TransactionFollowUpPage: React.FC = () => {
           mine,
         }),
         transactionFollowUpApi.dashboard(mine),
+        transactionFollowUpApi.analytics({
+          mine,
+          periodDays: analyticsPeriod === 'all' ? 'all' : Number(analyticsPeriod),
+        }),
       ]);
       setRecords(pageResult.items || []);
       setTotal(pageResult.total || 0);
       setTotalPages(pageResult.totalPages || 0);
       setDashboard(dashboardResult);
+      setAnalytics(analyticsResult);
       if (pageResult.totalPages && page > pageResult.totalPages) setPage(pageResult.totalPages);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل نظام المتابعة');
     } finally {
       setLoading(false);
     }
-  }, [page, priority, search, status, mine]);
+  }, [page, priority, search, status, mine, analyticsPeriod]);
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => void load(), search.trim() ? 250 : 0);
@@ -369,6 +404,148 @@ export const TransactionFollowUpPage: React.FC = () => {
         <Summary title="غير مسندة" value={dashboard.unassigned} icon={<UserRound className="h-5 w-5 text-amber-700" />} />
         <Summary title="منجزة / مغلقة" value={dashboard.completed} icon={<CheckCircle2 className="h-5 w-5 text-emerald-700" />} />
       </div>
+
+      <Card className="rounded-[28px] border-slate-200 bg-white/90 shadow-md">
+        <CardHeader className="border-b">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Gauge className="h-5 w-5 text-primary" />
+                لوحة الرقابة والأداء SLA
+              </CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                مؤشرات سرعة الإجراء والإنجاز في الموعد والحمل التشغيلي للموظفين.
+              </p>
+            </div>
+            <NativeSelect
+              value={analyticsPeriod}
+              onChange={(event) => setAnalyticsPeriod(event.target.value as '30' | '90' | '365' | 'all')}
+              className="w-full lg:w-52"
+            >
+              <option value="30">آخر 30 يومًا</option>
+              <option value="90">آخر 90 يومًا</option>
+              <option value="365">آخر سنة</option>
+              <option value="all">كل الفترات</option>
+            </NativeSelect>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5 p-4 sm:p-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricTile
+              title="الإنجاز في الموعد"
+              value={analytics.summary.onTimeRate == null ? '—' : `${analytics.summary.onTimeRate}%`}
+              hint={analytics.summary.completed ? `${analytics.summary.completed.toLocaleString('ar-SA')} معاملة منجزة` : 'لا توجد معاملات منجزة في الفترة'}
+              icon={<TrendingUp className="h-5 w-5 text-emerald-700" />}
+            />
+            <MetricTile
+              title="متوسط مدة الإنجاز"
+              value={analytics.summary.avgCompletionDays == null ? '—' : `${analytics.summary.avgCompletionDays} يوم`}
+              hint="من تسجيل المعاملة حتى إنجازها"
+              icon={<TimerReset className="h-5 w-5 text-sky-700" />}
+            />
+            <MetricTile
+              title="متوسط أول إجراء"
+              value={analytics.summary.avgFirstActionHours == null ? '—' : `${analytics.summary.avgFirstActionHours} ساعة`}
+              hint="من الإسناد حتى أول إجراء مسجل"
+              icon={<Clock3 className="h-5 w-5 text-violet-700" />}
+            />
+            <MetricTile
+              title="متأخرة حاليًا"
+              value={analytics.summary.overdueOpen.toLocaleString('ar-SA')}
+              hint={`${analytics.summary.needsAction.toLocaleString('ar-SA')} تحتاج إجراء أو تحديث`}
+              icon={<AlertTriangle className="h-5 w-5 text-red-600" />}
+            />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[0.9fr_2.1fr]">
+            <Card className="border-slate-200 shadow-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">أعمار المعاملات المفتوحة</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-2 text-center">
+                <AgeBox label="0 - 2 يوم" value={analytics.ageBuckets.upTo2Days} />
+                <AgeBox label="3 - 7 أيام" value={analytics.ageBuckets.from3To7Days} />
+                <AgeBox label="8 - 14 يوم" value={analytics.ageBuckets.from8To14Days} />
+                <AgeBox label="أكثر من 14 يوم" value={analytics.ageBuckets.over14Days} danger />
+              </CardContent>
+            </Card>
+
+            <Card className="min-w-0 border-slate-200 shadow-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <UsersRound className="h-4 w-4" />
+                  أداء وحمل الموظفين
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                {analytics.employees.length ? (
+                  <table className="w-full min-w-[760px] text-sm">
+                    <thead>
+                      <tr className="border-b text-xs text-muted-foreground">
+                        <th className="px-2 py-2 text-right font-bold">الموظف</th>
+                        <th className="px-2 py-2 text-center font-bold">مفتوحة</th>
+                        <th className="px-2 py-2 text-center font-bold">متأخرة</th>
+                        <th className="px-2 py-2 text-center font-bold">منجزة</th>
+                        <th className="px-2 py-2 text-center font-bold">في الموعد</th>
+                        <th className="px-2 py-2 text-center font-bold">متوسط الإنجاز</th>
+                        <th className="px-2 py-2 text-center font-bold">أول إجراء</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analytics.employees.map((employee) => (
+                        <tr key={employee.userId} className="border-b last:border-0">
+                          <td className="px-2 py-3 font-bold">{employee.username}</td>
+                          <td className="px-2 py-3 text-center">{employee.open.toLocaleString('ar-SA')}</td>
+                          <td className={`px-2 py-3 text-center font-bold ${employee.overdue ? 'text-red-700' : ''}`}>
+                            {employee.overdue.toLocaleString('ar-SA')}
+                          </td>
+                          <td className="px-2 py-3 text-center">{employee.completed.toLocaleString('ar-SA')}</td>
+                          <td className="px-2 py-3 text-center">{employee.onTimeRate == null ? '—' : `${employee.onTimeRate}%`}</td>
+                          <td className="px-2 py-3 text-center">{employee.avgCompletionDays == null ? '—' : `${employee.avgCompletionDays} يوم`}</td>
+                          <td className="px-2 py-3 text-center">{employee.avgFirstActionHours == null ? '—' : `${employee.avgFirstActionHours} س`}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="py-8 text-center text-sm text-muted-foreground">لا توجد بيانات أداء كافية للفترة المحددة.</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {analytics.oldestOverdue.length > 0 && (
+            <Card className="border-red-200 bg-red-50/20 shadow-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base text-red-900">أقدم المعاملات المتأخرة</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2 lg:grid-cols-2">
+                {analytics.oldestOverdue.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => void openDetails(item.id)}
+                    className="rounded-xl border border-red-100 bg-white p-3 text-right transition hover:border-red-300"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <b className="text-sm">معاملة {item.transactionNumber}</b>
+                        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{item.subject}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {item.assigneeName || 'غير مسندة'} · الاستحقاق {formatDate(item.dueDate)}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="shrink-0 border-red-300 bg-red-50 text-red-700">
+                        {item.overdueDays.toLocaleString('ar-SA')} يوم
+                      </Badge>
+                    </div>
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="rounded-[28px] border-white/60 bg-white/80 shadow-md">
         <CardHeader className="border-b">
@@ -593,6 +770,36 @@ const Info = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-xl border bg-slate-50/70 p-3">
     <p className="text-[11px] text-muted-foreground">{label}</p>
     <p className="mt-1 text-sm font-bold text-slate-900">{value}</p>
+  </div>
+);
+
+const MetricTile = ({
+  title,
+  value,
+  hint,
+  icon,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  icon: React.ReactNode;
+}) => (
+  <div className="rounded-2xl border bg-slate-50/70 p-4">
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <p className="text-xs font-bold text-muted-foreground">{title}</p>
+        <p className="mt-1 text-2xl font-black text-slate-900">{value}</p>
+      </div>
+      <div className="rounded-xl border bg-white p-2">{icon}</div>
+    </div>
+    <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{hint}</p>
+  </div>
+);
+
+const AgeBox = ({ label, value, danger = false }: { label: string; value: number; danger?: boolean }) => (
+  <div className={`rounded-xl border p-3 ${danger ? 'border-red-200 bg-red-50' : 'bg-slate-50/70'}`}>
+    <p className="text-[11px] text-muted-foreground">{label}</p>
+    <p className={`mt-1 text-xl font-black ${danger && value ? 'text-red-700' : 'text-slate-900'}`}>{value.toLocaleString('ar-SA')}</p>
   </div>
 );
 
