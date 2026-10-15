@@ -28,6 +28,7 @@ import {
   Search,
   Send,
   Save,
+  ShieldAlert,
   Play,
   Trash2,
   UserRound,
@@ -56,6 +57,7 @@ import { TransactionDirectivesDashboardDialog } from '../components/TransactionD
 import { TransactionApprovalCenterDialog } from '../components/TransactionApprovalCenterDialog';
 import { TransactionApprovalHistoryDialog } from '../components/TransactionApprovalHistoryDialog';
 import { TransactionDirectiveKpiDialog } from '../components/TransactionDirectiveKpiDialog';
+import { TransactionEarlyWarningDialog } from '../components/TransactionEarlyWarningDialog';
 import {
   TransactionImprovementPlansDialog,
   type ImprovementPlanSeed,
@@ -252,6 +254,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [approvalCenterOpen, setApprovalCenterOpen] = React.useState(false);
   const [approvalHistoryOpen, setApprovalHistoryOpen] = React.useState(false);
   const [directiveKpiOpen, setDirectiveKpiOpen] = React.useState(false);
+  const [earlyWarningOpen, setEarlyWarningOpen] = React.useState(false);
   const [improvementPlansOpen, setImprovementPlansOpen] = React.useState(false);
   const [improvementPlanSeed, setImprovementPlanSeed] = React.useState<ImprovementPlanSeed | null>(null);
   const [createForm, setCreateForm] = React.useState<TransactionFollowUpCreateInput>(emptyCreate());
@@ -378,6 +381,11 @@ export const TransactionFollowUpPage: React.FC = () => {
     if (searchParams.get('capa') !== '1' || !(isAdmin || canDelete)) return;
     setImprovementPlanSeed(null);
     setImprovementPlansOpen(true);
+  }, [searchParams, isAdmin, canDelete]);
+
+  React.useEffect(() => {
+    if (searchParams.get('earlyWarning') !== '1' || !(isAdmin || canDelete)) return;
+    setEarlyWarningOpen(true);
   }, [searchParams, isAdmin, canDelete]);
 
   const createTransaction = async () => {
@@ -866,6 +874,16 @@ ${styleAssets}
                 خطط التحسين CAPA
               </Button>
             )}
+            {(isAdmin || canDelete) && (
+              <Button
+                variant="outline"
+                className="border-orange-300 bg-orange-50 text-orange-900 hover:bg-orange-100"
+                onClick={() => setEarlyWarningOpen(true)}
+              >
+                <ShieldAlert className="ml-2 h-4 w-4" />
+                الإنذار المبكر
+              </Button>
+            )}
             {canPrint && (
               <Button variant="outline" onClick={() => void openExecutiveReport()}>
                 <FileText className="ml-2 h-4 w-4" />
@@ -1169,6 +1187,21 @@ ${styleAssets}
             }
             setImprovementPlanSeed(seed || null);
             setImprovementPlansOpen(true);
+          }}
+        />
+      )}
+
+      {(isAdmin || canDelete) && (
+        <TransactionEarlyWarningDialog
+          open={earlyWarningOpen}
+          onOpenChange={(open) => {
+            setEarlyWarningOpen(open);
+            if (!open && searchParams.get('earlyWarning') === '1') {
+              const next = new URLSearchParams(searchParams);
+              next.delete('earlyWarning');
+              next.delete('alert');
+              setSearchParams(next);
+            }
           }}
         />
       )}
