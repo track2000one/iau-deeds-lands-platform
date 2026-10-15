@@ -36,6 +36,8 @@ const EMPTY_DATA: TransactionFollowUpDirectivesDashboard = {
     open: 0,
     pending: 0,
     inProgress: 0,
+    awaitingApproval: 0,
+    returned: 0,
     overdue: 0,
     dueToday: 0,
     dueSoon: 0,
@@ -62,7 +64,9 @@ const formatDate = (value?: string | null) =>
 const statusLabel: Record<string, string> = {
   pending: 'بانتظار التنفيذ',
   in_progress: 'قيد التنفيذ',
-  completed: 'منجز',
+  awaiting_approval: 'بانتظار اعتماد الإدارة',
+  returned: 'معاد للاستكمال',
+  completed: 'منجز ومعتمد',
   cancelled: 'ملغى',
 };
 
@@ -140,10 +144,12 @@ export const TransactionDirectivesDashboardDialog: React.FC<Props> = ({
         </DialogHeader>
 
         <div className="space-y-4 overflow-y-auto pe-1">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-9">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-11">
             <Metric label="المفتوحة" value={data.summary.open} />
             <Metric label="بانتظار التنفيذ" value={data.summary.pending} warning={data.summary.pending > 0} />
             <Metric label="قيد التنفيذ" value={data.summary.inProgress} />
+            <Metric label="بانتظار الاعتماد" value={data.summary.awaitingApproval} warning={data.summary.awaitingApproval > 0} />
+            <Metric label="معادة للاستكمال" value={data.summary.returned} warning={data.summary.returned > 0} />
             <Metric label="صدرت اليوم" value={data.summary.issuedToday} />
             <Metric label="المتأخرة" value={data.summary.overdue} danger={data.summary.overdue > 0} />
             <Metric label="مستحقة اليوم" value={data.summary.dueToday} warning={data.summary.dueToday > 0} />
@@ -167,7 +173,9 @@ export const TransactionDirectivesDashboardDialog: React.FC<Props> = ({
                 <option value="">كل الحالات</option>
                 <option value="pending">بانتظار التنفيذ</option>
                 <option value="in_progress">قيد التنفيذ</option>
-                <option value="completed">منجزة</option>
+                <option value="awaiting_approval">بانتظار اعتماد الإدارة</option>
+                <option value="returned">معادة للاستكمال</option>
+                <option value="completed">منجزة ومعتمدة</option>
                 <option value="cancelled">ملغاة</option>
               </NativeSelect>
               <NativeSelect value={priority} onChange={(e) => setPriority(e.target.value)}>
@@ -303,7 +311,9 @@ export const TransactionDirectivesDashboardDialog: React.FC<Props> = ({
                               <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
                                 <span>مفتوحة: <b>{employee.open.toLocaleString('ar-SA')}</b></span>
                                 <span>قيد التنفيذ: <b>{employee.inProgress.toLocaleString('ar-SA')}</b></span>
-                                <span>منجزة: <b>{employee.completed.toLocaleString('ar-SA')}</b></span>
+                                <span>بانتظار الاعتماد: <b>{employee.awaitingApproval.toLocaleString('ar-SA')}</b></span>
+                                <span>معادة: <b>{employee.returned.toLocaleString('ar-SA')}</b></span>
+                                <span>منجزة ومعتمدة: <b>{employee.completed.toLocaleString('ar-SA')}</b></span>
                                 <span className={employee.overdue ? 'text-red-700' : ''}>
                                   متأخرة: <b>{employee.overdue.toLocaleString('ar-SA')}</b>
                                 </span>
