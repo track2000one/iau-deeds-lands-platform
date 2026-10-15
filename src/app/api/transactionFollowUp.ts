@@ -47,6 +47,8 @@ export type TransactionFollowUpDirectivesDashboard = {
     open: number;
     pending: number;
     inProgress: number;
+    awaitingApproval: number;
+    returned: number;
     overdue: number;
     dueToday: number;
     dueSoon: number;
@@ -62,6 +64,8 @@ export type TransactionFollowUpDirectivesDashboard = {
     open: number;
     pending: number;
     inProgress: number;
+    awaitingApproval: number;
+    returned: number;
     overdue: number;
     completed: number;
     urgent: number;
@@ -86,7 +90,7 @@ export type TransactionFollowUpDirective = {
   title: string;
   instruction: string;
   priority: 'normal' | 'high' | 'urgent';
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'in_progress' | 'awaiting_approval' | 'returned' | 'completed' | 'cancelled';
   assigneeUserId: string;
   assigneeName: string;
   dueDate?: string | null;
@@ -97,6 +101,14 @@ export type TransactionFollowUpDirective = {
   completedAt?: string | null;
   completionResponse?: string | null;
   completionNote?: string | null;
+  completionSubmittedAt?: string | null;
+  completionSubmittedById?: string | null;
+  completionSubmittedByName?: string | null;
+  reviewDecision?: 'approved' | 'return_for_completion' | 'request_modification' | null;
+  reviewNote?: string | null;
+  reviewedAt?: string | null;
+  reviewedById?: string | null;
+  reviewedByName?: string | null;
   lastUpdatedById?: string | null;
   lastUpdatedByName?: string | null;
   createdAt: string;
@@ -629,13 +641,29 @@ export const transactionFollowUpApi = {
     transactionId: string,
     directiveId: string,
     input: {
-      status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+      status: 'pending' | 'in_progress' | 'awaiting_approval' | 'cancelled';
       completionResponse?: string | null;
       completionNote?: string | null;
     },
   ) =>
     apiJson<TransactionFollowUpDirective>(
       `/api/transaction-follow-up/${transactionId}/directives/${directiveId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  reviewDirective: (
+    transactionId: string,
+    directiveId: string,
+    input: {
+      decision: 'approved' | 'return_for_completion' | 'request_modification';
+      reviewNote?: string | null;
+    },
+  ) =>
+    apiJson<TransactionFollowUpDirective>(
+      `/api/transaction-follow-up/${transactionId}/directives/${directiveId}/review`,
       {
         method: 'PATCH',
         body: JSON.stringify(input),
