@@ -29,6 +29,7 @@ import {
   Send,
   Save,
   ShieldAlert,
+  ShieldCheck,
   Play,
   Trash2,
   UserRound,
@@ -58,6 +59,10 @@ import { TransactionApprovalCenterDialog } from '../components/TransactionApprov
 import { TransactionApprovalHistoryDialog } from '../components/TransactionApprovalHistoryDialog';
 import { TransactionDirectiveKpiDialog } from '../components/TransactionDirectiveKpiDialog';
 import { TransactionEarlyWarningDialog } from '../components/TransactionEarlyWarningDialog';
+import {
+  TransactionPreventiveActionsDialog,
+  type PreventiveActionSeed,
+} from '../components/TransactionPreventiveActionsDialog';
 import {
   TransactionImprovementPlansDialog,
   type ImprovementPlanSeed,
@@ -255,8 +260,11 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [approvalHistoryOpen, setApprovalHistoryOpen] = React.useState(false);
   const [directiveKpiOpen, setDirectiveKpiOpen] = React.useState(false);
   const [earlyWarningOpen, setEarlyWarningOpen] = React.useState(false);
+  const [preventiveActionsOpen, setPreventiveActionsOpen] = React.useState(false);
+  const [preventiveActionSeed, setPreventiveActionSeed] = React.useState<PreventiveActionSeed | null>(null);
   const [improvementPlansOpen, setImprovementPlansOpen] = React.useState(false);
   const [improvementPlanSeed, setImprovementPlanSeed] = React.useState<ImprovementPlanSeed | null>(null);
+  const [capaSourcePreventiveActionId, setCapaSourcePreventiveActionId] = React.useState<string | null>(null);
   const [createForm, setCreateForm] = React.useState<TransactionFollowUpCreateInput>(emptyCreate());
   const [selected, setSelected] = React.useState<TransactionFollowUpRecord | null>(null);
   const [actionText, setActionText] = React.useState('');
@@ -387,6 +395,12 @@ export const TransactionFollowUpPage: React.FC = () => {
     if (searchParams.get('earlyWarning') !== '1' || !(isAdmin || canDelete)) return;
     setEarlyWarningOpen(true);
   }, [searchParams, isAdmin, canDelete]);
+
+  React.useEffect(() => {
+    if (searchParams.get('preventive') !== '1') return;
+    setPreventiveActionSeed(null);
+    setPreventiveActionsOpen(true);
+  }, [searchParams]);
 
   const createTransaction = async () => {
     if (!createForm.transactionNumber.trim() || !createForm.subject.trim() || !createForm.transactionDate) {
@@ -884,6 +898,17 @@ ${styleAssets}
                 الإنذار المبكر
               </Button>
             )}
+            <Button
+              variant="outline"
+              className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+              onClick={() => {
+                setPreventiveActionSeed(null);
+                setPreventiveActionsOpen(true);
+              }}
+            >
+              <ShieldCheck className="ml-2 h-4 w-4" />
+              التدخلات الوقائية
+            </Button>
             {canPrint && (
               <Button variant="outline" onClick={() => void openExecutiveReport()}>
                 <FileText className="ml-2 h-4 w-4" />
@@ -1203,8 +1228,39 @@ ${styleAssets}
               setSearchParams(next);
             }
           }}
+          onOpenPreventiveActions={(seed) => {
+            setEarlyWarningOpen(false);
+            setPreventiveActionSeed(seed);
+            setPreventiveActionsOpen(true);
+          }}
         />
       )}
+
+      <TransactionPreventiveActionsDialog
+        open={preventiveActionsOpen}
+        onOpenChange={(open) => {
+          setPreventiveActionsOpen(open);
+          if (!open) {
+            setPreventiveActionSeed(null);
+            if (searchParams.get('preventive') === '1') {
+              const next = new URLSearchParams(searchParams);
+              next.delete('preventive');
+              next.delete('alert');
+              setSearchParams(next);
+            }
+          }
+        }}
+        assignees={assignees}
+        supervisor={isAdmin || canDelete}
+        seed={preventiveActionSeed}
+        onOpenCapa={(seed, preventiveActionId) => {
+          setPreventiveActionsOpen(false);
+          setPreventiveActionSeed(null);
+          setCapaSourcePreventiveActionId(preventiveActionId);
+          setImprovementPlanSeed(seed);
+          setImprovementPlansOpen(true);
+        }}
+      />
 
       {(isAdmin || canDelete) && (
         <TransactionImprovementPlansDialog
@@ -1213,6 +1269,7 @@ ${styleAssets}
             setImprovementPlansOpen(open);
             if (!open) {
               setImprovementPlanSeed(null);
+              setCapaSourcePreventiveActionId(null);
               if (searchParams.get('capa') === '1') {
                 const next = new URLSearchParams(searchParams);
                 next.delete('capa');
@@ -1223,6 +1280,16 @@ ${styleAssets}
           }}
           assignees={assignees}
           seed={improvementPlanSeed}
+          onPlanCreated={async (plan) => {
+            if (!capaSourcePreventiveActionId) return;
+            try {
+              await transactionFollowUpApi.linkPreventiveActionCapa(capaSourcePreventiveActionId, plan.id);
+              toast.success('تم ربط خطة CAPA بالتدخل الوقائي الفاشل');
+              setCapaSourcePreventiveActionId(null);
+            } catch (error) {
+              toast.warning(error instanceof Error ? error.message : 'تم إنشاء CAPA وتعذر ربطها تلقائيًا بالتدخل الوقائي');
+            }
+          }}
         />
       )}
 
