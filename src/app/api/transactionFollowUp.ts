@@ -165,6 +165,68 @@ export type TransactionFollowUpPage = {
   totalPages: number;
 };
 
+export type TransactionFollowUpExecutiveReport = {
+  generatedAt: string;
+  period: {
+    from: string;
+    to: string;
+  };
+  scope: {
+    mine: boolean;
+    assigneeUserId?: string | null;
+  };
+  summary: {
+    totalIncluded: number;
+    open: number;
+    completed: number;
+    waiting: number;
+    needsFollowUp: number;
+    overdueSnapshot: number;
+    onTimeRate: number | null;
+    avgCompletionDays: number | null;
+    avgFirstActionHours: number | null;
+  };
+  statusCounts: Record<TransactionFollowUpStatus, number>;
+  employees: Array<{
+    userId?: string | null;
+    username: string;
+    total: number;
+    open: number;
+    completed: number;
+    overdue: number;
+  }>;
+  transactions: Array<{
+    id: string;
+    trackingNumber: string;
+    transactionNumber: string;
+    transactionDate: string;
+    transactionType: TransactionFollowUpType;
+    subject: string;
+    sourceEntity?: string | null;
+    priority: TransactionFollowUpPriority;
+    status: TransactionFollowUpStatus;
+    currentAssigneeName?: string | null;
+    requiredAction?: string | null;
+    dueDate?: string | null;
+    completedAt?: string | null;
+    closedAt?: string | null;
+    indicator: TransactionFollowUpIndicator;
+    indicatorLabel: string;
+  }>;
+  overdueSnapshot: Array<{
+    id: string;
+    trackingNumber: string;
+    transactionNumber: string;
+    subject: string;
+    priority: TransactionFollowUpPriority;
+    status: TransactionFollowUpStatus;
+    currentAssigneeName?: string | null;
+    dueDate: string;
+    overdueDays: number;
+    indicatorLabel: string;
+  }>;
+};
+
 export type TransactionFollowUpCreateInput = {
   transactionNumber: string;
   transactionDate: string;
@@ -215,6 +277,23 @@ export const transactionFollowUpApi = {
     const suffix = query.toString();
     return apiJson<TransactionFollowUpAnalytics>(
       `/api/transaction-follow-up/analytics${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  executiveReport: (input: {
+    from?: string;
+    to?: string;
+    assigneeUserId?: string;
+    mine?: boolean;
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (input.from) query.set('from', input.from);
+    if (input.to) query.set('to', input.to);
+    if (input.assigneeUserId) query.set('assigneeUserId', input.assigneeUserId);
+    if (input.mine) query.set('mine', 'true');
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpExecutiveReport>(
+      `/api/transaction-follow-up/reports/executive${suffix ? `?${suffix}` : ''}`,
     );
   },
 
