@@ -16,6 +16,7 @@ export type TransactionFollowUpWorkQueueBucket =
   | 'overdue'
   | 'urgent_today'
   | 'extension_requests'
+  | 'external_follow_up_due'
   | 'due_3_days'
   | 'awaiting_review'
   | 'waiting_external'
@@ -54,6 +55,46 @@ export type TransactionFollowUpExtensionRequest = {
   cancelledAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  transaction?: {
+    id: string;
+    trackingNumber: string;
+    transactionNumber: string;
+    subject: string;
+    priority: TransactionFollowUpPriority;
+    status: TransactionFollowUpStatus;
+    currentAssigneeUserId?: string | null;
+    currentAssigneeName?: string | null;
+    dueDate?: string | null;
+  };
+};
+
+export type TransactionFollowUpExternalWaitStatus = 'active' | 'responded' | 'cancelled';
+
+export type TransactionFollowUpExternalWait = {
+  id: string;
+  transactionId: string;
+  externalEntity: string;
+  outboundReferenceNumber?: string | null;
+  sentAt: string;
+  nextFollowUpDate: string;
+  notes?: string | null;
+  status: TransactionFollowUpExternalWaitStatus;
+  followUpCount: number;
+  lastFollowUpAt?: string | null;
+  lastFollowUpNote?: string | null;
+  responseReceivedAt?: string | null;
+  responseReferenceNumber?: string | null;
+  responseNote?: string | null;
+  createdById?: string | null;
+  createdByName?: string | null;
+  closedById?: string | null;
+  closedByName?: string | null;
+  closedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  waitingDays?: number;
+  daysUntilFollowUp?: number;
+  followUpDue?: boolean;
   transaction?: {
     id: string;
     trackingNumber: string;
@@ -678,6 +719,7 @@ export type TransactionFollowUpRecord = {
   events?: TransactionFollowUpEvent[];
   directives?: TransactionFollowUpDirective[];
   extensionRequests?: TransactionFollowUpExtensionRequest[];
+  externalWaits?: TransactionFollowUpExternalWait[];
   indicator: TransactionFollowUpIndicator;
   indicatorLabel: string;
   indicatorSeverity: 'success' | 'warning' | 'danger' | 'info';
@@ -687,6 +729,7 @@ export type TransactionFollowUpRecord = {
 
 export type TransactionFollowUpWorkQueueItem = TransactionFollowUpRecord & {
   pendingExtension?: TransactionFollowUpExtensionRequest | null;
+  activeExternalWait?: TransactionFollowUpExternalWait | null;
   queueBucket: TransactionFollowUpWorkQueueBucket;
   daysUntilDue?: number | null;
   overdueDays: number;
@@ -1050,6 +1093,66 @@ export const transactionFollowUpApi = {
       {
         method: 'PATCH',
         body: JSON.stringify({}),
+      },
+    ),
+
+  externalWaits: (status: TransactionFollowUpExternalWaitStatus = 'active') =>
+    apiJson<TransactionFollowUpExternalWait[]>(
+      `/api/transaction-follow-up/external-waits?status=${encodeURIComponent(status)}`,
+    ),
+
+  startExternalWait: (
+    transactionId: string,
+    input: {
+      externalEntity: string;
+      outboundReferenceNumber?: string | null;
+      sentAt: string;
+      nextFollowUpDate: string;
+      notes?: string | null;
+    },
+  ) =>
+    apiJson<TransactionFollowUpExternalWait>(
+      `/api/transaction-follow-up/${transactionId}/external-wait`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  recordExternalFollowUp: (
+    waitId: string,
+    input: { nextFollowUpDate: string; note: string },
+  ) =>
+    apiJson<TransactionFollowUpExternalWait>(
+      `/api/transaction-follow-up/external-waits/${waitId}/follow-up`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  recordExternalResponse: (
+    waitId: string,
+    input: {
+      responseReceivedAt: string;
+      responseReferenceNumber?: string | null;
+      responseNote: string;
+    },
+  ) =>
+    apiJson<TransactionFollowUpExternalWait>(
+      `/api/transaction-follow-up/external-waits/${waitId}/response`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  cancelExternalWait: (waitId: string, note: string) =>
+    apiJson<TransactionFollowUpExternalWait>(
+      `/api/transaction-follow-up/external-waits/${waitId}/cancel`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ note }),
       },
     ),
 
