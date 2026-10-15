@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, ShieldAlert } from 'lucide-react';
+import { ArrowRight, Gauge, ShieldAlert } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -41,10 +41,18 @@ export const TransactionRiskRegisterPage: React.FC = () => {
               إدارة المخاطر المتكررة وربطها بالتدخلات الوقائية وCAPA، مع تقييم الاحتمالية والأثر والخطر المتبقي ومواعيد المراجعة.
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate('/follow-up')}>
-            <ArrowRight className="ml-2 h-4 w-4" />
-            العودة إلى نظام المتابعة
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {supervisor && (
+              <Button variant="outline" onClick={() => navigate('/follow-up/risks/executive')}>
+                <Gauge className="ml-2 h-4 w-4" />
+                لوحة المخاطر التنفيذية
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => navigate('/follow-up')}>
+              <ArrowRight className="ml-2 h-4 w-4" />
+              العودة إلى نظام المتابعة
+            </Button>
+          </div>
         </div>
       </section>
 
