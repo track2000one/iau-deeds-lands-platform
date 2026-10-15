@@ -1,18 +1,23 @@
 import React from 'react';
 import {
   AlertTriangle,
+  BarChart3,
   CheckCircle2,
   ClipboardCheck,
   Clock3,
   RefreshCw,
+  Repeat2,
   Save,
   ShieldCheck,
   Target,
+  TimerReset,
+  TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   transactionFollowUpApi,
   type TransactionFollowUpAssignee,
+  type TransactionFollowUpImprovementEffectiveness,
   type TransactionFollowUpImprovementPlan,
   type TransactionFollowUpImprovementPlanPage,
 } from '../api/transactionFollowUp';
@@ -110,6 +115,16 @@ const formatMetricValue = (metricKey: TransactionFollowUpImprovementPlan['metric
   return `${(value / 24).toLocaleString('ar-SA', { maximumFractionDigits: 1 })} يوم`;
 };
 
+const formatPercent = (value?: number | null) =>
+  value == null ? '—' : `${value.toLocaleString('ar-SA', { maximumFractionDigits: 1 })}%`;
+
+const formatDays = (value?: number | null) =>
+  value == null ? '—' : `${value.toLocaleString('ar-SA', { maximumFractionDigits: 1 })} يوم`;
+
+const formatTrendMonth = (year: number, month: number) =>
+  new Intl.DateTimeFormat('ar-SA-u-ca-gregory', { month: 'short', year: 'numeric' })
+    .format(new Date(year, month - 1, 1));
+
 const dateInput = (daysFromNow = 30) => {
   const date = new Date();
   date.setDate(date.getDate() + daysFromNow);
@@ -160,6 +175,9 @@ export const TransactionImprovementPlansDialog: React.FC<Props> = ({
   seed,
 }) => {
   const [data, setData] = React.useState<TransactionFollowUpImprovementPlanPage>(EMPTY_PAGE);
+  const [effectiveness, setEffectiveness] = React.useState<TransactionFollowUpImprovementEffectiveness | null>(null);
+  const [effectivenessLoading, setEffectivenessLoading] = React.useState(false);
+  const [effectivenessPeriod, setEffectivenessPeriod] = React.useState<'90' | '180' | '365' | 'all'>('180');
   const [loading, setLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [verifyingId, setVerifyingId] = React.useState<string | null>(null);
@@ -184,10 +202,29 @@ export const TransactionImprovementPlansDialog: React.FC<Props> = ({
     }
   }, [statusFilter]);
 
+  const loadEffectiveness = React.useCallback(async () => {
+    try {
+      setEffectivenessLoading(true);
+      const result = await transactionFollowUpApi.improvementEffectiveness({
+        periodDays: effectivenessPeriod === 'all' ? 'all' : Number(effectivenessPeriod),
+      });
+      setEffectiveness(result);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل تحليل فعالية خطط التحسين');
+    } finally {
+      setEffectivenessLoading(false);
+    }
+  }, [effectivenessPeriod]);
+
   React.useEffect(() => {
     if (!open) return;
     void load();
   }, [open, load]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    void loadEffectiveness();
+  }, [open, loadEffectiveness]);
 
   React.useEffect(() => {
     if (!open || !seed) return;
@@ -254,7 +291,7 @@ export const TransactionImprovementPlansDialog: React.FC<Props> = ({
       setCreateOpen(false);
       setForm(blankForm());
       window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
-      await load();
+      await Promise.all([load(), loadEffectiveness()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر إنشاء خطة التحسين');
     } finally {
@@ -280,7 +317,7 @@ export const TransactionImprovementPlansDialog: React.FC<Props> = ({
       });
       toast.success(status === 'monitoring' ? 'تم تحويل الخطة إلى مرحلة قياس الأثر' : 'تم تحديث حالة خطة التحسين');
       setProgressNotes((current) => ({ ...current, [plan.id]: '' }));
-      await load();
+      await Promise.all([load(), loadEffectiveness()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحديث خطة التحسين');
     } finally {
@@ -297,7 +334,7 @@ export const TransactionImprovementPlansDialog: React.FC<Props> = ({
       } else {
         toast.warning('تم قياس الأثر وما زال المؤشر دون المستهدف — تستمر الخطة في المتابعة');
       }
-      await load();
+      await Promise.all([load(), loadEffectiveness()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر قياس أثر خطة التحسين');
     } finally {
@@ -325,6 +362,203 @@ export const TransactionImprovementPlansDialog: React.FC<Props> = ({
             <SummaryCard label="في قياس الأثر" value={data.summary.monitoring} warning={data.summary.monitoring > 0} />
             <SummaryCard label="أغلقت آخر 30 يومًا" value={data.summary.completed30d} success={data.summary.completed30d > 0} />
           </div>
+
+          <Card className="overflow-hidden border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-none">
+            <CardHeader className="border-b py-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <BarChart3 className="h-5 w-5 text-teal-700" />
+                    فعالية خطط التحسين CAPA
+                  </CardTitle>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    قياس نجاح الخطط، سرعة استعادة المؤشرات للمستهدف، واستدامة التحسن بعد الإغلاق.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <NativeSelect
+                    className="w-40"
+                    value={effectivenessPeriod}
+                    onChange={(event) => setEffectivenessPeriod(event.target.value as '90' | '180' | '365' | 'all')}
+                  >
+                    <option value="90">آخر 90 يومًا</option>
+                    <option value="180">آخر 180 يومًا</option>
+                    <option value="365">آخر سنة</option>
+                    <option value="all">كل الفترات</option>
+                  </NativeSelect>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void loadEffectiveness()} disabled={effectivenessLoading}>
+                    <RefreshCw className={`ml-1 h-3.5 w-3.5 ${effectivenessLoading ? 'animate-spin' : ''}`} />
+                    تحديث التحليل
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 p-4">
+              {effectivenessLoading && !effectiveness ? (
+                <div className="py-10 text-center text-xs text-muted-foreground">
+                  <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                  جارٍ احتساب فعالية خطط التحسين...
+                </div>
+              ) : effectiveness ? (
+                <>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <EffectivenessMetric
+                      label="نسبة فعالية الخطط"
+                      value={formatPercent(effectiveness.summary.effectivenessRate)}
+                      hint={`${effectiveness.summary.successful.toLocaleString('ar-SA')} ناجحة من ${effectiveness.summary.verified.toLocaleString('ar-SA')} خطة تم قياسها`}
+                      icon={<TrendingUp className="h-4 w-4 text-emerald-700" />}
+                      good={effectiveness.summary.effectivenessRate != null && effectiveness.summary.effectivenessRate >= 80}
+                    />
+                    <EffectivenessMetric
+                      label="متوسط استعادة المستهدف"
+                      value={formatDays(effectiveness.summary.avgRecoveryDays)}
+                      hint="من إنشاء الخطة حتى تحقق المستهدف وإغلاقها"
+                      icon={<TimerReset className="h-4 w-4 text-sky-700" />}
+                    />
+                    <EffectivenessMetric
+                      label="متوسط التحسن"
+                      value={formatPercent(effectiveness.summary.avgImprovementPercent)}
+                      hint="التغير النسبي في الاتجاه الإيجابي مقارنة بالقيمة الأساسية"
+                      icon={<Target className="h-4 w-4 text-violet-700" />}
+                      good={effectiveness.summary.avgImprovementPercent != null && effectiveness.summary.avgImprovementPercent > 0}
+                    />
+                    <EffectivenessMetric
+                      label="تكرار المشكلة خلال 90 يومًا"
+                      value={formatPercent(effectiveness.summary.recurrenceRate90d)}
+                      hint={effectiveness.summary.recurrenceEligible
+                        ? `${effectiveness.summary.recurrenceCount.toLocaleString('ar-SA')} حالة تكرار من ${effectiveness.summary.recurrenceEligible.toLocaleString('ar-SA')} خطة مكتملة فترة المراقبة`
+                        : 'لا توجد خطط مكتملة أتمت فترة مراقبة 90 يومًا بعد'}
+                      icon={<Repeat2 className="h-4 w-4 text-amber-700" />}
+                      danger={effectiveness.summary.recurrenceRate90d != null && effectiveness.summary.recurrenceRate90d > 20}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+                    <div className="overflow-hidden rounded-xl border bg-white">
+                      <div className="border-b px-3 py-2">
+                        <p className="text-xs font-black">الفعالية حسب مؤشر الأداء</p>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[760px] text-[11px]">
+                          <thead className="bg-slate-50 text-slate-600">
+                            <tr>
+                              <th className="p-2 text-right">المؤشر</th>
+                              <th className="p-2 text-center">الخطط</th>
+                              <th className="p-2 text-center">تم القياس</th>
+                              <th className="p-2 text-center">نجحت</th>
+                              <th className="p-2 text-center">الفعالية</th>
+                              <th className="p-2 text-center">زمن الاستعادة</th>
+                              <th className="p-2 text-center">التكرار 90 يومًا</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {effectiveness.metricBreakdown.map((metric) => (
+                              <tr key={metric.metricKey} className="border-t">
+                                <td className="p-2 font-bold">{metric.metricLabel}</td>
+                                <td className="p-2 text-center">{metric.plans.toLocaleString('ar-SA')}</td>
+                                <td className="p-2 text-center">{metric.verified.toLocaleString('ar-SA')}</td>
+                                <td className="p-2 text-center">{metric.successful.toLocaleString('ar-SA')}</td>
+                                <td className="p-2 text-center">
+                                  <span className={`inline-flex rounded-full px-2 py-1 font-black ${
+                                    metric.effectivenessRate == null
+                                      ? 'bg-slate-100 text-slate-600'
+                                      : metric.effectivenessRate >= 80
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : metric.effectivenessRate >= 60
+                                          ? 'bg-amber-50 text-amber-800'
+                                          : 'bg-red-50 text-red-700'
+                                  }`}>
+                                    {formatPercent(metric.effectivenessRate)}
+                                  </span>
+                                </td>
+                                <td className="p-2 text-center">{formatDays(metric.avgRecoveryDays)}</td>
+                                <td className="p-2 text-center">{formatPercent(metric.recurrenceRate90d)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border bg-white p-3">
+                      <p className="text-xs font-black">اتجاه آخر 6 أشهر</p>
+                      <div className="mt-3 space-y-2">
+                        {effectiveness.monthlyTrend.map((month) => (
+                          <div key={month.key} className="rounded-lg border bg-slate-50 p-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold">{formatTrendMonth(month.year, month.month)}</span>
+                              <span className="text-[9px] text-muted-foreground">
+                                {month.successful.toLocaleString('ar-SA')} نجاح
+                              </span>
+                            </div>
+                            <div className="mt-1 grid grid-cols-3 gap-1 text-center text-[9px]">
+                              <div><b>{month.created.toLocaleString('ar-SA')}</b><br />أنشئت</div>
+                              <div><b>{month.verified.toLocaleString('ar-SA')}</b><br />قيست</div>
+                              <div><b className="text-emerald-700">{month.successful.toLocaleString('ar-SA')}</b><br />نجحت</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <EffectivenessTextTable
+                      title="أكثر أسباب الانحراف تكرارًا"
+                      rows={effectiveness.topRootCauses}
+                      textHeader="سبب الانحراف"
+                    />
+                    <EffectivenessTextTable
+                      title="الإجراءات التصحيحية الأكثر استخدامًا وفعالية"
+                      rows={effectiveness.topCorrectiveActions}
+                      textHeader="الإجراء التصحيحي"
+                    />
+                  </div>
+
+                  <div className="overflow-hidden rounded-xl border bg-white">
+                    <div className="border-b px-3 py-2">
+                      <p className="text-xs font-black">فعالية التنفيذ حسب مسؤول الخطة</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[720px] text-[11px]">
+                        <thead className="bg-slate-50 text-slate-600">
+                          <tr>
+                            <th className="p-2 text-right">المسؤول</th>
+                            <th className="p-2 text-center">الخطط</th>
+                            <th className="p-2 text-center">مفتوحة</th>
+                            <th className="p-2 text-center">متأخرة</th>
+                            <th className="p-2 text-center">تم قياسها</th>
+                            <th className="p-2 text-center">الفعالية</th>
+                            <th className="p-2 text-center">متوسط الاستعادة</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {effectiveness.owners.map((owner) => (
+                            <tr key={owner.userId || owner.username} className="border-t">
+                              <td className="p-2 font-bold">{owner.username}</td>
+                              <td className="p-2 text-center">{owner.plans.toLocaleString('ar-SA')}</td>
+                              <td className="p-2 text-center">{owner.open.toLocaleString('ar-SA')}</td>
+                              <td className={`p-2 text-center font-bold ${owner.overdue ? 'text-red-700' : ''}`}>
+                                {owner.overdue.toLocaleString('ar-SA')}
+                              </td>
+                              <td className="p-2 text-center">{owner.verified.toLocaleString('ar-SA')}</td>
+                              <td className="p-2 text-center">{formatPercent(owner.effectivenessRate)}</td>
+                              <td className="p-2 text-center">{formatDays(owner.avgRecoveryDays)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <p className="text-[9px] leading-5 text-muted-foreground">
+                    معدل التكرار خلال 90 يومًا يُحسب فقط للخطط التي حققت المستهدف ومضى على إغلاقها 90 يومًا كاملة؛
+                    ويُعد ظهور خطة جديدة لنفس المؤشر ونفس النطاق خلال هذه المدة تكرارًا للمشكلة.
+                  </p>
+                </>
+              ) : null}
+            </CardContent>
+          </Card>
 
           <div className="flex flex-col gap-2 rounded-xl border bg-slate-50/70 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-2">
@@ -573,6 +807,85 @@ export const TransactionImprovementPlansDialog: React.FC<Props> = ({
     </Dialog>
   );
 };
+
+const EffectivenessMetric = ({
+  label,
+  value,
+  hint,
+  icon,
+  good = false,
+  danger = false,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: React.ReactNode;
+  good?: boolean;
+  danger?: boolean;
+}) => (
+  <div className={`rounded-xl border p-3 ${
+    danger
+      ? 'border-red-200 bg-red-50/70'
+      : good
+        ? 'border-emerald-200 bg-emerald-50/70'
+        : 'bg-white'
+  }`}>
+    <div className="flex items-center justify-between gap-2">
+      <p className="text-[10px] font-bold text-slate-600">{label}</p>
+      {icon}
+    </div>
+    <p className={`mt-1 text-xl font-black ${danger ? 'text-red-700' : good ? 'text-emerald-700' : 'text-slate-900'}`}>
+      {value}
+    </p>
+    <p className="mt-1 text-[9px] leading-4 text-muted-foreground">{hint}</p>
+  </div>
+);
+
+const EffectivenessTextTable = ({
+  title,
+  rows,
+  textHeader,
+}: {
+  title: string;
+  rows: TransactionFollowUpImprovementEffectiveness['topRootCauses'];
+  textHeader: string;
+}) => (
+  <div className="overflow-hidden rounded-xl border bg-white">
+    <div className="border-b px-3 py-2">
+      <p className="text-xs font-black">{title}</p>
+    </div>
+    {rows.length ? (
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-[10px]">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="p-2 text-right">{textHeader}</th>
+              <th className="p-2 text-center">مرات الظهور</th>
+              <th className="p-2 text-center">مفتوحة</th>
+              <th className="p-2 text-center">تم قياسها</th>
+              <th className="p-2 text-center">الفعالية</th>
+              <th className="p-2 text-center">الاستعادة</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${row.text}-${index}`} className="border-t">
+                <td className="max-w-[320px] p-2 font-medium leading-5">{row.text}</td>
+                <td className="p-2 text-center">{row.plans.toLocaleString('ar-SA')}</td>
+                <td className="p-2 text-center">{row.open.toLocaleString('ar-SA')}</td>
+                <td className="p-2 text-center">{row.verified.toLocaleString('ar-SA')}</td>
+                <td className="p-2 text-center">{formatPercent(row.effectivenessRate)}</td>
+                <td className="p-2 text-center">{formatDays(row.avgRecoveryDays)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <div className="p-6 text-center text-[10px] text-muted-foreground">لا توجد بيانات كافية للتحليل بعد.</div>
+    )}
+  </div>
+);
 
 const Field = ({
   label,
