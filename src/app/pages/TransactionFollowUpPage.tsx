@@ -431,14 +431,173 @@ export const TransactionFollowUpPage: React.FC = () => {
     }
   };
 
+  const loadReportArchives = async (page = reportArchivePage) => {
+    try {
+      setReportArchiveLoading(true);
+      const result = await transactionFollowUpApi.reportArchives({ page, pageSize: 20 });
+      setReportArchives(result.items || []);
+      setReportArchivePage(result.page || 1);
+      setReportArchiveTotalPages(result.totalPages || 0);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل أرشيف التقارير');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
+  const loadReportSchedules = async () => {
+    try {
+      setReportScheduleLoading(true);
+      setReportSchedules(await transactionFollowUpApi.reportSchedules());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل جدولة التقارير');
+    } finally {
+      setReportScheduleLoading(false);
+    }
+  };
+
+  const saveCurrentReportArchive = async () => {
+    if (!reportData) {
+      toast.error('أنشئ التقرير أولًا قبل حفظه في الأرشيف');
+      return;
+    }
+    try {
+      setReportArchiveLoading(true);
+      await transactionFollowUpApi.archiveReport({
+        reportType: reportMode,
+        from: reportFrom,
+        to: reportTo,
+        assigneeUserId: isAdmin || canDelete ? reportAssigneeId || null : null,
+      });
+      toast.success('تم حفظ نسخة ثابتة من التقرير في الأرشيف');
+      setReportSection('archive');
+      await loadReportArchives(1);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ التقرير في الأرشيف');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
+  const openArchivedReport = async (id: string) => {
+    try {
+      setReportArchiveLoading(true);
+      const archive = await transactionFollowUpApi.reportArchive(id);
+      setReportData(archive.snapshot);
+      setReportFrom(archive.periodFrom.slice(0, 10));
+      setReportTo(archive.periodTo.slice(0, 10));
+      setReportMode(archive.reportType);
+      setReportAssigneeId(archive.assigneeUserId || '');
+      setReportSection('preview');
+      toast.success('تم فتح النسخة المؤرشفة');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر فتح التقرير المؤرشف');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
+  const deleteArchivedReport = async (id: string) => {
+    if (!window.confirm('حذف هذه النسخة المؤرشفة من التقرير؟')) return;
+    try {
+      await transactionFollowUpApi.deleteReportArchive(id);
+      toast.success('تم حذف التقرير المؤرشف');
+      await loadReportArchives(reportArchivePage);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حذف التقرير المؤرشف');
+    }
+  };
+
+  const compareArchivedReports = async () => {
+    if (!compareLeftId || !compareRightId || compareLeftId === compareRightId) {
+      toast.error('اختر تقريرين مختلفين للمقارنة');
+      return;
+    }
+    try {
+      setReportArchiveLoading(true);
+      setReportComparison(await transactionFollowUpApi.compareReportArchives(compareLeftId, compareRightId));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر مقارنة التقريرين');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
+  const createReportSchedule = async () => {
+    if (!scheduleName.trim()) {
+      toast.error('اكتب اسم الجدولة');
+      return;
+    }
+    try {
+      setReportScheduleLoading(true);
+      await transactionFollowUpApi.createReportSchedule({
+        name: scheduleName.trim(),
+        frequency: scheduleFrequency,
+        dayOfWeek: scheduleFrequency === 'weekly' ? scheduleDayOfWeek : null,
+        dayOfMonth: scheduleFrequency === 'monthly' ? scheduleDayOfMonth : null,
+        runHour: scheduleRunHour,
+        assigneeUserId: isAdmin || canDelete ? scheduleAssigneeId || null : null,
+        isActive: true,
+      });
+      toast.success('تم إنشاء جدولة التقرير الآلي');
+      await loadReportSchedules();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء جدولة التقرير');
+    } finally {
+      setReportScheduleLoading(false);
+    }
+  };
+
+  const toggleReportSchedule = async (schedule: TransactionFollowUpReportSchedule) => {
+    try {
+      setReportScheduleLoading(true);
+      await transactionFollowUpApi.updateReportSchedule(schedule.id, { isActive: !schedule.isActive });
+      toast.success(schedule.isActive ? 'تم إيقاف الجدولة' : 'تم تفعيل الجدولة');
+      await loadReportSchedules();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحديث الجدولة');
+    } finally {
+      setReportScheduleLoading(false);
+    }
+  };
+
+  const runReportScheduleNow = async (schedule: TransactionFollowUpReportSchedule) => {
+    try {
+      setReportScheduleLoading(true);
+      const result = await transactionFollowUpApi.runReportSchedule(schedule.id);
+      toast.success(result.generated ? 'تم إنشاء تقرير مؤرشف من الجدولة' : 'لا يوجد تقرير جديد يحتاج للإنشاء');
+      await Promise.all([loadReportSchedules(), loadReportArchives(1)]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تشغيل الجدولة');
+    } finally {
+      setReportScheduleLoading(false);
+    }
+  };
+
+  const deleteReportSchedule = async (schedule: TransactionFollowUpReportSchedule) => {
+    if (!window.confirm(`حذف جدولة «${schedule.name}»؟`)) return;
+    try {
+      await transactionFollowUpApi.deleteReportSchedule(schedule.id);
+      toast.success('تم حذف الجدولة');
+      await loadReportSchedules();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حذف الجدولة');
+    }
+  };
+
   const openExecutiveReport = async () => {
     const range = reportRange('monthly');
     setReportMode('monthly');
     setReportFrom(range.from);
     setReportTo(range.to);
     setReportAssigneeId('');
+    setReportSection('preview');
     setReportOpen(true);
-    await loadExecutiveReport(range.from, range.to, '');
+    await Promise.all([
+      loadExecutiveReport(range.from, range.to, ''),
+      loadReportArchives(1),
+      loadReportSchedules(),
+    ]);
   };
 
   const applyReportMode = async (mode: 'weekly' | 'monthly' | 'custom') => {
