@@ -15,6 +15,7 @@ export type TransactionFollowUpType = 'incoming' | 'outgoing' | 'internal';
 export type TransactionFollowUpWorkQueueBucket =
   | 'overdue'
   | 'urgent_today'
+  | 'extension_requests'
   | 'due_3_days'
   | 'awaiting_review'
   | 'waiting_external'
@@ -30,6 +31,41 @@ export type TransactionFollowUpWorkQueueAction =
   | 'submit_completion'
   | 'approve_close'
   | 'return_to_employee';
+
+export type TransactionFollowUpExtensionRequestStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled';
+
+export type TransactionFollowUpExtensionRequest = {
+  id: string;
+  transactionId: string;
+  currentDueDate: string;
+  requestedDueDate: string;
+  reason: string;
+  status: TransactionFollowUpExtensionRequestStatus;
+  requestedById: string;
+  requestedByName: string;
+  reviewedById?: string | null;
+  reviewedByName?: string | null;
+  reviewNote?: string | null;
+  decisionAt?: string | null;
+  cancelledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  transaction?: {
+    id: string;
+    trackingNumber: string;
+    transactionNumber: string;
+    subject: string;
+    priority: TransactionFollowUpPriority;
+    status: TransactionFollowUpStatus;
+    currentAssigneeUserId?: string | null;
+    currentAssigneeName?: string | null;
+    dueDate?: string | null;
+  };
+};
 
 export type TransactionFollowUpIndicator =
   | 'unassigned'
@@ -641,6 +677,7 @@ export type TransactionFollowUpRecord = {
   updatedAt: string;
   events?: TransactionFollowUpEvent[];
   directives?: TransactionFollowUpDirective[];
+  extensionRequests?: TransactionFollowUpExtensionRequest[];
   indicator: TransactionFollowUpIndicator;
   indicatorLabel: string;
   indicatorSeverity: 'success' | 'warning' | 'danger' | 'info';
@@ -649,6 +686,7 @@ export type TransactionFollowUpRecord = {
 };
 
 export type TransactionFollowUpWorkQueueItem = TransactionFollowUpRecord & {
+  pendingExtension?: TransactionFollowUpExtensionRequest | null;
   queueBucket: TransactionFollowUpWorkQueueBucket;
   daysUntilDue?: number | null;
   overdueDays: number;
@@ -974,6 +1012,44 @@ export const transactionFollowUpApi = {
       {
         method: 'PATCH',
         body: JSON.stringify(input),
+      },
+    ),
+
+  extensionRequests: (status: TransactionFollowUpExtensionRequestStatus = 'pending') =>
+    apiJson<TransactionFollowUpExtensionRequest[]>(
+      `/api/transaction-follow-up/extension-requests?status=${encodeURIComponent(status)}`,
+    ),
+
+  requestExtension: (
+    transactionId: string,
+    input: { requestedDueDate: string; reason: string },
+  ) =>
+    apiJson<TransactionFollowUpExtensionRequest>(
+      `/api/transaction-follow-up/${transactionId}/extension-requests`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  decideExtensionRequest: (
+    requestId: string,
+    input: { decision: 'approved' | 'rejected'; reviewNote?: string | null },
+  ) =>
+    apiJson<TransactionFollowUpExtensionRequest>(
+      `/api/transaction-follow-up/extension-requests/${requestId}/decision`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  cancelExtensionRequest: (requestId: string) =>
+    apiJson<TransactionFollowUpExtensionRequest>(
+      `/api/transaction-follow-up/extension-requests/${requestId}/cancel`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({}),
       },
     ),
 
