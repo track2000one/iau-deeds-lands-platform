@@ -116,6 +116,47 @@ export type TransactionFollowUpDashboard = {
   needsAction: number;
 };
 
+export type TransactionFollowUpAnalytics = {
+  periodDays: number | null;
+  generatedAt: string;
+  summary: {
+    tracked: number;
+    open: number;
+    completed: number;
+    overdueOpen: number;
+    needsAction: number;
+    onTimeRate: number | null;
+    avgCompletionDays: number | null;
+    avgFirstActionHours: number | null;
+  };
+  ageBuckets: {
+    upTo2Days: number;
+    from3To7Days: number;
+    from8To14Days: number;
+    over14Days: number;
+  };
+  employees: Array<{
+    userId: string;
+    username: string;
+    open: number;
+    overdue: number;
+    completed: number;
+    onTimeRate: number | null;
+    avgCompletionDays: number | null;
+    avgFirstActionHours: number | null;
+  }>;
+  oldestOverdue: Array<{
+    id: string;
+    trackingNumber: string;
+    transactionNumber: string;
+    subject: string;
+    assigneeName?: string | null;
+    dueDate: string;
+    overdueDays: number;
+    priority: TransactionFollowUpPriority;
+  }>;
+};
+
 export type TransactionFollowUpPage = {
   items: TransactionFollowUpRecord[];
   total: number;
@@ -166,6 +207,16 @@ export const transactionFollowUpApi = {
     apiJson<TransactionFollowUpDashboard>(
       `/api/transaction-follow-up/dashboard${mine ? '?mine=true' : ''}`,
     ),
+
+  analytics: (input: { mine?: boolean; periodDays?: number | 'all' } = {}) => {
+    const query = new URLSearchParams();
+    if (input.mine) query.set('mine', 'true');
+    if (input.periodDays) query.set('periodDays', String(input.periodDays));
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpAnalytics>(
+      `/api/transaction-follow-up/analytics${suffix ? `?${suffix}` : ''}`,
+    );
+  },
 
   assignees: () =>
     apiJson<TransactionFollowUpAssignee[]>('/api/transaction-follow-up/assignees'),
