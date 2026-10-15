@@ -250,6 +250,56 @@ export type TransactionFollowUpImprovementPlan = {
   events?: TransactionFollowUpImprovementPlanEvent[];
 };
 
+export type TransactionFollowUpEarlyWarningMetric = {
+  metricKey: 'firstPassRate' | 'onTimeRate' | 'reworkRate' | 'avgExecutionHours' | 'avgApprovalHours';
+  metricLabel: string;
+  currentValue: number | null;
+  previousValue: number | null;
+  delta: number | null;
+  projectedValue: number | null;
+  target: number;
+  direction: 'min' | 'max';
+  currentStatus: 'green' | 'yellow' | 'red' | 'neutral';
+  projectedStatus: 'green' | 'yellow' | 'red' | 'neutral';
+  riskScore: number;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  confidence: 'low' | 'medium' | 'high';
+  reasons: string[];
+  recommendation: string;
+};
+
+export type TransactionFollowUpEarlyWarning = {
+  generatedAt: string;
+  methodology: 'rule_based_linear_trend' | string;
+  periodDays: number;
+  targets: TransactionFollowUpKpiTargets;
+  summary: {
+    atRiskMetrics: number;
+    predictedMetricBreaches: number;
+    atRiskEmployees: number;
+    criticalEmployees: number;
+    highRiskEmployees: number;
+    mediumRiskEmployees: number;
+  };
+  metrics: TransactionFollowUpEarlyWarningMetric[];
+  employees: Array<{
+    userId: string;
+    username: string;
+    riskScore: number;
+    riskLevel: 'low' | 'medium' | 'high' | 'critical';
+    confidence: 'low' | 'medium' | 'high';
+    openDirectives: number;
+    overdueOpen: number;
+    urgentOpen: number;
+    returnedOpen: number;
+    reviewedDirectives: number;
+    topMetric: TransactionFollowUpEarlyWarningMetric | null;
+    predictedBreaches: number;
+    reasons: string[];
+    recommendation: string;
+  }>;
+};
+
 export type TransactionFollowUpImprovementEffectiveness = {
   generatedAt: string;
   periodDays: number | null;
@@ -965,6 +1015,15 @@ export const transactionFollowUpApi = {
     const suffix = query.toString();
     return apiJson<TransactionFollowUpDirectivesDashboard>(
       `/api/transaction-follow-up/directives/dashboard${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  earlyWarning: (input: { periodDays?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (input.periodDays) query.set('periodDays', String(input.periodDays));
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpEarlyWarning>(
+      `/api/transaction-follow-up/directives/early-warning${suffix ? `?${suffix}` : ''}`,
     );
   },
 
