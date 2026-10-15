@@ -166,6 +166,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   assignees: TransactionFollowUpAssignee[];
   seed?: ImprovementPlanSeed | null;
+  onPlanCreated?: (plan: TransactionFollowUpImprovementPlan) => void | Promise<void>;
 };
 
 export const TransactionImprovementPlansDialog: React.FC<Props> = ({
@@ -173,6 +174,7 @@ export const TransactionImprovementPlansDialog: React.FC<Props> = ({
   onOpenChange,
   assignees,
   seed,
+  onPlanCreated,
 }) => {
   const [data, setData] = React.useState<TransactionFollowUpImprovementPlanPage>(EMPTY_PAGE);
   const [effectiveness, setEffectiveness] = React.useState<TransactionFollowUpImprovementEffectiveness | null>(null);
@@ -273,7 +275,7 @@ export const TransactionImprovementPlansDialog: React.FC<Props> = ({
 
     try {
       setSaving(true);
-      await transactionFollowUpApi.createImprovementPlan({
+      const created = await transactionFollowUpApi.createImprovementPlan({
         metricKey: form.metricKey,
         scopeType: form.scopeType,
         assigneeUserId: form.scopeType === 'employee' ? form.assigneeUserId : null,
@@ -287,6 +289,7 @@ export const TransactionImprovementPlansDialog: React.FC<Props> = ({
         ownerUserId: form.ownerUserId || null,
         dueDate: form.dueDate,
       });
+      if (onPlanCreated) await onPlanCreated(created);
       toast.success('تم إنشاء خطة تحسين الأداء CAPA');
       setCreateOpen(false);
       setForm(blankForm());
