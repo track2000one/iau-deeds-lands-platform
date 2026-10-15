@@ -46,14 +46,15 @@ const normalizeFollowUpAlert = (alert: TransactionFollowUpAlert): PlatformNotice
   source: 'follow_up',
   title: alert.title,
   message: alert.message,
-  entityType: 'transaction_follow_up',
-  entityId: alert.transactionId,
+  entityType: alert.kind === 'kpi_target_breach' ? 'follow_up_kpi' : 'transaction_follow_up',
+  entityId: alert.transactionId || null,
   severity: alert.severity,
   isRead: alert.isRead,
   createdAt: alert.createdAt,
 });
 
 const notificationCategory = (notice: PlatformNotice) => {
+  if (notice.source === 'follow_up' && notice.entityType === 'follow_up_kpi') return 'follow_up_kpi';
   if (notice.source === 'follow_up') return 'follow_up';
   const type = String(notice.entityType || '').toLowerCase();
   const text = `${notice.title || ''} ${notice.message || ''}`.toLowerCase();
@@ -187,7 +188,11 @@ export const PlatformNotificationCenter: React.FC = () => {
 
     setOpen(false);
     if (notice.source === 'follow_up') {
-      navigate(`/follow-up?transaction=${encodeURIComponent(notice.entityId || '')}&alert=${encodeURIComponent(notice.id)}`);
+      if (notice.entityType === 'follow_up_kpi') {
+        navigate(`/follow-up?kpi=1&alert=${encodeURIComponent(notice.id)}`);
+      } else {
+        navigate(`/follow-up?transaction=${encodeURIComponent(notice.entityId || '')}&alert=${encodeURIComponent(notice.id)}`);
+      }
       return;
     }
 
@@ -271,11 +276,13 @@ export const PlatformNotificationCenter: React.FC = () => {
           <div className="divide-y divide-slate-100">
             {ordered.slice(0, 30).map((notice) => {
               const category = notificationCategory(notice);
-              const Icon = category === 'follow_up'
-                ? notice.severity === 'danger' ? AlertTriangle : ListTodo
-                : category === 'improvement' || category === 'completion'
-                  ? Target
-                  : Clock3;
+              const Icon = category === 'follow_up_kpi'
+                ? Target
+                : category === 'follow_up'
+                  ? notice.severity === 'danger' ? AlertTriangle : ListTodo
+                  : category === 'improvement' || category === 'completion'
+                    ? Target
+                    : Clock3;
               const iconClass = notice.source === 'follow_up' && notice.severity === 'danger'
                 ? 'border-red-200 bg-red-50 text-red-700'
                 : notice.isRead
