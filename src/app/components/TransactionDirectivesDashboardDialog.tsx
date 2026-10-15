@@ -40,6 +40,7 @@ const EMPTY_DATA: TransactionFollowUpDirectivesDashboard = {
     dueToday: 0,
     dueSoon: 0,
     completed7d: 0,
+    issuedToday: 0,
     urgentOpen: 0,
     decisions: 0,
     directives: 0,
@@ -139,10 +140,11 @@ export const TransactionDirectivesDashboardDialog: React.FC<Props> = ({
         </DialogHeader>
 
         <div className="space-y-4 overflow-y-auto pe-1">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-9">
             <Metric label="المفتوحة" value={data.summary.open} />
             <Metric label="بانتظار التنفيذ" value={data.summary.pending} warning={data.summary.pending > 0} />
             <Metric label="قيد التنفيذ" value={data.summary.inProgress} />
+            <Metric label="صدرت اليوم" value={data.summary.issuedToday} />
             <Metric label="المتأخرة" value={data.summary.overdue} danger={data.summary.overdue > 0} />
             <Metric label="مستحقة اليوم" value={data.summary.dueToday} warning={data.summary.dueToday > 0} />
             <Metric label="خلال 3 أيام" value={data.summary.dueSoon} />
@@ -301,6 +303,7 @@ export const TransactionDirectivesDashboardDialog: React.FC<Props> = ({
                               <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
                                 <span>مفتوحة: <b>{employee.open.toLocaleString('ar-SA')}</b></span>
                                 <span>قيد التنفيذ: <b>{employee.inProgress.toLocaleString('ar-SA')}</b></span>
+                                <span>منجزة: <b>{employee.completed.toLocaleString('ar-SA')}</b></span>
                                 <span className={employee.overdue ? 'text-red-700' : ''}>
                                   متأخرة: <b>{employee.overdue.toLocaleString('ar-SA')}</b>
                                 </span>
