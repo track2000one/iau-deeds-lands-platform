@@ -22,6 +22,7 @@ export type TransactionRiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export type TransactionRiskStatus = 'open' | 'monitoring' | 'controlled' | 'accepted' | 'closed';
 export type TransactionRiskTreatmentStrategy = 'reduce' | 'avoid' | 'transfer' | 'accept';
 export type TransactionRiskSourceType = 'manual' | 'early_warning' | 'preventive_action' | 'capa';
+export type TransactionRiskAcceptanceStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'expired';
 
 export type TransactionRiskEvent = {
   id: string;
@@ -39,6 +40,56 @@ export type TransactionRiskEvent = {
   changedById?: string | null;
   changedByName?: string | null;
   createdAt: string;
+};
+
+export type TransactionRiskAcceptanceRequest = {
+  id: string;
+  riskId: string;
+  justification: string;
+  compensatingControls?: string[] | null;
+  requestedUntil: string;
+  status: TransactionRiskAcceptanceStatus;
+  requestedById: string;
+  requestedByName: string;
+  reviewedById?: string | null;
+  reviewedByName?: string | null;
+  reviewComment?: string | null;
+  decisionAt?: string | null;
+  cancelledAt?: string | null;
+  expiredAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  risk?: {
+    id: string;
+    riskNumber: string;
+    title: string;
+    category?: TransactionRiskCategory;
+    ownerUserId?: string;
+    ownerName?: string;
+    assigneeUserId?: string | null;
+    assigneeName?: string | null;
+    residualScore: number;
+    residualLevel: TransactionRiskLevel;
+    status: TransactionRiskStatus;
+    acceptanceExpiresAt?: string | null;
+  };
+};
+
+export type TransactionRiskAcceptancePage = {
+  generatedAt: string;
+  supervisor: boolean;
+  summary: {
+    pending: number;
+    activeApproved: number;
+    expiringSoon: number;
+    rejected30d: number;
+    expired30d: number;
+  };
+  items: TransactionRiskAcceptanceRequest[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 };
 
 export type TransactionRiskRecord = {
@@ -74,6 +125,13 @@ export type TransactionRiskRecord = {
   lastOccurrenceAt?: string | null;
   notes?: string | null;
   closedAt?: string | null;
+  acceptanceExpiresAt?: string | null;
+  acceptanceApprovedAt?: string | null;
+  acceptanceApprovedById?: string | null;
+  acceptanceApprovedByName?: string | null;
+  acceptanceReason?: string | null;
+  latestAcceptance?: TransactionRiskAcceptanceRequest | null;
+  acceptanceExpiresSoon?: boolean;
   createdById?: string | null;
   createdByName?: string | null;
   updatedById?: string | null;
@@ -232,6 +290,14 @@ export type TransactionRiskDashboard = {
     open: number;
     overdue: number;
   };
+  acceptance: {
+    pending: number;
+    activeApproved: number;
+    expiringSoon: number;
+    rejected30d: number;
+    expired30d: number;
+    acceptedOutsideAppetite: number;
+  };
 };
 
 export type TransactionRiskCreateInput = {
@@ -279,6 +345,61 @@ export const transactionRiskApi = {
   dashboard: () =>
     apiJson<TransactionRiskDashboard>('/api/transaction-follow-up/directives/risk-dashboard'),
 
+
+  acceptances: (input: {
+    page?: number;
+    pageSize?: number;
+    status?: TransactionRiskAcceptanceStatus | '';
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (input.page) query.set('page', String(input.page));
+    if (input.pageSize) query.set('pageSize', String(input.pageSize));
+    if (input.status) query.set('status', input.status);
+    const suffix = query.toString();
+    return apiJson<TransactionRiskAcceptancePage>(
+      `/api/transaction-follow-up/directives/risk-acceptances${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  requestAcceptance: (
+    riskId: string,
+    input: {
+      justification: string;
+      compensatingControls?: string[];
+      requestedUntil: string;
+    },
+  ) =>
+    apiJson<TransactionRiskAcceptanceRequest>(
+      `/api/transaction-follow-up/directives/risks/${riskId}/acceptance-requests`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  decideAcceptance: (
+    requestId: string,
+    input: {
+      decision: 'approved' | 'rejected';
+      reviewComment: string;
+    },
+  ) =>
+    apiJson<TransactionRiskAcceptanceRequest>(
+      `/api/transaction-follow-up/directives/risk-acceptances/${requestId}/decision`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  cancelAcceptance: (requestId: string) =>
+    apiJson<TransactionRiskAcceptanceRequest>(
+      `/api/transaction-follow-up/directives/risk-acceptances/${requestId}/cancel`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({}),
+      },
+    ),
 
   list: (input: {
     page?: number;
