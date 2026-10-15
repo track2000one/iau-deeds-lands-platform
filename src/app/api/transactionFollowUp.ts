@@ -39,6 +39,33 @@ export type TransactionFollowUpEvent = {
   createdAt: string;
 };
 
+export type TransactionFollowUpDirective = {
+  id: string;
+  transactionId: string;
+  directiveType: 'directive' | 'decision';
+  title: string;
+  instruction: string;
+  priority: 'normal' | 'high' | 'urgent';
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  assigneeUserId: string;
+  assigneeName: string;
+  dueDate?: string | null;
+  issuedById?: string | null;
+  issuedByName?: string | null;
+  issuedAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  completionResponse?: string | null;
+  completionNote?: string | null;
+  lastUpdatedById?: string | null;
+  lastUpdatedByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isOverdue: boolean;
+  isDueToday: boolean;
+  daysOverdue: number;
+};
+
 export type TransactionFollowUpRecord = {
   id: string;
   trackingNumber: string;
@@ -69,6 +96,7 @@ export type TransactionFollowUpRecord = {
   createdAt: string;
   updatedAt: string;
   events?: TransactionFollowUpEvent[];
+  directives?: TransactionFollowUpDirective[];
   indicator: TransactionFollowUpIndicator;
   indicatorLabel: string;
   indicatorSeverity: 'success' | 'warning' | 'danger' | 'info';
@@ -523,6 +551,39 @@ export const transactionFollowUpApi = {
       method: 'PATCH',
       body: JSON.stringify(input),
     }),
+
+  createDirective: (
+    id: string,
+    input: {
+      directiveType: 'directive' | 'decision';
+      title: string;
+      instruction: string;
+      priority: 'normal' | 'high' | 'urgent';
+      assigneeUserId: string;
+      dueDate?: string | null;
+    },
+  ) =>
+    apiJson<TransactionFollowUpDirective>(`/api/transaction-follow-up/${id}/directives`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  updateDirective: (
+    transactionId: string,
+    directiveId: string,
+    input: {
+      status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+      completionResponse?: string | null;
+      completionNote?: string | null;
+    },
+  ) =>
+    apiJson<TransactionFollowUpDirective>(
+      `/api/transaction-follow-up/${transactionId}/directives/${directiveId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
 
   recordAction: (
     id: string,
