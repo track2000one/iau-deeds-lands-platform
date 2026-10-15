@@ -19,6 +19,7 @@ const MODULES: ModuleName[] = [
   'leased_buildings_out',
   'leased_buildings_in',
   'central_buildings',
+  'transaction_follow_up',
   'contracts_follow_up',
   'assets',
   'accounting_transformation',
