@@ -54,6 +54,7 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Textarea } from '../components/ui/textarea';
 import { TransactionExecutiveReport } from '../components/TransactionExecutiveReport';
 import { TransactionExecutiveInbox } from '../components/TransactionExecutiveInbox';
+import { TransactionDailyWorkCenter } from '../components/TransactionDailyWorkCenter';
 import { TransactionManagementDirectives } from '../components/TransactionManagementDirectives';
 import { TransactionDirectivesDashboardDialog } from '../components/TransactionDirectivesDashboardDialog';
 import { TransactionApprovalCenterDialog } from '../components/TransactionApprovalCenterDialog';
@@ -349,6 +350,12 @@ export const TransactionFollowUpPage: React.FC = () => {
   React.useEffect(() => {
     setPage(1);
   }, [status, priority, mine]);
+
+  React.useEffect(() => {
+    if (!(isAdmin || canDelete) && !mine) {
+      setMine(true);
+    }
+  }, [isAdmin, canDelete, mine]);
 
   const openDetails = async (id: string) => {
     try {
@@ -839,10 +846,17 @@ ${styleAssets}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant={mine ? 'default' : 'outline'} onClick={() => setMine((value) => !value)}>
-              <UserRound className="ml-2 h-4 w-4" />
-              {mine ? 'عرض جميع المعاملات' : 'معاملاتي'}
-            </Button>
+            {(isAdmin || canDelete) ? (
+              <Button variant={mine ? 'default' : 'outline'} onClick={() => setMine((value) => !value)}>
+                <UserRound className="ml-2 h-4 w-4" />
+                {mine ? 'عرض جميع المعاملات' : 'معاملاتي'}
+              </Button>
+            ) : (
+              <Badge variant="outline" className="border-primary/30 bg-primary/5 px-3 py-2">
+                <UserRound className="ml-2 h-4 w-4" />
+                مهامي المسندة
+              </Badge>
+            )}
             <Button variant="outline" onClick={() => void load()} disabled={loading}>
               <RefreshCw className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               تحديث
@@ -962,6 +976,13 @@ ${styleAssets}
           </div>
         </div>
       </section>
+
+      <TransactionDailyWorkCenter
+        mine={mine}
+        supervisor={isAdmin || canDelete}
+        onOpenTransaction={(id) => void openDetails(id)}
+        onChanged={() => void load()}
+      />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
         <Summary title="المعاملات المفتوحة" value={dashboard.open} icon={<Inbox className="h-5 w-5" />} />
