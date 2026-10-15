@@ -104,6 +104,136 @@ export type TransactionRiskPage = {
   totalPages: number;
 };
 
+export type TransactionRiskDashboard = {
+  generatedAt: string;
+  appetite: {
+    maxResidualScore: number;
+    level: 'medium';
+    status: 'within' | 'watch' | 'breached';
+    withinCount: number;
+    outsideCount: number;
+    outsideRate: number;
+    statement: string;
+  };
+  summary: {
+    active: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    outsideAppetite: number;
+    overdueReview: number;
+    recurring: number;
+    accepted: number;
+    controlled: number;
+    averageInherentScore: number | null;
+    averageResidualScore: number | null;
+    averageRiskReductionPercent: number | null;
+    treatmentCoveragePercent: number;
+  };
+  kri: Array<{
+    key: string;
+    label: string;
+    value: number | null;
+    unit: string;
+    status: 'green' | 'yellow' | 'red' | 'neutral';
+    target: string;
+    description: string;
+  }>;
+  topRisks: Array<Pick<
+    TransactionRiskRecord,
+    | 'id'
+    | 'riskNumber'
+    | 'title'
+    | 'category'
+    | 'ownerUserId'
+    | 'ownerName'
+    | 'status'
+    | 'inherentScore'
+    | 'residualScore'
+    | 'residualLevel'
+    | 'recurrenceCount'
+    | 'reviewDate'
+    | 'isReviewOverdue'
+    | 'treatmentStrategy'
+  >>;
+  owners: Array<{
+    ownerUserId: string | null;
+    ownerName: string;
+    active: number;
+    outsideAppetite: number;
+    overdueReview: number;
+    averageResidualScore: number;
+    riskReductionPercent: number | null;
+  }>;
+  categories: Array<{
+    category: TransactionRiskCategory;
+    active: number;
+    outsideAppetite: number;
+    averageResidualScore: number;
+  }>;
+  statuses: Array<{ status: TransactionRiskStatus; count: number }>;
+  treatmentStrategies: Array<{ strategy: TransactionRiskTreatmentStrategy; count: number }>;
+  trend: Array<{
+    key: string;
+    year: number;
+    month: number;
+    created: number;
+    closed: number;
+    reassessed: number;
+    highCriticalAssessments: number;
+  }>;
+  earlyWarning: {
+    summary: {
+      atRiskMetrics: number;
+      predictedMetricBreaches: number;
+      atRiskEmployees: number;
+      criticalEmployees: number;
+      highRiskEmployees: number;
+      mediumRiskEmployees: number;
+    };
+    metrics: Array<{
+      metricKey: TransactionRiskMetricKey;
+      metricLabel: string;
+      currentValue: number | null;
+      projectedValue: number | null;
+      target: number;
+      direction: 'min' | 'max';
+      currentStatus: 'green' | 'yellow' | 'red' | 'neutral';
+      projectedStatus: 'green' | 'yellow' | 'red' | 'neutral';
+      riskScore: number;
+      riskLevel: 'low' | 'medium' | 'high' | 'critical';
+      reasons: string[];
+      recommendation: string;
+    }>;
+    employees: Array<{
+      userId: string;
+      username: string;
+      riskScore: number;
+      riskLevel: 'low' | 'medium' | 'high' | 'critical';
+      overdueOpen: number;
+      urgentOpen: number;
+      returnedOpen: number;
+      openDirectives: number;
+      reasons: string[];
+      recommendation: string;
+    }>;
+  };
+  preventive: {
+    periodDays: number;
+    total: number;
+    verified: number;
+    effective: number;
+    failed: number;
+    overdue: number;
+    failureRate: number;
+  };
+  capa: {
+    open: number;
+    overdue: number;
+  };
+};
+
 export type TransactionRiskCreateInput = {
   title: string;
   description: string;
@@ -146,6 +276,10 @@ export type TransactionRiskUpdateInput = Partial<{
 }>;
 
 export const transactionRiskApi = {
+  dashboard: () =>
+    apiJson<TransactionRiskDashboard>('/api/transaction-follow-up/directives/risk-dashboard'),
+
+
   list: (input: {
     page?: number;
     pageSize?: number;
