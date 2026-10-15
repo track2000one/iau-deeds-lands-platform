@@ -24,7 +24,7 @@ export type TransactionFollowUpIndicator =
 
 export type TransactionFollowUpEvent = {
   id: string;
-  transactionId?: string | null;
+  transactionId: string;
   eventType: string;
   fromStatus?: string | null;
   toStatus?: string | null;
@@ -380,7 +380,7 @@ export type TransactionFollowUpAssignee = {
 export type TransactionFollowUpAlert = {
   id: string;
   alertKey: string;
-  transactionId: string;
+  transactionId?: string | null;
   userId: string;
   kind: string;
   severity: 'info' | 'warning' | 'danger';
