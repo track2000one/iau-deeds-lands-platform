@@ -1161,6 +1161,12 @@ ${styleAssets}
           assignees={assignees}
           onOpenImprovementPlans={(seed) => {
             setDirectiveKpiOpen(false);
+            if (searchParams.get('kpi') === '1') {
+              const next = new URLSearchParams(searchParams);
+              next.delete('kpi');
+              next.delete('alert');
+              setSearchParams(next);
+            }
             setImprovementPlanSeed(seed || null);
             setImprovementPlansOpen(true);
           }}
