@@ -39,6 +39,45 @@ export type TransactionFollowUpEvent = {
   createdAt: string;
 };
 
+export type TransactionFollowUpDirectivesDashboard = {
+  generatedAt: string;
+  scope: 'all' | 'mine_or_employee';
+  summary: {
+    total: number;
+    open: number;
+    pending: number;
+    inProgress: number;
+    overdue: number;
+    dueToday: number;
+    dueSoon: number;
+    completed7d: number;
+    urgentOpen: number;
+    decisions: number;
+    directives: number;
+  };
+  employees: Array<{
+    userId: string;
+    username: string;
+    open: number;
+    pending: number;
+    inProgress: number;
+    overdue: number;
+    completed: number;
+    urgent: number;
+  }>;
+  items: Array<TransactionFollowUpDirective & {
+    transaction: {
+      id: string;
+      transactionNumber: string;
+      trackingNumber: string;
+      subject: string;
+      status: TransactionFollowUpStatus;
+      currentAssigneeName?: string | null;
+    };
+  }>;
+  totalItems: number;
+};
+
 export type TransactionFollowUpDirective = {
   id: string;
   transactionId: string;
@@ -551,6 +590,23 @@ export const transactionFollowUpApi = {
       method: 'PATCH',
       body: JSON.stringify(input),
     }),
+
+  directivesDashboard: (input: {
+    search?: string;
+    status?: string;
+    priority?: string;
+    assigneeUserId?: string;
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (input.search) query.set('search', input.search);
+    if (input.status) query.set('status', input.status);
+    if (input.priority) query.set('priority', input.priority);
+    if (input.assigneeUserId) query.set('assigneeUserId', input.assigneeUserId);
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpDirectivesDashboard>(
+      `/api/transaction-follow-up/directives/dashboard${suffix ? `?${suffix}` : ''}`,
+    );
+  },
 
   createDirective: (
     id: string,
