@@ -7,6 +7,7 @@ import {
   CalendarClock,
   GitCompareArrows,
   Gavel,
+  History,
   CheckCircle2,
   CircleDot,
   Clock3,
@@ -52,6 +53,7 @@ import { TransactionExecutiveInbox } from '../components/TransactionExecutiveInb
 import { TransactionManagementDirectives } from '../components/TransactionManagementDirectives';
 import { TransactionDirectivesDashboardDialog } from '../components/TransactionDirectivesDashboardDialog';
 import { TransactionApprovalCenterDialog } from '../components/TransactionApprovalCenterDialog';
+import { TransactionApprovalHistoryDialog } from '../components/TransactionApprovalHistoryDialog';
 import {
   transactionFollowUpApi,
   type TransactionFollowUpAnalytics,
@@ -242,6 +244,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [directivesDashboardOpen, setDirectivesDashboardOpen] = React.useState(false);
   const [approvalCenterOpen, setApprovalCenterOpen] = React.useState(false);
+  const [approvalHistoryOpen, setApprovalHistoryOpen] = React.useState(false);
   const [createForm, setCreateForm] = React.useState<TransactionFollowUpCreateInput>(emptyCreate());
   const [selected, setSelected] = React.useState<TransactionFollowUpRecord | null>(null);
   const [actionText, setActionText] = React.useState('');
@@ -814,6 +817,12 @@ ${styleAssets}
                 مركز الاعتمادات
               </Button>
             )}
+            {(isAdmin || canDelete) && (
+              <Button variant="outline" onClick={() => setApprovalHistoryOpen(true)}>
+                <History className="ml-2 h-4 w-4" />
+                سجل الاعتمادات
+              </Button>
+            )}
             {canPrint && (
               <Button variant="outline" onClick={() => void openExecutiveReport()}>
                 <FileText className="ml-2 h-4 w-4" />
@@ -1082,6 +1091,15 @@ ${styleAssets}
           assignees={assignees}
           onOpenTransaction={(id) => void openDetails(id)}
           onChanged={() => void load()}
+        />
+      )}
+
+      {(isAdmin || canDelete) && (
+        <TransactionApprovalHistoryDialog
+          open={approvalHistoryOpen}
+          onOpenChange={setApprovalHistoryOpen}
+          assignees={assignees}
+          onOpenTransaction={(id) => void openDetails(id)}
         />
       )}
 
