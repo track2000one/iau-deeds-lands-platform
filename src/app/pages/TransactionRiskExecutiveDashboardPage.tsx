@@ -303,6 +303,9 @@ export const TransactionRiskExecutiveDashboardPage: React.FC = () => {
             <p className="mt-1 text-xs">
               {data.appetite.outsideCount.toLocaleString('ar-SA')} من {data.summary.active.toLocaleString('ar-SA')} خطر نشط
             </p>
+            <p className="mt-1 text-[10px] opacity-80">
+              مقبولة إداريًا رغم تجاوز الشهية: {data.acceptance.acceptedOutsideAppetite.toLocaleString('ar-SA')}
+            </p>
           </div>
         </CardContent>
       </Card>
