@@ -11,6 +11,7 @@ import {
   MapPinned,
   Pencil,
   RefreshCw,
+  Search,
   Save,
   Trash2,
 } from 'lucide-react';
@@ -171,7 +172,8 @@ export const getPendingBuildingImport = (building?: MosqueBuilding | null): Buil
   }
 };
 
-export const isPendingImportedBuilding = (building?: MosqueBuilding | null) => Boolean(getPendingBuildingImport(building));
+export const isPendingImportedBuilding = (building?: MosqueBuilding | null) =>
+  String(building?.notes || '').includes(PENDING_MARKER);
 
 const reviewNotes = (draft: BuildingImportDraft) => {
   const notes: string[] = [];
@@ -262,14 +264,46 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
   const [savingReview, setSavingReview] = useState(false);
   const [reviewMapOpen, setReviewMapOpen] = useState(false);
   const [locatingReview, setLocatingReview] = useState(false);
+  const [pendingSearch, setPendingSearch] = useState('');
+  const [pendingPage, setPendingPage] = useState(1);
+  const PENDING_PAGE_SIZE = 24;
 
-  const pendingItems = useMemo<PendingItem[]>(
-    () => buildings.flatMap((building) => {
-      const envelope = getPendingBuildingImport(building);
-      return envelope ? [{ building, envelope }] : [];
-    }),
+  const pendingBuildings = useMemo(
+    () => buildings.filter((building) => isPendingImportedBuilding(building)),
     [buildings],
   );
+
+  const filteredPendingBuildings = useMemo(() => {
+    const needle = pendingSearch.trim().toLowerCase();
+    if (!needle) return pendingBuildings;
+    return pendingBuildings.filter((building) => [
+      building.buildingNumber,
+      building.name,
+      building.campusLocation,
+      building.city,
+      building.district,
+      building.notes,
+    ].some((value) => String(value || '').toLowerCase().includes(needle)));
+  }, [pendingBuildings, pendingSearch]);
+
+  const pendingTotalPages = Math.max(1, Math.ceil(filteredPendingBuildings.length / PENDING_PAGE_SIZE));
+  const pendingItems = useMemo<PendingItem[]>(() => {
+    const start = (pendingPage - 1) * PENDING_PAGE_SIZE;
+    return filteredPendingBuildings
+      .slice(start, start + PENDING_PAGE_SIZE)
+      .flatMap((building) => {
+        const envelope = getPendingBuildingImport(building);
+        return envelope ? [{ building, envelope }] : [];
+      });
+  }, [filteredPendingBuildings, pendingPage]);
+
+  useEffect(() => {
+    setPendingPage((current) => Math.min(Math.max(1, current), pendingTotalPages));
+  }, [pendingTotalPages]);
+
+  useEffect(() => {
+    setPendingPage(1);
+  }, [pendingSearch]);
 
   const officialBuildings = useMemo(() => buildings.filter((building) => !isPendingImportedBuilding(building)), [buildings]);
 
@@ -519,7 +553,7 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
         </div>
       )}
 
-      {pendingItems.length > 0 && (
+      {pendingBuildings.length > 0 && (
         <Card className="border-amber-300 bg-gradient-to-b from-amber-50/90 to-white shadow-[0_6px_0_rgba(180,83,9,0.10),0_13px_26px_rgba(15,23,42,0.06)]">
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -533,11 +567,56 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
                 </CardDescription>
               </div>
               <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800">
-                {pendingItems.length} معلق
+                {pendingBuildings.length.toLocaleString('ar-SA')} معلق
               </Badge>
             </div>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-white/80 p-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative w-full lg:max-w-md">
+                <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={pendingSearch}
+                  onChange={(event) => setPendingSearch(event.target.value)}
+                  placeholder="ابحث في السجلات المعلقة..."
+                  className="pr-10"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                <span>
+                  عرض {filteredPendingBuildings.length ? ((pendingPage - 1) * PENDING_PAGE_SIZE) + 1 : 0}
+                  {' - '}
+                  {Math.min(pendingPage * PENDING_PAGE_SIZE, filteredPendingBuildings.length)}
+                  {' من '}
+                  {filteredPendingBuildings.length.toLocaleString('ar-SA')}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={pendingPage <= 1}
+                  onClick={() => setPendingPage((page) => Math.max(1, page - 1))}
+                >
+                  السابق
+                </Button>
+                <Badge variant="outline">صفحة {pendingPage.toLocaleString('ar-SA')} / {pendingTotalPages.toLocaleString('ar-SA')}</Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={pendingPage >= pendingTotalPages}
+                  onClick={() => setPendingPage((page) => Math.min(pendingTotalPages, page + 1))}
+                >
+                  التالي
+                </Button>
+              </div>
+            </div>
+
+            {filteredPendingBuildings.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/40 py-10 text-center text-sm text-amber-900">
+                لا توجد سجلات معلقة مطابقة للبحث.
+              </div>
+            ) : (
             <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
               {pendingItems.map((item) => {
                 const notes = reviewNotes(item.envelope.draft);
@@ -593,6 +672,7 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
                 );
               })}
             </div>
+            )}
           </CardContent>
         </Card>
       )}
