@@ -93,14 +93,16 @@ export const TransactionDirectivesDashboardDialog: React.FC<Props> = ({
   const [priority, setPriority] = React.useState('');
   const [assigneeUserId, setAssigneeUserId] = React.useState('');
 
-  const load = React.useCallback(async () => {
+  const load = React.useCallback(async (overrideAssigneeUserId?: string) => {
     try {
       setLoading(true);
       const result = await transactionFollowUpApi.directivesDashboard({
         search,
         status,
         priority,
-        assigneeUserId: supervisor ? assigneeUserId || undefined : undefined,
+        assigneeUserId: supervisor
+          ? (overrideAssigneeUserId !== undefined ? overrideAssigneeUserId : assigneeUserId) || undefined
+          : undefined,
       });
       setData(result);
     } catch (error) {
@@ -289,7 +291,7 @@ export const TransactionDirectivesDashboardDialog: React.FC<Props> = ({
                           type="button"
                           onClick={() => {
                             setAssigneeUserId(employee.userId);
-                            window.setTimeout(() => void load(), 0);
+                            void load(employee.userId);
                           }}
                           className="w-full px-4 py-3 text-right transition hover:bg-slate-50"
                         >
