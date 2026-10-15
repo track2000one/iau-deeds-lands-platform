@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router';
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -124,6 +125,8 @@ const emptyCreate = (): TransactionFollowUpCreateInput => ({
 });
 
 export const TransactionFollowUpPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openedFromUrlRef = React.useRef<string | null>(null);
   const { currentUser } = useAuth();
   const { isAdmin, hasPermission } = usePermissions();
   const canAdd = isAdmin || hasPermission('transaction_follow_up', 'canAdd');
@@ -220,6 +223,13 @@ export const TransactionFollowUpPage: React.FC = () => {
     }
   };
 
+  React.useEffect(() => {
+    const transactionId = searchParams.get('transaction');
+    if (!transactionId || openedFromUrlRef.current === transactionId) return;
+    openedFromUrlRef.current = transactionId;
+    void openDetails(transactionId);
+  }, [searchParams]);
+
   const createTransaction = async () => {
     if (!createForm.transactionNumber.trim() || !createForm.subject.trim() || !createForm.transactionDate) {
       toast.error('أكمل رقم المعاملة وتاريخها وموضوعها');
@@ -260,6 +270,7 @@ export const TransactionFollowUpPage: React.FC = () => {
         note: assignNote || null,
       });
       toast.success('تم إسناد المعاملة وتسجيل التحويل');
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
       await openDetails(updated.id);
       await load();
     } catch (error) {
@@ -284,6 +295,7 @@ export const TransactionFollowUpPage: React.FC = () => {
         dueDate: nextDueDate || null,
       });
       toast.success(actionStatus === 'completed' || actionStatus === 'closed' ? 'تم تحديث وإنهاء حالة المعاملة' : 'تم تسجيل الإجراء');
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
       await openDetails(updated.id);
       await load();
     } catch (error) {
@@ -459,7 +471,18 @@ export const TransactionFollowUpPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(selected) || detailLoading} onOpenChange={(open) => { if (!open && !saving) setSelected(null); }}>
+      <Dialog
+        open={Boolean(selected) || detailLoading}
+        onOpenChange={(open) => {
+          if (!open && !saving) {
+            setSelected(null);
+            if (searchParams.get('transaction')) {
+              openedFromUrlRef.current = null;
+              setSearchParams({});
+            }
+          }
+        }}
+      >
         <DialogContent className="max-h-[94dvh] overflow-y-auto sm:max-w-5xl" dir="rtl">
           {detailLoading && !selected ? (
             <div className="py-16 text-center"><RefreshCw className="mx-auto h-6 w-6 animate-spin" /></div>
