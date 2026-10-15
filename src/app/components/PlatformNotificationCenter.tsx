@@ -168,19 +168,30 @@ export const PlatformNotificationCenter: React.FC = () => {
     [notifications]
   );
 
-  const openNotice = async (notice: MosqueNotification) => {
+  const openNotice = async (notice: PlatformNotice) => {
     if (!notice.isRead) {
       try {
-        await mosqueApi.readNotification(notice.id);
-        setNotifications((current) => current.map((item) => item.id === notice.id ? { ...item, isRead: true } : item));
+        if (notice.source === 'follow_up') {
+          await transactionFollowUpApi.readAlert(notice.id);
+        } else {
+          await mosqueApi.readNotification(notice.id);
+        }
+        setNotifications((current) => current.map((item) =>
+          item.id === notice.id && item.source === notice.source ? { ...item, isRead: true } : item
+        ));
         window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
       } catch (error) {
         console.warn('Unable to mark notification as read:', error);
       }
     }
 
-    const tab = notificationTargetTab(notice);
     setOpen(false);
+    if (notice.source === 'follow_up') {
+      navigate(`/follow-up?transaction=${encodeURIComponent(notice.entityId || '')}&alert=${encodeURIComponent(notice.id)}`);
+      return;
+    }
+
+    const tab = notificationTargetTab(notice);
     navigate(`/mosques?tab=${encodeURIComponent(tab)}&notice=${encodeURIComponent(notice.id)}`);
   };
 
@@ -190,7 +201,12 @@ export const PlatformNotificationCenter: React.FC = () => {
 
     setLoading(true);
     try {
-      await Promise.all(unread.map((notice) => mosqueApi.readNotification(notice.id)));
+      const mosqueUnread = unread.filter((notice) => notice.source === 'mosques');
+      const hasFollowUpUnread = unread.some((notice) => notice.source === 'follow_up');
+      await Promise.all([
+        ...mosqueUnread.map((notice) => mosqueApi.readNotification(notice.id)),
+        ...(hasFollowUpUnread ? [transactionFollowUpApi.readAllAlerts()] : []),
+      ]);
       setNotifications((current) => current.map((notice) => ({ ...notice, isRead: true })));
       window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
     } catch (error) {
@@ -200,7 +216,7 @@ export const PlatformNotificationCenter: React.FC = () => {
     }
   };
 
-  if (!canViewMosques) return null;
+  if (!canViewNotifications) return null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -253,17 +269,26 @@ export const PlatformNotificationCenter: React.FC = () => {
 
         <ScrollArea className="max-h-[430px]">
           <div className="divide-y divide-slate-100">
-            {ordered.slice(0, 20).map((notice) => {
+            {ordered.slice(0, 30).map((notice) => {
               const category = notificationCategory(notice);
-              const Icon = category === 'improvement' || category === 'completion' ? Target : Clock3;
+              const Icon = category === 'follow_up'
+                ? notice.severity === 'danger' ? AlertTriangle : ListTodo
+                : category === 'improvement' || category === 'completion'
+                  ? Target
+                  : Clock3;
+              const iconClass = notice.source === 'follow_up' && notice.severity === 'danger'
+                ? 'border-red-200 bg-red-50 text-red-700'
+                : notice.isRead
+                  ? 'border-slate-200 bg-white text-slate-500'
+                  : 'border-amber-200 bg-white text-amber-700';
               return (
                 <button
-                  key={notice.id}
+                  key={`${notice.source}:${notice.id}`}
                   type="button"
                   onClick={() => void openNotice(notice)}
                   className={`flex w-full gap-3 p-4 text-right transition hover:bg-slate-50 ${notice.isRead ? 'bg-white' : 'bg-amber-50/45'}`}
                 >
-                  <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${notice.isRead ? 'border-slate-200 bg-white text-slate-500' : 'border-amber-200 bg-white text-amber-700'}`}>
+                  <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${iconClass}`}>
                     <Icon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -291,17 +316,32 @@ export const PlatformNotificationCenter: React.FC = () => {
           </div>
         </ScrollArea>
 
-        <div className="border-t border-slate-200 bg-white p-3">
-          <Button
-            variant="outline"
-            className="w-full border-[#d9c9a5] bg-[#fffdf8] font-bold text-[#0b4a3f]"
-            onClick={() => {
-              setOpen(false);
-              navigate('/mosques?tab=notifications');
-            }}
-          >
-            عرض جميع الإشعارات
-          </Button>
+        <div className={`grid gap-2 border-t border-slate-200 bg-white p-3 ${canViewMosques && canViewFollowUp ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {canViewFollowUp && (
+            <Button
+              variant="outline"
+              className="border-[#d9c9a5] bg-[#fffdf8] font-bold text-[#0b4a3f]"
+              onClick={() => {
+                setOpen(false);
+                navigate('/follow-up');
+              }}
+            >
+              <ListTodo className="ml-1 h-4 w-4" />
+              نظام المتابعة
+            </Button>
+          )}
+          {canViewMosques && (
+            <Button
+              variant="outline"
+              className="border-[#d9c9a5] bg-[#fffdf8] font-bold text-[#0b4a3f]"
+              onClick={() => {
+                setOpen(false);
+                navigate('/mosques?tab=notifications');
+              }}
+            >
+              إشعارات المساجد
+            </Button>
+          )}
         </div>
       </PopoverContent>
     </Popover>
