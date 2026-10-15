@@ -1019,111 +1019,442 @@ ${styleAssets}
           <DialogHeader className="text-right">
             <DialogTitle>التقارير التنفيذية لمتابعة المعاملات</DialogTitle>
             <DialogDescription>
-              إعداد تقرير أسبوعي أو شهري أو لفترة مخصصة، مع إمكانية الطباعة أو الحفظ بصيغة PDF.
+              إعداد التقارير، حفظ النسخ المؤرشفة، المقارنة بين الفترات، وجدولة التقارير الأسبوعية والشهرية.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-3 rounded-2xl border bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-6">
-            <Field label="نوع التقرير">
-              <NativeSelect
-                value={reportMode}
-                onChange={(event) => void applyReportMode(event.target.value as 'weekly' | 'monthly' | 'custom')}
-              >
-                <option value="weekly">أسبوعي</option>
-                <option value="monthly">شهري</option>
-                <option value="custom">فترة مخصصة</option>
-              </NativeSelect>
-            </Field>
-            <Field label="من تاريخ">
-              <Input
-                type="date"
-                value={reportFrom}
-                onChange={(event) => {
-                  setReportMode('custom');
-                  setReportFrom(event.target.value);
-                }}
-              />
-            </Field>
-            <Field label="إلى تاريخ">
-              <Input
-                type="date"
-                value={reportTo}
-                onChange={(event) => {
-                  setReportMode('custom');
-                  setReportTo(event.target.value);
-                }}
-              />
-            </Field>
-            {(isAdmin || canDelete) && (
-              <Field label="الموظف">
-                <NativeSelect value={reportAssigneeId} onChange={(event) => setReportAssigneeId(event.target.value)}>
-                  <option value="">جميع الموظفين</option>
-                  {assignees.map((user) => (
-                    <option key={user.id} value={user.id}>{user.username}</option>
-                  ))}
-                </NativeSelect>
-              </Field>
-            )}
-            <div className="flex items-end">
-              <Button
-                className="w-full"
-                variant="outline"
-                disabled={reportLoading}
-                onClick={() => void loadExecutiveReport()}
-              >
-                <RefreshCw className={`ml-2 h-4 w-4 ${reportLoading ? 'animate-spin' : ''}`} />
-                تحديث التقرير
-              </Button>
-            </div>
-            <div className="flex items-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                disabled={!reportData || reportLoading || reportExporting}
-                onClick={printExecutiveReport}
-              >
-                <Printer className="ml-2 h-4 w-4" />
-                طباعة
-              </Button>
-              <Button
-                type="button"
-                className="flex-1"
-                disabled={!reportData || reportLoading || reportExporting}
-                onClick={() => void exportExecutiveReportPdf()}
-              >
-                {reportExporting
-                  ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" />
-                  : <FileDown className="ml-2 h-4 w-4" />}
-                PDF
-              </Button>
-            </div>
+          <div className="flex flex-wrap gap-2 border-b pb-3">
+            <Button
+              type="button"
+              variant={reportSection === 'preview' ? 'default' : 'outline'}
+              onClick={() => setReportSection('preview')}
+            >
+              <FileText className="ml-2 h-4 w-4" />
+              معاينة التقرير
+            </Button>
+            <Button
+              type="button"
+              variant={reportSection === 'archive' ? 'default' : 'outline'}
+              onClick={() => {
+                setReportSection('archive');
+                void loadReportArchives(reportArchivePage);
+              }}
+            >
+              <Archive className="ml-2 h-4 w-4" />
+              أرشيف التقارير
+            </Button>
+            <Button
+              type="button"
+              variant={reportSection === 'schedule' ? 'default' : 'outline'}
+              onClick={() => {
+                setReportSection('schedule');
+                void loadReportSchedules();
+              }}
+            >
+              <CalendarClock className="ml-2 h-4 w-4" />
+              الجدولة الآلية
+            </Button>
           </div>
 
-          <div className="max-h-[70dvh] overflow-auto rounded-2xl border bg-slate-100 p-2 sm:p-4">
-            {reportLoading && !reportData ? (
-              <div className="py-24 text-center text-sm text-muted-foreground">
-                <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />
-                جارٍ إعداد التقرير التنفيذي...
+          {reportSection === 'preview' && (
+            <>
+              <div className="grid gap-3 rounded-2xl border bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-7">
+                <Field label="نوع التقرير">
+                  <NativeSelect
+                    value={reportMode}
+                    onChange={(event) => void applyReportMode(event.target.value as 'weekly' | 'monthly' | 'custom')}
+                  >
+                    <option value="weekly">أسبوعي</option>
+                    <option value="monthly">شهري</option>
+                    <option value="custom">فترة مخصصة</option>
+                  </NativeSelect>
+                </Field>
+                <Field label="من تاريخ">
+                  <Input
+                    type="date"
+                    value={reportFrom}
+                    onChange={(event) => {
+                      setReportMode('custom');
+                      setReportFrom(event.target.value);
+                    }}
+                  />
+                </Field>
+                <Field label="إلى تاريخ">
+                  <Input
+                    type="date"
+                    value={reportTo}
+                    onChange={(event) => {
+                      setReportMode('custom');
+                      setReportTo(event.target.value);
+                    }}
+                  />
+                </Field>
+                {(isAdmin || canDelete) && (
+                  <Field label="الموظف">
+                    <NativeSelect value={reportAssigneeId} onChange={(event) => setReportAssigneeId(event.target.value)}>
+                      <option value="">جميع الموظفين</option>
+                      {assignees.map((user) => (
+                        <option key={user.id} value={user.id}>{user.username}</option>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                )}
+                <div className="flex items-end">
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    disabled={reportLoading}
+                    onClick={() => void loadExecutiveReport()}
+                  >
+                    <RefreshCw className={`ml-2 h-4 w-4 ${reportLoading ? 'animate-spin' : ''}`} />
+                    تحديث
+                  </Button>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={!reportData || reportLoading || reportArchiveLoading}
+                    onClick={() => void saveCurrentReportArchive()}
+                  >
+                    <Save className="ml-2 h-4 w-4" />
+                    حفظ بالأرشيف
+                  </Button>
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    disabled={!reportData || reportLoading || reportExporting}
+                    onClick={printExecutiveReport}
+                  >
+                    <Printer className="ml-2 h-4 w-4" />
+                    طباعة
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    disabled={!reportData || reportLoading || reportExporting}
+                    onClick={() => void exportExecutiveReportPdf()}
+                  >
+                    {reportExporting
+                      ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" />
+                      : <FileDown className="ml-2 h-4 w-4" />}
+                    PDF
+                  </Button>
+                </div>
               </div>
-            ) : reportData ? (
-              <TransactionExecutiveReport
-                ref={reportRef}
-                report={reportData}
-                assigneeLabel={
-                  reportAssigneeId
-                    ? assignees.find((user) => user.id === reportAssigneeId)?.username || null
-                    : !(isAdmin || canDelete)
-                      ? currentUser?.username || null
-                      : null
-                }
-              />
-            ) : (
-              <div className="py-24 text-center text-sm text-muted-foreground">
-                حدد فترة التقرير ثم اضغط «تحديث التقرير».
+
+              <div className="max-h-[68dvh] overflow-auto rounded-2xl border bg-slate-100 p-2 sm:p-4">
+                {reportLoading && !reportData ? (
+                  <div className="py-24 text-center text-sm text-muted-foreground">
+                    <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />
+                    جارٍ إعداد التقرير التنفيذي...
+                  </div>
+                ) : reportData ? (
+                  <TransactionExecutiveReport
+                    ref={reportRef}
+                    report={reportData}
+                    assigneeLabel={
+                      reportAssigneeId
+                        ? assignees.find((user) => user.id === reportAssigneeId)?.username || null
+                        : !(isAdmin || canDelete)
+                          ? currentUser?.username || null
+                          : null
+                    }
+                  />
+                ) : (
+                  <div className="py-24 text-center text-sm text-muted-foreground">
+                    حدد فترة التقرير ثم اضغط «تحديث».
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
+
+          {reportSection === 'archive' && (
+            <div className="max-h-[74dvh] space-y-4 overflow-auto">
+              <Card className="border-violet-200 shadow-none">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <GitCompareArrows className="h-4 w-4" />
+                    مقارنة تقريرين
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+                    <NativeSelect value={compareLeftId} onChange={(e) => setCompareLeftId(e.target.value)}>
+                      <option value="">التقرير السابق</option>
+                      {reportArchives.map((archive) => (
+                        <option key={archive.id} value={archive.id}>
+                          {archive.reportType === 'weekly' ? 'أسبوعي' : archive.reportType === 'monthly' ? 'شهري' : 'مخصص'} — {formatDate(archive.periodFrom)} إلى {formatDate(archive.periodTo)}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                    <NativeSelect value={compareRightId} onChange={(e) => setCompareRightId(e.target.value)}>
+                      <option value="">التقرير اللاحق</option>
+                      {reportArchives.map((archive) => (
+                        <option key={archive.id} value={archive.id}>
+                          {archive.reportType === 'weekly' ? 'أسبوعي' : archive.reportType === 'monthly' ? 'شهري' : 'مخصص'} — {formatDate(archive.periodFrom)} إلى {formatDate(archive.periodTo)}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={reportArchiveLoading || !compareLeftId || !compareRightId}
+                      onClick={() => void compareArchivedReports()}
+                    >
+                      <GitCompareArrows className="ml-2 h-4 w-4" />
+                      مقارنة
+                    </Button>
+                  </div>
+
+                  {reportComparison && (
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      <ComparisonMetric label="إجمالي المعاملات" value={reportComparison.delta.totalIncluded} />
+                      <ComparisonMetric label="المفتوحة" value={reportComparison.delta.open} inverse />
+                      <ComparisonMetric label="المنجزة" value={reportComparison.delta.completed} />
+                      <ComparisonMetric label="المتأخرة" value={reportComparison.delta.overdueSnapshot} inverse />
+                      <ComparisonMetric label="الإنجاز في الموعد" value={reportComparison.delta.onTimeRate} suffix="%" />
+                      <ComparisonMetric label="متوسط الإنجاز" value={reportComparison.delta.avgCompletionDays} suffix=" يوم" inverse />
+                      <ComparisonMetric label="متوسط أول إجراء" value={reportComparison.delta.avgFirstActionHours} suffix=" س" inverse />
+                      <ComparisonMetric label="بانتظار رد" value={reportComparison.delta.waiting} inverse />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-none">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base">التقارير المحفوظة</CardTitle>
+                      <p className="mt-1 text-xs text-muted-foreground">كل تقرير هنا يمثل نسخة ثابتة من البيانات وقت الحفظ.</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => void loadReportArchives(reportArchivePage)} disabled={reportArchiveLoading}>
+                      <RefreshCw className={`ml-1 h-4 w-4 ${reportArchiveLoading ? 'animate-spin' : ''}`} />
+                      تحديث
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {reportArchiveLoading && !reportArchives.length ? (
+                    <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل الأرشيف...</div>
+                  ) : reportArchives.length === 0 ? (
+                    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+                      لا توجد تقارير مؤرشفة حتى الآن.
+                    </div>
+                  ) : (
+                    reportArchives.map((archive) => (
+                      <div key={archive.id} className="flex flex-col gap-3 rounded-xl border bg-white p-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <b className="text-sm">
+                              {archive.reportType === 'weekly' ? 'تقرير أسبوعي' : archive.reportType === 'monthly' ? 'تقرير شهري' : 'تقرير مخصص'}
+                            </b>
+                            <Badge variant="outline">{archive.source === 'scheduled' ? 'آلي' : 'يدوي'}</Badge>
+                            {archive.assigneeName && <Badge variant="outline">{archive.assigneeName}</Badge>}
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {formatDate(archive.periodFrom)} — {formatDate(archive.periodTo)}
+                            {' · '}
+                            تم الحفظ {formatDateTime(archive.createdAt)}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-600">
+                            <span>الإجمالي: <b>{archive.summary?.totalIncluded?.toLocaleString('ar-SA') ?? '—'}</b></span>
+                            <span>منجزة: <b>{archive.summary?.completed?.toLocaleString('ar-SA') ?? '—'}</b></span>
+                            <span className={archive.summary?.overdueSnapshot ? 'text-red-700' : ''}>متأخرة: <b>{archive.summary?.overdueSnapshot?.toLocaleString('ar-SA') ?? '—'}</b></span>
+                            <span>في الموعد: <b>{archive.summary?.onTimeRate == null ? '—' : `${archive.summary.onTimeRate}%`}</b></span>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <Button size="sm" variant="outline" onClick={() => void openArchivedReport(archive.id)}>
+                            <FileText className="ml-1 h-4 w-4" />
+                            فتح
+                          </Button>
+                          {canDelete && (
+                            <Button size="sm" variant="outline" className="border-red-200 text-red-700" onClick={() => void deleteArchivedReport(archive.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+
+                  <div className="flex items-center justify-between border-t pt-3">
+                    <span className="text-xs text-muted-foreground">
+                      صفحة {reportArchivePage.toLocaleString('ar-SA')} من {Math.max(1, reportArchiveTotalPages).toLocaleString('ar-SA')}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={reportArchivePage <= 1 || reportArchiveLoading}
+                        onClick={() => void loadReportArchives(reportArchivePage - 1)}
+                      >
+                        السابق
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!reportArchiveTotalPages || reportArchivePage >= reportArchiveTotalPages || reportArchiveLoading}
+                        onClick={() => void loadReportArchives(reportArchivePage + 1)}
+                      >
+                        التالي
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {reportSection === 'schedule' && (
+            <div className="max-h-[74dvh] space-y-4 overflow-auto">
+              {canEdit && (
+                <Card className="border-sky-200 shadow-none">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <CalendarClock className="h-4 w-4" />
+                      إنشاء جدولة تقرير
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                    <div className="xl:col-span-2">
+                      <Field label="اسم الجدولة">
+                        <Input value={scheduleName} onChange={(e) => setScheduleName(e.target.value)} />
+                      </Field>
+                    </div>
+                    <Field label="التكرار">
+                      <NativeSelect
+                        value={scheduleFrequency}
+                        onChange={(e) => {
+                          const value = e.target.value as 'weekly' | 'monthly';
+                          setScheduleFrequency(value);
+                          setScheduleName(value === 'weekly' ? 'التقرير الأسبوعي للمتابعة' : 'التقرير الشهري للمتابعة');
+                        }}
+                      >
+                        <option value="weekly">أسبوعي</option>
+                        <option value="monthly">شهري</option>
+                      </NativeSelect>
+                    </Field>
+                    {scheduleFrequency === 'weekly' ? (
+                      <Field label="يوم الإصدار">
+                        <NativeSelect value={scheduleDayOfWeek} onChange={(e) => setScheduleDayOfWeek(Number(e.target.value))}>
+                          <option value={0}>الأحد</option>
+                          <option value={1}>الاثنين</option>
+                          <option value={2}>الثلاثاء</option>
+                          <option value={3}>الأربعاء</option>
+                          <option value={4}>الخميس</option>
+                          <option value={5}>الجمعة</option>
+                          <option value={6}>السبت</option>
+                        </NativeSelect>
+                      </Field>
+                    ) : (
+                      <Field label="يوم الشهر">
+                        <NativeSelect value={scheduleDayOfMonth} onChange={(e) => setScheduleDayOfMonth(Number(e.target.value))}>
+                          {Array.from({ length: 28 }, (_, index) => index + 1).map((day) => (
+                            <option key={day} value={day}>{day}</option>
+                          ))}
+                        </NativeSelect>
+                      </Field>
+                    )}
+                    <Field label="ساعة الإصدار">
+                      <NativeSelect value={scheduleRunHour} onChange={(e) => setScheduleRunHour(Number(e.target.value))}>
+                        {Array.from({ length: 24 }, (_, hour) => (
+                          <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>
+                        ))}
+                      </NativeSelect>
+                    </Field>
+                    {(isAdmin || canDelete) && (
+                      <Field label="نطاق الموظف">
+                        <NativeSelect value={scheduleAssigneeId} onChange={(e) => setScheduleAssigneeId(e.target.value)}>
+                          <option value="">جميع الموظفين</option>
+                          {assignees.map((user) => (
+                            <option key={user.id} value={user.id}>{user.username}</option>
+                          ))}
+                        </NativeSelect>
+                      </Field>
+                    )}
+                    <div className="flex items-end">
+                      <Button className="w-full" disabled={reportScheduleLoading} onClick={() => void createReportSchedule()}>
+                        <Plus className="ml-2 h-4 w-4" />
+                        إنشاء الجدولة
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card className="shadow-none">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base">الجدولات النشطة والمحـفوظة</CardTitle>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        التقرير الأسبوعي يغطي الأسبوع المكتمل السابق، والشهري يغطي الشهر المكتمل السابق.
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => void loadReportSchedules()} disabled={reportScheduleLoading}>
+                      <RefreshCw className={`ml-1 h-4 w-4 ${reportScheduleLoading ? 'animate-spin' : ''}`} />
+                      تحديث
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {reportScheduleLoading && !reportSchedules.length ? (
+                    <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل الجدولات...</div>
+                  ) : reportSchedules.length === 0 ? (
+                    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+                      لا توجد جدولات تقارير حتى الآن.
+                    </div>
+                  ) : (
+                    reportSchedules.map((schedule) => (
+                      <div key={schedule.id} className="flex flex-col gap-3 rounded-xl border bg-white p-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <b className="text-sm">{schedule.name}</b>
+                            <Badge variant="outline">{schedule.frequency === 'weekly' ? 'أسبوعي' : 'شهري'}</Badge>
+                            <Badge variant="outline" className={schedule.isActive ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-600'}>
+                              {schedule.isActive ? 'نشطة' : 'متوقفة'}
+                            </Badge>
+                            {schedule.assigneeName && <Badge variant="outline">{schedule.assigneeName}</Badge>}
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {schedule.frequency === 'weekly'
+                              ? `يوم ${['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][schedule.dayOfWeek ?? 0]}`
+                              : `يوم ${schedule.dayOfMonth ?? 1} من كل شهر`}
+                            {' · '}
+                            الساعة {String(schedule.runHour).padStart(2, '0')}:00
+                          </p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            الإصدار القادم: {formatDateTime(schedule.nextRunAt)}
+                            {schedule.lastRunAt ? <> · آخر تشغيل: {formatDateTime(schedule.lastRunAt)}</> : null}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          <Button size="sm" variant="outline" onClick={() => void runReportScheduleNow(schedule)} disabled={reportScheduleLoading}>
+                            <Play className="ml-1 h-4 w-4" />
+                            تشغيل الآن
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => void toggleReportSchedule(schedule)} disabled={reportScheduleLoading}>
+                            {schedule.isActive ? 'إيقاف' : 'تفعيل'}
+                          </Button>
+                          <Button size="sm" variant="outline" className="border-red-200 text-red-700" onClick={() => void deleteReportSchedule(schedule)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
