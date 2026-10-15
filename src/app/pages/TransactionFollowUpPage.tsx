@@ -6,6 +6,7 @@ import {
   ArrowLeftRight,
   CalendarClock,
   GitCompareArrows,
+  Gavel,
   CheckCircle2,
   CircleDot,
   Clock3,
@@ -48,6 +49,7 @@ import { Textarea } from '../components/ui/textarea';
 import { TransactionExecutiveReport } from '../components/TransactionExecutiveReport';
 import { TransactionExecutiveInbox } from '../components/TransactionExecutiveInbox';
 import { TransactionManagementDirectives } from '../components/TransactionManagementDirectives';
+import { TransactionDirectivesDashboardDialog } from '../components/TransactionDirectivesDashboardDialog';
 import {
   transactionFollowUpApi,
   type TransactionFollowUpAnalytics,
@@ -236,6 +238,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [priority, setPriority] = React.useState('');
   const [mine, setMine] = React.useState(false);
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [directivesDashboardOpen, setDirectivesDashboardOpen] = React.useState(false);
   const [createForm, setCreateForm] = React.useState<TransactionFollowUpCreateInput>(emptyCreate());
   const [selected, setSelected] = React.useState<TransactionFollowUpRecord | null>(null);
   const [actionText, setActionText] = React.useState('');
@@ -794,6 +797,10 @@ ${styleAssets}
               <RefreshCw className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               تحديث
             </Button>
+            <Button variant="outline" onClick={() => setDirectivesDashboardOpen(true)}>
+              <Gavel className="ml-2 h-4 w-4" />
+              لوحة التوجيهات
+            </Button>
             {canPrint && (
               <Button variant="outline" onClick={() => void openExecutiveReport()}>
                 <FileText className="ml-2 h-4 w-4" />
@@ -1046,6 +1053,14 @@ ${styleAssets}
           </div>
         </CardContent>
       </Card>
+
+      <TransactionDirectivesDashboardDialog
+        open={directivesDashboardOpen}
+        onOpenChange={setDirectivesDashboardOpen}
+        supervisor={isAdmin || canDelete}
+        assignees={assignees}
+        onOpenTransaction={(id) => void openDetails(id)}
+      />
 
       <Dialog open={reportOpen} onOpenChange={(open) => !reportExporting && setReportOpen(open)}>
         <DialogContent className="max-h-[96dvh] overflow-hidden sm:max-w-[1180px]" dir="rtl">
