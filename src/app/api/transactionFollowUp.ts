@@ -227,6 +227,58 @@ export type TransactionFollowUpExecutiveReport = {
   }>;
 };
 
+export type TransactionFollowUpReportArchive = {
+  id: string;
+  reportType: 'weekly' | 'monthly' | 'custom';
+  periodFrom: string;
+  periodTo: string;
+  assigneeUserId?: string | null;
+  assigneeName?: string | null;
+  scopeMine: boolean;
+  source: 'manual' | 'scheduled' | string;
+  snapshot?: TransactionFollowUpExecutiveReport;
+  summary?: TransactionFollowUpExecutiveReport['summary'] | null;
+  scheduleId?: string | null;
+  generatedById?: string | null;
+  generatedByName?: string | null;
+  createdAt: string;
+};
+
+export type TransactionFollowUpReportArchivePage = {
+  items: TransactionFollowUpReportArchive[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export type TransactionFollowUpReportComparison = {
+  left: TransactionFollowUpReportArchive & { snapshot: TransactionFollowUpExecutiveReport };
+  right: TransactionFollowUpReportArchive & { snapshot: TransactionFollowUpExecutiveReport };
+  delta: Record<
+    'totalIncluded' | 'open' | 'completed' | 'waiting' | 'needsFollowUp' | 'overdueSnapshot' | 'onTimeRate' | 'avgCompletionDays' | 'avgFirstActionHours',
+    number | null
+  >;
+};
+
+export type TransactionFollowUpReportSchedule = {
+  id: string;
+  name: string;
+  frequency: 'weekly' | 'monthly';
+  dayOfWeek?: number | null;
+  dayOfMonth?: number | null;
+  runHour: number;
+  assigneeUserId?: string | null;
+  assigneeName?: string | null;
+  isActive: boolean;
+  lastRunAt?: string | null;
+  nextRunAt?: string | null;
+  createdById?: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TransactionFollowUpCreateInput = {
   transactionNumber: string;
   transactionDate: string;
@@ -296,6 +348,93 @@ export const transactionFollowUpApi = {
       `/api/transaction-follow-up/reports/executive${suffix ? `?${suffix}` : ''}`,
     );
   },
+
+  reportArchives: (input: { page?: number; pageSize?: number; assigneeUserId?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (input.page) query.set('page', String(input.page));
+    if (input.pageSize) query.set('pageSize', String(input.pageSize));
+    if (input.assigneeUserId) query.set('assigneeUserId', input.assigneeUserId);
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpReportArchivePage>(
+      `/api/transaction-follow-up/reports/archives${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  reportArchive: (id: string) =>
+    apiJson<TransactionFollowUpReportArchive & { snapshot: TransactionFollowUpExecutiveReport }>(
+      `/api/transaction-follow-up/reports/archives/${id}`,
+    ),
+
+  archiveReport: (input: {
+    reportType: 'weekly' | 'monthly' | 'custom';
+    from: string;
+    to: string;
+    assigneeUserId?: string | null;
+  }) =>
+    apiJson<TransactionFollowUpReportArchive>('/api/transaction-follow-up/reports/archives', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  compareReportArchives: (leftId: string, rightId: string) => {
+    const query = new URLSearchParams({ leftId, rightId });
+    return apiJson<TransactionFollowUpReportComparison>(
+      `/api/transaction-follow-up/reports/archives/compare?${query.toString()}`,
+    );
+  },
+
+  deleteReportArchive: (id: string) =>
+    apiJson<void>(`/api/transaction-follow-up/reports/archives/${id}`, {
+      method: 'DELETE',
+    }),
+
+  reportSchedules: () =>
+    apiJson<TransactionFollowUpReportSchedule[]>('/api/transaction-follow-up/reports/schedules'),
+
+  createReportSchedule: (input: {
+    name: string;
+    frequency: 'weekly' | 'monthly';
+    dayOfWeek?: number | null;
+    dayOfMonth?: number | null;
+    runHour: number;
+    assigneeUserId?: string | null;
+    isActive?: boolean;
+  }) =>
+    apiJson<TransactionFollowUpReportSchedule>('/api/transaction-follow-up/reports/schedules', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  updateReportSchedule: (
+    id: string,
+    input: Partial<{
+      name: string;
+      frequency: 'weekly' | 'monthly';
+      dayOfWeek: number | null;
+      dayOfMonth: number | null;
+      runHour: number;
+      assigneeUserId: string | null;
+      isActive: boolean;
+    }>,
+  ) =>
+    apiJson<TransactionFollowUpReportSchedule>(
+      `/api/transaction-follow-up/reports/schedules/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  runReportSchedule: (id: string) =>
+    apiJson<{ scanned: number; generated: number }>(
+      `/api/transaction-follow-up/reports/schedules/${id}/run`,
+      { method: 'POST' },
+    ),
+
+  deleteReportSchedule: (id: string) =>
+    apiJson<void>(`/api/transaction-follow-up/reports/schedules/${id}`, {
+      method: 'DELETE',
+    }),
 
   assignees: () =>
     apiJson<TransactionFollowUpAssignee[]>('/api/transaction-follow-up/assignees'),
