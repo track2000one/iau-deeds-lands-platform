@@ -257,6 +257,10 @@ export const TransactionRiskExecutiveDashboardPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => navigate('/follow-up/risks/acceptance')}>
+            <FileCheck2 className="me-2 h-4 w-4" />
+            حوكمة قبول المخاطر
+          </Button>
           <Button variant="outline" onClick={() => navigate('/follow-up/risks')}>
             <ShieldAlert className="me-2 h-4 w-4" />
             سجل المخاطر
@@ -620,11 +624,20 @@ export const TransactionRiskExecutiveDashboardPage: React.FC = () => {
               <MiniStat label="CAPA مفتوحة" value={data.capa.open} />
               <MiniStat label="CAPA متأخرة" value={data.capa.overdue} danger={data.capa.overdue > 0} />
               <MiniStat label="نسبة فشل الوقاية" value={data.preventive.failureRate + '%'} warning={data.preventive.failureRate >= 15} />
+              <MiniStat label="طلبات قبول معلقة" value={data.acceptance.pending} warning={data.acceptance.pending > 0} />
+              <MiniStat label="قبول مخاطر فعال" value={data.acceptance.activeApproved} />
+              <MiniStat label="قبول ينتهي قريبًا" value={data.acceptance.expiringSoon} danger={data.acceptance.expiringSoon > 0} />
             </div>
-            <Button className="w-full" variant="outline" onClick={() => navigate('/follow-up')}>
-              <Activity className="me-2 h-4 w-4" />
-              فتح نظام المتابعة والإجراءات التصحيحية
-            </Button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button className="w-full" variant="outline" onClick={() => navigate('/follow-up/risks/acceptance')}>
+                <FileCheck2 className="me-2 h-4 w-4" />
+                مركز قبول المخاطر
+              </Button>
+              <Button className="w-full" variant="outline" onClick={() => navigate('/follow-up')}>
+                <Activity className="me-2 h-4 w-4" />
+                نظام المتابعة وCAPA
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
