@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router';
 import {
   Activity,
   AlertTriangle,
@@ -6,6 +7,7 @@ import {
   Clock3,
   RefreshCw,
   Save,
+  ShieldAlert,
   ShieldCheck,
   Target,
 } from 'lucide-react';
@@ -17,6 +19,7 @@ import {
   type TransactionFollowUpPreventiveActionPage,
 } from '../api/transactionFollowUp';
 import type { ImprovementPlanSeed } from './TransactionImprovementPlansDialog';
+import type { RiskRegisterSeed } from './TransactionRiskRegisterDialog';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -203,6 +206,7 @@ export const TransactionPreventiveActionsDialog: React.FC<Props> = ({
   seed,
   onOpenCapa,
 }) => {
+  const navigate = useNavigate();
   const [data, setData] = React.useState<TransactionFollowUpPreventiveActionPage>(EMPTY_PAGE);
   const [loading, setLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -341,6 +345,67 @@ export const TransactionPreventiveActionsDialog: React.FC<Props> = ({
       assigneeUserId: action.scopeType === 'employee' ? action.assigneeUserId : null,
       assigneeName: action.scopeType === 'employee' ? action.assigneeName : null,
     }, action.id);
+  };
+
+  const openRiskRegister = (action: TransactionFollowUpPreventiveAction) => {
+    const sourceLevel = action.sourceRiskLevel || (
+      action.resultRiskScore != null
+        ? action.resultRiskScore >= 85
+          ? 'critical'
+          : action.resultRiskScore >= 65
+            ? 'high'
+            : action.resultRiskScore >= 40
+              ? 'medium'
+              : 'low'
+        : 'medium'
+    );
+    const matrixValue =
+      action.status === 'failed'
+        ? 4
+        : sourceLevel === 'critical'
+          ? 5
+          : sourceLevel === 'high'
+            ? 4
+            : sourceLevel === 'medium'
+              ? 3
+              : 2;
+
+    const sourceReasons = Array.isArray(action.sourceReasons) ? action.sourceReasons : [];
+    const seed: RiskRegisterSeed = {
+      title: action.metricLabel
+        ? 'خطر تشغيلي مرتبط بمؤشر ' + action.metricLabel
+        : action.assigneeName
+          ? 'خطر تشغيلي مرتبط بالموظف ' + action.assigneeName
+          : 'خطر تشغيلي من تدخل وقائي',
+      description: [
+        sourceReasons.join(' '),
+        'التدخل الوقائي: ' + action.actionText,
+        action.progressNote ? 'نتيجة المتابعة: ' + action.progressNote : '',
+      ].filter(Boolean).join('\n'),
+      category: action.scopeType === 'employee' ? 'workload' : 'process',
+      sourceType: 'preventive_action',
+      metricKey: action.metricKey || null,
+      scopeType: action.scopeType,
+      assigneeUserId: action.scopeType === 'employee' ? action.assigneeUserId || null : null,
+      ownerUserId: action.ownerUserId,
+      probability: matrixValue,
+      impact: matrixValue,
+      controls: action.status === 'effective' ? [action.actionText] : [],
+      treatmentStrategy: 'reduce',
+      treatmentPlan: action.status === 'failed'
+        ? 'معالجة سبب فشل التدخل الوقائي وربط الإجراء بخطة CAPA عند الحاجة.'
+        : action.actionText,
+      residualProbability: action.status === 'effective' ? Math.max(1, matrixValue - 2) : matrixValue,
+      residualImpact: action.status === 'effective' ? Math.max(1, matrixValue - 1) : matrixValue,
+      reviewDate: dateInput(30),
+      sourcePreventiveActionId: action.id,
+      sourceImprovementPlanId: action.improvementPlanId || null,
+      recurrenceCount: action.status === 'failed' ? 1 : 0,
+      notes: action.expectedOutcome || null,
+    };
+
+    onOpenChange(false);
+    navigate('/follow-up/risks', { state: { riskSeed: seed } });
   };
 
   return (
@@ -533,6 +598,21 @@ export const TransactionPreventiveActionsDialog: React.FC<Props> = ({
                               >
                                 <AlertTriangle className="ml-1 h-3.5 w-3.5" />
                                 إنشاء CAPA
+                              </Button>
+                            )}
+                            {supervisor && (
+                              action.status === 'failed' ||
+                              ['high', 'critical'].includes(action.sourceRiskLevel || '')
+                            ) && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="border-red-300 bg-red-50 text-red-900 hover:bg-red-100"
+                                onClick={() => openRiskRegister(action)}
+                              >
+                                <ShieldAlert className="ml-1 h-3.5 w-3.5" />
+                                تسجيل في سجل المخاطر
                               </Button>
                             )}
                           </div>
