@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Archive,
   ArrowLeftRight,
+  Building2,
   CalendarClock,
   GitCompareArrows,
   Gavel,
@@ -1865,6 +1866,53 @@ ${styleAssets}
                   <CardContent className="text-sm leading-7">{selected.notes || 'لا توجد ملاحظات.'}</CardContent>
                 </Card>
               </div>
+
+              {selected.externalWaits?.length ? (
+                <Card className="border-cyan-200">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Building2 className="h-4 w-4" />
+                      سجل انتظار الجهات الخارجية
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selected.externalWaits.map((wait) => (
+                      <div key={wait.id} className="rounded-xl border bg-slate-50/70 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <b className="text-sm">{wait.externalEntity}</b>
+                            <Badge
+                              variant="outline"
+                              className={
+                                wait.status === 'active'
+                                  ? 'border-sky-300 bg-sky-50 text-sky-900'
+                                  : wait.status === 'responded'
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                                    : 'border-slate-300 bg-white text-slate-700'
+                              }
+                            >
+                              {wait.status === 'active' ? 'بانتظار الرد' : wait.status === 'responded' ? 'تم الرد' : 'ملغى'}
+                            </Badge>
+                          </div>
+                          <span className="text-[11px] text-muted-foreground">
+                            أرسل: {formatDate(wait.sentAt)}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                          {wait.outboundReferenceNumber && <span>المرجع الصادر: <b className="text-foreground">{wait.outboundReferenceNumber}</b></span>}
+                          <span>المتابعة القادمة: <b className="text-foreground">{formatDate(wait.nextFollowUpDate)}</b></span>
+                          <span>عدد المتابعات: <b className="text-foreground">{wait.followUpCount.toLocaleString('ar-SA')}</b></span>
+                          {wait.responseReceivedAt && <span>ورود الرد: <b className="text-foreground">{formatDate(wait.responseReceivedAt)}</b></span>}
+                          {wait.responseReferenceNumber && <span>مرجع الرد: <b className="text-foreground">{wait.responseReferenceNumber}</b></span>}
+                        </div>
+                        {wait.notes && <p className="mt-2 text-xs leading-6"><b>ملاحظات الانتظار:</b> {wait.notes}</p>}
+                        {wait.lastFollowUpNote && <p className="mt-1 text-xs leading-6"><b>آخر متابعة:</b> {wait.lastFollowUpNote}</p>}
+                        {wait.responseNote && <p className="mt-1 text-xs leading-6"><b>{wait.status === 'cancelled' ? 'سبب الإلغاء' : 'ملخص الرد'}:</b> {wait.responseNote}</p>}
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              ) : null}
 
               {canManageSelected && !['completed', 'closed'].includes(selected.status) && (
                 <div className="grid gap-4 xl:grid-cols-2">
