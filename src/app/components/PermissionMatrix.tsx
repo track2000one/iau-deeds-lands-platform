@@ -113,6 +113,9 @@ export const PermissionMatrix: React.FC<{
             <p className="mt-1 text-xs font-semibold text-emerald-700">
               {ui('سياسة الجولات والزيارات الميدانية: صلاحيتا «تعديل» و«حذف» في وحدة المساجد تسمحان للمستخدم بإدارة الجولات والزيارات التي أنشأها بنفسه فقط. سجلات المستخدمين الآخرين تكون «عرض فقط»، بينما مسؤول النظام أو رئيس الوحدة يستطيع إدارة جميع السجلات وفق الصلاحيات الممنوحة.', 'Field tours and visits policy: Edit and Delete permissions in the Mosques module let a user manage only tours and visits they created. Other users’ records are read-only, while the system administrator or unit head can manage all records according to granted permissions.')}
             </p>
+            <p className="mt-1 text-xs font-semibold text-sky-700">
+              {ui('نظام المتابعة: صلاحية «تعديل» تسمح للمستخدم بتحديث المعاملات المسندة إليه أو التي أنشأها وتسجيل إجراءاتها. صلاحية «حذف» مستقلة ولا يظهر زر الحذف ولا يقبل الخادم عملية الحذف إلا للمستخدم الذي مُنحت له هذه الصلاحية صراحةً.', 'Transaction Follow-up: Edit lets a user update assigned or self-created transactions and record actions. Delete is independent; the delete button is hidden and the server rejects deletion unless that permission is explicitly granted.')}
+            </p>
             <p className="mt-2 text-xs font-medium text-primary">
               {ui('يمكن تمرير الجدول بعجلة الفأرة أو بسحب شريط التمرير الواضح على طرف الجدول، كما يمكن استخدام زري أعلى وأسفل للانتقال السريع.', 'Scroll with the mouse wheel or drag the visible scrollbar at the edge of the table. You can also use the Top and Bottom buttons for quick navigation.')}
             </p>
