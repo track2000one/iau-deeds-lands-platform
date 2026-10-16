@@ -258,6 +258,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [status, setStatus] = React.useState('');
   const [priority, setPriority] = React.useState('');
   const [mine, setMine] = React.useState(false);
+  const [activeWorkspace, setActiveWorkspace] = React.useState<'daily' | 'transactions' | 'directives' | 'oversight'>('daily');
   const [createOpen, setCreateOpen] = React.useState(false);
   const [directivesDashboardOpen, setDirectivesDashboardOpen] = React.useState(false);
   const [approvalCenterOpen, setApprovalCenterOpen] = React.useState(false);
@@ -834,173 +835,203 @@ ${styleAssets}
 
   return (
     <div className="mx-auto w-full max-w-[1750px] space-y-5">
-      <section className="rounded-[28px] border border-white/60 bg-white/80 p-5 shadow-[0_16px_48px_rgba(15,23,42,.08)] backdrop-blur-xl sm:p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-black text-primary">
+      <section className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_18px_50px_rgba(15,23,42,.07)]">
+        <div className="flex flex-col gap-5 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-xs font-black text-primary">
               <ListTodo className="h-4 w-4" />
               سير ومتابعة المعاملات
             </div>
-            <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">نظام المتابعة</h1>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-muted-foreground">
-              تسجيل المعاملة وإسنادها للموظف المختص، متابعة الإجراءات والتحويلات، وإظهار المعاملات المتأخرة أو التي لم يحدث عليها إجراء.
+            <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">نظام المتابعة</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-500">
+              مركز عمل موحد لمتابعة المعاملات والاستحقاقات والإجراءات والاعتمادات حتى الإنجاز والإقفال.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+
+          <div className="flex flex-wrap items-center gap-2">
             {(isAdmin || canDelete) ? (
-              <Button variant={mine ? 'default' : 'outline'} onClick={() => setMine((value) => !value)}>
+              <Button
+                variant="outline"
+                className="h-10 rounded-xl border-slate-300 bg-white"
+                onClick={() => setMine((value) => !value)}
+              >
                 <UserRound className="ml-2 h-4 w-4" />
-                {mine ? 'عرض جميع المعاملات' : 'معاملاتي'}
+                {mine ? 'عرض الإدارة' : 'معاملاتي'}
               </Button>
             ) : (
-              <Badge variant="outline" className="border-primary/30 bg-primary/5 px-3 py-2">
+              <Badge variant="outline" className="h-10 rounded-xl border-primary/20 bg-primary/5 px-3">
                 <UserRound className="ml-2 h-4 w-4" />
                 مهامي المسندة
               </Badge>
             )}
-            <Button variant="outline" onClick={() => void load()} disabled={loading}>
-              <RefreshCw className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl border-slate-300 bg-white"
+              onClick={() => void load()}
+              disabled={loading}
+            >
+              <RefreshCw className={'ml-2 h-4 w-4 ' + (loading ? 'animate-spin' : '')} />
               تحديث
             </Button>
-            <Button variant="outline" onClick={() => setDirectivesDashboardOpen(true)}>
-              <Gavel className="ml-2 h-4 w-4" />
-              لوحة التوجيهات
-            </Button>
-            {(isAdmin || canDelete) && (
+
+            {canAdd && (
               <Button
-                variant="outline"
-                className="border-violet-300 bg-violet-50 text-violet-900 hover:bg-violet-100"
-                onClick={() => setApprovalCenterOpen(true)}
-              >
-                <FileCheck2 className="ml-2 h-4 w-4" />
-                مركز الاعتمادات
-              </Button>
-            )}
-            {(isAdmin || canDelete) && (
-              <Button variant="outline" onClick={() => setApprovalHistoryOpen(true)}>
-                <History className="ml-2 h-4 w-4" />
-                سجل الاعتمادات
-              </Button>
-            )}
-            {(isAdmin || canDelete) && (
-              <Button
-                variant="outline"
-                className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
-                onClick={() => setDirectiveKpiOpen(true)}
-              >
-                <Gauge className="ml-2 h-4 w-4" />
-                KPI التوجيهات
-              </Button>
-            )}
-            {(isAdmin || canDelete) && (
-              <Button
-                variant="outline"
-                className="border-teal-300 bg-teal-50 text-teal-900 hover:bg-teal-100"
+                className="h-10 rounded-xl px-4 shadow-sm"
                 onClick={() => {
-                  setImprovementPlanSeed(null);
-                  setImprovementPlansOpen(true);
+                  setCreateForm(emptyCreate());
+                  setCreateOpen(true);
                 }}
               >
-                <ClipboardCheck className="ml-2 h-4 w-4" />
-                خطط التحسين CAPA
-              </Button>
-            )}
-            {(isAdmin || canDelete) && (
-              <Button
-                variant="outline"
-                className="border-orange-300 bg-orange-50 text-orange-900 hover:bg-orange-100"
-                onClick={() => setEarlyWarningOpen(true)}
-              >
-                <ShieldAlert className="ml-2 h-4 w-4" />
-                الإنذار المبكر
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
-              onClick={() => {
-                setPreventiveActionSeed(null);
-                setPreventiveActionsOpen(true);
-              }}
-            >
-              <ShieldCheck className="ml-2 h-4 w-4" />
-              التدخلات الوقائية
-            </Button>
-            <Button
-              variant="outline"
-              className="border-red-300 bg-red-50 text-red-900 hover:bg-red-100"
-              onClick={() => navigate('/follow-up/risks')}
-            >
-              <ShieldAlert className="ml-2 h-4 w-4" />
-              سجل المخاطر
-            </Button>
-            <Button
-              variant="outline"
-              className="border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-              onClick={() => navigate('/follow-up/risks/acceptance')}
-            >
-              <FileCheck2 className="ml-2 h-4 w-4" />
-              قبول المخاطر
-            </Button>
-            {(isAdmin || canDelete) && (
-              <Button
-                variant="outline"
-                className="border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-                onClick={() => navigate('/follow-up/risks/policy')}
-              >
-                <Settings2 className="ml-2 h-4 w-4" />
-                شهية المخاطر وKRI
-              </Button>
-            )}
-            {(isAdmin || canDelete) && (
-              <Button
-                variant="outline"
-                className="border-slate-300 bg-slate-50 text-slate-900 hover:bg-slate-100"
-                onClick={() => navigate('/follow-up/risks/executive')}
-              >
-                <Gauge className="ml-2 h-4 w-4" />
-                لوحة المخاطر التنفيذية
-              </Button>
-            )}
-            {canPrint && (
-              <Button variant="outline" onClick={() => void openExecutiveReport()}>
-                <FileText className="ml-2 h-4 w-4" />
-                التقارير التنفيذية
-              </Button>
-            )}
-            {canAdd && (
-              <Button onClick={() => { setCreateForm(emptyCreate()); setCreateOpen(true); }}>
                 <Plus className="ml-2 h-4 w-4" />
                 تسجيل معاملة
               </Button>
             )}
           </div>
         </div>
+
+        <div className="border-t bg-slate-50/70 px-3 py-3 sm:px-5">
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <WorkspaceTab
+              active={activeWorkspace === 'daily'}
+              icon={<Inbox className="h-4 w-4" />}
+              title="المتابعة اليومية"
+              hint="ما يحتاج إجراء الآن"
+              onClick={() => setActiveWorkspace('daily')}
+            />
+            <WorkspaceTab
+              active={activeWorkspace === 'transactions'}
+              icon={<ListTodo className="h-4 w-4" />}
+              title="المعاملات"
+              hint="البحث والقائمة الكاملة"
+              onClick={() => setActiveWorkspace('transactions')}
+            />
+            <WorkspaceTab
+              active={activeWorkspace === 'directives'}
+              icon={<Gavel className="h-4 w-4" />}
+              title="التوجيهات والاعتمادات"
+              hint="التوجيهات والقرارات"
+              onClick={() => setActiveWorkspace('directives')}
+            />
+            <WorkspaceTab
+              active={activeWorkspace === 'oversight'}
+              icon={<Gauge className="h-4 w-4" />}
+              title="الرقابة والتحسين"
+              hint="الأداء والمخاطر والتقارير"
+              onClick={() => setActiveWorkspace('oversight')}
+            />
+          </div>
+        </div>
       </section>
 
-      <TransactionDailyWorkCenter
-        mine={mine}
-        supervisor={isAdmin || canDelete}
-        onOpenTransaction={(id) => void openDetails(id)}
-        onChanged={() => void load()}
-      />
+      {activeWorkspace === 'daily' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+            <DailyStat title="مفتوحة" value={dashboard.open} icon={<Inbox className="h-4 w-4" />} />
+            <DailyStat title="تحتاج إجراء" value={dashboard.needsAction} icon={<AlertTriangle className="h-4 w-4" />} tone="danger" />
+            <DailyStat title="متأخرة" value={dashboard.overdue} icon={<Clock3 className="h-4 w-4" />} tone="danger" />
+            <DailyStat title="بانتظار جهة" value={dashboard.waiting} icon={<FileClock className="h-4 w-4" />} tone="info" />
+            <DailyStat title="غير مسندة" value={dashboard.unassigned} icon={<UserRound className="h-4 w-4" />} tone="warning" />
+            <DailyStat title="منجزة / مغلقة" value={dashboard.completed} icon={<CheckCircle2 className="h-4 w-4" />} tone="success" />
+          </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
-        <Summary title="المعاملات المفتوحة" value={dashboard.open} icon={<Inbox className="h-5 w-5" />} />
-        <Summary title="تحتاج إجراء" value={dashboard.needsAction} icon={<AlertTriangle className="h-5 w-5 text-red-600" />} />
-        <Summary title="متأخرة" value={dashboard.overdue} icon={<Clock3 className="h-5 w-5 text-red-600" />} />
-        <Summary title="بانتظار رد" value={dashboard.waiting} icon={<FileClock className="h-5 w-5 text-sky-700" />} />
-        <Summary title="غير مسندة" value={dashboard.unassigned} icon={<UserRound className="h-5 w-5 text-amber-700" />} />
-        <Summary title="منجزة / مغلقة" value={dashboard.completed} icon={<CheckCircle2 className="h-5 w-5 text-emerald-700" />} />
-      </div>
+          <TransactionDailyWorkCenter
+            mine={mine}
+            supervisor={isAdmin || canDelete}
+            onOpenTransaction={(id) => void openDetails(id)}
+            onChanged={() => void load()}
+          />
 
-      <TransactionExecutiveInbox
-        data={executiveInbox}
-        loading={loading}
-        supervisor={isAdmin || canDelete}
-        onRefresh={() => void load()}
-        onOpenTransaction={(id) => void openDetails(id)}
-      />
+          {(isAdmin || canDelete) && (
+            <TransactionExecutiveInbox
+              data={executiveInbox}
+              loading={loading}
+              supervisor
+              onRefresh={() => void load()}
+              onOpenTransaction={(id) => void openDetails(id)}
+            />
+          )}
+        </div>
+      )}
+
+      {activeWorkspace === 'oversight' && (
+        <div className="space-y-4">
+          <Card className="rounded-[24px] border-slate-200 bg-white shadow-sm">
+            <CardHeader className="border-b pb-4">
+              <div>
+                <CardTitle className="text-base">الرقابة والتحسين</CardTitle>
+                <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                  الأدوات المتقدمة منفصلة عن العمل اليومي لتبقى الشاشة الرئيسية واضحة وسريعة.
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+              {(isAdmin || canDelete) && (
+                <ToolCard
+                  icon={<ShieldAlert className="h-5 w-5" />}
+                  title="الإنذار المبكر"
+                  description="رصد المؤشرات والحالات التي تتجه للتعثر."
+                  onClick={() => setEarlyWarningOpen(true)}
+                />
+              )}
+              <ToolCard
+                icon={<ShieldCheck className="h-5 w-5" />}
+                title="التدخلات الوقائية"
+                description="إجراءات وقائية قبل تحول الحالة إلى مشكلة فعلية."
+                onClick={() => {
+                  setPreventiveActionSeed(null);
+                  setPreventiveActionsOpen(true);
+                }}
+              />
+              {(isAdmin || canDelete) && (
+                <ToolCard
+                  icon={<ClipboardCheck className="h-5 w-5" />}
+                  title="خطط التحسين CAPA"
+                  description="متابعة الإجراءات التصحيحية وقياس فعاليتها."
+                  onClick={() => {
+                    setImprovementPlanSeed(null);
+                    setImprovementPlansOpen(true);
+                  }}
+                />
+              )}
+              <ToolCard
+                icon={<ShieldAlert className="h-5 w-5" />}
+                title="سجل المخاطر"
+                description="المخاطر التشغيلية المرتبطة بدورة المتابعة."
+                onClick={() => navigate('/follow-up/risks')}
+              />
+              <ToolCard
+                icon={<FileCheck2 className="h-5 w-5" />}
+                title="قبول المخاطر"
+                description="طلبات القبول والاعتماد المؤقت للمخاطر."
+                onClick={() => navigate('/follow-up/risks/acceptance')}
+              />
+              {(isAdmin || canDelete) && (
+                <ToolCard
+                  icon={<Settings2 className="h-5 w-5" />}
+                  title="شهية المخاطر وKRI"
+                  description="حدود المخاطر ومؤشرات الإنذار الرئيسية."
+                  onClick={() => navigate('/follow-up/risks/policy')}
+                />
+              )}
+              {(isAdmin || canDelete) && (
+                <ToolCard
+                  icon={<Gauge className="h-5 w-5" />}
+                  title="لوحة المخاطر التنفيذية"
+                  description="ملخص تنفيذي للمخاطر والتجاوزات."
+                  onClick={() => navigate('/follow-up/risks/executive')}
+                />
+              )}
+              {canPrint && (
+                <ToolCard
+                  icon={<FileText className="h-5 w-5" />}
+                  title="التقارير التنفيذية"
+                  description="تقارير دورية وأرشيف ومقارنات وجدولة."
+                  onClick={() => void openExecutiveReport()}
+                />
+              )}
+            </CardContent>
+          </Card>
 
       <Card className="rounded-[28px] border-slate-200 bg-white/90 shadow-md">
         <CardHeader className="border-b">
@@ -1144,6 +1175,56 @@ ${styleAssets}
         </CardContent>
       </Card>
 
+
+        </div>
+      )}
+
+      {activeWorkspace === 'directives' && (
+        <Card className="rounded-[24px] border-slate-200 bg-white shadow-sm">
+          <CardHeader className="border-b pb-4">
+            <CardTitle className="text-base">التوجيهات والاعتمادات</CardTitle>
+            <p className="mt-1 text-xs leading-6 text-muted-foreground">
+              إدارة التوجيهات الإدارية وطلبات الاعتماد ومؤشرات تنفيذها من مكان واحد.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+            <ToolCard
+              icon={<Gavel className="h-5 w-5" />}
+              title="لوحة التوجيهات"
+              description="عرض التوجيهات المفتوحة وحالتها ومسؤولي التنفيذ."
+              onClick={() => setDirectivesDashboardOpen(true)}
+            />
+            {(isAdmin || canDelete) && (
+              <ToolCard
+                icon={<FileCheck2 className="h-5 w-5" />}
+                title="مركز الاعتمادات"
+                description="طلبات بانتظار مراجعة واعتماد المدير."
+                onClick={() => setApprovalCenterOpen(true)}
+                emphasis
+              />
+            )}
+            {(isAdmin || canDelete) && (
+              <ToolCard
+                icon={<History className="h-5 w-5" />}
+                title="سجل الاعتمادات"
+                description="القرارات السابقة وتاريخ المراجعات."
+                onClick={() => setApprovalHistoryOpen(true)}
+              />
+            )}
+            {(isAdmin || canDelete) && (
+              <ToolCard
+                icon={<Gauge className="h-5 w-5" />}
+                title="KPI التوجيهات"
+                description="قياس الالتزام والتنفيذ والتأخير للتوجيهات."
+                onClick={() => setDirectiveKpiOpen(true)}
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeWorkspace === 'transactions' && (
+        <div className="space-y-4">
       <Card className="rounded-[28px] border-white/60 bg-white/80 shadow-md">
         <CardHeader className="border-b">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -1221,6 +1302,10 @@ ${styleAssets}
           </div>
         </CardContent>
       </Card>
+
+
+        </div>
+      )}
 
       <TransactionDirectivesDashboardDialog
         open={directivesDashboardOpen}
@@ -1988,6 +2073,110 @@ ${styleAssets}
   );
 };
 
+const WorkspaceTab = ({
+  active,
+  icon,
+  title,
+  hint,
+  onClick,
+}: {
+  active: boolean;
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={'group flex min-h-[62px] items-center gap-3 rounded-2xl border px-3 py-2.5 text-right transition ' + (
+      active
+        ? 'border-primary/40 bg-white text-primary shadow-sm ring-1 ring-primary/10'
+        : 'border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white'
+    )}
+  >
+    <span className={'grid h-9 w-9 shrink-0 place-items-center rounded-xl ' + (
+      active ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-600 group-hover:bg-slate-50'
+    )}>
+      {icon}
+    </span>
+    <span className="min-w-0">
+      <span className="block text-xs font-black sm:text-sm">{title}</span>
+      <span className="mt-0.5 hidden text-[10px] text-slate-400 sm:block">{hint}</span>
+    </span>
+  </button>
+);
+
+const DailyStat = ({
+  title,
+  value,
+  icon,
+  tone = 'default',
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+  tone?: 'default' | 'danger' | 'warning' | 'info' | 'success';
+}) => {
+  const toneClass = {
+    default: 'border-slate-200 bg-white text-slate-900',
+    danger: 'border-red-200 bg-red-50/60 text-red-900',
+    warning: 'border-amber-200 bg-amber-50/60 text-amber-900',
+    info: 'border-sky-200 bg-sky-50/60 text-sky-900',
+    success: 'border-emerald-200 bg-emerald-50/60 text-emerald-900',
+  }[tone];
+
+  return (
+    <div className={'flex items-center justify-between rounded-2xl border px-3 py-3 ' + toneClass}>
+      <div>
+        <p className="text-[10px] font-bold opacity-65">{title}</p>
+        <p className="mt-0.5 text-xl font-black">{value.toLocaleString('ar-SA')}</p>
+      </div>
+      <span className="grid h-8 w-8 place-items-center rounded-xl border border-current/10 bg-white/70">
+        {icon}
+      </span>
+    </div>
+  );
+};
+
+const ToolCard = ({
+  icon,
+  title,
+  description,
+  onClick,
+  emphasis = false,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+  emphasis?: boolean;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={'group rounded-2xl border p-4 text-right transition hover:-translate-y-0.5 hover:shadow-md ' + (
+      emphasis
+        ? 'border-violet-200 bg-violet-50/60'
+        : 'border-slate-200 bg-white hover:border-primary/30'
+    )}
+  >
+    <div className="flex items-start gap-3">
+      <span className={'grid h-10 w-10 shrink-0 place-items-center rounded-xl ' + (
+        emphasis
+          ? 'bg-violet-100 text-violet-800'
+          : 'bg-slate-100 text-slate-700 group-hover:bg-primary/10 group-hover:text-primary'
+      )}>
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-black text-slate-900">{title}</span>
+        <span className="mt-1 block text-[11px] leading-5 text-slate-500">{description}</span>
+      </span>
+    </div>
+  </button>
+);
+
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
     <Label>{label}</Label>
@@ -2067,14 +2256,3 @@ const AgeBox = ({ label, value, danger = false }: { label: string; value: number
   </div>
 );
 
-const Summary = ({ title, value, icon }: { title: string; value: number; icon: React.ReactNode }) => (
-  <Card className="rounded-2xl border-white/60 bg-white/80">
-    <CardContent className="flex items-center justify-between p-4">
-      <div>
-        <p className="text-xs text-muted-foreground">{title}</p>
-        <p className="mt-1 text-2xl font-black">{value.toLocaleString('ar-SA')}</p>
-      </div>
-      <div className="rounded-xl border bg-background/80 p-2">{icon}</div>
-    </CardContent>
-  </Card>
-);
