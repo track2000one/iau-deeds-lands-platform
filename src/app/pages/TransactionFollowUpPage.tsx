@@ -26,6 +26,7 @@ import {
   UsersRound,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   Send,
   Settings2,
@@ -240,6 +241,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const canAdd = isAdmin || hasPermission('transaction_follow_up', 'canAdd');
   const canEdit = isAdmin || hasPermission('transaction_follow_up', 'canEdit');
   const canDelete = isAdmin || hasPermission('transaction_follow_up', 'canDelete');
+  const canReopen = isAdmin || hasPermission('transaction_follow_up', 'canReopen');
   const canPrint = isAdmin || hasPermission('transaction_follow_up', 'canPrint');
 
   const [dashboard, setDashboard] = React.useState<TransactionFollowUpDashboard>(EMPTY_DASHBOARD);
@@ -807,6 +809,36 @@ ${styleAssets}
       toast.error(error instanceof Error ? error.message : 'تعذر إنشاء ملف PDF');
     } finally {
       setReportExporting(false);
+    }
+  };
+
+  const reopenTransaction = async (record: TransactionFollowUpRecord) => {
+    const entered = window.prompt(
+      `اكتب سبب إعادة فتح المعاملة رقم ${record.transactionNumber}:`,
+    );
+    if (entered == null) return;
+    const reason = entered.trim();
+    if (reason.length < 5) {
+      toast.error('سبب إعادة فتح المعاملة مطلوب');
+      return;
+    }
+    if (!window.confirm('سيتم إعادة المعاملة إلى العمل وحفظ سبب إعادة الفتح في سجل الإجراءات. هل تريد المتابعة؟')) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await transactionFollowUpApi.workQueueAction(record.id, {
+        action: 'reopen',
+        note: reason,
+      });
+      toast.success('تمت إعادة فتح المعاملة وإعادتها إلى العمل');
+      await Promise.all([load(), openDetails(record.id)]);
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إعادة فتح المعاملة');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1998,6 +2030,32 @@ ${styleAssets}
                   </CardContent>
                 </Card>
               ) : null}
+
+              {canReopen && ['completed', 'closed'].includes(selected.status) && (
+                <Card className="border-amber-200 bg-amber-50/50">
+                  <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="flex items-center gap-2 text-sm font-black text-amber-950">
+                        <RotateCcw className="h-4 w-4" />
+                        إعادة فتح المعاملة
+                      </p>
+                      <p className="mt-1 text-xs leading-6 text-amber-900/80">
+                        المعاملة {selected.status === 'closed' ? 'مغلقة' : 'منجزة'}، ويمكن لصاحب صلاحية «إعادة فتح» إعادتها للعمل عند وجود سبب يستدعي الاستكمال أو التعديل.
+                        سيحفظ النظام سبب إعادة الفتح واسم المستخدم وتاريخه في سجل الإجراءات.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="shrink-0 border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+                      disabled={saving}
+                      onClick={() => void reopenTransaction(selected)}
+                    >
+                      <RotateCcw className="ml-2 h-4 w-4" />
+                      إعادة فتح المعاملة
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
 
               {canManageSelected && !['completed', 'closed'].includes(selected.status) && (
                 <div className="grid gap-4 xl:grid-cols-2">

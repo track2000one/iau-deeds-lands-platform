@@ -189,6 +189,11 @@ const actionMeta: Record<
     icon: RotateCcw,
     className: 'border-red-300 text-red-800 hover:bg-red-50',
   },
+  reopen: {
+    label: 'إعادة فتح المعاملة',
+    icon: RotateCcw,
+    className: 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100',
+  },
 };
 
 const priorityLabel: Record<string, string> = {
@@ -337,6 +342,19 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
       note = entered.trim();
     }
 
+    if (action === 'reopen') {
+      const entered = window.prompt('اكتب سبب إعادة فتح المعاملة المنجزة أو المغلقة:');
+      if (entered == null) return;
+      if (entered.trim().length < 5) {
+        toast.error('سبب إعادة فتح المعاملة مطلوب');
+        return;
+      }
+      note = entered.trim();
+      if (!window.confirm('سيتم إعادة المعاملة إلى العمل وتسجيل سبب إعادة الفتح في سجل الإجراءات. هل تريد المتابعة؟')) {
+        return;
+      }
+    }
+
     if (action === 'approve_close' && !window.confirm('اعتماد إنجاز المعاملة وإقفالها نهائيًا؟')) {
       return;
     }
@@ -352,6 +370,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
         submit_completion: 'تم رفع المعاملة للمراجعة والاعتماد',
         approve_close: 'تم اعتماد الإنجاز وإقفال المعاملة',
         return_to_employee: 'تمت إعادة المعاملة للموظف لاستكمال المطلوب',
+        reopen: 'تمت إعادة فتح المعاملة وإعادتها إلى العمل',
       };
       toast.success(messages[action]);
       window.dispatchEvent(new CustomEvent('iau-notifications-changed'));

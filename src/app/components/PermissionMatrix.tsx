@@ -37,6 +37,7 @@ const ACTIONS: Array<{
   { key: 'canAdd', ar: 'إضافة', en: 'Add' },
   { key: 'canEdit', ar: 'تعديل', en: 'Edit' },
   { key: 'canDelete', ar: 'حذف', en: 'Delete' },
+  { key: 'canReopen', ar: 'إعادة فتح', en: 'Reopen' },
   { key: 'canPrint', ar: 'طباعة', en: 'Print' },
   { key: 'canCreateUser', ar: 'إضافة مستخدم جديد', en: 'Create User' },
   { key: 'canCreateCycle', ar: 'إنشاء دورة جديدة', en: 'Create Cycle' },
@@ -88,6 +89,7 @@ export const PermissionMatrix: React.FC<{
         canAdd: false,
         canEdit: false,
         canDelete: false,
+        canReopen: false,
         canPrint: false,
         canCreateUser: false,
         canCreateCycle: false,
@@ -114,7 +116,7 @@ export const PermissionMatrix: React.FC<{
               {ui('سياسة الجولات والزيارات الميدانية: صلاحيتا «تعديل» و«حذف» في وحدة المساجد تسمحان للمستخدم بإدارة الجولات والزيارات التي أنشأها بنفسه فقط. سجلات المستخدمين الآخرين تكون «عرض فقط»، بينما مسؤول النظام أو رئيس الوحدة يستطيع إدارة جميع السجلات وفق الصلاحيات الممنوحة.', 'Field tours and visits policy: Edit and Delete permissions in the Mosques module let a user manage only tours and visits they created. Other users’ records are read-only, while the system administrator or unit head can manage all records according to granted permissions.')}
             </p>
             <p className="mt-1 text-xs font-semibold text-sky-700">
-              {ui('نظام المتابعة: صلاحية «تعديل» تسمح للمستخدم بتحديث المعاملات المسندة إليه أو التي أنشأها وتسجيل إجراءاتها. صلاحية «حذف» مستقلة ولا يظهر زر الحذف ولا يقبل الخادم عملية الحذف إلا للمستخدم الذي مُنحت له هذه الصلاحية صراحةً.', 'Transaction Follow-up: Edit lets a user update assigned or self-created transactions and record actions. Delete is independent; the delete button is hidden and the server rejects deletion unless that permission is explicitly granted.')}
+              {ui('نظام المتابعة: «تعديل» لتحديث المعاملات وتسجيل الإجراءات، و«حذف» للحذف النهائي، و«إعادة فتح» صلاحية مستقلة لإعادة المعاملة المنجزة أو المغلقة إلى العمل مع إلزام المستخدم بتسجيل سبب إعادة الفتح.', 'Transaction Follow-up: Edit updates transactions and records actions, Delete controls permanent deletion, and Reopen is a separate permission for returning completed or closed transactions to active work with a mandatory reason.')}
             </p>
             <p className="mt-2 text-xs font-medium text-primary">
               {ui('يمكن تمرير الجدول بعجلة الفأرة أو بسحب شريط التمرير الواضح على طرف الجدول، كما يمكن استخدام زري أعلى وأسفل للانتقال السريع.', 'Scroll with the mouse wheel or drag the visible scrollbar at the edge of the table. You can also use the Top and Bottom buttons for quick navigation.')}
@@ -171,9 +173,11 @@ export const PermissionMatrix: React.FC<{
                   const isCyclePermission = action.key === 'canCreateCycle' || action.key === 'canApproveCycle';
                   const supported = action.key === 'canCreateUser'
                     ? moduleName === 'mosques'
-                    : isCyclePermission
-                      ? ['assets', 'accounting_transformation'].includes(moduleName)
-                      : true;
+                    : action.key === 'canReopen'
+                      ? moduleName === 'transaction_follow_up'
+                      : isCyclePermission
+                        ? ['assets', 'accounting_transformation'].includes(moduleName)
+                        : true;
                   return (
                     <td key={action.key} className="p-3 text-center">
                       {supported ? (

@@ -31,7 +31,8 @@ export type TransactionFollowUpWorkQueueAction =
   | 'needs_follow_up'
   | 'submit_completion'
   | 'approve_close'
-  | 'return_to_employee';
+  | 'return_to_employee'
+  | 'reopen';
 
 export type TransactionFollowUpExtensionRequestStatus =
   | 'pending'
@@ -741,6 +742,7 @@ export type TransactionFollowUpWorkQueue = {
   generatedAt: string;
   scope: 'mine' | 'all';
   supervisor: boolean;
+  canReopen?: boolean;
   focusBucket: TransactionFollowUpWorkQueueBucket;
   counts: Record<TransactionFollowUpWorkQueueBucket, number>;
   buckets: Record<TransactionFollowUpWorkQueueBucket, TransactionFollowUpWorkQueueItem[]>;
