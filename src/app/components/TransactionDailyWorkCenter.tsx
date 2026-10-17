@@ -572,11 +572,11 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
       <CardHeader className="border-b bg-slate-50/60 px-4 py-4 sm:px-5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 text-xl">
               <Inbox className="h-5 w-5 text-primary" />
               مركز عملي اليوم
             </CardTitle>
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
               {data.scope === 'mine' ? 'الأعمال المسندة إليك مرتبة حسب الأولوية.' : 'أعمال الإدارة مرتبة حسب الأولوية والاستحقاق.'}
             </p>
           </div>
@@ -612,9 +612,9 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                   <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/70">
                     <Icon className="h-4 w-4" />
                   </span>
-                  <b className="text-lg">{(data.counts[bucket] || 0).toLocaleString('ar-SA')}</b>
+                  <b className="text-2xl">{(data.counts[bucket] || 0).toLocaleString('ar-SA')}</b>
                 </div>
-                <p className="mt-1.5 text-[10px] font-black sm:text-[11px]">{meta.shortLabel}</p>
+                <p className="mt-2 text-sm font-black">{meta.shortLabel}</p>
               </button>
             );
           })}
@@ -623,8 +623,8 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
         <div className={'rounded-2xl border px-4 py-3 ' + selectedMeta.className}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-black">{selectedMeta.label}</p>
-              <p className="mt-1 text-[11px] opacity-80">{selectedMeta.description}</p>
+              <p className="text-lg font-black">{selectedMeta.label}</p>
+              <p className="mt-1 text-sm leading-6 opacity-80">{selectedMeta.description}</p>
             </div>
             <Badge variant="outline" className="border-current">
               {items.length.toLocaleString('ar-SA')} معاملة معروضة
@@ -633,7 +633,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
         </div>
 
         {loading && !items.length ? (
-          <div className="py-12 text-center text-xs text-muted-foreground">
+          <div className="py-12 text-center text-sm text-muted-foreground">
             <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin" />
             جارٍ تحميل صندوق العمل...
           </div>
@@ -647,7 +647,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <b className="text-sm">معاملة {item.transactionNumber}</b>
+                      <b className="text-base">معاملة {item.transactionNumber}</b>
                       <Badge variant="outline">{priorityLabel[item.priority] || item.priority}</Badge>
                       <Badge variant="outline">{statusLabel[item.status] || item.status}</Badge>
                       {item.overdueDays > 0 && (
@@ -666,11 +666,11 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-800">
+                    <p className="mt-2 line-clamp-2 text-base font-semibold leading-7 text-slate-800">
                       {item.subject}
                     </p>
                     {item.requiredAction && (
-                      <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-700">
+                      <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
                         <b>المطلوب:</b> {item.requiredAction}
                       </p>
                     )}
@@ -686,7 +686,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                     )}
                     {item.activeExternalWait && (
                       <div className={
-                        'mt-2 rounded-xl border px-3 py-2 text-[11px] leading-5 ' +
+                        'mt-2 rounded-xl border px-3 py-2 text-sm leading-6 ' +
                         (item.activeExternalWait.followUpDue
                           ? 'border-red-200 bg-red-50/70 text-red-950'
                           : 'border-sky-200 bg-sky-50/70 text-sky-950')
@@ -711,7 +711,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                         )}
                       </div>
                     )}
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-muted-foreground">
                       {supervisor && (
                         <span>
                           الموظف: <b className="text-foreground">{item.currentAssigneeName || 'غير مسندة'}</b>
@@ -728,7 +728,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                       </span>
                     </div>
                   </div>
-                  <div className="font-mono text-[10px] text-muted-foreground">
+                  <div className="font-mono text-xs text-muted-foreground">
                     {item.trackingNumber}
                   </div>
                 </div>
