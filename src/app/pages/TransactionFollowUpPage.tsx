@@ -57,6 +57,7 @@ import { Textarea } from '../components/ui/textarea';
 import { TransactionExecutiveReport } from '../components/TransactionExecutiveReport';
 import { TransactionExecutiveInbox } from '../components/TransactionExecutiveInbox';
 import { TransactionDailyWorkCenter } from '../components/TransactionDailyWorkCenter';
+import { TransactionFollowUpCard } from '../components/TransactionFollowUpCard';
 import { TransactionManagementDirectives } from '../components/TransactionManagementDirectives';
 import { TransactionDirectivesDashboardDialog } from '../components/TransactionDirectivesDashboardDialog';
 import { TransactionApprovalCenterDialog } from '../components/TransactionApprovalCenterDialog';
@@ -1291,38 +1292,33 @@ ${styleAssets}
               لا توجد معاملات مطابقة.
             </div>
           ) : (
-            <div className="space-y-2">
-              {records.map((record) => (
-                <button
-                  key={record.id}
-                  type="button"
-                  onClick={() => void openDetails(record.id)}
-                  className="w-full rounded-2xl border bg-background/80 p-4 text-right transition hover:border-primary/40 hover:shadow-sm"
-                >
-                  <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <b className="text-base text-slate-900">معاملة {record.transactionNumber}</b>
-                        <Badge variant="outline">{typeLabels[record.transactionType]}</Badge>
-                        <Badge variant="outline" className={priorityClass[record.priority]}>{priorityLabels[record.priority]}</Badge>
-                        <Badge variant="outline" className={indicatorClass[record.indicatorSeverity]}>{record.indicatorLabel}</Badge>
-                      </div>
-                      <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-800">{record.subject}</p>
-                      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
-                        <span>التاريخ: <b className="text-foreground">{formatDate(record.transactionDate)}</b></span>
-                        <span>الموظف: <b className="text-foreground">{record.currentAssigneeName || 'غير مسندة'}</b></span>
-                        <span>الحالة: <b className="text-foreground">{statusLabels[record.status]}</b></span>
-                        <span>الاستحقاق: <b className="text-foreground">{formatDate(record.dueDate)}</b></span>
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-xs text-muted-foreground xl:text-left">
-                      <div className="font-mono">{record.trackingNumber}</div>
-                      <div className="mt-1">آخر إجراء: {formatDateTime(record.lastActionAt)}</div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {records.map((record) => {
+                const recordCanEdit =
+                  canEdit &&
+                  !['completed', 'closed'].includes(record.status) &&
+                  (
+                    isAdmin ||
+                    canDelete ||
+                    record.createdById === currentUser?.uid ||
+                    record.currentAssigneeUserId === currentUser?.uid
+                  );
+
+                return (
+                  <TransactionFollowUpCard
+                    key={record.id}
+                    record={record}
+                    canEdit={recordCanEdit}
+                    canDelete={canDelete}
+                    canReopen={canReopen}
+                    onView={(item) => void openDetails(item.id)}
+                    onEdit={(item) => void openDetails(item.id)}
+                    onDelete={(item) => void remove(item)}
+                    onReopen={(item) => void reopenTransaction(item)}
+                  />
+                );
+              })}
+            </section>
           )}
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
