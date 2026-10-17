@@ -24,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { formatFlexibleDate } from '../../utils/dateUtils';
 import type {
   TransactionFollowUpPriority,
   TransactionFollowUpRecord,
@@ -98,6 +99,13 @@ const formatDateTime = (value?: string | null) =>
         minute: '2-digit',
       }).format(new Date(value))
     : '—';
+
+const formatTransactionDate = (record: TransactionFollowUpRecord) =>
+  formatFlexibleDate(
+    record.transactionDateInput || record.transactionDate,
+    record.transactionDateType || 'gregorian',
+    'ar',
+  );
 
 type Props = {
   record: TransactionFollowUpRecord;
@@ -251,7 +259,7 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
             <CalendarDays className="h-3.5 w-3.5" />
             تاريخ المعاملة
           </dt>
-          <dd className="mt-1 font-semibold">{formatDate(record.transactionDate)}</dd>
+          <dd className="mt-1 font-semibold">{formatTransactionDate(record)}</dd>
         </div>
         <div>
           <dt className="flex items-center gap-1 text-xs text-muted-foreground">
