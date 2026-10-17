@@ -362,10 +362,10 @@ export const TransactionFollowUpPage: React.FC = () => {
   }, [status, priority, mine]);
 
   React.useEffect(() => {
-    if (!(isAdmin || canDelete || canTransfer) && !mine) {
+    if (!(isAdmin || canDelete) && !mine) {
       setMine(true);
     }
-  }, [isAdmin, canDelete, canTransfer, mine]);
+  }, [isAdmin, canDelete, mine]);
 
   const openDetails = async (id: string) => {
     try {
@@ -905,7 +905,6 @@ ${styleAssets}
     (
       isAdmin ||
       canDelete ||
-      selected.createdById === currentUser?.uid ||
       selected.currentAssigneeUserId === currentUser?.uid
     )
   );
@@ -914,7 +913,12 @@ ${styleAssets}
     selected &&
     canTransfer &&
     !['completed', 'closed'].includes(selected.status) &&
-    Boolean(selected.currentAssigneeUserId)
+    Boolean(selected.currentAssigneeUserId) &&
+    (
+      isAdmin ||
+      canDelete ||
+      selected.currentAssigneeUserId === currentUser?.uid
+    )
   );
 
   return (
@@ -933,7 +937,7 @@ ${styleAssets}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {(isAdmin || canDelete || canTransfer) ? (
+            {(isAdmin || canDelete) ? (
               <Button
                 variant="outline"
                 className="h-10 rounded-xl border-slate-300 bg-white"
@@ -1351,7 +1355,6 @@ ${styleAssets}
                   (
                     isAdmin ||
                     canDelete ||
-                    record.createdById === currentUser?.uid ||
                     record.currentAssigneeUserId === currentUser?.uid
                   );
 
@@ -1365,7 +1368,12 @@ ${styleAssets}
                     canTransfer={
                       canTransfer &&
                       !['completed', 'closed'].includes(record.status) &&
-                      Boolean(record.currentAssigneeUserId)
+                      Boolean(record.currentAssigneeUserId) &&
+                      (
+                        isAdmin ||
+                        canDelete ||
+                        record.currentAssigneeUserId === currentUser?.uid
+                      )
                     }
                     supervisor={isAdmin || canDelete}
                     busy={cardActionBusyId === record.id}
@@ -2141,7 +2149,7 @@ ${styleAssets}
                         </Field>
                         {!(isAdmin || canDelete) && (
                           <p className="text-[11px] leading-5 text-muted-foreground">
-                            صلاحية «تحويل» تتيح للمستخدم تحويل أي معاملة مسندة حاليًا إلى موظف آخر، مع إلزامه بتسجيل سبب التحويل وحفظه في سجل الإجراءات.
+                            صلاحية «تحويل» تتيح للمستخدم العادي تحويل المعاملة المسندة إليه فقط إلى موظف آخر، مع إلزامه بتسجيل سبب التحويل وحفظه في سجل الإجراءات.
                           </p>
                         )}
                         <Button
