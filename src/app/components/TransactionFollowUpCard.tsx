@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ArrowLeftRight,
   Building2,
   CalendarDays,
   CheckCircle2,
@@ -103,12 +104,14 @@ type Props = {
   canEdit: boolean;
   canDelete: boolean;
   canReopen: boolean;
+  canTransfer: boolean;
   supervisor: boolean;
   busy?: boolean;
   onView: (record: TransactionFollowUpRecord) => void;
   onEdit: (record: TransactionFollowUpRecord) => void;
   onDelete: (record: TransactionFollowUpRecord) => void;
   onReopen: (record: TransactionFollowUpRecord) => void;
+  onTransfer: (record: TransactionFollowUpRecord) => void;
   onQuickAction: (
     record: TransactionFollowUpRecord,
     action: Extract<TransactionFollowUpWorkQueueAction, 'start' | 'approve_close'>,
@@ -120,12 +123,14 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
   canEdit,
   canDelete,
   canReopen,
+  canTransfer,
   supervisor,
   busy = false,
   onView,
   onEdit,
   onDelete,
   onReopen,
+  onTransfer,
   onQuickAction,
 }) => {
   const finalState = record.status === 'completed' || record.status === 'closed';
@@ -342,6 +347,13 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
               <DropdownMenuItem onClick={() => onReopen(record)}>
                 <RotateCcw className="ml-2 h-4 w-4" />
                 إعادة فتح المعاملة
+              </DropdownMenuItem>
+            )}
+
+            {canTransfer && !finalState && record.currentAssigneeUserId && (
+              <DropdownMenuItem onClick={() => onTransfer(record)}>
+                <ArrowLeftRight className="ml-2 h-4 w-4" />
+                تحويل المعاملة
               </DropdownMenuItem>
             )}
 

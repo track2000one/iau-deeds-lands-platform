@@ -243,6 +243,10 @@ export const TransactionFollowUpPage: React.FC = () => {
   const canEdit = isAdmin || hasPermission('transaction_follow_up', 'canEdit');
   const canDelete = isAdmin || hasPermission('transaction_follow_up', 'canDelete');
   const canReopen = isAdmin || hasPermission('transaction_follow_up', 'canReopen');
+  const canTransfer =
+    isAdmin ||
+    canDelete ||
+    hasPermission('transaction_follow_up', 'canTransfer');
   const canPrint = isAdmin || hasPermission('transaction_follow_up', 'canPrint');
 
   const [dashboard, setDashboard] = React.useState<TransactionFollowUpDashboard>(EMPTY_DASHBOARD);
@@ -448,6 +452,14 @@ export const TransactionFollowUpPage: React.FC = () => {
   const saveAssignment = async () => {
     if (!selected || !assignUserId) {
       toast.error('اختر الموظف المختص');
+      return;
+    }
+    if (assignUserId === selected.currentAssigneeUserId) {
+      toast.error('المعاملة مسندة بالفعل إلى الموظف المحدد');
+      return;
+    }
+    if (!(isAdmin || canDelete) && assignNote.trim().length < 3) {
+      toast.error('سبب تحويل المعاملة مطلوب');
       return;
     }
     try {
@@ -898,6 +910,22 @@ ${styleAssets}
     )
   );
 
+  const canTransferSelected = Boolean(
+    selected &&
+    canTransfer &&
+    !['completed', 'closed'].includes(selected.status) &&
+    (
+      isAdmin ||
+      canDelete ||
+      selected.currentAssigneeUserId === currentUser?.uid
+    ) &&
+    (
+      isAdmin ||
+      canDelete ||
+      Boolean(selected.currentAssigneeUserId)
+    )
+  );
+
   return (
     <div className="mx-auto w-full max-w-[1750px] space-y-5">
       <section className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_18px_50px_rgba(15,23,42,.07)]">
@@ -1343,12 +1371,22 @@ ${styleAssets}
                     canEdit={recordCanEdit}
                     canDelete={canDelete}
                     canReopen={canReopen}
+                    canTransfer={
+                      canTransfer &&
+                      !['completed', 'closed'].includes(record.status) &&
+                      (
+                        isAdmin ||
+                        canDelete ||
+                        record.currentAssigneeUserId === currentUser?.uid
+                      )
+                    }
                     supervisor={isAdmin || canDelete}
                     busy={cardActionBusyId === record.id}
                     onView={(item) => void openDetails(item.id)}
                     onEdit={(item) => void openDetails(item.id)}
                     onDelete={(item) => void remove(item)}
                     onReopen={(item) => void reopenTransaction(item)}
+                    onTransfer={(item) => void openDetails(item.id)}
                     onQuickAction={(item, action) => void runCardQuickAction(item, action)}
                   />
                 );
@@ -2088,30 +2126,63 @@ ${styleAssets}
                 </Card>
               )}
 
-              {canManageSelected && !['completed', 'closed'].includes(selected.status) && (
+              {(canTransferSelected || canManageSelected) && !['completed', 'closed'].includes(selected.status) && (
                 <div className="grid gap-4 xl:grid-cols-2">
-                  <Card className="border-violet-200">
-                    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ArrowLeftRight className="h-4 w-4" />إسناد / تحويل</CardTitle></CardHeader>
-                    <CardContent className="space-y-3">
-                      <Field label="الموظف المختص"><NativeSelect value={assignUserId} onChange={(e) => setAssignUserId(e.target.value)}><option value="">اختر الموظف</option>{assignees.map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}</NativeSelect></Field>
-                      <Field label="ملاحظة التحويل"><Input value={assignNote} onChange={(e) => setAssignNote(e.target.value)} placeholder="سبب التحويل أو المطلوب من الموظف" /></Field>
-                      <Button onClick={() => void saveAssignment()} disabled={saving || !assignUserId}><Send className="ml-2 h-4 w-4" />حفظ الإسناد</Button>
-                    </CardContent>
-                  </Card>
+                  {canTransferSelected && (
+                    <Card className="border-violet-200">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <ArrowLeftRight className="h-4 w-4" />
+                          {isAdmin || canDelete ? 'إسناد / تحويل' : 'تحويل المعاملة'}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <Field label="الموظف المحول إليه">
+                          <NativeSelect value={assignUserId} onChange={(e) => setAssignUserId(e.target.value)}>
+                            <option value="">اختر الموظف</option>
+                            {assignees
+                              .filter((user) => user.id !== selected.currentAssigneeUserId)
+                              .map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}
+                          </NativeSelect>
+                        </Field>
+                        <Field label={isAdmin || canDelete ? 'ملاحظة التحويل' : 'سبب التحويل *'}>
+                          <Input
+                            value={assignNote}
+                            onChange={(e) => setAssignNote(e.target.value)}
+                            placeholder="سبب التحويل أو المطلوب من الموظف"
+                          />
+                        </Field>
+                        {!(isAdmin || canDelete) && (
+                          <p className="text-[11px] leading-5 text-muted-foreground">
+                            صلاحية التحويل للموظف العادي تتيح تحويل المعاملات المسندة إليه فقط، ويُحفظ سبب التحويل في سجل الإجراءات.
+                          </p>
+                        )}
+                        <Button
+                          onClick={() => void saveAssignment()}
+                          disabled={saving || !assignUserId || (!(isAdmin || canDelete) && assignNote.trim().length < 3)}
+                        >
+                          <Send className="ml-2 h-4 w-4" />
+                          تحويل المعاملة
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                  <Card className="border-emerald-200">
-                    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CircleDot className="h-4 w-4" />تسجيل إجراء</CardTitle></CardHeader>
-                    <CardContent className="space-y-3">
-                      <Field label="الإجراء الذي تم اتخاذه *"><Textarea rows={2} value={actionText} onChange={(e) => setActionText(e.target.value)} placeholder="مثال: تم إعداد الخطاب ورفعه للاعتماد" /></Field>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <Field label="الحالة بعد الإجراء"><NativeSelect value={actionStatus} onChange={(e) => setActionStatus(e.target.value as TransactionFollowUpStatus)}>{Object.entries(statusLabels).filter(([value]) => value !== 'new' && value !== 'assigned').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
-                        <Field label="الاستحقاق القادم"><Input type="date" value={nextDueDate} onChange={(e) => setNextDueDate(e.target.value)} /></Field>
-                      </div>
-                      <Field label="الإجراء القادم"><Input value={nextAction} onChange={(e) => setNextAction(e.target.value)} /></Field>
-                      <Field label="ملاحظة"><Textarea rows={2} value={actionNote} onChange={(e) => setActionNote(e.target.value)} /></Field>
-                      <Button onClick={() => void recordAction()} disabled={saving || !actionText.trim()}><CheckCircle2 className="ml-2 h-4 w-4" />تسجيل الإجراء</Button>
-                    </CardContent>
-                  </Card>
+                  {canManageSelected && (
+                    <Card className="border-emerald-200">
+                      <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CircleDot className="h-4 w-4" />تسجيل إجراء</CardTitle></CardHeader>
+                      <CardContent className="space-y-3">
+                        <Field label="الإجراء الذي تم اتخاذه *"><Textarea rows={2} value={actionText} onChange={(e) => setActionText(e.target.value)} placeholder="مثال: تم إعداد الخطاب ورفعه للاعتماد" /></Field>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Field label="الحالة بعد الإجراء"><NativeSelect value={actionStatus} onChange={(e) => setActionStatus(e.target.value as TransactionFollowUpStatus)}>{Object.entries(statusLabels).filter(([value]) => value !== 'new' && value !== 'assigned').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
+                          <Field label="الاستحقاق القادم"><Input type="date" value={nextDueDate} onChange={(e) => setNextDueDate(e.target.value)} /></Field>
+                        </div>
+                        <Field label="الإجراء القادم"><Input value={nextAction} onChange={(e) => setNextAction(e.target.value)} /></Field>
+                        <Field label="ملاحظة"><Textarea rows={2} value={actionNote} onChange={(e) => setActionNote(e.target.value)} /></Field>
+                        <Button onClick={() => void recordAction()} disabled={saving || !actionText.trim()}><CheckCircle2 className="ml-2 h-4 w-4" />تسجيل الإجراء</Button>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               )}
 
