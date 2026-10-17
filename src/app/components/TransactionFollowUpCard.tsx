@@ -10,7 +10,6 @@ import {
   FileClock,
   MoreHorizontal,
   Pencil,
-  PlayCircle,
   RotateCcw,
   Trash2,
   UserRound,
@@ -30,12 +29,11 @@ import type {
   TransactionFollowUpRecord,
   TransactionFollowUpStatus,
   TransactionFollowUpType,
-  TransactionFollowUpWorkQueueAction,
 } from '../api/transactionFollowUp';
 
 const statusLabels: Record<TransactionFollowUpStatus, string> = {
   new: 'جديدة',
-  assigned: 'مسندة',
+  assigned: 'تحت التنفيذ',
   in_progress: 'تحت التنفيذ',
   waiting_response: 'بانتظار جهة',
   needs_follow_up: 'تحتاج متابعة',
@@ -122,7 +120,7 @@ type Props = {
   onTransfer: (record: TransactionFollowUpRecord) => void;
   onQuickAction: (
     record: TransactionFollowUpRecord,
-    action: Extract<TransactionFollowUpWorkQueueAction, 'start' | 'approve_close'>,
+    action: 'approve_close',
   ) => void;
 };
 
@@ -149,28 +147,20 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
 
   const assigned = Boolean(record.currentAssigneeUserId);
   const primaryAction =
-    canEdit && assigned && ['new', 'assigned'].includes(record.status)
+    record.status === 'waiting_response'
       ? {
-          kind: 'quick' as const,
-          action: 'start' as const,
-          label: 'بدء التنفيذ',
-          icon: PlayCircle,
-          className: 'bg-sky-700 text-white hover:bg-sky-800',
+          kind: 'open' as const,
+          label: 'متابعة الجهة',
+          icon: Building2,
+          className: 'bg-violet-700 text-white hover:bg-violet-800',
         }
-      : record.status === 'waiting_response'
+      : canEdit && assigned && ['new', 'assigned', 'in_progress', 'needs_follow_up'].includes(record.status)
         ? {
-            kind: 'open' as const,
-            label: 'متابعة الجهة',
-            icon: Building2,
-            className: 'bg-violet-700 text-white hover:bg-violet-800',
+            kind: 'edit' as const,
+            label: 'تسجيل إجراء',
+            icon: Pencil,
+            className: 'bg-sky-700 text-white hover:bg-sky-800',
           }
-        : canEdit && ['in_progress', 'needs_follow_up'].includes(record.status)
-          ? {
-              kind: 'edit' as const,
-              label: 'تسجيل إجراء',
-              icon: Pencil,
-              className: 'bg-sky-700 text-white hover:bg-sky-800',
-            }
           : record.status === 'completed' && supervisor
             ? {
                 kind: 'quick' as const,
