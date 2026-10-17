@@ -251,7 +251,7 @@ export const router = createHashRouter([
       { path: 'follow-up/risks/policy', element: <PermissionGuard module="transaction_risk_policy" action="canView">{page(<TransactionRiskPolicyPage />)}</PermissionGuard> },
       { path: 'contracts/follow-up', element: <PermissionGuard module="contracts_follow_up" action="canView">{page(<ContractsFollowUpPage />)}</PermissionGuard> },
       { path: 'reports', element: page(<ReportsPage />) },
-      { path: 'archive', element: page(<ArchivePage />) },
+      { path: 'archive', element: <PermissionGuard module="archive" action="canView">{page(<ArchivePage />)}</PermissionGuard> },
       { path: 'settings', element: page(<SettingsPage />) },
       { path: 'appearance', element: page(<AppearanceSettingsPage />) },
       { path: 'search', element: page(<UnifiedSearchPage />) },
