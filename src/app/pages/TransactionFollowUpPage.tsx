@@ -2683,10 +2683,10 @@ const DailyStat = ({
   return (
     <div className={'flex items-center justify-between rounded-2xl border px-3 py-3 ' + toneClass}>
       <div>
-        <p className="text-[10px] font-bold opacity-65">{title}</p>
-        <p className="mt-0.5 text-xl font-black">{value.toLocaleString('ar-SA')}</p>
+        <p className="text-sm font-bold opacity-75">{title}</p>
+        <p className="mt-1 text-2xl font-black">{value.toLocaleString('ar-SA')}</p>
       </div>
-      <span className="grid h-8 w-8 place-items-center rounded-xl border border-current/10 bg-white/70">
+      <span className="grid h-9 w-9 place-items-center rounded-xl border border-current/10 bg-white/70">
         {icon}
       </span>
     </div>
