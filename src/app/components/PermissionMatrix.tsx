@@ -127,6 +127,9 @@ export const PermissionMatrix: React.FC<{
             <p className="mt-1 text-xs font-semibold text-amber-700">
               {ui('صفحات المخاطر الأربع (سجل المخاطر التشغيلية، لوحة المخاطر التنفيذية، طلبات قبول المخاطر، شهية المخاطر وإعدادات KRI) تكون للمسؤول افتراضيًا، ولا تظهر للمستخدم العادي إلا إذا منح المسؤول صلاحية «عرض» للصفحة المطلوبة.', 'The four risk pages are administrator-only by default and are shown to an ordinary user only when an administrator grants View permission for the required risk page.')}
             </p>
+            <p className="mt-1 text-xs font-semibold text-violet-700">
+              {ui('الأرشفة: «عرض» لفتح الملفات والمعاملات المؤرشفة، «إضافة» لترحيل المعاملة المغلقة إلى الأرشفة وإضافة الملفات، «تعديل» لاستعادة المعاملة إلى نظام المتابعة أو تعديل بيانات الأرشفة، «حذف» للحذف النهائي من المنصة، و«طباعة» لطباعة بيانات المعاملات وتقارير الأرشفة.', 'Archive: View opens archived files and transactions; Add archives closed transactions and adds files; Edit restores transactions to follow-up or edits archive metadata; Delete permanently removes archive records from the platform; Print enables archived transaction printing and archive reports.')}
+            </p>
             <p className="mt-2 text-xs font-medium text-primary">
               {ui('يمكن تمرير الجدول بعجلة الفأرة أو بسحب شريط التمرير الواضح على طرف الجدول، كما يمكن استخدام زري أعلى وأسفل للانتقال السريع.', 'Scroll with the mouse wheel or drag the visible scrollbar at the edge of the table. You can also use the Top and Bottom buttons for quick navigation.')}
             </p>
