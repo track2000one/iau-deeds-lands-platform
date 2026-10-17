@@ -20,6 +20,10 @@ const MODULES: ModuleName[] = [
   'leased_buildings_in',
   'central_buildings',
   'transaction_follow_up',
+  'transaction_risk_register',
+  'transaction_risk_executive',
+  'transaction_risk_acceptance',
+  'transaction_risk_policy',
   'contracts_follow_up',
   'assets',
   'accounting_transformation',
@@ -120,6 +124,9 @@ export const PermissionMatrix: React.FC<{
             <p className="mt-1 text-xs font-semibold text-sky-700">
               {ui('نظام المتابعة: إنشاء المعاملة ليس من صلاحيات المستخدم العادي ويقتصر على المستخدم الإشرافي. «تعديل» لتحديث المعاملات المسندة للمستخدم وتسجيل الإجراءات، و«حذف» للحذف النهائي بصلاحية إشرافية، و«إعادة فتح» لإعادة المنجزة أو المغلقة إلى العمل، و«تحويل» تسمح للمستخدم العادي بتحويل المعاملة المسندة إليه فقط إلى موظف آخر مع إلزامه بتسجيل سبب التحويل.', 'Transaction Follow-up: Creating transactions is not available to ordinary users and is restricted to supervisors. Edit updates assigned transactions and records actions, Delete is supervisory, Reopen returns completed or closed transactions to active work, and Transfer lets an ordinary user transfer only a transaction assigned to them with a mandatory recorded reason.')}
             </p>
+            <p className="mt-1 text-xs font-semibold text-amber-700">
+              {ui('صفحات المخاطر الأربع (سجل المخاطر التشغيلية، لوحة المخاطر التنفيذية، طلبات قبول المخاطر، شهية المخاطر وإعدادات KRI) تكون للمسؤول افتراضيًا، ولا تظهر للمستخدم العادي إلا إذا منح المسؤول صلاحية «عرض» للصفحة المطلوبة.', 'The four risk pages are administrator-only by default and are shown to an ordinary user only when an administrator grants View permission for the required risk page.')}
+            </p>
             <p className="mt-2 text-xs font-medium text-primary">
               {ui('يمكن تمرير الجدول بعجلة الفأرة أو بسحب شريط التمرير الواضح على طرف الجدول، كما يمكن استخدام زري أعلى وأسفل للانتقال السريع.', 'Scroll with the mouse wheel or drag the visible scrollbar at the edge of the table. You can also use the Top and Bottom buttons for quick navigation.')}
             </p>
@@ -173,15 +180,23 @@ export const PermissionMatrix: React.FC<{
 
                 {ACTIONS.map((action) => {
                   const isCyclePermission = action.key === 'canCreateCycle' || action.key === 'canApproveCycle';
-                  const supported = action.key === 'canCreateUser'
-                    ? moduleName === 'mosques'
-                    : action.key === 'canAdd' && moduleName === 'transaction_follow_up'
-                      ? false
-                      : action.key === 'canReopen' || action.key === 'canTransfer'
-                        ? moduleName === 'transaction_follow_up'
-                        : isCyclePermission
-                          ? ['assets', 'accounting_transformation'].includes(moduleName)
-                          : true;
+                  const riskViewOnlyModules: ModuleName[] = [
+                    'transaction_risk_register',
+                    'transaction_risk_executive',
+                    'transaction_risk_acceptance',
+                    'transaction_risk_policy',
+                  ];
+                  const supported = riskViewOnlyModules.includes(moduleName)
+                    ? action.key === 'canView'
+                    : action.key === 'canCreateUser'
+                      ? moduleName === 'mosques'
+                      : action.key === 'canAdd' && moduleName === 'transaction_follow_up'
+                        ? false
+                        : action.key === 'canReopen' || action.key === 'canTransfer'
+                          ? moduleName === 'transaction_follow_up'
+                          : isCyclePermission
+                            ? ['assets', 'accounting_transformation'].includes(moduleName)
+                            : true;
                   return (
                     <td key={action.key} className="p-3 text-center">
                       {supported ? (
