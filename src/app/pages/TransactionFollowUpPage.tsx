@@ -58,6 +58,7 @@ import { TransactionExecutiveReport } from '../components/TransactionExecutiveRe
 import { TransactionExecutiveInbox } from '../components/TransactionExecutiveInbox';
 import { TransactionDailyWorkCenter } from '../components/TransactionDailyWorkCenter';
 import { TransactionFollowUpCard } from '../components/TransactionFollowUpCard';
+import { AppDateField } from '../components/AppDateField';
 import { TransactionManagementDirectives } from '../components/TransactionManagementDirectives';
 import { TransactionDirectivesDashboardDialog } from '../components/TransactionDirectivesDashboardDialog';
 import { TransactionApprovalCenterDialog } from '../components/TransactionApprovalCenterDialog';
@@ -88,6 +89,7 @@ import {
   type TransactionFollowUpStatus,
   type TransactionFollowUpType,
 } from '../api/transactionFollowUp';
+import { formatFlexibleDate, isValidFlexibleDate } from '../../utils/dateUtils';
 
 const EMPTY_DASHBOARD: TransactionFollowUpDashboard = {
   total: 0,
@@ -198,6 +200,21 @@ const formatDateTime = (value?: string | null) =>
       }).format(new Date(value))
     : '—';
 
+const formatTransactionDate = (record?: Pick<
+  TransactionFollowUpRecord,
+  'transactionDate' | 'transactionDateType' | 'transactionDateInput'
+> | null) =>
+  record
+    ? formatFlexibleDate(
+        record.transactionDateInput || record.transactionDate,
+        record.transactionDateType || 'gregorian',
+        'ar',
+      )
+    : '—';
+
+const enteredTransactionYear = (value?: string | null) =>
+  value?.match(/^(\d{4})/)?.[1] || '';
+
 const toInputDate = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -222,6 +239,7 @@ const reportRange = (mode: 'weekly' | 'monthly') => {
 const emptyCreate = (): TransactionFollowUpCreateInput => ({
   transactionNumber: '',
   transactionDate: new Date().toISOString().slice(0, 10),
+  transactionDateType: 'gregorian',
   transactionType: 'incoming',
   subject: '',
   sourceEntity: '',
@@ -424,6 +442,14 @@ export const TransactionFollowUpPage: React.FC = () => {
   const createTransaction = async () => {
     if (!createForm.transactionNumber.trim() || !createForm.subject.trim() || !createForm.transactionDate) {
       toast.error('أكمل رقم المعاملة وتاريخها وموضوعها');
+      return;
+    }
+    if (!isValidFlexibleDate(createForm.transactionDate, createForm.transactionDateType)) {
+      toast.error(
+        createForm.transactionDateType === 'hijri'
+          ? 'أدخل تاريخًا هجريًا صحيحًا مثل 1448/05/10'
+          : 'أدخل تاريخًا ميلاديًا صحيحًا',
+      );
       return;
     }
     try {
@@ -1985,8 +2011,35 @@ ${styleAssets}
             <DialogDescription>سجّل بيانات المعاملة وحدد الموظف والإجراء والمدة المستهدفة.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="رقم المعاملة *"><Input value={createForm.transactionNumber} onChange={(e) => setCreateForm((p) => ({ ...p, transactionNumber: e.target.value }))} /></Field>
-            <Field label="تاريخ المعاملة *"><Input type="date" value={createForm.transactionDate} onChange={(e) => setCreateForm((p) => ({ ...p, transactionDate: e.target.value }))} /></Field>
+            <div className="md:col-span-2">
+              <Field label="رقم المعاملة *">
+                <Input
+                  value={createForm.transactionNumber}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, transactionNumber: e.target.value }))}
+                  placeholder="مثال: 1234"
+                />
+              </Field>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                رقم المعاملة فريد داخل نفس العام، ويمكن تكراره فقط في عام مختلف.
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <AppDateField
+                label="تاريخ المعاملة"
+                value={createForm.transactionDate}
+                dateType={createForm.transactionDateType}
+                onValueChange={(value) => setCreateForm((p) => ({ ...p, transactionDate: value }))}
+                onDateTypeChange={(transactionDateType) =>
+                  setCreateForm((p) => ({ ...p, transactionDateType, transactionDate: '' }))
+                }
+                required
+                helperText={
+                  enteredTransactionYear(createForm.transactionDate)
+                    ? `سيتم التحقق من عدم تكرار رقم المعاملة داخل عام ${enteredTransactionYear(createForm.transactionDate)}${createForm.transactionDateType === 'hijri' ? 'هـ' : 'م'}.`
+                    : 'اختر التقويم الميلادي أو الهجري حسب تاريخ أصل المعاملة.'
+                }
+              />
+            </div>
             <Field label="نوع المعاملة"><NativeSelect value={createForm.transactionType} onChange={(e) => setCreateForm((p) => ({ ...p, transactionType: e.target.value as TransactionFollowUpType }))}>{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
             <Field label="الأولوية"><NativeSelect value={createForm.priority} onChange={(e) => setCreateForm((p) => ({ ...p, priority: e.target.value as TransactionFollowUpPriority }))}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
             <div className="md:col-span-2"><Field label="موضوع المعاملة *"><Input value={createForm.subject} onChange={(e) => setCreateForm((p) => ({ ...p, subject: e.target.value }))} /></Field></div>
@@ -2027,7 +2080,7 @@ ${styleAssets}
               </DialogHeader>
 
               <div className="grid gap-3 md:grid-cols-4">
-                <Info label="تاريخ المعاملة" value={formatDate(selected.transactionDate)} />
+                <Info label="تاريخ المعاملة" value={formatTransactionDate(selected)} />
                 <Info label="النوع" value={typeLabels[selected.transactionType]} />
                 <Info label="الأولوية" value={priorityLabels[selected.priority]} />
                 <Info label="الحالة" value={statusLabels[selected.status]} />
