@@ -5,8 +5,13 @@ const GREGORIAN_DATE_PATTERN = /^(\d{4})-(\d{1,2})-(\d{1,2})/;
 
 const pad2 = (value: string | number) => String(value).padStart(2, '0');
 
+export const normalizeArabicDigits = (value: string) =>
+  value
+    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
+
 export const normalizeHijriInput = (value: string) => {
-  return value
+  return normalizeArabicDigits(value)
     .replace(/[^0-9/\-]/g, '')
     .replaceAll('-', '/')
     .slice(0, 10);
