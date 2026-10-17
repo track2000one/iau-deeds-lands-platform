@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
+import { usePermissions } from '../../context/PermissionsContext';
 import {
   transactionRiskApi,
   type TransactionRiskCategory,
@@ -227,6 +228,10 @@ const ProgressMetric = ({
 
 export const TransactionRiskExecutiveDashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { isAdmin, hasPermission } = usePermissions();
+  const canViewPolicy = isAdmin || hasPermission('transaction_risk_policy', 'canView');
+  const canViewAcceptance = isAdmin || hasPermission('transaction_risk_acceptance', 'canView');
+  const canViewRegister = isAdmin || hasPermission('transaction_risk_register', 'canView');
   const [data, setData] = React.useState<TransactionRiskDashboard>(EMPTY);
   const [loading, setLoading] = React.useState(true);
 
@@ -273,18 +278,24 @@ export const TransactionRiskExecutiveDashboardPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate('/follow-up/risks/policy')}>
-            <Settings2 className="me-2 h-4 w-4" />
-            شهية المخاطر وKRI
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/follow-up/risks/acceptance')}>
-            <FileCheck2 className="me-2 h-4 w-4" />
-            حوكمة قبول المخاطر
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/follow-up/risks')}>
-            <ShieldAlert className="me-2 h-4 w-4" />
-            سجل المخاطر
-          </Button>
+          {canViewPolicy && (
+            <Button variant="outline" onClick={() => navigate('/follow-up/risks/policy')}>
+              <Settings2 className="me-2 h-4 w-4" />
+              شهية المخاطر وKRI
+            </Button>
+          )}
+          {canViewAcceptance && (
+            <Button variant="outline" onClick={() => navigate('/follow-up/risks/acceptance')}>
+              <FileCheck2 className="me-2 h-4 w-4" />
+              طلبات قبول المخاطر
+            </Button>
+          )}
+          {canViewRegister && (
+            <Button variant="outline" onClick={() => navigate('/follow-up/risks')}>
+              <ShieldAlert className="me-2 h-4 w-4" />
+              سجل المخاطر
+            </Button>
+          )}
           <Button variant="outline" disabled={loading} onClick={() => void load()}>
             <RefreshCw className={'me-2 h-4 w-4 ' + (loading ? 'animate-spin' : '')} />
             تحديث المؤشرات
