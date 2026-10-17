@@ -280,6 +280,7 @@ export const TransactionFollowUpPage: React.FC = () => {
     canDelete ||
     hasPermission('transaction_follow_up', 'canTransfer');
   const canPrint = isAdmin || hasPermission('transaction_follow_up', 'canPrint');
+  const canArchive = isAdmin || hasPermission('archive', 'canAdd');
 
   const [dashboard, setDashboard] = React.useState<TransactionFollowUpDashboard>(EMPTY_DASHBOARD);
   const [executiveInbox, setExecutiveInbox] = React.useState<TransactionFollowUpExecutiveInbox>(EMPTY_EXECUTIVE_INBOX);
@@ -1040,6 +1041,38 @@ ${styleAssets}
       window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر إعادة فتح المعاملة');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const archiveTransaction = async (record: TransactionFollowUpRecord) => {
+    if (record.status !== 'closed') {
+      toast.error('لا يمكن أرشفة المعاملة إلا بعد اعتماد إنجازها وإقفالها');
+      return;
+    }
+
+    const entered = window.prompt(
+      `ملاحظات الأرشفة للمعاملة رقم ${record.transactionNumber} (اختياري):`,
+      '',
+    );
+    if (entered == null) return;
+
+    if (!window.confirm(
+      'سيتم ترحيل المعاملة من قوائم المتابعة النشطة إلى قسم «الأرشفة»، مع الاحتفاظ بكامل سجل الإجراءات والمرفقات. هل تريد المتابعة؟',
+    )) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await transactionFollowUpApi.archive(record.id, entered.trim() || null);
+      toast.success('تم ترحيل المعاملة إلى قسم الأرشفة');
+      if (selected?.id === record.id) setSelected(null);
+      await load();
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر ترحيل المعاملة إلى الأرشفة');
     } finally {
       setSaving(false);
     }
@@ -2493,6 +2526,31 @@ ${styleAssets}
                   </CardContent>
                 </Card>
               ) : null}
+
+              {canArchive && selected.status === 'closed' && !selected.archivedAt && (
+                <Card className="border-emerald-200 bg-emerald-50/50">
+                  <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="flex items-center gap-2 text-sm font-black text-emerald-950">
+                        <Archive className="h-4 w-4" />
+                        ترحيل اختياري إلى الأرشفة
+                      </p>
+                      <p className="mt-1 text-xs leading-6 text-emerald-900/80">
+                        المعاملة مغلقة ويمكن ترحيلها إلى قسم «الأرشفة» عند الحاجة. لن يتم حذف سجلها أو مرفقاتها،
+                        وستختفي فقط من قوائم المتابعة النشطة.
+                      </p>
+                    </div>
+                    <Button
+                      className="shrink-0 bg-emerald-700 text-white hover:bg-emerald-800"
+                      disabled={saving}
+                      onClick={() => void archiveTransaction(selected)}
+                    >
+                      <Archive className="ml-2 h-4 w-4" />
+                      ترحيل إلى الأرشفة
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
 
               {canReopen && ['completed', 'closed'].includes(selected.status) && (
                 <Card className="border-amber-200 bg-amber-50/50">
