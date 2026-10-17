@@ -17,6 +17,9 @@ import {
   FileCheck2,
   FileDown,
   FileText,
+  Paperclip,
+  Upload,
+  ExternalLink,
   Printer,
   Inbox,
   ListTodo,
@@ -215,6 +218,17 @@ const formatTransactionDate = (record?: Pick<
 const enteredTransactionYear = (value?: string | null) =>
   value?.match(/^(\d{4})/)?.[1] || '';
 
+const TRANSACTION_ATTACHMENT_ACCEPT =
+  'image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp4';
+const MAX_TRANSACTION_ATTACHMENTS = 10;
+const MAX_TRANSACTION_ATTACHMENT_SIZE_MB = 20;
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} بايت`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} ك.ب`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} م.ب`;
+};
+
 const toInputDate = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -305,6 +319,9 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [nextDueDate, setNextDueDate] = React.useState('');
   const [assignUserId, setAssignUserId] = React.useState('');
   const [assignNote, setAssignNote] = React.useState('');
+  const [createFiles, setCreateFiles] = React.useState<File[]>([]);
+  const [detailFiles, setDetailFiles] = React.useState<File[]>([]);
+  const [attachmentUploading, setAttachmentUploading] = React.useState(false);
   const reportRef = React.useRef<HTMLDivElement | null>(null);
   const [reportOpen, setReportOpen] = React.useState(false);
   const [reportLoading, setReportLoading] = React.useState(false);
@@ -390,6 +407,7 @@ export const TransactionFollowUpPage: React.FC = () => {
       setDetailLoading(true);
       const record = await transactionFollowUpApi.get(id);
       setSelected(record);
+      setDetailFiles([]);
       setAssignUserId(record.currentAssigneeUserId || '');
       setAssignNote('');
       setActionText('');
@@ -439,6 +457,103 @@ export const TransactionFollowUpPage: React.FC = () => {
     setPreventiveActionsOpen(true);
   }, [searchParams]);
 
+  const selectTransactionFiles = (
+    incoming: File[],
+    current: File[],
+    existingCount = 0,
+  ) => {
+    const available = Math.max(0, MAX_TRANSACTION_ATTACHMENTS - existingCount);
+    if (available === 0) {
+      toast.error(`الحد الأعلى للمرفقات هو ${MAX_TRANSACTION_ATTACHMENTS} ملفات`);
+      return current;
+    }
+
+    const next = [...current];
+    const oversized: string[] = [];
+
+    for (const file of incoming) {
+      if (file.size > MAX_TRANSACTION_ATTACHMENT_SIZE_MB * 1024 * 1024) {
+        oversized.push(file.name);
+        continue;
+      }
+      const duplicate = next.some(
+        (item) =>
+          item.name === file.name &&
+          item.size === file.size &&
+          item.lastModified === file.lastModified,
+      );
+      if (!duplicate && next.length < available) next.push(file);
+    }
+
+    if (oversized.length) {
+      toast.error(
+        `تجاوز حجم الملف الحد المسموح (${MAX_TRANSACTION_ATTACHMENT_SIZE_MB} م.ب): ${oversized.join('، ')}`,
+      );
+    }
+    if (incoming.length + current.length > available) {
+      toast.warning(`الحد الأعلى للمرفقات هو ${MAX_TRANSACTION_ATTACHMENTS} ملفات`);
+    }
+
+    return next;
+  };
+
+  const uploadTransactionFiles = async (transactionId: string, files: File[]) => {
+    let uploaded = 0;
+    const failed: string[] = [];
+
+    for (const file of files) {
+      try {
+        await transactionFollowUpApi.uploadAttachment(transactionId, file);
+        uploaded += 1;
+      } catch {
+        failed.push(file.name);
+      }
+    }
+
+    return { uploaded, failed };
+  };
+
+  const uploadDetailAttachments = async () => {
+    if (!selected || detailFiles.length === 0) return;
+
+    try {
+      setAttachmentUploading(true);
+      const result = await uploadTransactionFiles(selected.id, detailFiles);
+      if (result.uploaded) {
+        toast.success(
+          result.uploaded === 1
+            ? 'تم رفع المرفق بنجاح'
+            : `تم رفع ${result.uploaded} مرفقات بنجاح`,
+        );
+      }
+      if (result.failed.length) {
+        toast.warning(`تعذر رفع: ${result.failed.join('، ')}`);
+      }
+      setDetailFiles([]);
+      await openDetails(selected.id);
+      await load();
+    } finally {
+      setAttachmentUploading(false);
+    }
+  };
+
+  const deleteTransactionAttachment = async (attachmentId: string, title: string) => {
+    if (!selected) return;
+    if (!window.confirm(`حذف المرفق «${title}» من المعاملة؟`)) return;
+
+    try {
+      setAttachmentUploading(true);
+      await transactionFollowUpApi.deleteAttachment(selected.id, attachmentId);
+      toast.success('تم حذف المرفق');
+      await openDetails(selected.id);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حذف المرفق');
+    } finally {
+      setAttachmentUploading(false);
+    }
+  };
+
   const createTransaction = async () => {
     if (!createForm.transactionNumber.trim() || !createForm.subject.trim() || !createForm.transactionDate) {
       toast.error('أكمل رقم المعاملة وتاريخها وموضوعها');
@@ -463,8 +578,25 @@ export const TransactionFollowUpPage: React.FC = () => {
         notes: createForm.notes || null,
       });
       toast.success(`تم تسجيل المعاملة برقم متابعة ${created.trackingNumber}`);
+
+      if (createFiles.length) {
+        setAttachmentUploading(true);
+        const result = await uploadTransactionFiles(created.id, createFiles);
+        if (result.uploaded) {
+          toast.success(
+            result.uploaded === 1
+              ? 'تم إرفاق ملف واحد بالمعاملة'
+              : `تم إرفاق ${result.uploaded} ملفات بالمعاملة`,
+          );
+        }
+        if (result.failed.length) {
+          toast.warning(`تم تسجيل المعاملة، وتعذر رفع: ${result.failed.join('، ')}`);
+        }
+      }
+
       setCreateOpen(false);
       setCreateForm(emptyCreate());
+      setCreateFiles([]);
       setPage(1);
       await load();
       await openDetails(created.id);
@@ -472,6 +604,7 @@ export const TransactionFollowUpPage: React.FC = () => {
       toast.error(error instanceof Error ? error.message : 'تعذر تسجيل المعاملة');
     } finally {
       setSaving(false);
+      setAttachmentUploading(false);
     }
   };
 
@@ -947,6 +1080,19 @@ ${styleAssets}
     )
   );
 
+  const canManageAttachments = Boolean(
+    selected &&
+    (
+      isAdmin ||
+      canDelete ||
+      (
+        canEdit &&
+        selected.currentAssigneeUserId === currentUser?.uid &&
+        !['completed', 'closed'].includes(selected.status)
+      )
+    )
+  );
+
   return (
     <div className="mx-auto w-full max-w-[1750px] space-y-5">
       <section className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_18px_50px_rgba(15,23,42,.07)]">
@@ -994,6 +1140,7 @@ ${styleAssets}
                 className="h-10 rounded-xl px-4 shadow-sm"
                 onClick={() => {
                   setCreateForm(emptyCreate());
+                  setCreateFiles([]);
                   setCreateOpen(true);
                 }}
               >
@@ -2004,7 +2151,14 @@ ${styleAssets}
         </DialogContent>
       </Dialog>
 
-      <Dialog open={createOpen} onOpenChange={(open) => !saving && setCreateOpen(open)}>
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          if (saving || attachmentUploading) return;
+          setCreateOpen(open);
+          if (!open) setCreateFiles([]);
+        }}
+      >
         <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-3xl" dir="rtl">
           <DialogHeader className="text-right">
             <DialogTitle>تسجيل معاملة جديدة</DialogTitle>
@@ -2049,7 +2203,67 @@ ${styleAssets}
             <Field label="تاريخ الاستحقاق"><Input type="date" value={createForm.dueDate || ''} onChange={(e) => setCreateForm((p) => ({ ...p, dueDate: e.target.value }))} /></Field>
             <Field label="تنبيه عدم النشاط بعد (أيام)"><Input type="number" min={1} max={90} value={createForm.inactivityAlertDays || 3} onChange={(e) => setCreateForm((p) => ({ ...p, inactivityAlertDays: Number(e.target.value) || 3 }))} /></Field>
             <div className="md:col-span-2"><Field label="ملاحظات"><Textarea rows={3} value={createForm.notes || ''} onChange={(e) => setCreateForm((p) => ({ ...p, notes: e.target.value }))} /></Field></div>
-            <div className="md:col-span-2 flex justify-end gap-2"><Button variant="outline" onClick={() => setCreateOpen(false)} disabled={saving}>إلغاء</Button><Button onClick={() => void createTransaction()} disabled={saving}>{saving ? 'جارٍ الحفظ...' : 'تسجيل وإسناد المعاملة'}</Button></div>
+
+            <div className="md:col-span-2 rounded-2xl border border-dashed border-sky-200 bg-sky-50/40 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-black text-slate-900">
+                    <Paperclip className="h-4 w-4 text-sky-700" />
+                    إرفاق الملفات
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    يمكنك اختيار عدة ملفات دفعة واحدة. الحد الأعلى {MAX_TRANSACTION_ATTACHMENTS} ملفات، وبحد {MAX_TRANSACTION_ATTACHMENT_SIZE_MB} م.ب لكل ملف.
+                  </p>
+                </div>
+                <Badge variant="outline" className="bg-white">
+                  {createFiles.length.toLocaleString('ar-SA')} ملف محدد
+                </Badge>
+              </div>
+
+              <Input
+                className="mt-3 bg-white"
+                type="file"
+                multiple
+                accept={TRANSACTION_ATTACHMENT_ACCEPT}
+                disabled={saving || attachmentUploading}
+                onChange={(event) => {
+                  const incoming = Array.from(event.target.files || []);
+                  event.target.value = '';
+                  setCreateFiles((current) => selectTransactionFiles(incoming, current));
+                }}
+              />
+
+              {createFiles.length ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {createFiles.map((file, index) => (
+                    <div key={`${file.name}-${file.size}-${file.lastModified}`} className="flex min-w-0 items-center justify-between gap-2 rounded-xl border bg-white px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold">{file.name}</p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">{formatFileSize(file.size)}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 shrink-0 p-0 text-red-600"
+                        onClick={() => setCreateFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                        disabled={saving || attachmentUploading}
+                        aria-label="إزالة الملف"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="md:col-span-2 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setCreateOpen(false); setCreateFiles([]); }} disabled={saving || attachmentUploading}>إلغاء</Button>
+              <Button onClick={() => void createTransaction()} disabled={saving || attachmentUploading}>
+                {saving ? (createFiles.length ? 'جارٍ الحفظ ورفع المرفقات...' : 'جارٍ الحفظ...') : 'تسجيل وإسناد المعاملة'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -2059,6 +2273,7 @@ ${styleAssets}
         onOpenChange={(open) => {
           if (!open && !saving) {
             setSelected(null);
+            setDetailFiles([]);
             if (searchParams.get('transaction')) {
               openedFromUrlRef.current = null;
               setSearchParams({});
@@ -2100,6 +2315,127 @@ ${styleAssets}
                   <CardContent className="text-sm leading-7">{selected.notes || 'لا توجد ملاحظات.'}</CardContent>
                 </Card>
               </div>
+
+              <Card className="border-sky-200">
+                <CardHeader>
+                  <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
+                    <span className="flex items-center gap-2">
+                      <Paperclip className="h-4 w-4 text-sky-700" />
+                      مرفقات المعاملة
+                    </span>
+                    <Badge variant="outline" className="bg-white">
+                      {(selected.attachments?.length || 0).toLocaleString('ar-SA')} مرفق
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!selected.attachments?.length ? (
+                    <div className="rounded-xl border border-dashed py-6 text-center text-sm text-muted-foreground">
+                      لا توجد مرفقات مسجلة لهذه المعاملة.
+                    </div>
+                  ) : (
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {selected.attachments.map((attachment) => (
+                        <div key={attachment.id} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border bg-slate-50/70 p-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">{attachment.title}</p>
+                            <p className="mt-1 text-[10px] text-muted-foreground">
+                              {attachment.createdBy ? `أضيف بواسطة ${attachment.createdBy} · ` : ''}
+                              {formatDateTime(attachment.createdAt)}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button variant="outline" size="sm" className="h-8" asChild>
+                              <a href={attachment.driveUrl} target="_blank" rel="noreferrer">
+                                <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                                فتح
+                              </a>
+                            </Button>
+                            {canManageAttachments && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-600"
+                                disabled={attachmentUploading}
+                                onClick={() => void deleteTransactionAttachment(attachment.id, attachment.title)}
+                                aria-label="حذف المرفق"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {canManageAttachments && (
+                    <div className="rounded-xl border border-dashed border-sky-200 bg-sky-50/40 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-black">إضافة مرفقات جديدة</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            اختيار متعدد، حتى {MAX_TRANSACTION_ATTACHMENTS} مرفقات إجمالًا، وبحد {MAX_TRANSACTION_ATTACHMENT_SIZE_MB} م.ب للملف.
+                          </p>
+                        </div>
+                        {detailFiles.length ? (
+                          <Badge variant="outline" className="bg-white">{detailFiles.length.toLocaleString('ar-SA')} محدد</Badge>
+                        ) : null}
+                      </div>
+
+                      <Input
+                        className="mt-3 bg-white"
+                        type="file"
+                        multiple
+                        accept={TRANSACTION_ATTACHMENT_ACCEPT}
+                        disabled={attachmentUploading}
+                        onChange={(event) => {
+                          const incoming = Array.from(event.target.files || []);
+                          event.target.value = '';
+                          setDetailFiles((current) =>
+                            selectTransactionFiles(
+                              incoming,
+                              current,
+                              selected.attachments?.length || 0,
+                            ),
+                          );
+                        }}
+                      />
+
+                      {detailFiles.length ? (
+                        <div className="mt-3 space-y-2">
+                          {detailFiles.map((file, index) => (
+                            <div key={`${file.name}-${file.size}-${file.lastModified}`} className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-semibold">{file.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{formatFileSize(file.size)}</p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-red-600"
+                                onClick={() => setDetailFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                                disabled={attachmentUploading}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            onClick={() => void uploadDetailAttachments()}
+                            disabled={attachmentUploading || detailFiles.length === 0}
+                          >
+                            <Upload className="ml-2 h-4 w-4" />
+                            {attachmentUploading ? 'جارٍ رفع الملفات...' : `رفع ${detailFiles.length} ملف`}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {selected.externalWaits?.length ? (
                 <Card className="border-cyan-200">
