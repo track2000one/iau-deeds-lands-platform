@@ -254,6 +254,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [loading, setLoading] = React.useState(true);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [cardActionBusyId, setCardActionBusyId] = React.useState<string | null>(null);
   const [page, setPage] = React.useState(1);
   const [totalPages, setTotalPages] = React.useState(0);
   const [total, setTotal] = React.useState(0);
@@ -813,6 +814,37 @@ ${styleAssets}
     }
   };
 
+  const runCardQuickAction = async (
+    record: TransactionFollowUpRecord,
+    action: 'start' | 'approve_close',
+  ) => {
+    if (
+      action === 'approve_close' &&
+      !window.confirm(`اعتماد إنجاز المعاملة رقم ${record.transactionNumber} وإقفالها؟`)
+    ) {
+      return;
+    }
+
+    try {
+      setCardActionBusyId(record.id);
+      await transactionFollowUpApi.workQueueAction(record.id, { action });
+      toast.success(
+        action === 'start'
+          ? 'تم بدء تنفيذ المعاملة'
+          : 'تم اعتماد إنجاز المعاملة وإقفالها',
+      );
+      window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
+      await load();
+      if (selected?.id === record.id) {
+        await openDetails(record.id);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تنفيذ الإجراء');
+    } finally {
+      setCardActionBusyId(null);
+    }
+  };
+
   const reopenTransaction = async (record: TransactionFollowUpRecord) => {
     const entered = window.prompt(
       `اكتب سبب إعادة فتح المعاملة رقم ${record.transactionNumber}:`,
@@ -1311,10 +1343,13 @@ ${styleAssets}
                     canEdit={recordCanEdit}
                     canDelete={canDelete}
                     canReopen={canReopen}
+                    supervisor={isAdmin || canDelete}
+                    busy={cardActionBusyId === record.id}
                     onView={(item) => void openDetails(item.id)}
                     onEdit={(item) => void openDetails(item.id)}
                     onDelete={(item) => void remove(item)}
                     onReopen={(item) => void reopenTransaction(item)}
+                    onQuickAction={(item, action) => void runCardQuickAction(item, action)}
                   />
                 );
               })}
