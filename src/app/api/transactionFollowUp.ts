@@ -1066,21 +1066,21 @@ export const transactionFollowUpApi = {
     if (input.search?.trim()) query.set('search', input.search.trim());
     const suffix = query.toString();
     return apiJson<TransactionFollowUpPage>(
-      `/api/transaction-follow-up/archived${suffix ? `?${suffix}` : ''}`,
+      `/api/archive/transactions${suffix ? `?${suffix}` : ''}`,
     );
   },
 
   archivedRecord: (id: string) =>
-    apiJson<TransactionFollowUpRecord>(`/api/transaction-follow-up/archived/${id}`),
+    apiJson<TransactionFollowUpRecord>(`/api/archive/transactions/${id}`),
 
   archive: (id: string, note?: string | null) =>
-    apiJson<TransactionFollowUpRecord>(`/api/transaction-follow-up/${id}/archive`, {
-      method: 'PATCH',
+    apiJson<TransactionFollowUpRecord>(`/api/archive/transactions/${id}`, {
+      method: 'POST',
       body: JSON.stringify({ note: note || null }),
     }),
 
   restoreFromArchive: (id: string, note?: string | null) =>
-    apiJson<TransactionFollowUpRecord>(`/api/transaction-follow-up/archived/${id}/restore`, {
+    apiJson<TransactionFollowUpRecord>(`/api/archive/transactions/${id}/restore`, {
       method: 'PATCH',
       body: JSON.stringify({ note: note || null }),
     }),
