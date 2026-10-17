@@ -18,6 +18,9 @@ export const TransactionRiskRegisterPage: React.FC = () => {
   const location = useLocation();
   const { isAdmin, hasPermission } = usePermissions();
   const supervisor = isAdmin || hasPermission('transaction_follow_up', 'canDelete');
+  const canViewPolicy = isAdmin || hasPermission('transaction_risk_policy', 'canView');
+  const canViewAcceptance = isAdmin || hasPermission('transaction_risk_acceptance', 'canView');
+  const canViewExecutive = isAdmin || hasPermission('transaction_risk_executive', 'canView');
   const [assignees, setAssignees] = React.useState<TransactionFollowUpAssignee[]>([]);
   const navigationSeed = (location.state as { riskSeed?: RiskRegisterSeed } | null)?.riskSeed || null;
 
@@ -42,15 +45,19 @@ export const TransactionRiskRegisterPage: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => navigate('/follow-up/risks/policy')}>
-              <Settings2 className="ml-2 h-4 w-4" />
-              شهية المخاطر وKRI
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/follow-up/risks/acceptance')}>
-              <FileCheck2 className="ml-2 h-4 w-4" />
-              حوكمة قبول المخاطر
-            </Button>
-            {supervisor && (
+            {canViewPolicy && (
+              <Button variant="outline" onClick={() => navigate('/follow-up/risks/policy')}>
+                <Settings2 className="ml-2 h-4 w-4" />
+                شهية المخاطر وKRI
+              </Button>
+            )}
+            {canViewAcceptance && (
+              <Button variant="outline" onClick={() => navigate('/follow-up/risks/acceptance')}>
+                <FileCheck2 className="ml-2 h-4 w-4" />
+                طلبات قبول المخاطر
+              </Button>
+            )}
+            {canViewExecutive && (
               <Button variant="outline" onClick={() => navigate('/follow-up/risks/executive')}>
                 <Gauge className="ml-2 h-4 w-4" />
                 لوحة المخاطر التنفيذية
