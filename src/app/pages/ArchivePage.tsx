@@ -26,6 +26,7 @@ import {
   Copy,
   RotateCcw,
   ListTodo,
+  Printer,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -225,6 +226,14 @@ const getArchiveFileTypeLabel = (doc: ArchiveDocument) => {
   return 'ملف';
 };
 
+
+const escapePrintHtml = (value: unknown) =>
+  String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
 
 export const ArchivePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -501,6 +510,100 @@ export const ArchivePage: React.FC = () => {
     } finally {
       setArchivedTransactionLoading(false);
     }
+  };
+
+  const deleteArchivedTransaction = async (record: TransactionFollowUpRecord) => {
+    if (!canDelete) {
+      toast.error('لا تملك صلاحية حذف المعاملات المؤرشفة');
+      return;
+    }
+
+    if (!window.confirm(
+      `حذف المعاملة رقم ${record.transactionNumber} نهائيًا من المنصة؟ سيتم حذف سجل المتابعة والإجراءات المرتبطة بها من قاعدة البيانات، بينما ملفات Google Drive الأصلية لا تُحذف تلقائيًا.`,
+    )) {
+      return;
+    }
+
+    const confirmation = window.prompt(
+      'للتأكيد اكتب كلمة: حذف',
+      '',
+    );
+    if (confirmation?.trim() !== 'حذف') {
+      if (confirmation != null) toast.error('لم يتم الحذف لأن كلمة التأكيد غير مطابقة');
+      return;
+    }
+
+    try {
+      setArchivedTransactionLoading(true);
+      await transactionFollowUpApi.deleteArchivedTransaction(record.id);
+      setArchivedTransactions((current) => current.filter((item) => item.id !== record.id));
+      if (selectedArchivedTransaction?.id === record.id) {
+        setSelectedArchivedTransaction(null);
+      }
+      toast.success('تم حذف المعاملة المؤرشفة نهائيًا من المنصة');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حذف المعاملة المؤرشفة');
+    } finally {
+      setArchivedTransactionLoading(false);
+    }
+  };
+
+  const printArchivedTransaction = (record: TransactionFollowUpRecord) => {
+    if (!canPrint) {
+      toast.error('لا تملك صلاحية طباعة المعاملات المؤرشفة');
+      return;
+    }
+
+    const popup = window.open('', '_blank', 'width=980,height=760');
+    if (!popup) {
+      toast.error('تعذر فتح نافذة الطباعة. تحقق من السماح بالنوافذ المنبثقة.');
+      return;
+    }
+    popup.opener = null;
+
+    const rows = [
+      ['رقم المعاملة', record.transactionNumber],
+      ['السنة', record.transactionYear ? `${record.transactionYear}${record.transactionDateType === 'hijri' ? 'هـ' : 'م'}` : '—'],
+      ['تاريخ المعاملة', formatArchivedTransactionDate(record)],
+      ['رقم المتابعة', record.trackingNumber],
+      ['الموضوع', record.subject],
+      ['الجهة', record.sourceEntity || '—'],
+      ['الموظف المختص', record.currentAssigneeName || '—'],
+      ['تاريخ الإقفال', formatDate(record.closedAt || undefined)],
+      ['تاريخ الأرشفة', formatDate(record.archivedAt || undefined)],
+      ['تمت الأرشفة بواسطة', record.archivedByName || '—'],
+      ['ملاحظات الأرشفة', record.archiveNote || '—'],
+    ];
+
+    popup.document.write(`<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>المعاملة المؤرشفة ${escapePrintHtml(record.transactionNumber)}</title>
+<style>
+  body{font-family:Arial,"Segoe UI",sans-serif;margin:32px;color:#0f172a}
+  h1{font-size:24px;margin:0 0 8px}
+  .sub{color:#64748b;margin-bottom:22px}
+  table{width:100%;border-collapse:collapse}
+  th,td{border:1px solid #cbd5e1;padding:10px;text-align:right;vertical-align:top}
+  th{width:190px;background:#f8fafc}
+  .foot{margin-top:20px;color:#64748b;font-size:12px}
+  @media print{body{margin:12mm}}
+</style>
+</head>
+<body>
+  <h1>بيانات المعاملة المؤرشفة</h1>
+  <div class="sub">نظام المتابعة — قسم الأرشفة</div>
+  <table>
+    <tbody>
+      ${rows.map(([label, value]) => `<tr><th>${escapePrintHtml(label)}</th><td>${escapePrintHtml(value)}</td></tr>`).join('')}
+    </tbody>
+  </table>
+  <div class="foot">تم إنشاء نسخة الطباعة من منصة إدارة الأصول والأملاك والأوقاف الجامعية.</div>
+  <script>window.onload=()=>{window.print();}</script>
+</body>
+</html>`);
+    popup.document.close();
   };
 
   const openAddForm = () => {
@@ -969,7 +1072,7 @@ export const ArchivePage: React.FC = () => {
                     </p>
                   ) : null}
 
-                  <div className="mt-4 flex flex-wrap justify-end gap-2 border-t pt-3">
+                  <div className="mt-4 grid grid-cols-2 gap-2 border-t pt-3 sm:flex sm:flex-wrap sm:justify-end">
                     <Button
                       type="button"
                       variant="outline"
@@ -980,6 +1083,21 @@ export const ArchivePage: React.FC = () => {
                       <Eye className="ml-1 h-4 w-4" />
                       عرض التفاصيل
                     </Button>
+
+                    {canPrint && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-sky-300 text-sky-800 hover:bg-sky-50"
+                        disabled={archivedTransactionLoading}
+                        onClick={() => printArchivedTransaction(record)}
+                      >
+                        <Printer className="ml-1 h-4 w-4" />
+                        طباعة
+                      </Button>
+                    )}
+
                     {canRestoreTransaction && (
                       <Button
                         type="button"
@@ -991,6 +1109,19 @@ export const ArchivePage: React.FC = () => {
                       >
                         <RotateCcw className="ml-1 h-4 w-4" />
                         استعادة للمتابعة
+                      </Button>
+                    )}
+
+                    {canDelete && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        disabled={archivedTransactionLoading}
+                        onClick={() => void deleteArchivedTransaction(record)}
+                      >
+                        <Trash2 className="ml-1 h-4 w-4" />
+                        حذف
                       </Button>
                     )}
                   </div>
@@ -1083,17 +1214,42 @@ export const ArchivePage: React.FC = () => {
               )}
             </div>
 
-            {canRestoreTransaction && (
-              <div className="flex justify-end border-t pt-4">
-                <Button
-                  variant="outline"
-                  className="border-amber-300 text-amber-800 hover:bg-amber-50"
-                  disabled={archivedTransactionLoading}
-                  onClick={() => void restoreArchivedTransaction(selectedArchivedTransaction)}
-                >
-                  <RotateCcw className="ml-2 h-4 w-4" />
-                  استعادة المعاملة إلى نظام المتابعة
-                </Button>
+            {(canPrint || canRestoreTransaction || canDelete) && (
+              <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
+                {canPrint && (
+                  <Button
+                    variant="outline"
+                    className="border-sky-300 text-sky-800 hover:bg-sky-50"
+                    disabled={archivedTransactionLoading}
+                    onClick={() => printArchivedTransaction(selectedArchivedTransaction)}
+                  >
+                    <Printer className="ml-2 h-4 w-4" />
+                    طباعة
+                  </Button>
+                )}
+
+                {canRestoreTransaction && (
+                  <Button
+                    variant="outline"
+                    className="border-amber-300 text-amber-800 hover:bg-amber-50"
+                    disabled={archivedTransactionLoading}
+                    onClick={() => void restoreArchivedTransaction(selectedArchivedTransaction)}
+                  >
+                    <RotateCcw className="ml-2 h-4 w-4" />
+                    استعادة المعاملة إلى نظام المتابعة
+                  </Button>
+                )}
+
+                {canDelete && (
+                  <Button
+                    variant="destructive"
+                    disabled={archivedTransactionLoading}
+                    onClick={() => void deleteArchivedTransaction(selectedArchivedTransaction)}
+                  >
+                    <Trash2 className="ml-2 h-4 w-4" />
+                    حذف المعاملة نهائيًا
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>
