@@ -155,6 +155,8 @@ export const TransactionRiskPolicyPage: React.FC = () => {
   const { currentUser } = useAuth();
   const { isAdmin, hasPermission } = usePermissions();
   const supervisor = isAdmin || hasPermission('transaction_follow_up', 'canDelete');
+  const canViewRegister = isAdmin || hasPermission('transaction_risk_register', 'canView');
+  const canViewExecutive = isAdmin || hasPermission('transaction_risk_executive', 'canView');
   const [data, setData] = React.useState<TransactionRiskPolicyResponse>(EMPTY);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -277,10 +279,12 @@ export const TransactionRiskPolicyPage: React.FC = () => {
     <div className="space-y-6" dir="rtl">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <Button variant="ghost" className="mb-2 px-0" onClick={() => navigate('/follow-up/risks')}>
-            <ArrowRight className="me-2 h-4 w-4" />
-            سجل المخاطر التشغيلية
-          </Button>
+          {canViewRegister && (
+            <Button variant="ghost" className="mb-2 px-0" onClick={() => navigate('/follow-up/risks')}>
+              <ArrowRight className="me-2 h-4 w-4" />
+              سجل المخاطر التشغيلية
+            </Button>
+          )}
           <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800">
             <Settings2 className="h-4 w-4" />
             حوكمة منهجية المخاطر
@@ -292,10 +296,12 @@ export const TransactionRiskPolicyPage: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate('/follow-up/risks/executive')}>
-            <ShieldAlert className="me-2 h-4 w-4" />
-            لوحة المخاطر التنفيذية
-          </Button>
+          {canViewExecutive && (
+            <Button variant="outline" onClick={() => navigate('/follow-up/risks/executive')}>
+              <ShieldAlert className="me-2 h-4 w-4" />
+              لوحة المخاطر التنفيذية
+            </Button>
+          )}
           <Button variant="outline" disabled={loading} onClick={() => void load()}>
             <RefreshCw className={'me-2 h-4 w-4 ' + (loading ? 'animate-spin' : '')} />
             تحديث
