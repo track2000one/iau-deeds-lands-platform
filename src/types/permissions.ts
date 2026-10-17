@@ -11,6 +11,10 @@ export type ModuleName =
   | 'leased_buildings_in'
   | 'central_buildings'
   | 'transaction_follow_up'
+  | 'transaction_risk_register'
+  | 'transaction_risk_executive'
+  | 'transaction_risk_acceptance'
+  | 'transaction_risk_policy'
   | 'contracts_follow_up'
   | 'assets'
   | 'accounting_transformation'
@@ -63,6 +67,10 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   leased_buildings_in: 'المباني المستأجرة',
   central_buildings: 'السجل المركزي للمباني',
   transaction_follow_up: 'نظام المتابعة',
+  transaction_risk_register: 'سجل المخاطر التشغيلية',
+  transaction_risk_executive: 'لوحة المخاطر التنفيذية',
+  transaction_risk_acceptance: 'طلبات قبول المخاطر',
+  transaction_risk_policy: 'شهية المخاطر وإعدادات KRI',
   contracts_follow_up: 'متابعة العقود',
   assets: 'وحدة الأصول',
   accounting_transformation: 'لجنة متابعة متطلبات التحول المحاسبي',
@@ -85,6 +93,10 @@ export const MODULE_LABELS_EN: Record<ModuleName, string> = {
   leased_buildings_in: 'Leased Buildings (In)',
   central_buildings: 'Central Building Registry',
   transaction_follow_up: 'Transaction Follow-up System',
+  transaction_risk_register: 'Operational Risk Register',
+  transaction_risk_executive: 'Executive Risk Dashboard',
+  transaction_risk_acceptance: 'Risk Acceptance Requests',
+  transaction_risk_policy: 'Risk Appetite & KRI Settings',
   contracts_follow_up: 'Contract Follow-up',
   assets: 'Assets Unit',
   accounting_transformation: 'Accounting Transformation Requirements Committee',
@@ -133,6 +145,10 @@ export const createEmptyPermissions = (): UserPermissions => ({
   leased_buildings_in: { ...NONE },
   central_buildings: { ...NONE },
   transaction_follow_up: { ...NONE },
+  transaction_risk_register: { ...NONE },
+  transaction_risk_executive: { ...NONE },
+  transaction_risk_acceptance: { ...NONE },
+  transaction_risk_policy: { ...NONE },
   contracts_follow_up: { ...NONE },
   assets: { ...NONE },
   accounting_transformation: { ...NONE },
@@ -155,6 +171,10 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   leased_buildings_in: { ...FULL },
   central_buildings: { ...FULL },
   transaction_follow_up: { ...FULL },
+  transaction_risk_register: { ...FULL },
+  transaction_risk_executive: { ...FULL },
+  transaction_risk_acceptance: { ...FULL },
+  transaction_risk_policy: { ...FULL },
   contracts_follow_up: { ...FULL },
   assets: { ...FULL },
   accounting_transformation: { ...FULL },
