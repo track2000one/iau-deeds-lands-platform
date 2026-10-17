@@ -1134,9 +1134,20 @@ ${styleAssets}
               تحديث
             </Button>
 
+            {canPrint && (
+              <Button
+                variant="outline"
+                className="h-10 rounded-xl border-sky-300 bg-sky-50 px-4 text-sky-800 shadow-sm hover:bg-sky-100 hover:text-sky-900"
+                onClick={() => void openExecutiveReport()}
+              >
+                <FileText className="ml-2 h-4 w-4" />
+                التقارير
+              </Button>
+            )}
+
             {canAdd && (
               <Button
-                className="h-10 rounded-xl px-4 shadow-sm"
+                className="h-10 rounded-xl bg-emerald-600 px-4 text-white shadow-sm hover:bg-emerald-700"
                 onClick={() => {
                   setCreateForm(emptyCreate());
                   setCreateFiles([]);
