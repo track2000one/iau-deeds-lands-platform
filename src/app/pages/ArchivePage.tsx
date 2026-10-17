@@ -24,6 +24,8 @@ import {
   ShieldCheck,
   AlertTriangle,
   Copy,
+  RotateCcw,
+  ListTodo,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -49,6 +51,10 @@ import { usePermissions } from '../../context/PermissionsContext';
 import { AttachmentPreviewCard } from '../components/AttachmentPreview';
 import { ArchiveReportsDialog } from '../components/ArchiveReportsDialog';
 import { ArchiveExcelImportDialog, type ArchiveExcelImportPayload } from '../components/ArchiveExcelImportDialog';
+import {
+  transactionFollowUpApi,
+  type TransactionFollowUpRecord,
+} from '../api/transactionFollowUp';
 
 type ArchiveDocument = {
   id: string;
@@ -151,6 +157,13 @@ const formatArchiveDocumentDate = (value?: string, type: 'gregorian' | 'hijri' =
   }
 };
 
+const formatArchivedTransactionDate = (record: TransactionFollowUpRecord) => {
+  if (record.transactionDateType === 'hijri' && record.transactionDateInput) {
+    return `${record.transactionDateInput}هـ`;
+  }
+  return formatDate(record.transactionDate);
+};
+
 const normalizeHijriInput = (value: string) => {
   return value
     .replace(/[^0-9/\-]/g, '')
@@ -220,8 +233,12 @@ export const ArchivePage: React.FC = () => {
   const canEdit = isAdmin || hasPermission('archive', 'canEdit');
   const canDelete = isAdmin || hasPermission('archive', 'canDelete');
   const canPrint = isAdmin || hasPermission('archive', 'canPrint');
+  const canRestoreTransaction = isAdmin || hasPermission('archive', 'canEdit');
 
   const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
+  const [archivedTransactions, setArchivedTransactions] = useState<TransactionFollowUpRecord[]>([]);
+  const [selectedArchivedTransaction, setSelectedArchivedTransaction] = useState<TransactionFollowUpRecord | null>(null);
+  const [archivedTransactionLoading, setArchivedTransactionLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterConfidentiality, setFilterConfidentiality] = useState('');
@@ -281,6 +298,12 @@ export const ArchivePage: React.FC = () => {
     const remote = await archiveRequest<ArchiveDocument[]>();
     setDocuments(Array.isArray(remote) ? remote : []);
     return Array.isArray(remote) ? remote : [];
+  };
+
+  const loadArchivedTransactions = async () => {
+    const result = await transactionFollowUpApi.archived({ page: 1, pageSize: 500 });
+    setArchivedTransactions(result.items || []);
+    return result.items || [];
   };
 
   const migrateLegacyDocuments = async (remoteDocuments: ArchiveDocument[]) => {
@@ -345,7 +368,10 @@ export const ArchivePage: React.FC = () => {
 
     const initializeArchive = async () => {
       try {
-        const remote = await loadDocumentsFromServer();
+        const [remote] = await Promise.all([
+          loadDocumentsFromServer(),
+          loadArchivedTransactions(),
+        ]);
 
         if (!mounted) return;
 
@@ -391,6 +417,26 @@ export const ArchivePage: React.FC = () => {
     });
   }, [documents, searchQuery, filterCategory, filterConfidentiality]);
 
+  const filteredArchivedTransactions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return archivedTransactions;
+
+    return archivedTransactions.filter((record) =>
+      [
+        record.transactionNumber,
+        record.transactionYear,
+        record.trackingNumber,
+        record.subject,
+        record.sourceEntity,
+        record.currentAssigneeName,
+        record.archivedByName,
+        record.archiveNote,
+      ]
+        .filter((value) => value !== undefined && value !== null && String(value).trim())
+        .some((value) => String(value).toLowerCase().includes(query)),
+    );
+  }, [archivedTransactions, searchQuery]);
+
   const totalSize = useMemo(() => documents.reduce((sum, doc) => sum + Number(doc.fileSize || 0), 0), [documents]);
   const availableCategories = useMemo(() => Array.from(new Set([...categories, ...documents.map((doc) => doc.category).filter(Boolean)])), [documents]);
   const archiveQuality = useMemo(() => {
@@ -411,6 +457,50 @@ export const ArchivePage: React.FC = () => {
 
   const updateFormField = (field: keyof ArchiveFormState, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const openArchivedTransaction = async (record: TransactionFollowUpRecord) => {
+    try {
+      setArchivedTransactionLoading(true);
+      const details = await transactionFollowUpApi.archivedRecord(record.id);
+      setSelectedArchivedTransaction(details);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر فتح المعاملة المؤرشفة');
+    } finally {
+      setArchivedTransactionLoading(false);
+    }
+  };
+
+  const restoreArchivedTransaction = async (record: TransactionFollowUpRecord) => {
+    const entered = window.prompt(
+      `اكتب سبب استعادة المعاملة رقم ${record.transactionNumber} من الأرشفة:`,
+      '',
+    );
+    if (entered == null) return;
+    const note = entered.trim();
+    if (note.length < 5) {
+      toast.error('سبب الاستعادة مطلوب ويجب توضيحه');
+      return;
+    }
+    if (!window.confirm(
+      'ستعود المعاملة إلى نظام المتابعة بحالتها المغلقة، ويمكن إعادة فتحها لاحقًا بصلاحية مستقلة. هل تريد المتابعة؟',
+    )) {
+      return;
+    }
+
+    try {
+      setArchivedTransactionLoading(true);
+      await transactionFollowUpApi.restoreFromArchive(record.id, note);
+      setArchivedTransactions((current) => current.filter((item) => item.id !== record.id));
+      if (selectedArchivedTransaction?.id === record.id) {
+        setSelectedArchivedTransaction(null);
+      }
+      toast.success('تمت استعادة المعاملة من الأرشفة إلى نظام المتابعة');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر استعادة المعاملة من الأرشفة');
+    } finally {
+      setArchivedTransactionLoading(false);
+    }
   };
 
   const openAddForm = () => {
@@ -743,7 +833,7 @@ export const ArchivePage: React.FC = () => {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">الأرشفة</h1>
           <p className="text-muted-foreground mt-1">
-            أرشفة المستندات والصور وملفات PDF وWord وجميع الصيغ مع العناوين والتصنيفات والبحث.
+            مركز موحد لأرشفة المستندات والملفات، واستقبال المعاملات المغلقة التي يتم ترحيلها اختياريًا من نظام المتابعة.
           </p>
         </div>
 
@@ -773,7 +863,7 @@ export const ArchivePage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-5 flex items-center justify-between">
             <div>
@@ -791,6 +881,16 @@ export const ArchivePage: React.FC = () => {
               <p className="text-2xl font-bold">{filteredDocuments.length}</p>
             </div>
             <Search className="h-9 w-9 text-primary" />
+          </CardContent>
+        </Card>
+
+        <Card className="border-emerald-200 bg-emerald-50/40">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">المعاملات المؤرشفة</p>
+              <p className="text-2xl font-bold text-emerald-800">{archivedTransactions.length}</p>
+            </div>
+            <ListTodo className="h-9 w-9 text-emerald-700" />
           </CardContent>
         </Card>
 
@@ -814,6 +914,191 @@ export const ArchivePage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="overflow-hidden border-emerald-200/80 bg-gradient-to-l from-emerald-50/60 via-white to-slate-50/70">
+        <CardHeader className="border-b border-emerald-100">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ListTodo className="h-5 w-5 text-emerald-700" />
+                المعاملات المؤرشفة من نظام المتابعة
+              </CardTitle>
+              <CardDescription>
+                تظهر هنا فقط المعاملات المغلقة التي اختار صاحب الصلاحية ترحيلها إلى الأرشفة.
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="w-fit border-emerald-300 bg-white px-3 py-1 text-emerald-800">
+              {filteredArchivedTransactions.length.toLocaleString('ar-SA')} معاملة
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-5">
+          {filteredArchivedTransactions.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-emerald-200 bg-white/70 p-8 text-center text-sm text-muted-foreground">
+              لا توجد معاملات مؤرشفة مطابقة للبحث حاليًا.
+            </div>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+              {filteredArchivedTransactions.map((record) => (
+                <article key={record.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <b className="text-base text-slate-900">معاملة {record.transactionNumber}</b>
+                        {record.transactionYear ? (
+                          <Badge variant="outline">{record.transactionYear}{record.transactionDateType === 'hijri' ? 'هـ' : 'م'}</Badge>
+                        ) : null}
+                        <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">مؤرشفة</Badge>
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-slate-700">{record.subject}</p>
+                    </div>
+                    <Archive className="h-5 w-5 shrink-0 text-emerald-700" />
+                  </div>
+
+                  <div className="mt-3 grid gap-1.5 text-xs text-muted-foreground">
+                    <span>تاريخ المعاملة: <b className="text-foreground">{formatArchivedTransactionDate(record)}</b></span>
+                    <span>الجهة: <b className="text-foreground">{record.sourceEntity || '—'}</b></span>
+                    <span>الموظف: <b className="text-foreground">{record.currentAssigneeName || '—'}</b></span>
+                    <span>تاريخ الأرشفة: <b className="text-foreground">{formatDate(record.archivedAt || undefined)}</b></span>
+                    <span>أرشفها: <b className="text-foreground">{record.archivedByName || '—'}</b></span>
+                  </div>
+
+                  {record.archiveNote ? (
+                    <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700">
+                      <b>ملاحظة الأرشفة:</b> {record.archiveNote}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-4 flex flex-wrap justify-end gap-2 border-t pt-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={archivedTransactionLoading}
+                      onClick={() => void openArchivedTransaction(record)}
+                    >
+                      <Eye className="ml-1 h-4 w-4" />
+                      عرض التفاصيل
+                    </Button>
+                    {canRestoreTransaction && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-amber-300 text-amber-800 hover:bg-amber-50"
+                        disabled={archivedTransactionLoading}
+                        onClick={() => void restoreArchivedTransaction(record)}
+                      >
+                        <RotateCcw className="ml-1 h-4 w-4" />
+                        استعادة للمتابعة
+                      </Button>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {selectedArchivedTransaction && (
+        <Card className="border-emerald-200">
+          <CardHeader className="border-b">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Archive className="h-5 w-5 text-emerald-700" />
+                  تفاصيل المعاملة المؤرشفة رقم {selectedArchivedTransaction.transactionNumber}
+                </CardTitle>
+                <CardDescription className="mt-1">{selectedArchivedTransaction.subject}</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setSelectedArchivedTransaction(null)}>
+                <X className="ml-1 h-4 w-4" />
+                إغلاق
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 p-4 sm:p-5">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <InfoItem label="رقم المعاملة" value={selectedArchivedTransaction.transactionNumber} />
+              <InfoItem label="السنة" value={selectedArchivedTransaction.transactionYear ? `${selectedArchivedTransaction.transactionYear}${selectedArchivedTransaction.transactionDateType === 'hijri' ? 'هـ' : 'م'}` : '—'} />
+              <InfoItem label="تاريخ المعاملة" value={formatArchivedTransactionDate(selectedArchivedTransaction)} />
+              <InfoItem label="رقم المتابعة" value={selectedArchivedTransaction.trackingNumber} />
+              <InfoItem label="الجهة" value={selectedArchivedTransaction.sourceEntity || '—'} />
+              <InfoItem label="الموظف المختص" value={selectedArchivedTransaction.currentAssigneeName || '—'} />
+              <InfoItem label="تاريخ الإقفال" value={formatDate(selectedArchivedTransaction.closedAt || undefined)} />
+              <InfoItem label="تاريخ الأرشفة" value={formatDate(selectedArchivedTransaction.archivedAt || undefined)} />
+              <InfoItem label="تمت الأرشفة بواسطة" value={selectedArchivedTransaction.archivedByName || '—'} />
+            </div>
+
+            {selectedArchivedTransaction.archiveNote ? (
+              <InfoBlock label="ملاحظات الأرشفة" value={selectedArchivedTransaction.archiveNote} />
+            ) : null}
+
+            <div>
+              <h3 className="mb-2 text-sm font-black">مرفقات المعاملة</h3>
+              {selectedArchivedTransaction.attachments?.length ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {selectedArchivedTransaction.attachments.map((attachment) => (
+                    <div key={attachment.id} className="flex items-center justify-between gap-3 rounded-xl border bg-slate-50/60 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{attachment.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{attachment.mimeType || 'ملف'}</p>
+                      </div>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={attachment.driveUrl} target="_blank" rel="noreferrer">
+                          <ExternalLink className="ml-1 h-4 w-4" />
+                          فتح
+                        </a>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  لا توجد مرفقات مرتبطة بهذه المعاملة.
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-sm font-black">سجل الإجراءات والتحويلات</h3>
+              {selectedArchivedTransaction.events?.length ? (
+                <div className="max-h-[360px] space-y-2 overflow-y-auto">
+                  {selectedArchivedTransaction.events.map((event) => (
+                    <div key={event.id} className="rounded-xl border bg-slate-50/60 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <b className="text-sm">{event.actionText || 'تحديث المعاملة'}</b>
+                        <span className="text-xs text-muted-foreground">{formatDate(event.createdAt)}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">بواسطة: {event.createdByName || '—'}</p>
+                      {event.note ? <p className="mt-2 text-sm leading-6">{event.note}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  لا توجد أحداث مسجلة.
+                </div>
+              )}
+            </div>
+
+            {canRestoreTransaction && (
+              <div className="flex justify-end border-t pt-4">
+                <Button
+                  variant="outline"
+                  className="border-amber-300 text-amber-800 hover:bg-amber-50"
+                  disabled={archivedTransactionLoading}
+                  onClick={() => void restoreArchivedTransaction(selectedArchivedTransaction)}
+                >
+                  <RotateCcw className="ml-2 h-4 w-4" />
+                  استعادة المعاملة إلى نظام المتابعة
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="overflow-hidden border-sky-200/80 bg-gradient-to-l from-sky-50/70 via-white to-slate-50/80">
         <CardHeader className="pb-3">
@@ -1167,7 +1452,7 @@ export const ArchivePage: React.FC = () => {
             <Filter className="h-5 w-5" />
             البحث والتصفية
           </CardTitle>
-          <CardDescription>ابحث بالعنوان أو الرقم أو الجهة أو الكلمات المفتاحية أو اسم الملف.</CardDescription>
+          <CardDescription>ابحث في ملفات الأرشفة والمعاملات المؤرشفة بالعنوان أو الرقم أو الجهة أو الكلمات المفتاحية.</CardDescription>
         </CardHeader>
 
         <CardContent>
