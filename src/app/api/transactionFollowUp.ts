@@ -601,6 +601,21 @@ export type TransactionFollowUpDirectiveKpi = {
   }>;
 };
 
+export type TransactionFollowUpAttachment = {
+  id: string;
+  entityType: 'transaction_follow_up';
+  entityId: string;
+  attachmentType: string;
+  title: string;
+  driveUrl: string;
+  driveFileId?: string | null;
+  mimeType?: string | null;
+  notes?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TransactionFollowUpDirectiveEvidence = {
   id: string;
   entityType: 'transaction_follow_up_directive';
@@ -724,6 +739,7 @@ export type TransactionFollowUpRecord = {
   directives?: TransactionFollowUpDirective[];
   extensionRequests?: TransactionFollowUpExtensionRequest[];
   externalWaits?: TransactionFollowUpExternalWait[];
+  attachments?: TransactionFollowUpAttachment[];
   indicator: TransactionFollowUpIndicator;
   indicatorLabel: string;
   indicatorSeverity: 'success' | 'warning' | 'danger' | 'info';
@@ -1299,6 +1315,59 @@ export const transactionFollowUpApi = {
 
   get: (id: string) =>
     apiJson<TransactionFollowUpRecord>(`/api/transaction-follow-up/${id}`),
+
+  uploadAttachment: async (
+    transactionId: string,
+    file: File,
+    notes?: string | null,
+  ) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('fileName', file.name);
+
+    const uploadResponse = await authenticatedFetch('/api/uploads', {
+      method: 'POST',
+      headers: { 'x-upload-module': 'transaction_follow_up' },
+      body: formData,
+    });
+    const uploaded = await uploadResponse.json().catch(() => ({}));
+    if (!uploadResponse.ok) {
+      throw new Error(uploaded?.message || `تعذر رفع الملف: ${file.name}`);
+    }
+
+    try {
+      return await apiJson<TransactionFollowUpAttachment>(
+        `/api/transaction-follow-up/${transactionId}/attachments`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            title: file.name,
+            driveUrl: uploaded.driveUrl,
+            driveFileId: uploaded.driveFileId || null,
+            mimeType: uploaded.mimeType || file.type || null,
+            notes: notes || null,
+          }),
+        },
+      );
+    } catch (error) {
+      if (uploaded.driveFileId) {
+        void authenticatedFetch(`/api/uploads/${uploaded.driveFileId}`, {
+          method: 'DELETE',
+          headers: { 'x-upload-module': 'transaction_follow_up' },
+        }).catch(() => undefined);
+      }
+      throw error;
+    }
+  },
+
+  deleteAttachment: (
+    transactionId: string,
+    attachmentId: string,
+  ) =>
+    apiJson<void>(
+      `/api/transaction-follow-up/${transactionId}/attachments/${attachmentId}`,
+      { method: 'DELETE' },
+    ),
 
   create: (input: TransactionFollowUpCreateInput) =>
     apiJson<TransactionFollowUpRecord>('/api/transaction-follow-up', {
