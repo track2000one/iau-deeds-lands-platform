@@ -148,7 +148,7 @@ const EMPTY_ANALYTICS: TransactionFollowUpAnalytics = {
 
 const statusLabels: Record<TransactionFollowUpStatus, string> = {
   new: 'جديدة',
-  assigned: 'مسندة',
+  assigned: 'تحت الإجراء',
   in_progress: 'تحت الإجراء',
   waiting_response: 'بانتظار رد',
   needs_follow_up: 'تحتاج متابعة',
@@ -991,10 +991,9 @@ ${styleAssets}
 
   const runCardQuickAction = async (
     record: TransactionFollowUpRecord,
-    action: 'start' | 'approve_close',
+    action: 'approve_close',
   ) => {
     if (
-      action === 'approve_close' &&
       !window.confirm(`اعتماد إنجاز المعاملة رقم ${record.transactionNumber} وإقفالها؟`)
     ) {
       return;
@@ -1003,11 +1002,7 @@ ${styleAssets}
     try {
       setCardActionBusyId(record.id);
       await transactionFollowUpApi.workQueueAction(record.id, { action });
-      toast.success(
-        action === 'start'
-          ? 'تم بدء تنفيذ المعاملة'
-          : 'تم اعتماد إنجاز المعاملة وإقفالها',
-      );
+      toast.success('تم اعتماد إنجاز المعاملة وإقفالها');
       window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
       await load();
       if (selected?.id === record.id) {
