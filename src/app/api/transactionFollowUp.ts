@@ -731,6 +731,10 @@ export type TransactionFollowUpRecord = {
   relatedEntityLabel?: string | null;
   completedAt?: string | null;
   closedAt?: string | null;
+  archivedAt?: string | null;
+  archivedById?: string | null;
+  archivedByName?: string | null;
+  archiveNote?: string | null;
   createdById?: string | null;
   createdByName?: string | null;
   createdAt: string;
@@ -1054,6 +1058,32 @@ export const transactionFollowUpApi = {
     if (input.mine) query.set('mine', 'true');
     return apiJson<TransactionFollowUpPage>(`/api/transaction-follow-up?${query.toString()}`);
   },
+
+  archived: (input: { page?: number; pageSize?: number; search?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (input.page) query.set('page', String(input.page));
+    if (input.pageSize) query.set('pageSize', String(input.pageSize));
+    if (input.search?.trim()) query.set('search', input.search.trim());
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpPage>(
+      `/api/transaction-follow-up/archived${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  archivedRecord: (id: string) =>
+    apiJson<TransactionFollowUpRecord>(`/api/transaction-follow-up/archived/${id}`),
+
+  archive: (id: string, note?: string | null) =>
+    apiJson<TransactionFollowUpRecord>(`/api/transaction-follow-up/${id}/archive`, {
+      method: 'PATCH',
+      body: JSON.stringify({ note: note || null }),
+    }),
+
+  restoreFromArchive: (id: string, note?: string | null) =>
+    apiJson<TransactionFollowUpRecord>(`/api/transaction-follow-up/archived/${id}/restore`, {
+      method: 'PATCH',
+      body: JSON.stringify({ note: note || null }),
+    }),
 
   dashboard: (mine = false) =>
     apiJson<TransactionFollowUpDashboard>(
