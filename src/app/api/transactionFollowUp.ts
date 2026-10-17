@@ -1085,6 +1085,11 @@ export const transactionFollowUpApi = {
       body: JSON.stringify({ note: note || null }),
     }),
 
+  deleteArchivedTransaction: (id: string) =>
+    apiJson<void>(`/api/archive/transactions/${id}`, {
+      method: 'DELETE',
+    }),
+
   dashboard: (mine = false) =>
     apiJson<TransactionFollowUpDashboard>(
       `/api/transaction-follow-up/dashboard${mine ? '?mine=true' : ''}`,
