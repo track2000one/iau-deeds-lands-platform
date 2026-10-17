@@ -362,10 +362,10 @@ export const TransactionFollowUpPage: React.FC = () => {
   }, [status, priority, mine]);
 
   React.useEffect(() => {
-    if (!(isAdmin || canDelete) && !mine) {
+    if (!(isAdmin || canDelete || canTransfer) && !mine) {
       setMine(true);
     }
-  }, [isAdmin, canDelete, mine]);
+  }, [isAdmin, canDelete, canTransfer, mine]);
 
   const openDetails = async (id: string) => {
     try {
@@ -914,16 +914,7 @@ ${styleAssets}
     selected &&
     canTransfer &&
     !['completed', 'closed'].includes(selected.status) &&
-    (
-      isAdmin ||
-      canDelete ||
-      selected.currentAssigneeUserId === currentUser?.uid
-    ) &&
-    (
-      isAdmin ||
-      canDelete ||
-      Boolean(selected.currentAssigneeUserId)
-    )
+    Boolean(selected.currentAssigneeUserId)
   );
 
   return (
@@ -942,7 +933,7 @@ ${styleAssets}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {(isAdmin || canDelete) ? (
+            {(isAdmin || canDelete || canTransfer) ? (
               <Button
                 variant="outline"
                 className="h-10 rounded-xl border-slate-300 bg-white"
@@ -1374,11 +1365,7 @@ ${styleAssets}
                     canTransfer={
                       canTransfer &&
                       !['completed', 'closed'].includes(record.status) &&
-                      (
-                        isAdmin ||
-                        canDelete ||
-                        record.currentAssigneeUserId === currentUser?.uid
-                      )
+                      Boolean(record.currentAssigneeUserId)
                     }
                     supervisor={isAdmin || canDelete}
                     busy={cardActionBusyId === record.id}
@@ -2154,7 +2141,7 @@ ${styleAssets}
                         </Field>
                         {!(isAdmin || canDelete) && (
                           <p className="text-[11px] leading-5 text-muted-foreground">
-                            صلاحية التحويل للموظف العادي تتيح تحويل المعاملات المسندة إليه فقط، ويُحفظ سبب التحويل في سجل الإجراءات.
+                            صلاحية «تحويل» تتيح للمستخدم تحويل أي معاملة مسندة حاليًا إلى موظف آخر، مع إلزامه بتسجيل سبب التحويل وحفظه في سجل الإجراءات.
                           </p>
                         )}
                         <Button
