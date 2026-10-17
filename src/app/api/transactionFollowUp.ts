@@ -693,6 +693,9 @@ export type TransactionFollowUpRecord = {
   trackingNumber: string;
   transactionNumber: string;
   transactionDate: string;
+  transactionDateType?: 'gregorian' | 'hijri';
+  transactionDateInput?: string | null;
+  transactionYear?: number | null;
   transactionType: TransactionFollowUpType;
   subject: string;
   sourceEntity?: string | null;
@@ -1000,6 +1003,7 @@ export type TransactionFollowUpReportSchedule = {
 export type TransactionFollowUpCreateInput = {
   transactionNumber: string;
   transactionDate: string;
+  transactionDateType: 'gregorian' | 'hijri';
   transactionType: TransactionFollowUpType;
   subject: string;
   sourceEntity?: string | null;
