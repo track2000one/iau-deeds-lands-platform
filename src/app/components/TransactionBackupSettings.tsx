@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Archive,
   CalendarClock,
+  CheckCircle2,
   ExternalLink,
   HardDriveDownload,
   Play,
@@ -48,6 +49,18 @@ const statusClass: Record<TransactionFollowUpBackupRun['status'], string> = {
   failed: 'border-red-300 bg-red-50 text-red-800',
 };
 
+const integrityLabel = {
+  success: 'تم التحقق — سليمة',
+  warning: 'تم التحقق — مع ملاحظات',
+  failed: 'فشل فحص السلامة',
+} as const;
+
+const integrityClass = {
+  success: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+  warning: 'border-amber-300 bg-amber-50 text-amber-800',
+  failed: 'border-red-300 bg-red-50 text-red-800',
+} as const;
+
 const defaultSchedule = (): Pick<
   TransactionFollowUpBackupSchedule,
   'frequency' | 'dayOfWeek' | 'dayOfMonth' | 'runHour' | 'includeAttachments' | 'retentionCount' | 'isActive'
@@ -68,6 +81,7 @@ export const TransactionBackupSettings: React.FC = () => {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [running, setRunning] = React.useState(false);
+  const [verifyingId, setVerifyingId] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     try {
@@ -145,6 +159,27 @@ export const TransactionBackupSettings: React.FC = () => {
     }
   };
 
+  const verifyRun = async (run: TransactionFollowUpBackupRun) => {
+    try {
+      setVerifyingId(run.id);
+      const verified = await transactionFollowUpApi.verifyBackupRun(run.id);
+      setRuns((current) => current.map((item) => item.id === verified.id ? verified : item));
+      if (verified.integrityStatus === 'success') {
+        toast.success('تم فحص النسخة الاحتياطية وتبين أنها سليمة وقابلة للقراءة');
+      } else if (verified.integrityStatus === 'warning') {
+        toast.warning(verified.integrityMessage || 'النسخة قابلة للقراءة مع وجود ملاحظات');
+      } else {
+        toast.error(verified.integrityMessage || 'فشل فحص سلامة النسخة الاحتياطية');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر فحص سلامة النسخة الاحتياطية');
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  const latestVerified = runs.find((run) => run.verifiedAt && run.integrityStatus);
+
   return (
     <Card className="border-emerald-200 shadow-none">
       <CardHeader className="border-b border-emerald-100 bg-emerald-50/40 pb-4">
@@ -170,6 +205,16 @@ export const TransactionBackupSettings: React.FC = () => {
             >
               {persisted?.isActive ? 'النسخ الآلي مفعّل' : 'النسخ الآلي متوقف'}
             </Badge>
+            {latestVerified?.integrityStatus && (
+              <Badge
+                variant="outline"
+                className={integrityClass[latestVerified.integrityStatus]}
+                title={latestVerified.integrityMessage || undefined}
+              >
+                <CheckCircle2 className="ml-1 h-3.5 w-3.5" />
+                آخر نسخة: {integrityLabel[latestVerified.integrityStatus]}
+              </Badge>
+            )}
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || running}>
               <RefreshCw className={`ml-1 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               تحديث
@@ -348,12 +393,41 @@ export const TransactionBackupSettings: React.FC = () => {
                             <span className="text-red-700">تعذر: <b>{run.failedAttachmentCount.toLocaleString('ar-SA')}</b></span>
                           )}
                         </div>
+                        {run.integrityStatus && (
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className={integrityClass[run.integrityStatus]}>
+                              {integrityLabel[run.integrityStatus]}
+                            </Badge>
+                            <span className="text-[11px] text-muted-foreground">
+                              {run.verifiedAt ? `فُحصت ${formatDateTime(run.verifiedAt)}` : ''}
+                              {run.verifiedFileCount != null ? ` · ${run.verifiedFileCount.toLocaleString('ar-SA')} ملف تم التحقق منه` : ''}
+                            </span>
+                          </div>
+                        )}
+                        {run.integrityMessage ? (
+                          <p className={`mt-2 text-xs leading-5 ${run.integrityStatus === 'failed' ? 'text-red-700' : 'text-slate-600'}`}>
+                            {run.integrityMessage}
+                          </p>
+                        ) : null}
                         {run.errorMessage ? (
                           <p className="mt-2 text-xs text-red-700">{run.errorMessage}</p>
                         ) : null}
                       </div>
 
                       <div className="flex shrink-0 flex-wrap gap-2">
+                        {run.status !== 'running' && run.status !== 'failed' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={verifyingId === run.id}
+                            onClick={() => void verifyRun(run)}
+                          >
+                            {verifyingId === run.id
+                              ? <RefreshCw className="ml-1 h-4 w-4 animate-spin" />
+                              : <ShieldCheck className="ml-1 h-4 w-4" />}
+                            فحص السلامة
+                          </Button>
+                        )}
                         {run.folderUrl && (
                           <Button size="sm" variant="outline" asChild>
                             <a href={run.folderUrl} target="_blank" rel="noreferrer">
