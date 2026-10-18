@@ -631,6 +631,21 @@ export type TransactionFollowUpDirectiveEvidence = {
   updatedAt: string;
 };
 
+export type TransactionFollowUpBackupAttachment = {
+  id: string;
+  entityType: 'transaction_follow_up' | 'transaction_follow_up_directive';
+  entityId: string;
+  attachmentType: string;
+  title: string;
+  driveUrl: string;
+  driveFileId?: string | null;
+  mimeType?: string | null;
+  notes?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TransactionFollowUpDirective = {
   id: string;
   transactionId: string;
@@ -896,6 +911,95 @@ export type TransactionFollowUpAnalytics = {
     overdueDays: number;
     priority: TransactionFollowUpPriority;
   }>;
+};
+
+export type TransactionFollowUpBackupData = {
+  generatedAt: string;
+  full: boolean;
+  period?: { from: string; to: string } | null;
+  scope: {
+    mine: boolean;
+    assigneeUserId?: string | null;
+  };
+  transactions: Array<{
+    id: string;
+    trackingNumber: string;
+    transactionNumber: string;
+    transactionDate: string;
+    transactionDateType?: 'gregorian' | 'hijri';
+    transactionDateInput?: string | null;
+    transactionYear?: number | null;
+    transactionType: TransactionFollowUpType;
+    subject: string;
+    sourceEntity?: string | null;
+    priority: TransactionFollowUpPriority;
+    status: TransactionFollowUpStatus;
+    currentAssigneeUserId?: string | null;
+    currentAssigneeName?: string | null;
+    assignedAt?: string | null;
+    requiredAction?: string | null;
+    dueDate?: string | null;
+    inactivityAlertDays: number;
+    lastActionAt?: string | null;
+    lastActionByUserId?: string | null;
+    lastActionByName?: string | null;
+    notes?: string | null;
+    relatedModule?: string | null;
+    relatedEntityId?: string | null;
+    relatedEntityLabel?: string | null;
+    completedAt?: string | null;
+    closedAt?: string | null;
+    archivedAt?: string | null;
+    archivedById?: string | null;
+    archivedByName?: string | null;
+    archiveNote?: string | null;
+    createdById?: string | null;
+    createdByName?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    events: TransactionFollowUpEvent[];
+    directives: Array<{
+      id: string;
+      transactionId: string;
+      directiveType: 'directive' | 'decision';
+      title: string;
+      instruction: string;
+      priority: 'normal' | 'high' | 'urgent';
+      status: string;
+      assigneeUserId: string;
+      assigneeName: string;
+      dueDate?: string | null;
+      issuedById?: string | null;
+      issuedByName?: string | null;
+      issuedAt: string;
+      startedAt?: string | null;
+      completedAt?: string | null;
+      completionResponse?: string | null;
+      completionNote?: string | null;
+      completionSubmittedAt?: string | null;
+      completionSubmittedById?: string | null;
+      completionSubmittedByName?: string | null;
+      reviewDecision?: string | null;
+      reviewNote?: string | null;
+      reviewedAt?: string | null;
+      reviewedById?: string | null;
+      reviewedByName?: string | null;
+      lastUpdatedById?: string | null;
+      lastUpdatedByName?: string | null;
+      createdAt: string;
+      updatedAt: string;
+      reviews: TransactionFollowUpDirectiveReview[];
+    }>;
+    extensionRequests: TransactionFollowUpExtensionRequest[];
+    externalWaits: TransactionFollowUpExternalWait[];
+  }>;
+  attachments: TransactionFollowUpBackupAttachment[];
+  totals: {
+    transactions: number;
+    events: number;
+    directives: number;
+    attachments: number;
+  };
 };
 
 export type TransactionFollowUpPage = {
@@ -1226,6 +1330,36 @@ export const transactionFollowUpApi = {
     return apiJson<TransactionFollowUpAnalytics>(
       `/api/transaction-follow-up/analytics${suffix ? `?${suffix}` : ''}`,
     );
+  },
+
+  backupData: (input: {
+    full?: boolean;
+    from?: string;
+    to?: string;
+    assigneeUserId?: string;
+    mine?: boolean;
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (input.full) query.set('full', 'true');
+    if (input.from) query.set('from', input.from);
+    if (input.to) query.set('to', input.to);
+    if (input.assigneeUserId) query.set('assigneeUserId', input.assigneeUserId);
+    if (input.mine) query.set('mine', 'true');
+    const suffix = query.toString();
+    return apiJson<TransactionFollowUpBackupData>(
+      `/api/transaction-follow-up/reports/backup-data${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  downloadBackupAttachment: async (attachmentId: string) => {
+    const response = await authenticatedFetch(
+      `/api/transaction-follow-up/reports/backup-attachments/${attachmentId}`,
+    );
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload?.message || 'تعذر تنزيل المرفق');
+    }
+    return response.blob();
   },
 
   executiveReport: (input: {
