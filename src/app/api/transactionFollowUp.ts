@@ -1220,6 +1220,7 @@ export const transactionFollowUpApi = {
     search?: string;
     status?: string;
     priority?: string;
+    organizationalUnit?: TransactionFollowUpOrganizationalUnit | '';
     assigneeUserId?: string;
     mine?: boolean;
   } = {}) => {
@@ -1229,6 +1230,7 @@ export const transactionFollowUpApi = {
     if (input.search?.trim()) query.set('search', input.search.trim());
     if (input.status) query.set('status', input.status);
     if (input.priority) query.set('priority', input.priority);
+    if (input.organizationalUnit) query.set('organizationalUnit', input.organizationalUnit);
     if (input.assigneeUserId) query.set('assigneeUserId', input.assigneeUserId);
     if (input.mine) query.set('mine', 'true');
     return apiJson<TransactionFollowUpPage>(`/api/transaction-follow-up?${query.toString()}`);
