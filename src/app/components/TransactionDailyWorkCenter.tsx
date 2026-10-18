@@ -568,7 +568,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
   const selectedMeta = bucketMeta[selectedBucket];
 
   return (
-    <Card className="overflow-hidden rounded-[24px] border-slate-200 bg-white shadow-sm">
+    <Card className="followup-operational-card overflow-hidden rounded-[24px] border-slate-200 bg-white shadow-sm">
       <CardHeader className="border-b bg-slate-50/60 px-4 py-4 sm:px-5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
