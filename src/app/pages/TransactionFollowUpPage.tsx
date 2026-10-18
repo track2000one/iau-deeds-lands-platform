@@ -213,6 +213,16 @@ const priorityClass: Record<TransactionFollowUpPriority, string> = {
   urgent: 'border-red-300 bg-red-50 text-red-800',
 };
 
+const statusClass: Record<TransactionFollowUpStatus, string> = {
+  new: 'border-amber-300 bg-amber-50 text-amber-900',
+  assigned: 'border-blue-300 bg-blue-50 text-blue-800',
+  in_progress: 'border-blue-300 bg-blue-50 text-blue-800',
+  waiting_response: 'border-sky-300 bg-sky-50 text-sky-800',
+  needs_follow_up: 'border-orange-300 bg-orange-50 text-orange-800',
+  completed: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+  closed: 'border-slate-300 bg-slate-50 text-slate-700',
+};
+
 const formatDate = (value?: string | null) =>
   value
     ? new Intl.DateTimeFormat('ar-SA-u-ca-gregory', {
