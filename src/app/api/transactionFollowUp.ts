@@ -625,6 +625,7 @@ export type TransactionFollowUpAttachment = {
   mimeType?: string | null;
   notes?: string | null;
   createdBy?: string | null;
+  createdById?: string | null;
   createdAt: string;
   updatedAt: string;
 };
