@@ -32,6 +32,8 @@ export interface ModulePermissions {
   canDelete: boolean;
   canReopen: boolean;
   canTransfer: boolean;
+  canUploadAttachments: boolean;
+  canDeleteAttachments: boolean;
   canPrint: boolean;
   canCreateUser: boolean;
   canCreateCycle: boolean;
@@ -115,6 +117,8 @@ const FULL: ModulePermissions = {
   canDelete: true,
   canReopen: true,
   canTransfer: true,
+  canUploadAttachments: true,
+  canDeleteAttachments: true,
   canPrint: true,
   canCreateUser: true,
   canCreateCycle: true,
@@ -128,6 +132,8 @@ const NONE: ModulePermissions = {
   canDelete: false,
   canReopen: false,
   canTransfer: false,
+  canUploadAttachments: false,
+  canDeleteAttachments: false,
   canPrint: false,
   canCreateUser: false,
   canCreateCycle: false,
@@ -205,6 +211,8 @@ export const normalizePermissions = (
       output[moduleName].canDelete ||
       output[moduleName].canReopen ||
       output[moduleName].canTransfer ||
+      output[moduleName].canUploadAttachments ||
+      output[moduleName].canDeleteAttachments ||
       output[moduleName].canPrint ||
       output[moduleName].canCreateUser ||
       output[moduleName].canCreateCycle ||
