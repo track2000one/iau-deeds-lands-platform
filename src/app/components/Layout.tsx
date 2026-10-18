@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionsContext';
 import { ThemeInitializer } from './ThemeInitializer';
 import { PlatformNotificationCenter } from './PlatformNotificationCenter';
+import { PlatformAccountMenu } from './PlatformAccountMenu';
 import { PLATFORM_LOGO_URL } from '../config/branding';
 import {
   Home,
@@ -14,7 +15,6 @@ import {
   BarChart3,
   Gauge,
   Settings,
-  Languages,
   Menu,
   X,
   LogOut,
@@ -26,7 +26,6 @@ import {
   Archive,
   Palette,
   Mail,
-  Globe2,
   CalendarDays,
   History,
   ClipboardCheck,
@@ -132,14 +131,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   React.useEffect(() => {
     window.localStorage.setItem('iau-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
-
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'ar' ? 'en' : 'ar';
-
-    i18n.changeLanguage(newLang);
-    document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
-    document.documentElement.lang = newLang;
-  };
 
   const handleLogout = () => {
     logout();
@@ -253,9 +244,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Button>
 
             <div className="hidden md:flex items-center gap-2">
-              <Button title={ui('الحساب', 'Account')} aria-label={ui('الحساب', 'Account')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl future-glow-button" onClick={() => navigate(isAdmin ? '/admin' : defaultLandingPath)}>
-                <User className="h-4 w-4" />
-              </Button>
+              <PlatformAccountMenu />
               <PlatformNotificationCenter />
               {(isAdmin || hasPermission('contracts_follow_up', 'canView')) && (
                 <Button title={ui('متابعة العقود', 'Contract Follow-up')} aria-label={ui('متابعة العقود', 'Contract Follow-up')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={() => navigate('/contracts/follow-up')}>
@@ -265,20 +254,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Button title={ui('إنشاء رسالة بريد', 'Compose Email')} aria-label={ui('إنشاء رسالة بريد', 'Compose Email')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={() => { window.location.href = `mailto:?subject=${encodeURIComponent(ui('منصة إدارة الأصول والأملاك والأوقاف الجامعية', 'University Assets, Properties and Endowments Management Platform'))}`; }}>
                 <Mail className="h-4 w-4" />
               </Button>
-              <Button title={ui('تبديل اللغة', 'Switch Language')} aria-label={ui('تبديل اللغة', 'Switch Language')} variant="ghost" size="icon" className="h-10 w-10 rounded-2xl" onClick={toggleLanguage}>
-                <Globe2 className="h-4 w-4" />
-              </Button>
             </div>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleLanguage}
-              className="h-10 rounded-2xl px-3"
-            >
-              <Languages className="h-4 w-4 ml-2" />
-              {i18n.language === 'ar' ? 'EN' : 'AR'}
-            </Button>
 
             <div className="hidden xl:flex items-center gap-2 rounded-2xl border bg-background/50 px-4 py-2">
               <span className="font-mono text-sm">
