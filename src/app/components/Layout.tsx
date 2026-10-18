@@ -18,7 +18,6 @@ import {
   Menu,
   X,
   LogOut,
-  User,
   MapPin,
   Building,
   Shield,
