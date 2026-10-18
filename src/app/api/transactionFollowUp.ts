@@ -21,6 +21,10 @@ export type TransactionFollowUpType =
   | 'outgoing'
   | 'internal';
 
+export type TransactionFollowUpOrganizationalUnit =
+  | 'endowments_properties'
+  | 'mosques_prayer_rooms';
+
 export type TransactionFollowUpWorkQueueBucket =
   | 'overdue'
   | 'urgent_today'
@@ -736,6 +740,7 @@ export type TransactionFollowUpRecord = {
   transactionDateInput?: string | null;
   transactionYear?: number | null;
   transactionType: TransactionFollowUpType;
+  organizationalUnit?: TransactionFollowUpOrganizationalUnit | null;
   subject: string;
   sourceEntity?: string | null;
   priority: TransactionFollowUpPriority;
@@ -939,6 +944,7 @@ export type TransactionFollowUpBackupData = {
     transactionDateInput?: string | null;
     transactionYear?: number | null;
     transactionType: TransactionFollowUpType;
+    organizationalUnit?: TransactionFollowUpOrganizationalUnit | null;
     subject: string;
     sourceEntity?: string | null;
     priority: TransactionFollowUpPriority;
@@ -1192,6 +1198,7 @@ export type TransactionFollowUpCreateInput = {
   transactionDate: string;
   transactionDateType: 'gregorian' | 'hijri';
   transactionType: TransactionFollowUpType;
+  organizationalUnit: TransactionFollowUpOrganizationalUnit;
   subject: string;
   sourceEntity?: string | null;
   priority: TransactionFollowUpPriority;
