@@ -166,7 +166,7 @@ export const PermissionMatrix: React.FC<{
         className={`${dialogMode ? 'h-[clamp(300px,42dvh,480px)] min-h-[300px]' : 'max-h-[62vh] min-h-[320px]'} overflow-auto overscroll-contain scroll-smooth outline-none [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 focus:ring-2 focus:ring-primary/20`}
         aria-label={ui('جدول صلاحيات المستخدم قابل للتمرير', 'Scrollable user permissions table')}
       >
-        <table className="w-full min-w-[1180px] text-sm">
+        <table className="w-full min-w-[1380px] text-sm">
           <thead className="sticky top-0 z-10 bg-background shadow-sm">
             <tr className="border-b bg-muted/40">
               <th className={`p-3 ${isArabic ? 'text-right' : 'text-left'}`}>{ui('القسم', 'Section')}</th>
