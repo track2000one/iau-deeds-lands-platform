@@ -16,6 +16,7 @@ import {
   FileClock,
   FileCheck2,
   FileDown,
+  FileSpreadsheet,
   FileText,
   Paperclip,
   Upload,
@@ -80,6 +81,7 @@ import {
   transactionFollowUpApi,
   type TransactionFollowUpAnalytics,
   type TransactionFollowUpAssignee,
+  type TransactionFollowUpBackupData,
   type TransactionFollowUpCreateInput,
   type TransactionFollowUpDashboard,
   type TransactionFollowUpExecutiveInbox,
@@ -229,6 +231,26 @@ const formatFileSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} م.ب`;
 };
 
+const safeBackupFileName = (value: string, fallback = 'file') => {
+  const cleaned = String(value || '')
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 140);
+  return cleaned || fallback;
+};
+
+const saveBrowserBlob = (blob: Blob, fileName: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 const toInputDate = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -327,6 +349,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [reportOpen, setReportOpen] = React.useState(false);
   const [reportLoading, setReportLoading] = React.useState(false);
   const [reportExporting, setReportExporting] = React.useState(false);
+  const [backupProgress, setBackupProgress] = React.useState('');
   const [reportMode, setReportMode] = React.useState<'weekly' | 'monthly' | 'custom'>('monthly');
   const [reportFrom, setReportFrom] = React.useState(reportRange('monthly').from);
   const [reportTo, setReportTo] = React.useState(reportRange('monthly').to);
@@ -874,6 +897,465 @@ export const TransactionFollowUpPage: React.FC = () => {
     setReportFrom(range.from);
     setReportTo(range.to);
     await loadExecutiveReport(range.from, range.to, reportAssigneeId);
+  };
+
+  const buildFollowUpWorkbook = async (backup: TransactionFollowUpBackupData) => {
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'IAU Deeds and Lands Platform';
+    workbook.company = 'Imam Abdulrahman Bin Faisal University';
+    workbook.subject = 'نسخة بيانات نظام المتابعة';
+    workbook.created = new Date();
+
+    const setupSheet = (
+      name: string,
+      columns: Array<{ header: string; key: string; width?: number }>,
+    ) => {
+      const sheet = workbook.addWorksheet(name, {
+        views: [{ rightToLeft: true, state: 'frozen', ySplit: 1 }],
+      });
+      sheet.columns = columns;
+      const header = sheet.getRow(1);
+      header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
+      header.alignment = { horizontal: 'center', vertical: 'middle' };
+      header.height = 24;
+      sheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: 1, column: Math.max(1, columns.length) },
+      };
+      return sheet;
+    };
+
+    const transactionSheet = setupSheet('المعاملات', [
+      { header: 'رقم المتابعة', key: 'trackingNumber', width: 20 },
+      { header: 'رقم المعاملة', key: 'transactionNumber', width: 18 },
+      { header: 'السنة', key: 'transactionYear', width: 12 },
+      { header: 'نوع التاريخ', key: 'transactionDateType', width: 14 },
+      { header: 'تاريخ المعاملة', key: 'transactionDate', width: 18 },
+      { header: 'التاريخ ISO', key: 'transactionDateIso', width: 24 },
+      { header: 'النوع', key: 'transactionType', width: 12 },
+      { header: 'الموضوع', key: 'subject', width: 42 },
+      { header: 'الجهة', key: 'sourceEntity', width: 26 },
+      { header: 'الأولوية', key: 'priority', width: 12 },
+      { header: 'الحالة', key: 'status', width: 16 },
+      { header: 'الموظف المختص', key: 'assignee', width: 22 },
+      { header: 'الإجراء المطلوب', key: 'requiredAction', width: 36 },
+      { header: 'تاريخ الاستحقاق', key: 'dueDate', width: 18 },
+      { header: 'آخر إجراء', key: 'lastActionAt', width: 22 },
+      { header: 'آخر إجراء بواسطة', key: 'lastActionBy', width: 22 },
+      { header: 'ملاحظات', key: 'notes', width: 36 },
+      { header: 'تاريخ الإنجاز', key: 'completedAt', width: 20 },
+      { header: 'تاريخ الإقفال', key: 'closedAt', width: 20 },
+      { header: 'مؤرشفة', key: 'archived', width: 12 },
+      { header: 'تاريخ الأرشفة', key: 'archivedAt', width: 20 },
+      { header: 'أرشفها', key: 'archivedBy', width: 20 },
+      { header: 'ملاحظة الأرشفة', key: 'archiveNote', width: 32 },
+      { header: 'أنشأها', key: 'createdBy', width: 20 },
+      { header: 'تاريخ الإنشاء', key: 'createdAt', width: 22 },
+    ]);
+
+    backup.transactions.forEach((record) => {
+      transactionSheet.addRow({
+        trackingNumber: record.trackingNumber,
+        transactionNumber: record.transactionNumber,
+        transactionYear: record.transactionYear ?? '',
+        transactionDateType: record.transactionDateType === 'hijri' ? 'هجري' : 'ميلادي',
+        transactionDate:
+          record.transactionDateType === 'hijri' && record.transactionDateInput
+            ? record.transactionDateInput
+            : formatDate(record.transactionDate),
+        transactionDateIso: record.transactionDate,
+        transactionType: typeLabels[record.transactionType] || record.transactionType,
+        subject: record.subject,
+        sourceEntity: record.sourceEntity || '',
+        priority: priorityLabels[record.priority] || record.priority,
+        status: statusLabels[record.status] || record.status,
+        assignee: record.currentAssigneeName || '',
+        requiredAction: record.requiredAction || '',
+        dueDate: formatDate(record.dueDate),
+        lastActionAt: formatDateTime(record.lastActionAt),
+        lastActionBy: record.lastActionByName || '',
+        notes: record.notes || '',
+        completedAt: formatDateTime(record.completedAt),
+        closedAt: formatDateTime(record.closedAt),
+        archived: record.archivedAt ? 'نعم' : 'لا',
+        archivedAt: formatDateTime(record.archivedAt),
+        archivedBy: record.archivedByName || '',
+        archiveNote: record.archiveNote || '',
+        createdBy: record.createdByName || '',
+        createdAt: formatDateTime(record.createdAt),
+      });
+    });
+
+    const eventSheet = setupSheet('سجل الإجراءات', [
+      { header: 'رقم المعاملة', key: 'transactionNumber', width: 18 },
+      { header: 'السنة', key: 'transactionYear', width: 12 },
+      { header: 'نوع الحدث', key: 'eventType', width: 22 },
+      { header: 'من حالة', key: 'fromStatus', width: 16 },
+      { header: 'إلى حالة', key: 'toStatus', width: 16 },
+      { header: 'من موظف', key: 'fromAssignee', width: 22 },
+      { header: 'إلى موظف', key: 'toAssignee', width: 22 },
+      { header: 'الإجراء', key: 'actionText', width: 42 },
+      { header: 'الملاحظة', key: 'note', width: 42 },
+      { header: 'بواسطة', key: 'createdBy', width: 22 },
+      { header: 'التاريخ والوقت', key: 'createdAt', width: 22 },
+    ]);
+
+    backup.transactions.forEach((record) => {
+      record.events.forEach((event) => {
+        eventSheet.addRow({
+          transactionNumber: record.transactionNumber,
+          transactionYear: record.transactionYear ?? '',
+          eventType: event.eventType,
+          fromStatus: event.fromStatus ? statusLabels[event.fromStatus as TransactionFollowUpStatus] || event.fromStatus : '',
+          toStatus: event.toStatus ? statusLabels[event.toStatus as TransactionFollowUpStatus] || event.toStatus : '',
+          fromAssignee: event.fromAssigneeName || '',
+          toAssignee: event.toAssigneeName || '',
+          actionText: event.actionText || '',
+          note: event.note || '',
+          createdBy: event.createdByName || '',
+          createdAt: formatDateTime(event.createdAt),
+        });
+      });
+    });
+
+    const directiveSheet = setupSheet('التوجيهات والقرارات', [
+      { header: 'رقم المعاملة', key: 'transactionNumber', width: 18 },
+      { header: 'السنة', key: 'transactionYear', width: 12 },
+      { header: 'النوع', key: 'directiveType', width: 12 },
+      { header: 'العنوان', key: 'title', width: 34 },
+      { header: 'النص', key: 'instruction', width: 48 },
+      { header: 'الأولوية', key: 'priority', width: 12 },
+      { header: 'الحالة', key: 'status', width: 18 },
+      { header: 'المكلف', key: 'assigneeName', width: 22 },
+      { header: 'الاستحقاق', key: 'dueDate', width: 18 },
+      { header: 'أصدره', key: 'issuedByName', width: 22 },
+      { header: 'تاريخ الإصدار', key: 'issuedAt', width: 22 },
+      { header: 'رد الإنجاز', key: 'completionResponse', width: 40 },
+      { header: 'ملاحظة الإنجاز', key: 'completionNote', width: 36 },
+      { header: 'قرار المراجعة', key: 'reviewDecision', width: 20 },
+      { header: 'ملاحظة المراجعة', key: 'reviewNote', width: 36 },
+    ]);
+
+    const reviewSheet = setupSheet('مراجعات التوجيهات', [
+      { header: 'رقم المعاملة', key: 'transactionNumber', width: 18 },
+      { header: 'عنوان التوجيه', key: 'directiveTitle', width: 34 },
+      { header: 'القرار', key: 'decision', width: 22 },
+      { header: 'الحالة السابقة', key: 'previousStatus', width: 18 },
+      { header: 'الحالة التالية', key: 'nextStatus', width: 18 },
+      { header: 'ملاحظة المراجعة', key: 'reviewNote', width: 38 },
+      { header: 'رد الإنجاز', key: 'completionResponse', width: 38 },
+      { header: 'المراجع', key: 'reviewedByName', width: 22 },
+      { header: 'تاريخ المراجعة', key: 'reviewedAt', width: 22 },
+    ]);
+
+    backup.transactions.forEach((record) => {
+      record.directives.forEach((directive) => {
+        directiveSheet.addRow({
+          transactionNumber: record.transactionNumber,
+          transactionYear: record.transactionYear ?? '',
+          directiveType: directive.directiveType === 'decision' ? 'قرار' : 'توجيه',
+          title: directive.title,
+          instruction: directive.instruction,
+          priority: directive.priority,
+          status: directive.status,
+          assigneeName: directive.assigneeName,
+          dueDate: formatDate(directive.dueDate),
+          issuedByName: directive.issuedByName || '',
+          issuedAt: formatDateTime(directive.issuedAt),
+          completionResponse: directive.completionResponse || '',
+          completionNote: directive.completionNote || '',
+          reviewDecision: directive.reviewDecision || '',
+          reviewNote: directive.reviewNote || '',
+        });
+        directive.reviews.forEach((review) => {
+          reviewSheet.addRow({
+            transactionNumber: record.transactionNumber,
+            directiveTitle: directive.title,
+            decision: review.decision,
+            previousStatus: review.previousStatus,
+            nextStatus: review.nextStatus,
+            reviewNote: review.reviewNote || '',
+            completionResponse: review.completionResponse || '',
+            reviewedByName: review.reviewedByName || '',
+            reviewedAt: formatDateTime(review.reviewedAt),
+          });
+        });
+      });
+    });
+
+    const extensionSheet = setupSheet('طلبات التمديد', [
+      { header: 'رقم المعاملة', key: 'transactionNumber', width: 18 },
+      { header: 'الاستحقاق السابق', key: 'currentDueDate', width: 18 },
+      { header: 'الاستحقاق المطلوب', key: 'requestedDueDate', width: 18 },
+      { header: 'السبب', key: 'reason', width: 42 },
+      { header: 'الحالة', key: 'status', width: 16 },
+      { header: 'طلبها', key: 'requestedByName', width: 22 },
+      { header: 'راجعها', key: 'reviewedByName', width: 22 },
+      { header: 'ملاحظة المراجعة', key: 'reviewNote', width: 36 },
+      { header: 'تاريخ القرار', key: 'decisionAt', width: 22 },
+      { header: 'تاريخ الطلب', key: 'createdAt', width: 22 },
+    ]);
+
+    backup.transactions.forEach((record) => {
+      record.extensionRequests.forEach((request) => {
+        extensionSheet.addRow({
+          transactionNumber: record.transactionNumber,
+          currentDueDate: formatDate(request.currentDueDate),
+          requestedDueDate: formatDate(request.requestedDueDate),
+          reason: request.reason,
+          status: request.status,
+          requestedByName: request.requestedByName,
+          reviewedByName: request.reviewedByName || '',
+          reviewNote: request.reviewNote || '',
+          decisionAt: formatDateTime(request.decisionAt),
+          createdAt: formatDateTime(request.createdAt),
+        });
+      });
+    });
+
+    const waitSheet = setupSheet('انتظار الجهات', [
+      { header: 'رقم المعاملة', key: 'transactionNumber', width: 18 },
+      { header: 'الجهة الخارجية', key: 'externalEntity', width: 28 },
+      { header: 'رقم المرجع الصادر', key: 'outboundReferenceNumber', width: 20 },
+      { header: 'تاريخ الإرسال', key: 'sentAt', width: 18 },
+      { header: 'المتابعة القادمة', key: 'nextFollowUpDate', width: 18 },
+      { header: 'الحالة', key: 'status', width: 16 },
+      { header: 'عدد المتابعات', key: 'followUpCount', width: 14 },
+      { header: 'آخر متابعة', key: 'lastFollowUpAt', width: 22 },
+      { header: 'ملاحظة آخر متابعة', key: 'lastFollowUpNote', width: 38 },
+      { header: 'تاريخ ورود الرد', key: 'responseReceivedAt', width: 22 },
+      { header: 'رقم الرد', key: 'responseReferenceNumber', width: 20 },
+      { header: 'ملخص الرد', key: 'responseNote', width: 38 },
+    ]);
+
+    backup.transactions.forEach((record) => {
+      record.externalWaits.forEach((wait) => {
+        waitSheet.addRow({
+          transactionNumber: record.transactionNumber,
+          externalEntity: wait.externalEntity,
+          outboundReferenceNumber: wait.outboundReferenceNumber || '',
+          sentAt: formatDate(wait.sentAt),
+          nextFollowUpDate: formatDate(wait.nextFollowUpDate),
+          status: wait.status,
+          followUpCount: wait.followUpCount,
+          lastFollowUpAt: formatDateTime(wait.lastFollowUpAt),
+          lastFollowUpNote: wait.lastFollowUpNote || '',
+          responseReceivedAt: formatDateTime(wait.responseReceivedAt),
+          responseReferenceNumber: wait.responseReferenceNumber || '',
+          responseNote: wait.responseNote || '',
+        });
+      });
+    });
+
+    const transactionById = new Map(backup.transactions.map((record) => [record.id, record]));
+    const directiveInfo = new Map<string, { transactionId: string; title: string }>();
+    backup.transactions.forEach((record) => {
+      record.directives.forEach((directive) => {
+        directiveInfo.set(directive.id, {
+          transactionId: record.id,
+          title: directive.title,
+        });
+      });
+    });
+
+    const attachmentSheet = setupSheet('المرفقات', [
+      { header: 'رقم المعاملة', key: 'transactionNumber', width: 18 },
+      { header: 'السنة', key: 'transactionYear', width: 12 },
+      { header: 'المصدر', key: 'source', width: 22 },
+      { header: 'عنوان التوجيه', key: 'directiveTitle', width: 30 },
+      { header: 'اسم الملف', key: 'title', width: 38 },
+      { header: 'نوع الملف', key: 'mimeType', width: 28 },
+      { header: 'ملاحظات', key: 'notes', width: 36 },
+      { header: 'أضيف بواسطة', key: 'createdBy', width: 22 },
+      { header: 'تاريخ الإضافة', key: 'createdAt', width: 22 },
+      { header: 'رابط Google Drive', key: 'driveUrl', width: 55 },
+      { header: 'معرف الملف', key: 'driveFileId', width: 30 },
+    ]);
+
+    backup.attachments.forEach((attachment) => {
+      const directive = attachment.entityType === 'transaction_follow_up_directive'
+        ? directiveInfo.get(attachment.entityId)
+        : null;
+      const transaction = transactionById.get(
+        attachment.entityType === 'transaction_follow_up'
+          ? attachment.entityId
+          : directive?.transactionId || '',
+      );
+      attachmentSheet.addRow({
+        transactionNumber: transaction?.transactionNumber || '',
+        transactionYear: transaction?.transactionYear ?? '',
+        source: attachment.entityType === 'transaction_follow_up' ? 'المعاملة' : 'دليل توجيه/قرار',
+        directiveTitle: directive?.title || '',
+        title: attachment.title,
+        mimeType: attachment.mimeType || '',
+        notes: attachment.notes || '',
+        createdBy: attachment.createdBy || '',
+        createdAt: formatDateTime(attachment.createdAt),
+        driveUrl: attachment.driveUrl,
+        driveFileId: attachment.driveFileId || '',
+      });
+    });
+
+    workbook.eachSheet((sheet) => {
+      sheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return;
+        row.alignment = { vertical: 'top', wrapText: true, readingOrder: 'rtl' };
+      });
+    });
+
+    return {
+      workbook,
+      transactionById,
+      directiveInfo,
+    };
+  };
+
+  const exportFollowUpExcel = async () => {
+    try {
+      setReportExporting(true);
+      setBackupProgress('جارٍ تجهيز بيانات Excel...');
+      const backup = await transactionFollowUpApi.backupData({
+        from: reportFrom,
+        to: reportTo,
+        assigneeUserId: isAdmin || canDelete ? reportAssigneeId || undefined : undefined,
+        mine: !(isAdmin || canDelete),
+      });
+      const { workbook } = await buildFollowUpWorkbook(backup);
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveBrowserBlob(
+        new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `تقرير-متابعة-المعاملات-${reportFrom}-إلى-${reportTo}.xlsx`,
+      );
+      toast.success(`تم إنشاء تقرير Excel ويحتوي على ${backup.totals.transactions} معاملة وبيانات المرفقات`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء تقرير Excel');
+    } finally {
+      setBackupProgress('');
+      setReportExporting(false);
+    }
+  };
+
+  const exportFullFollowUpBackup = async () => {
+    if (!window.confirm(
+      'سيتم إنشاء نسخة احتياطية كاملة تحتوي على ملف Excel، البيانات الخام، والصور والمرفقات الفعلية. قد تستغرق العملية وقتًا حسب عدد وحجم الملفات. هل تريد المتابعة؟',
+    )) {
+      return;
+    }
+
+    try {
+      setReportExporting(true);
+      setBackupProgress('جارٍ جمع بيانات نظام المتابعة...');
+      const [backup, JSZipModule] = await Promise.all([
+        transactionFollowUpApi.backupData({
+          full: true,
+          mine: !(isAdmin || canDelete),
+        }),
+        import('jszip'),
+      ]);
+      const { workbook, transactionById, directiveInfo } = await buildFollowUpWorkbook(backup);
+      const zip = new JSZipModule.default();
+
+      setBackupProgress('جارٍ إنشاء ملف Excel...');
+      const workbookBuffer = await workbook.xlsx.writeBuffer();
+      zip.file('تقرير-نظام-المتابعة.xlsx', workbookBuffer);
+      zip.file(
+        'manifest.json',
+        JSON.stringify(
+          {
+            ...backup,
+            note: 'نسخة احتياطية مستقلة لنظام المتابعة تحتوي على البيانات الوصفية وسجل الإجراءات وروابط المرفقات.',
+          },
+          null,
+          2,
+        ),
+      );
+
+      const downloadFailures: Array<{ attachmentId: string; title: string; reason: string }> = [];
+      let completedDownloads = 0;
+      const totalAttachments = backup.attachments.length;
+
+      const buildAttachmentPath = (attachment: TransactionFollowUpBackupData['attachments'][number]) => {
+        const directive = attachment.entityType === 'transaction_follow_up_directive'
+          ? directiveInfo.get(attachment.entityId)
+          : null;
+        const transaction = transactionById.get(
+          attachment.entityType === 'transaction_follow_up'
+            ? attachment.entityId
+            : directive?.transactionId || '',
+        );
+        const transactionFolder = transaction
+          ? `معاملة-${safeBackupFileName(transaction.transactionNumber)}-${transaction.transactionYear || 'بدون-سنة'}`
+          : 'معاملة-غير-معروفة';
+        const sourceFolder = attachment.entityType === 'transaction_follow_up'
+          ? 'مرفقات-المعاملة'
+          : `أدلة-التوجيهات/${safeBackupFileName(directive?.title || attachment.entityId)}`;
+        return `المرفقات/${transactionFolder}/${sourceFolder}/${attachment.id.slice(-8)}-${safeBackupFileName(attachment.title, 'مرفق')}`;
+      };
+
+      for (let index = 0; index < backup.attachments.length; index += 4) {
+        const batch = backup.attachments.slice(index, index + 4);
+        await Promise.all(batch.map(async (attachment) => {
+          try {
+            if (!attachment.driveFileId) {
+              throw new Error('لا يوجد معرف Google Drive');
+            }
+            const blob = await transactionFollowUpApi.downloadBackupAttachment(attachment.id);
+            zip.file(buildAttachmentPath(attachment), await blob.arrayBuffer());
+          } catch (error) {
+            downloadFailures.push({
+              attachmentId: attachment.id,
+              title: attachment.title,
+              reason: error instanceof Error ? error.message : 'تعذر تنزيل الملف',
+            });
+          } finally {
+            completedDownloads += 1;
+            setBackupProgress(
+              totalAttachments
+                ? `جارٍ تنزيل المرفقات ${completedDownloads}/${totalAttachments}`
+                : 'لا توجد مرفقات؛ جارٍ إكمال النسخة...',
+            );
+          }
+        }));
+      }
+
+      if (downloadFailures.length) {
+        zip.file('مرفقات-تعذر-تنزيلها.json', JSON.stringify(downloadFailures, null, 2));
+      }
+
+      setBackupProgress('جارٍ ضغط النسخة الاحتياطية...');
+      const zipBlob = await zip.generateAsync(
+        {
+          type: 'blob',
+          compression: 'DEFLATE',
+          compressionOptions: { level: 6 },
+        },
+        (metadata) => {
+          setBackupProgress(`جارٍ ضغط النسخة الاحتياطية ${Math.round(metadata.percent)}%`);
+        },
+      );
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      saveBrowserBlob(zipBlob, `نسخة-احتياطية-نظام-المتابعة-${stamp}.zip`);
+
+      if (downloadFailures.length) {
+        toast.warning(
+          `تم إنشاء النسخة، لكن تعذر تنزيل ${downloadFailures.length} مرفق. أُضيفت قائمة بها داخل الملف المضغوط.`,
+        );
+      } else {
+        toast.success(
+          `تم إنشاء نسخة احتياطية كاملة: ${backup.totals.transactions} معاملة و${backup.totals.attachments} مرفق.`,
+        );
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء النسخة الاحتياطية الكاملة');
+    } finally {
+      setBackupProgress('');
+      setReportExporting(false);
+    }
   };
 
   const printExecutiveReport = () => {
@@ -1794,7 +2276,7 @@ ${styleAssets}
 
           {reportSection === 'preview' && (
             <>
-              <div className="grid gap-3 rounded-2xl border bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-7">
+              <div className="grid gap-3 rounded-2xl border bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-8">
                 <Field label="نوع التقرير">
                   <NativeSelect
                     value={reportMode}
@@ -1881,6 +2363,37 @@ ${styleAssets}
                     PDF
                   </Button>
                 </div>
+
+                <div className="flex items-end gap-2 xl:col-span-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:text-emerald-900"
+                    disabled={reportLoading || reportExporting}
+                    onClick={() => void exportFollowUpExcel()}
+                  >
+                    <FileSpreadsheet className="ml-2 h-4 w-4" />
+                    Excel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-[1.4] bg-slate-800 text-white hover:bg-slate-900"
+                    disabled={reportLoading || reportExporting}
+                    onClick={() => void exportFullFollowUpBackup()}
+                  >
+                    {reportExporting
+                      ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" />
+                      : <Archive className="ml-2 h-4 w-4" />}
+                    {backupProgress || 'نسخة احتياطية كاملة'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs leading-6 text-emerald-950">
+                <b>الحفظ الاحتياطي:</b> زر «Excel» يصدر بيانات الفترة المحددة في ملف منظم متعدد الأوراق،
+                بينما «نسخة احتياطية كاملة» تنشئ ملف ZIP مستقل يحتوي على Excel لجميع بيانات نظام المتابعة،
+                وملف بيانات خام JSON، ونسخ فعلية من الصور والمرفقات وأدلة التوجيهات. الهدف أن تبقى لديك نسخة قابلة للفتح
+                حتى في حال تعذر الوصول إلى الخدمة لاحقًا.
               </div>
 
               <div className="max-h-[68dvh] overflow-auto rounded-2xl border bg-slate-100 p-2 sm:p-4">
