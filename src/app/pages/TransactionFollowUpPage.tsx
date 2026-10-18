@@ -1841,14 +1841,222 @@ ${styleAssets}
       </section>
 
       {activeWorkspace === 'daily' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
-            <DailyStat title="مفتوحة" value={dashboard.open} icon={<Inbox className="h-4 w-4" />} />
-            <DailyStat title="تحتاج إجراء" value={dashboard.needsAction} icon={<AlertTriangle className="h-4 w-4" />} tone="danger" />
-            <DailyStat title="متأخرة" value={dashboard.overdue} icon={<Clock3 className="h-4 w-4" />} tone="danger" />
-            <DailyStat title="بانتظار جهة" value={dashboard.waiting} icon={<FileClock className="h-4 w-4" />} tone="info" />
-            <DailyStat title="غير مسندة" value={dashboard.unassigned} icon={<UserRound className="h-4 w-4" />} tone="warning" />
-            <DailyStat title="منجزة / مغلقة" value={dashboard.completed} icon={<CheckCircle2 className="h-4 w-4" />} tone="success" />
+        <div className="space-y-5">
+          <div className="followup-kpi-grid">
+            <FollowUpKpiCard title="مغلقة" value={dashboard.completed} icon={<FileText className="h-6 w-6" />} tone="slate" />
+            <FollowUpKpiCard title="تحتاج إجراء" value={dashboard.needsAction} icon={<AlertTriangle className="h-6 w-6" />} tone="orange" />
+            <FollowUpKpiCard title="متأخرة" value={dashboard.overdue} icon={<Clock3 className="h-6 w-6" />} tone="red" />
+            <FollowUpKpiCard title="بانتظار جهة" value={dashboard.waiting} icon={<FileClock className="h-6 w-6" />} tone="blue" />
+            <FollowUpKpiCard title="غير مسندة" value={dashboard.unassigned} icon={<UserRound className="h-6 w-6" />} tone="amber" />
+            <FollowUpKpiCard title="منجزة" value={dashboard.completed} icon={<CheckCircle2 className="h-6 w-6" />} tone="green" />
+          </div>
+
+          <section className="followup-filterbar">
+            <div className="followup-filterbar__search">
+              <Search className="h-5 w-5 text-cyan-300" />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') setActiveWorkspace('transactions');
+                }}
+                placeholder="البحث في رقم المعاملة أو الموضوع أو الجهة..."
+                className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+              />
+            </div>
+
+            <NativeSelect
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              className="followup-filterbar__select"
+            >
+              <option value="">جميع الحالات</option>
+              {Object.entries(statusLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </NativeSelect>
+
+            <NativeSelect
+              value={priority}
+              onChange={(event) => setPriority(event.target.value)}
+              className="followup-filterbar__select"
+            >
+              <option value="">جميع الأولويات</option>
+              {Object.entries(priorityLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </NativeSelect>
+
+            <NativeSelect
+              value={organizationalUnitFilter}
+              onChange={(event) =>
+                setOrganizationalUnitFilter(event.target.value as TransactionFollowUpOrganizationalUnit | '')
+              }
+              className="followup-filterbar__select"
+            >
+              <option value="">جميع الإدارات والوحدات</option>
+              {organizationalUnitOptions.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </NativeSelect>
+
+            <Button
+              type="button"
+              className="followup-filterbar__advanced"
+              onClick={() => setActiveWorkspace('transactions')}
+            >
+              <Settings2 className="ml-2 h-4 w-4" />
+              تصفية متقدمة
+            </Button>
+          </section>
+
+          <section className="followup-recent-panel">
+            <div className="followup-recent-panel__header">
+              <div className="flex items-center gap-3">
+                <span className="followup-recent-panel__icon">
+                  <Clock3 className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="text-lg font-black">أحدث المعاملات</h2>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    آخر المعاملات التي جرى تحديثها ضمن نطاق العرض الحالي.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="followup-recent-panel__all"
+                onClick={() => setActiveWorkspace('transactions')}
+              >
+                عرض الكل
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="followup-recent-table w-full min-w-[920px]">
+                <thead>
+                  <tr>
+                    <th>رقم المعاملة</th>
+                    <th>الموضوع</th>
+                    <th>الإدارة / الوحدة</th>
+                    <th>تاريخ المعاملة</th>
+                    <th>الحالة</th>
+                    <th>الأولوية</th>
+                    <th>الموظف المسؤول</th>
+                    <th>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading && recentRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-10 text-center text-sm text-slate-400">
+                        <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                        جارٍ تحميل المعاملات...
+                      </td>
+                    </tr>
+                  ) : recentRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-10 text-center text-sm text-slate-400">
+                        لا توجد معاملات مطابقة للنطاق الحالي.
+                      </td>
+                    </tr>
+                  ) : recentRecords.map((record) => (
+                    <tr key={record.id}>
+                      <td>
+                        <button
+                          type="button"
+                          className="text-right font-black text-white hover:text-cyan-300"
+                          onClick={() => void openDetails(record.id)}
+                        >
+                          {record.transactionNumber}
+                          <span className="mt-1 block font-mono text-[10px] font-normal text-slate-400">
+                            {record.trackingNumber}
+                          </span>
+                        </button>
+                      </td>
+                      <td className="max-w-[280px]">
+                        <span className="block truncate font-semibold text-slate-100">{record.subject}</span>
+                      </td>
+                      <td className="max-w-[230px]">
+                        <span className="block truncate text-xs text-slate-300">
+                          {record.organizationalUnit
+                            ? organizationalUnitLabels[record.organizationalUnit]
+                            : 'غير محددة'}
+                        </span>
+                      </td>
+                      <td>{formatTransactionDate(record)}</td>
+                      <td>
+                        <Badge variant="outline" className={statusClass[record.status]}>
+                          {statusLabels[record.status]}
+                        </Badge>
+                      </td>
+                      <td>
+                        <Badge variant="outline" className={priorityClass[record.priority]}>
+                          {priorityLabels[record.priority]}
+                        </Badge>
+                      </td>
+                      <td>
+                        <span className="inline-flex items-center gap-2 text-xs">
+                          <span className="followup-user-dot">
+                            <UserRound className="h-3.5 w-3.5" />
+                          </span>
+                          {record.currentAssigneeName || 'غير مسندة'}
+                        </span>
+                      </td>
+                      <td>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="followup-row-action"
+                          onClick={() => void openDetails(record.id)}
+                        >
+                          عرض
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <div className="followup-shortcut-grid">
+            {canAdd && (
+              <FollowUpShortcutCard
+                title="إضافة معاملة جديدة"
+                subtitle="تسجيل معاملة ومتابعتها"
+                icon={<Plus className="h-6 w-6" />}
+                tone="violet"
+                onClick={() => {
+                  setCreateForm(emptyCreate());
+                  setCreateFiles([]);
+                  setCreateOpen(true);
+                }}
+              />
+            )}
+            {canPrint && (
+              <FollowUpShortcutCard
+                title="التقارير والإحصائيات"
+                subtitle="عرض التقارير التفصيلية"
+                icon={<Gauge className="h-6 w-6" />}
+                tone="cyan"
+                onClick={() => void openExecutiveReport()}
+              />
+            )}
+            {(isAdmin || canDelete) && (
+              <FollowUpShortcutCard
+                title="نسخ احتياطية"
+                subtitle="النسخ والاستعادة والتحقق"
+                icon={<Archive className="h-6 w-6" />}
+                tone="amber"
+                onClick={openBackupCenter}
+              />
+            )}
+          </div>
+
+          <div className="followup-detail-separator">
+            <span>مركز العمل التشغيلي</span>
           </div>
 
           <TransactionDailyWorkCenter
