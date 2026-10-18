@@ -1678,7 +1678,10 @@ ${styleAssets}
       canDelete ||
       (
         canUploadAttachments &&
-        selected.currentAssigneeUserId === currentUser?.uid
+        (
+          selected.currentAssigneeUserId === currentUser?.uid ||
+          (canAdd && selected.createdById === currentUser?.uid)
+        )
       )
     )
   );
