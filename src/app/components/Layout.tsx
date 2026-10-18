@@ -214,10 +214,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const currentPage = getCurrentPage();
+  const isFollowUpRoute = location.pathname.startsWith('/follow-up');
   const now = new Date();
 
+  React.useEffect(() => {
+    document.body.classList.toggle('follow-up-theme-active', isFollowUpRoute);
+    return () => document.body.classList.remove('follow-up-theme-active');
+  }, [isFollowUpRoute]);
+
   return (
-    <div className="neo-platform-shell future-app-shell min-h-dvh h-dvh w-full min-w-0 flex flex-col overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div
+      className={`neo-platform-shell future-app-shell min-h-dvh h-dvh w-full min-w-0 flex flex-col overflow-hidden ${isFollowUpRoute ? 'follow-up-app-theme' : ''}`}
+      dir={isRTL ? 'rtl' : 'ltr'}
+    >
       <ThemeInitializer />
 
       <header className="future-topbar text-foreground z-30 relative shrink-0 min-h-[58px] sm:min-h-[64px]">
