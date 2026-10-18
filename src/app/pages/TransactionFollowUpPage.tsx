@@ -273,7 +273,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const { isAdmin, hasPermission } = usePermissions();
   const canEdit = isAdmin || hasPermission('transaction_follow_up', 'canEdit');
   const canDelete = isAdmin || hasPermission('transaction_follow_up', 'canDelete');
-  const canAdd = isAdmin || canDelete;
+  const canAdd = isAdmin || hasPermission('transaction_follow_up', 'canAdd');
   const canReopen = isAdmin || hasPermission('transaction_follow_up', 'canReopen');
   const canTransfer =
     isAdmin ||
@@ -557,7 +557,7 @@ export const TransactionFollowUpPage: React.FC = () => {
 
   const createTransaction = async () => {
     if (!canAdd) {
-      toast.error('إنشاء المعاملات متاح للمستخدم الإشرافي فقط');
+      toast.error('لا تملك صلاحية إضافة معاملة جديدة');
       return;
     }
     if (!createForm.transactionNumber.trim() || !createForm.subject.trim() || !createForm.transactionDate) {
