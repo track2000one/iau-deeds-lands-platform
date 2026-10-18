@@ -3349,6 +3349,82 @@ const WorkspaceTab = ({
   </button>
 );
 
+const FollowUpUnitCard = ({
+  title,
+  subtitle,
+  icon,
+  tone,
+  onClick,
+}: {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  tone: 'blue' | 'teal';
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`followup-unit-card followup-unit-card--${tone} group`}
+  >
+    <span className="followup-unit-card__icon">{icon}</span>
+    <span className="min-w-0 flex-1">
+      <span className="block text-base font-black sm:text-lg">{title}</span>
+      <span className="mt-1 block text-xs opacity-75">{subtitle}</span>
+    </span>
+    <span className="followup-unit-card__arrow">‹</span>
+  </button>
+);
+
+const FollowUpKpiCard = ({
+  title,
+  value,
+  icon,
+  tone,
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+  tone: 'slate' | 'orange' | 'red' | 'blue' | 'amber' | 'green';
+}) => (
+  <div className={`followup-kpi-card followup-kpi-card--${tone}`}>
+    <span className="followup-kpi-card__icon">{icon}</span>
+    <span className="min-w-0 flex-1">
+      <span className="block text-sm font-black">{title}</span>
+      <span className="mt-1 block text-3xl font-black leading-none">{value.toLocaleString('ar-SA')}</span>
+      <span className="mt-2 block text-[11px] opacity-70">معاملة</span>
+    </span>
+    <span className="followup-kpi-card__spark" aria-hidden="true" />
+  </div>
+);
+
+const FollowUpShortcutCard = ({
+  title,
+  subtitle,
+  icon,
+  tone,
+  onClick,
+}: {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  tone: 'violet' | 'cyan' | 'amber';
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`followup-shortcut-card followup-shortcut-card--${tone}`}
+  >
+    <span className="followup-shortcut-card__icon">{icon}</span>
+    <span className="min-w-0 flex-1">
+      <span className="block text-base font-black">{title}</span>
+      <span className="mt-1 block text-xs opacity-70">{subtitle}</span>
+    </span>
+    <span className="followup-shortcut-card__arrow">‹</span>
+  </button>
+);
+
 const DailyStat = ({
   title,
   value,
