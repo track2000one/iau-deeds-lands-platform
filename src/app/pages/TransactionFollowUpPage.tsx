@@ -661,7 +661,7 @@ export const TransactionFollowUpPage: React.FC = () => {
       });
       toast.success(`تم تسجيل المعاملة برقم متابعة ${created.trackingNumber}`);
 
-      if (createFiles.length) {
+      if (createFiles.length && canUploadAttachments) {
         setAttachmentUploading(true);
         const result = await uploadTransactionFiles(created.id, createFiles);
         if (result.uploaded) {
@@ -3307,7 +3307,7 @@ ${styleAssets}
                                 فتح
                               </a>
                             </Button>
-                            {canManageAttachments && (
+                            {canDeleteSelectedAttachment(attachment) && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -3325,7 +3325,7 @@ ${styleAssets}
                     </div>
                   )}
 
-                  {canManageAttachments && (
+                  {canUploadSelectedAttachments && (
                     <div className="rounded-xl border border-dashed border-sky-200 bg-sky-50/40 p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
