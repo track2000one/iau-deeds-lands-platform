@@ -94,6 +94,7 @@ import {
   type TransactionFollowUpRecord,
   type TransactionFollowUpStatus,
   type TransactionFollowUpType,
+  type TransactionFollowUpOrganizationalUnit,
 } from '../api/transactionFollowUp';
 import { formatFlexibleDate, isValidFlexibleDate } from '../../utils/dateUtils';
 
@@ -183,6 +184,19 @@ const transactionTypeOptions: Array<{ value: TransactionFollowUpType; label: str
   { value: 'outgoing_internal', label: 'صادر داخلي' },
   { value: 'outgoing_external', label: 'صادر خارجي' },
   { value: 'other', label: 'أخرى' },
+];
+
+const organizationalUnitLabels: Record<TransactionFollowUpOrganizationalUnit, string> = {
+  endowments_properties: 'إدارة أوقاف وأملاك الجامعة',
+  mosques_prayer_rooms: 'وحدة العناية بالمساجد والمصليات الجامعية',
+};
+
+const organizationalUnitOptions: Array<{
+  value: TransactionFollowUpOrganizationalUnit;
+  label: string;
+}> = [
+  { value: 'endowments_properties', label: 'إدارة أوقاف وأملاك الجامعة' },
+  { value: 'mosques_prayer_rooms', label: 'وحدة العناية بالمساجد والمصليات الجامعية' },
 ];
 
 const indicatorClass: Record<string, string> = {
@@ -291,6 +305,7 @@ const emptyCreate = (): TransactionFollowUpCreateInput => ({
   transactionDate: new Date().toISOString().slice(0, 10),
   transactionDateType: 'gregorian',
   transactionType: 'incoming_external',
+  organizationalUnit: '' as TransactionFollowUpOrganizationalUnit,
   subject: '',
   sourceEntity: '',
   priority: 'normal',
@@ -597,8 +612,13 @@ export const TransactionFollowUpPage: React.FC = () => {
       toast.error('لا تملك صلاحية إضافة معاملة جديدة');
       return;
     }
-    if (!createForm.transactionNumber.trim() || !createForm.subject.trim() || !createForm.transactionDate) {
-      toast.error('أكمل رقم المعاملة وتاريخها وموضوعها');
+    if (
+      !createForm.transactionNumber.trim() ||
+      !createForm.subject.trim() ||
+      !createForm.transactionDate ||
+      !createForm.organizationalUnit
+    ) {
+      toast.error('أكمل رقم المعاملة وتاريخها وموضوعها واختر الإدارة أو الوحدة');
       return;
     }
     if (!isValidFlexibleDate(createForm.transactionDate, createForm.transactionDateType)) {
@@ -951,7 +971,8 @@ export const TransactionFollowUpPage: React.FC = () => {
       { header: 'نوع التاريخ', key: 'transactionDateType', width: 14 },
       { header: 'تاريخ المعاملة', key: 'transactionDate', width: 18 },
       { header: 'التاريخ ISO', key: 'transactionDateIso', width: 24 },
-      { header: 'النوع', key: 'transactionType', width: 12 },
+      { header: 'النوع', key: 'transactionType', width: 16 },
+      { header: 'الإدارة / الوحدة', key: 'organizationalUnit', width: 38 },
       { header: 'الموضوع', key: 'subject', width: 42 },
       { header: 'الجهة', key: 'sourceEntity', width: 26 },
       { header: 'الأولوية', key: 'priority', width: 12 },
@@ -984,6 +1005,9 @@ export const TransactionFollowUpPage: React.FC = () => {
             : formatDate(record.transactionDate),
         transactionDateIso: record.transactionDate,
         transactionType: typeLabels[record.transactionType] || record.transactionType,
+        organizationalUnit: record.organizationalUnit
+          ? organizationalUnitLabels[record.organizationalUnit]
+          : 'غير محددة للمعاملات السابقة',
         subject: record.subject,
         sourceEntity: record.sourceEntity || '',
         priority: priorityLabels[record.priority] || record.priority,
@@ -2785,6 +2809,27 @@ ${styleAssets}
             </div>
             <Field label="نوع المعاملة"><NativeSelect value={createForm.transactionType} onChange={(e) => setCreateForm((p) => ({ ...p, transactionType: e.target.value as TransactionFollowUpType }))}>{transactionTypeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</NativeSelect></Field>
             <Field label="الأولوية"><NativeSelect value={createForm.priority} onChange={(e) => setCreateForm((p) => ({ ...p, priority: e.target.value as TransactionFollowUpPriority }))}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
+            <div className="md:col-span-2">
+              <Field label="الإدارة / الوحدة *">
+                <NativeSelect
+                  value={createForm.organizationalUnit || ''}
+                  onChange={(e) =>
+                    setCreateForm((p) => ({
+                      ...p,
+                      organizationalUnit: e.target.value as TransactionFollowUpOrganizationalUnit,
+                    }))
+                  }
+                >
+                  <option value="">اختر الإدارة أو الوحدة</option>
+                  {organizationalUnitOptions.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </NativeSelect>
+              </Field>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                حقل إلزامي لتحديد الجهة التنظيمية التي تتبع لها المعاملة داخل نظام المتابعة.
+              </p>
+            </div>
             <div className="md:col-span-2"><Field label="موضوع المعاملة *"><Input value={createForm.subject} onChange={(e) => setCreateForm((p) => ({ ...p, subject: e.target.value }))} /></Field></div>
             <Field label="الجهة"><Input value={createForm.sourceEntity || ''} onChange={(e) => setCreateForm((p) => ({ ...p, sourceEntity: e.target.value }))} placeholder="الجهة الواردة منها أو الموجهة إليها" /></Field>
             <Field label="الموظف المختص"><NativeSelect value={createForm.currentAssigneeUserId || ''} onChange={(e) => setCreateForm((p) => ({ ...p, currentAssigneeUserId: e.target.value }))}><option value="">بدون إسناد حاليًا</option>{assignees.map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}</NativeSelect></Field>
@@ -2886,6 +2931,7 @@ ${styleAssets}
               <div className="grid gap-3 md:grid-cols-4">
                 <Info label="تاريخ المعاملة" value={formatTransactionDate(selected)} />
                 <Info label="النوع" value={typeLabels[selected.transactionType]} />
+                <Info label="الإدارة / الوحدة" value={selected.organizationalUnit ? organizationalUnitLabels[selected.organizationalUnit] : 'غير محددة للمعاملات السابقة'} />
                 <Info label="الأولوية" value={priorityLabels[selected.priority]} />
                 <Info label="الحالة" value={statusLabels[selected.status]} />
                 <Info label="الجهة" value={selected.sourceEntity || '—'} />
