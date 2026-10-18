@@ -167,10 +167,23 @@ const priorityLabels: Record<TransactionFollowUpPriority, string> = {
 };
 
 const typeLabels: Record<TransactionFollowUpType, string> = {
+  incoming_internal: 'وارد داخلي',
+  incoming_external: 'وارد خارجي',
+  outgoing_internal: 'صادر داخلي',
+  outgoing_external: 'صادر خارجي',
+  other: 'أخرى',
   incoming: 'وارد',
   outgoing: 'صادر',
   internal: 'داخلي',
 };
+
+const transactionTypeOptions: Array<{ value: TransactionFollowUpType; label: string }> = [
+  { value: 'incoming_internal', label: 'وارد داخلي' },
+  { value: 'incoming_external', label: 'وارد خارجي' },
+  { value: 'outgoing_internal', label: 'صادر داخلي' },
+  { value: 'outgoing_external', label: 'صادر خارجي' },
+  { value: 'other', label: 'أخرى' },
+];
 
 const indicatorClass: Record<string, string> = {
   success: 'border-emerald-300 bg-emerald-50 text-emerald-800',
@@ -277,7 +290,7 @@ const emptyCreate = (): TransactionFollowUpCreateInput => ({
   transactionNumber: '',
   transactionDate: new Date().toISOString().slice(0, 10),
   transactionDateType: 'gregorian',
-  transactionType: 'incoming',
+  transactionType: 'incoming_external',
   subject: '',
   sourceEntity: '',
   priority: 'normal',
@@ -2770,7 +2783,7 @@ ${styleAssets}
                 }
               />
             </div>
-            <Field label="نوع المعاملة"><NativeSelect value={createForm.transactionType} onChange={(e) => setCreateForm((p) => ({ ...p, transactionType: e.target.value as TransactionFollowUpType }))}>{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
+            <Field label="نوع المعاملة"><NativeSelect value={createForm.transactionType} onChange={(e) => setCreateForm((p) => ({ ...p, transactionType: e.target.value as TransactionFollowUpType }))}>{transactionTypeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</NativeSelect></Field>
             <Field label="الأولوية"><NativeSelect value={createForm.priority} onChange={(e) => setCreateForm((p) => ({ ...p, priority: e.target.value as TransactionFollowUpPriority }))}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
             <div className="md:col-span-2"><Field label="موضوع المعاملة *"><Input value={createForm.subject} onChange={(e) => setCreateForm((p) => ({ ...p, subject: e.target.value }))} /></Field></div>
             <Field label="الجهة"><Input value={createForm.sourceEntity || ''} onChange={(e) => setCreateForm((p) => ({ ...p, sourceEntity: e.target.value }))} placeholder="الجهة الواردة منها أو الموجهة إليها" /></Field>
