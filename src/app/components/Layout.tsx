@@ -224,7 +224,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div
-      className={`neo-platform-shell future-app-shell min-h-dvh h-dvh w-full min-w-0 flex flex-col overflow-hidden ${isFollowUpRoute ? 'follow-up-app-theme' : ''}`}
+      className="neo-platform-shell future-app-shell min-h-dvh h-dvh w-full min-w-0 flex flex-col overflow-hidden"
       dir={isRTL ? 'rtl' : 'ltr'}
     >
       <ThemeInitializer />
@@ -424,7 +424,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </ScrollArea>
         </aside>
 
-        <main className="app-main min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background/70">
+        <main className={`app-main min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background/70 ${isFollowUpRoute ? 'follow-up-app-theme' : ''}`}>
           <div className="mobile-page-shell w-full max-w-none px-2 py-2.5 sm:px-3 sm:py-4 md:px-5 md:py-5 2xl:px-7">
             {children}
           </div>
