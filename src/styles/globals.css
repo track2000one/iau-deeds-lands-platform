@@ -1967,3 +1967,202 @@ label[data-app-required-label="true"]::after {
     color: #dceff5 !important;
   }
 }
+
+
+/* ===== Transaction Follow-up: Contrast Fixes ===== */
+@media screen {
+  /* Transaction cards: enforce the approved dark material and readable text. */
+  .follow-up-page-theme article.platform-record-card {
+    border-color: rgba(72, 198, 224, .34) !important;
+    background:
+      radial-gradient(circle at 88% 0%, rgba(36, 167, 199, .12), transparent 30%),
+      linear-gradient(145deg, #07384b 0%, #05293a 58%, #041f2f 100%) !important;
+    color: #f4fbff !important;
+    box-shadow:
+      0 18px 34px rgba(0, 7, 17, .36),
+      0 5px 12px rgba(0, 8, 18, .20),
+      inset 0 1px 0 rgba(255,255,255,.07) !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card h2,
+  .follow-up-page-theme article.platform-record-card dd,
+  .follow-up-page-theme article.platform-record-card p.text-slate-700,
+  .follow-up-page-theme article.platform-record-card p.text-slate-800,
+  .follow-up-page-theme article.platform-record-card span.text-slate-600 {
+    color: #eefaff !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card .text-muted-foreground,
+  .follow-up-page-theme article.platform-record-card .text-slate-400 {
+    color: #9bc0cf !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card .platform-record-metric,
+  .follow-up-page-theme article.platform-record-card [class*="bg-slate-50"] {
+    border-color: rgba(76, 188, 213, .18) !important;
+    background: rgba(10, 60, 78, .58) !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card button[variant="outline"],
+  .follow-up-page-theme article.platform-record-card button[class*="border"] {
+    color: #eafaff !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card > div:last-child {
+    border-color: rgba(79, 188, 213, .18) !important;
+  }
+
+  /* Transaction details modal: dark, consistent, and high contrast. */
+  body.follow-up-theme-active .followup-transaction-dialog {
+    border: 1px solid rgba(72, 198, 224, .30) !important;
+    background:
+      radial-gradient(circle at 86% 0%, rgba(36, 166, 199, .10), transparent 26%),
+      linear-gradient(145deg, #062f42 0%, #041f30 62%, #031824 100%) !important;
+    color: #f4fbff !important;
+    box-shadow:
+      0 34px 90px rgba(0, 5, 14, .72),
+      inset 0 1px 0 rgba(255,255,255,.06) !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog [data-slot="dialog-title"] {
+    color: #f7fdff !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog [data-slot="dialog-description"],
+  body.follow-up-theme-active .followup-transaction-dialog .text-muted-foreground {
+    color: #9fc2cf !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog [data-slot="card"] {
+    border-color: rgba(77, 191, 216, .22) !important;
+    background:
+      linear-gradient(145deg, rgba(8, 52, 70, .92), rgba(5, 35, 50, .92)) !important;
+    color: #eefaff !important;
+    box-shadow:
+      0 12px 24px rgba(0, 8, 18, .22),
+      inset 0 1px 0 rgba(255,255,255,.045) !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog [data-slot="card-header"] {
+    border-color: rgba(77, 191, 216, .14) !important;
+    background: rgba(8, 61, 80, .36) !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog [data-slot="card-title"],
+  body.follow-up-theme-active .followup-transaction-dialog .text-slate-900,
+  body.follow-up-theme-active .followup-transaction-dialog .text-slate-800,
+  body.follow-up-theme-active .followup-transaction-dialog .text-slate-700,
+  body.follow-up-theme-active .followup-transaction-dialog .text-foreground {
+    color: #eefaff !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog .rounded-xl.bg-slate-50\/70,
+  body.follow-up-theme-active .followup-transaction-dialog .rounded-xl.bg-slate-50\/65,
+  body.follow-up-theme-active .followup-transaction-dialog .rounded-lg.bg-white,
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-slate-50"] {
+    border-color: rgba(76, 188, 213, .18) !important;
+    background: rgba(12, 64, 82, .54) !important;
+    color: #eefaff !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-sky-50"] {
+    background: rgba(8, 73, 98, .48) !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-white"] {
+    background: rgba(10, 55, 72, .72) !important;
+    color: #effbff !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog input,
+  body.follow-up-theme-active .followup-transaction-dialog select,
+  body.follow-up-theme-active .followup-transaction-dialog textarea {
+    border-color: rgba(81, 194, 218, .34) !important;
+    background-color: rgba(2, 27, 42, .88) !important;
+    color: #f3fbff !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog input::placeholder,
+  body.follow-up-theme-active .followup-transaction-dialog textarea::placeholder {
+    color: #789dab !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog button[variant="outline"],
+  body.follow-up-theme-active .followup-transaction-dialog button[class*="border"] {
+    border-color: rgba(79, 196, 222, .32) !important;
+    background: rgba(8, 62, 82, .72) !important;
+    color: #eafaff !important;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog a {
+    color: #dff9ff;
+  }
+
+  body.follow-up-theme-active .followup-transaction-dialog > button[data-slot="dialog-close"] {
+    color: #dff7ff !important;
+    opacity: .9;
+  }
+
+  /* Preserve semantic badges in both cards and the details modal. */
+  .follow-up-page-theme article.platform-record-card [class*="bg-red-50"],
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-red-50"] {
+    background: rgba(103, 29, 41, .78) !important;
+    color: #ffd9de !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card [class*="bg-orange-50"],
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-orange-50"] {
+    background: rgba(100, 52, 22, .78) !important;
+    color: #ffe0bd !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card [class*="bg-amber-50"],
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-amber-50"] {
+    background: rgba(86, 63, 18, .78) !important;
+    color: #ffe9ae !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card [class*="bg-emerald-50"],
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-emerald-50"] {
+    background: rgba(12, 79, 64, .78) !important;
+    color: #caffef !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card [class*="bg-sky-50"],
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-sky-50"] {
+    background: rgba(15, 73, 105, .80) !important;
+    color: #d9f1ff !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card [class*="bg-blue-50"],
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-blue-50"] {
+    background: rgba(18, 62, 118, .80) !important;
+    color: #dcecff !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card [class*="bg-violet-50"],
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-violet-50"] {
+    background: rgba(61, 44, 105, .80) !important;
+    color: #ebe0ff !important;
+  }
+
+  .follow-up-page-theme article.platform-record-card [class*="bg-slate-50"],
+  .follow-up-page-theme article.platform-record-card [class*="bg-slate-100"],
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-slate-50"],
+  body.follow-up-theme-active .followup-transaction-dialog [class*="bg-slate-100"] {
+    background: rgba(28, 58, 71, .80) !important;
+    color: #e1f0f5 !important;
+  }
+
+  /* Required fields remain yellow for usability, with dark readable text. */
+  body.follow-up-theme-active .followup-transaction-dialog
+    :where(input, textarea, select)[required]:not(:disabled):not([readonly]),
+  body.follow-up-theme-active .followup-transaction-dialog
+    :where(input, textarea, select)[aria-required="true"]:not(:disabled):not([readonly]),
+  body.follow-up-theme-active .followup-transaction-dialog
+    :where(input, textarea, select)[data-app-required="true"]:not(:disabled):not([readonly]) {
+    background-color: #fff0a3 !important;
+    border-color: #e7b91f !important;
+    color: #193039 !important;
+  }
+}
