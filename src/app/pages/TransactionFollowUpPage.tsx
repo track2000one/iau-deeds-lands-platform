@@ -1843,12 +1843,12 @@ ${styleAssets}
       {activeWorkspace === 'daily' && (
         <div className="space-y-5">
           <div className="followup-kpi-grid">
-            <FollowUpKpiCard title="مغلقة" value={dashboard.completed} icon={<FileText className="h-6 w-6" />} tone="slate" />
+            <FollowUpKpiCard title="مفتوحة" value={dashboard.open} icon={<Inbox className="h-6 w-6" />} tone="slate" />
             <FollowUpKpiCard title="تحتاج إجراء" value={dashboard.needsAction} icon={<AlertTriangle className="h-6 w-6" />} tone="orange" />
             <FollowUpKpiCard title="متأخرة" value={dashboard.overdue} icon={<Clock3 className="h-6 w-6" />} tone="red" />
             <FollowUpKpiCard title="بانتظار جهة" value={dashboard.waiting} icon={<FileClock className="h-6 w-6" />} tone="blue" />
             <FollowUpKpiCard title="غير مسندة" value={dashboard.unassigned} icon={<UserRound className="h-6 w-6" />} tone="amber" />
-            <FollowUpKpiCard title="منجزة" value={dashboard.completed} icon={<CheckCircle2 className="h-6 w-6" />} tone="green" />
+            <FollowUpKpiCard title="منجزة / مغلقة" value={dashboard.completed} icon={<CheckCircle2 className="h-6 w-6" />} tone="green" />
           </div>
 
           <section className="followup-filterbar">
@@ -2356,7 +2356,7 @@ ${styleAssets}
               <CardTitle>قائمة المعاملات</CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">إجمالي النتائج: {total.toLocaleString('ar-SA')}</p>
             </div>
-            <div className="grid w-full gap-2 sm:grid-cols-3 xl:w-auto xl:min-w-[850px]">
+            <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:min-w-[1040px] xl:grid-cols-4">
               <div className="relative">
                 <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="pr-10" placeholder="رقم المعاملة، الموضوع، الجهة، الموظف..." />
@@ -2368,6 +2368,17 @@ ${styleAssets}
               <NativeSelect value={priority} onChange={(event) => setPriority(event.target.value)}>
                 <option value="">جميع الأولويات</option>
                 {Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </NativeSelect>
+              <NativeSelect
+                value={organizationalUnitFilter}
+                onChange={(event) =>
+                  setOrganizationalUnitFilter(event.target.value as TransactionFollowUpOrganizationalUnit | '')
+                }
+              >
+                <option value="">جميع الإدارات والوحدات</option>
+                {organizationalUnitOptions.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
               </NativeSelect>
             </div>
           </div>
