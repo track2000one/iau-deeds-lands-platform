@@ -24,6 +24,11 @@ const priorityLabels: Record<TransactionFollowUpPriority, string> = {
 };
 
 const typeLabels: Record<TransactionFollowUpType, string> = {
+  incoming_internal: 'وارد داخلي',
+  incoming_external: 'وارد خارجي',
+  outgoing_internal: 'صادر داخلي',
+  outgoing_external: 'صادر خارجي',
+  other: 'أخرى',
   incoming: 'وارد',
   outgoing: 'صادر',
   internal: 'داخلي',
