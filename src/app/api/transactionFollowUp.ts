@@ -1162,6 +1162,12 @@ export type TransactionFollowUpBackupRun = {
   integrityMessage?: string | null;
   verifiedFileCount?: number | null;
   verifiedAt?: string | null;
+  restoreTestStatus?: 'success' | 'warning' | 'failed' | null;
+  restoreTestMessage?: string | null;
+  restoreTestTransactions?: number | null;
+  restoreTestRelations?: number | null;
+  restoreTestAttachments?: number | null;
+  restoreTestAt?: string | null;
   startedAt: string;
   completedAt?: string | null;
   createdAt: string;
@@ -1495,6 +1501,12 @@ export const transactionFollowUpApi = {
   verifyBackupRun: (id: string) =>
     apiJson<TransactionFollowUpBackupRun>(
       `/api/transaction-follow-up/reports/backup-runs/${id}/verify`,
+      { method: 'POST' },
+    ),
+
+  testBackupRestore: (id: string) =>
+    apiJson<TransactionFollowUpBackupRun>(
+      `/api/transaction-follow-up/reports/backup-runs/${id}/restore-test`,
       { method: 'POST' },
     ),
 
