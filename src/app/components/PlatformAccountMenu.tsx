@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Clock3,
   LogOut,
-  Mail,
   Palette,
   Settings,
   ShieldCheck,
