@@ -61,6 +61,7 @@ import { Textarea } from '../components/ui/textarea';
 import { TransactionExecutiveReport } from '../components/TransactionExecutiveReport';
 import { TransactionExecutiveInbox } from '../components/TransactionExecutiveInbox';
 import { TransactionDailyWorkCenter } from '../components/TransactionDailyWorkCenter';
+import { TransactionBackupSettings } from '../components/TransactionBackupSettings';
 import { TransactionFollowUpCard } from '../components/TransactionFollowUpCard';
 import { AppDateField } from '../components/AppDateField';
 import { TransactionManagementDirectives } from '../components/TransactionManagementDirectives';
@@ -2564,6 +2565,8 @@ ${styleAssets}
 
           {reportSection === 'schedule' && (
             <div className="max-h-[74dvh] space-y-4 overflow-auto">
+              {(isAdmin || canDelete) && <TransactionBackupSettings />}
+
               {canEdit && (
                 <Card className="border-sky-200 shadow-none">
                   <CardHeader className="pb-3">
