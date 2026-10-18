@@ -2166,3 +2166,100 @@ label[data-app-required-label="true"]::after {
     color: #193039 !important;
   }
 }
+
+
+/* ===== Transaction Follow-up: Final Contrast Lock ===== */
+@media screen {
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card {
+    background:
+      radial-gradient(circle at 86% 0%, rgba(38, 181, 214, .12), transparent 30%),
+      linear-gradient(145deg, #06364a 0%, #05293b 58%, #031f30 100%) !important;
+    background-color: #05293b !important;
+    border: 1px solid rgba(72, 204, 231, .38) !important;
+    color: #f4fbff !important;
+    box-shadow:
+      0 18px 34px rgba(0, 7, 17, .38),
+      0 5px 12px rgba(0, 8, 18, .24),
+      inset 0 1px 0 rgba(255,255,255,.08) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card__label {
+    color: #9fc8d7 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card__number,
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card__subject,
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card dd,
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card__action-text {
+    color: #f6fcff !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card__tracking,
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card__meta {
+    color: #8eb8c7 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card .platform-record-metric {
+    background: rgba(10, 63, 82, .64) !important;
+    background-color: rgba(10, 63, 82, .64) !important;
+    border-color: rgba(83, 199, 224, .20) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card__action {
+    background:
+      linear-gradient(145deg, rgba(11, 71, 88, .94), rgba(8, 55, 69, .96)) !important;
+    background-color: #093c4d !important;
+    border-color: rgba(87, 201, 224, .24) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-transaction-card > div:last-child {
+    border-color: rgba(77, 190, 215, .20) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table thead,
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__head-row,
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__head-row th {
+    background:
+      linear-gradient(180deg, #0a4b64 0%, #073a50 100%) !important;
+    background-color: #083f57 !important;
+    color: #d9f5fd !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__head-row th {
+    border-bottom: 1px solid rgba(89, 209, 231, .24) !important;
+    font-weight: 900 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row,
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row td {
+    background: #082f40 !important;
+    background-color: #082f40 !important;
+    color: #eaf8fd !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row:nth-child(even),
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row:nth-child(even) td {
+    background: #093749 !important;
+    background-color: #093749 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row:hover,
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row:hover td {
+    background: #0b4a61 !important;
+    background-color: #0b4a61 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row td {
+    border-bottom-color: rgba(82, 184, 207, .14) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row .text-slate-100,
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row .text-white {
+    color: #f6fcff !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row .text-slate-300,
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__row .text-slate-400 {
+    color: #9fc3d1 !important;
+  }
+}
