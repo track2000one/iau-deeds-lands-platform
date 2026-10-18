@@ -55,6 +55,7 @@ import { ArchiveExcelImportDialog, type ArchiveExcelImportPayload } from '../com
 import {
   transactionFollowUpApi,
   type TransactionFollowUpRecord,
+  type TransactionFollowUpOrganizationalUnit,
 } from '../api/transactionFollowUp';
 
 type ArchiveDocument = {
@@ -164,6 +165,17 @@ const formatArchivedTransactionDate = (record: TransactionFollowUpRecord) => {
   }
   return formatDate(record.transactionDate);
 };
+
+const archivedOrganizationalUnitLabels: Record<TransactionFollowUpOrganizationalUnit, string> = {
+  endowments_properties: 'إدارة أوقاف وأملاك الجامعة',
+  mosques_prayer_rooms: 'وحدة العناية بالمساجد والمصليات الجامعية',
+};
+
+const archivedOrganizationalUnitLabel = (
+  value?: TransactionFollowUpOrganizationalUnit | null,
+) => value
+  ? archivedOrganizationalUnitLabels[value]
+  : 'غير محددة للمعاملات السابقة';
 
 const normalizeHijriInput = (value: string) => {
   return value
@@ -436,6 +448,7 @@ export const ArchivePage: React.FC = () => {
         record.transactionYear,
         record.trackingNumber,
         record.subject,
+        record.organizationalUnit ? archivedOrganizationalUnitLabels[record.organizationalUnit] : null,
         record.sourceEntity,
         record.currentAssigneeName,
         record.archivedByName,
@@ -566,6 +579,7 @@ export const ArchivePage: React.FC = () => {
       ['السنة', record.transactionYear ? `${record.transactionYear}${record.transactionDateType === 'hijri' ? 'هـ' : 'م'}` : '—'],
       ['تاريخ المعاملة', formatArchivedTransactionDate(record)],
       ['رقم المتابعة', record.trackingNumber],
+      ['الإدارة / الوحدة', archivedOrganizationalUnitLabel(record.organizationalUnit)],
       ['الموضوع', record.subject],
       ['الجهة', record.sourceEntity || '—'],
       ['الموظف المختص', record.currentAssigneeName || '—'],
@@ -1060,6 +1074,7 @@ export const ArchivePage: React.FC = () => {
 
                   <div className="mt-3 grid gap-1.5 text-xs text-muted-foreground">
                     <span>تاريخ المعاملة: <b className="text-foreground">{formatArchivedTransactionDate(record)}</b></span>
+                    <span>الإدارة / الوحدة: <b className="text-foreground">{archivedOrganizationalUnitLabel(record.organizationalUnit)}</b></span>
                     <span>الجهة: <b className="text-foreground">{record.sourceEntity || '—'}</b></span>
                     <span>الموظف: <b className="text-foreground">{record.currentAssigneeName || '—'}</b></span>
                     <span>تاريخ الأرشفة: <b className="text-foreground">{formatDate(record.archivedAt || undefined)}</b></span>
@@ -1155,6 +1170,7 @@ export const ArchivePage: React.FC = () => {
               <InfoItem label="السنة" value={selectedArchivedTransaction.transactionYear ? `${selectedArchivedTransaction.transactionYear}${selectedArchivedTransaction.transactionDateType === 'hijri' ? 'هـ' : 'م'}` : '—'} />
               <InfoItem label="تاريخ المعاملة" value={formatArchivedTransactionDate(selectedArchivedTransaction)} />
               <InfoItem label="رقم المتابعة" value={selectedArchivedTransaction.trackingNumber} />
+              <InfoItem label="الإدارة / الوحدة" value={archivedOrganizationalUnitLabel(selectedArchivedTransaction.organizationalUnit)} />
               <InfoItem label="الجهة" value={selectedArchivedTransaction.sourceEntity || '—'} />
               <InfoItem label="الموظف المختص" value={selectedArchivedTransaction.currentAssigneeName || '—'} />
               <InfoItem label="تاريخ الإقفال" value={formatDate(selectedArchivedTransaction.closedAt || undefined)} />
