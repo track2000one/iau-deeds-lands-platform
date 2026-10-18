@@ -646,17 +646,20 @@ export const TransactionFollowUpPage: React.FC = () => {
       toast.error('المعاملة مسندة بالفعل إلى الموظف المحدد');
       return;
     }
-    if (!(isAdmin || canDelete) && assignNote.trim().length < 3) {
+
+    const initialAssignment = !selected.currentAssigneeUserId;
+    if (!initialAssignment && !(isAdmin || canDelete) && assignNote.trim().length < 3) {
       toast.error('سبب تحويل المعاملة مطلوب');
       return;
     }
+
     try {
       setSaving(true);
       const updated = await transactionFollowUpApi.assign(selected.id, {
         assigneeUserId: assignUserId,
         note: assignNote || null,
       });
-      toast.success('تم إسناد المعاملة وتسجيل التحويل');
+      toast.success(initialAssignment ? 'تم إسناد المعاملة وبدء معالجتها' : 'تم تحويل المعاملة وتسجيل التحويل');
       window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
       await openDetails(updated.id);
       await load();
@@ -1580,6 +1583,20 @@ ${styleAssets}
       isAdmin ||
       canDelete ||
       selected.currentAssigneeUserId === currentUser?.uid
+    )
+  );
+
+  const canAssignSelected = Boolean(
+    selected &&
+    !['completed', 'closed'].includes(selected.status) &&
+    !selected.currentAssigneeUserId &&
+    (
+      isAdmin ||
+      canDelete ||
+      (
+        canAdd &&
+        selected.createdById === currentUser?.uid
+      )
     )
   );
 
@@ -3094,43 +3111,59 @@ ${styleAssets}
                 </Card>
               )}
 
-              {(canTransferSelected || canManageSelected) && !['completed', 'closed'].includes(selected.status) && (
+              {(canAssignSelected || canTransferSelected || canManageSelected) && !['completed', 'closed'].includes(selected.status) && (
                 <div className="grid gap-4 xl:grid-cols-2">
-                  {canTransferSelected && (
-                    <Card className="border-violet-200">
+                  {(canAssignSelected || canTransferSelected) && (
+                    <Card className={canAssignSelected ? 'border-sky-200 bg-sky-50/20' : 'border-violet-200'}>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
                           <ArrowLeftRight className="h-4 w-4" />
-                          {isAdmin || canDelete ? 'إسناد / تحويل' : 'تحويل المعاملة'}
+                          {canAssignSelected ? 'إسناد المعاملة إلى موظف' : (isAdmin || canDelete ? 'إسناد / تحويل' : 'تحويل المعاملة')}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        <Field label="الموظف المحول إليه">
+                        <Field label={canAssignSelected ? 'الموظف المسند إليه' : 'الموظف المحول إليه'}>
                           <NativeSelect value={assignUserId} onChange={(e) => setAssignUserId(e.target.value)}>
-                            <option value="">اختر الموظف</option>
+                            <option value="">{canAssignSelected ? 'اختر الموظف الذي ستسند إليه المعاملة' : 'اختر الموظف'}</option>
                             {assignees
                               .filter((user) => user.id !== selected.currentAssigneeUserId)
                               .map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}
                           </NativeSelect>
                         </Field>
-                        <Field label={isAdmin || canDelete ? 'ملاحظة التحويل' : 'سبب التحويل *'}>
+                        <Field
+                          label={
+                            canAssignSelected
+                              ? 'ملاحظة الإسناد'
+                              : (isAdmin || canDelete ? 'ملاحظة التحويل' : 'سبب التحويل *')
+                          }
+                        >
                           <Input
                             value={assignNote}
                             onChange={(e) => setAssignNote(e.target.value)}
-                            placeholder="سبب التحويل أو المطلوب من الموظف"
+                            placeholder={canAssignSelected ? 'اختياري: المطلوب من الموظف أو ملاحظة الإسناد' : 'سبب التحويل أو المطلوب من الموظف'}
                           />
                         </Field>
-                        {!(isAdmin || canDelete) && (
+
+                        {canAssignSelected ? (
+                          <p className="text-[11px] leading-5 text-sky-800">
+                            هذه المعاملة غير مسندة حاليًا. بعد اختيار الموظف وحفظ الإسناد ستبدأ المعالجة تلقائيًا وتتحول الحالة إلى «تحت الإجراء».
+                          </p>
+                        ) : !(isAdmin || canDelete) ? (
                           <p className="text-[11px] leading-5 text-muted-foreground">
                             صلاحية «تحويل» تتيح للمستخدم العادي تحويل المعاملة المسندة إليه فقط إلى موظف آخر، مع إلزامه بتسجيل سبب التحويل وحفظه في سجل الإجراءات.
                           </p>
-                        )}
+                        ) : null}
+
                         <Button
                           onClick={() => void saveAssignment()}
-                          disabled={saving || !assignUserId || (!(isAdmin || canDelete) && assignNote.trim().length < 3)}
+                          disabled={
+                            saving ||
+                            !assignUserId ||
+                            (!canAssignSelected && !(isAdmin || canDelete) && assignNote.trim().length < 3)
+                          }
                         >
                           <Send className="ml-2 h-4 w-4" />
-                          تحويل المعاملة
+                          {canAssignSelected ? 'إسناد المعاملة' : 'تحويل المعاملة'}
                         </Button>
                       </CardContent>
                     </Card>
