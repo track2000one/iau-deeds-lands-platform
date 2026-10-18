@@ -82,6 +82,7 @@ import {
   transactionFollowUpApi,
   type TransactionFollowUpAnalytics,
   type TransactionFollowUpAssignee,
+  type TransactionFollowUpAttachment,
   type TransactionFollowUpBackupData,
   type TransactionFollowUpCreateInput,
   type TransactionFollowUpDashboard,
