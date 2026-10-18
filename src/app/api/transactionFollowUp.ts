@@ -10,7 +10,16 @@ export type TransactionFollowUpStatus =
   | 'closed';
 
 export type TransactionFollowUpPriority = 'low' | 'normal' | 'high' | 'urgent';
-export type TransactionFollowUpType = 'incoming' | 'outgoing' | 'internal';
+export type TransactionFollowUpType =
+  | 'incoming_internal'
+  | 'incoming_external'
+  | 'outgoing_internal'
+  | 'outgoing_external'
+  | 'other'
+  // Legacy values kept for existing records created before the expanded classification.
+  | 'incoming'
+  | 'outgoing'
+  | 'internal';
 
 export type TransactionFollowUpWorkQueueBucket =
   | 'overdue'
