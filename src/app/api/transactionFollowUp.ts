@@ -1124,6 +1124,50 @@ export type TransactionFollowUpReportSchedule = {
   updatedAt: string;
 };
 
+export type TransactionFollowUpBackupSchedule = {
+  id: string;
+  scope: string;
+  frequency: 'weekly' | 'monthly';
+  dayOfWeek?: number | null;
+  dayOfMonth?: number | null;
+  runHour: number;
+  includeAttachments: boolean;
+  retentionCount: number;
+  isActive: boolean;
+  lastRunAt?: string | null;
+  nextRunAt?: string | null;
+  updatedById?: string | null;
+  updatedByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TransactionFollowUpBackupRun = {
+  id: string;
+  scheduleId?: string | null;
+  status: 'running' | 'success' | 'partial' | 'failed';
+  folderId?: string | null;
+  folderUrl?: string | null;
+  folderName?: string | null;
+  workbookFileId?: string | null;
+  workbookUrl?: string | null;
+  manifestFileId?: string | null;
+  manifestUrl?: string | null;
+  transactionCount: number;
+  attachmentCount: number;
+  copiedAttachmentCount: number;
+  failedAttachmentCount: number;
+  errorMessage?: string | null;
+  startedAt: string;
+  completedAt?: string | null;
+  createdAt: string;
+};
+
+export type TransactionFollowUpBackupSettings = {
+  schedule: TransactionFollowUpBackupSchedule;
+  runs: TransactionFollowUpBackupRun[];
+};
+
 export type TransactionFollowUpCreateInput = {
   transactionNumber: string;
   transactionDate: string;
@@ -1416,6 +1460,32 @@ export const transactionFollowUpApi = {
   deleteReportArchive: (id: string) =>
     apiJson<void>(`/api/transaction-follow-up/reports/archives/${id}`, {
       method: 'DELETE',
+    }),
+
+  backupSettings: () =>
+    apiJson<TransactionFollowUpBackupSettings>('/api/transaction-follow-up/reports/backup-schedule'),
+
+  updateBackupSchedule: (input: {
+    frequency: 'weekly' | 'monthly';
+    dayOfWeek?: number | null;
+    dayOfMonth?: number | null;
+    runHour: number;
+    includeAttachments: boolean;
+    retentionCount: number;
+    isActive: boolean;
+  }) =>
+    apiJson<TransactionFollowUpBackupSchedule>('/api/transaction-follow-up/reports/backup-schedule', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+
+  runBackupNow: () =>
+    apiJson<{
+      run: TransactionFollowUpBackupRun;
+      failedAttachments?: Array<{ attachmentId: string; title: string; reason: string }>;
+      message: string;
+    }>('/api/transaction-follow-up/reports/backup-schedule/run', {
+      method: 'POST',
     }),
 
   reportSchedules: () =>
