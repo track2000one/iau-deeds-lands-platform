@@ -1,14 +1,10 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import translationsAr from './locales/ar.json';
-import translationsEn from './locales/en.json';
 
 const resources = {
   ar: {
     translation: translationsAr,
-  },
-  en: {
-    translation: translationsEn,
   },
 };
 
@@ -17,8 +13,8 @@ i18n
   .init({
     resources,
     lng: 'ar',
-    fallbackLng: false,
-    supportedLngs: ['ar', 'en'],
+    fallbackLng: 'ar',
+    supportedLngs: ['ar'],
     load: 'languageOnly',
     interpolation: {
       escapeValue: false,
