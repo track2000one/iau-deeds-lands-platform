@@ -256,8 +256,6 @@ export const PlatformNotificationCenter: React.FC = () => {
     }
   };
 
-  if (!canViewNotifications) return null;
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -266,7 +264,7 @@ export const PlatformNotificationCenter: React.FC = () => {
           aria-label={unreadCount > 0 ? `مركز الإشعارات، ${unreadCount} غير مقروء` : 'مركز الإشعارات'}
           variant="ghost"
           size="icon"
-          className="relative h-10 w-10 rounded-2xl"
+          className="future-glow-button relative h-10 w-10 rounded-2xl"
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
@@ -362,12 +360,17 @@ export const PlatformNotificationCenter: React.FC = () => {
               <div className="p-8 text-center">
                 <CheckCheck className="mx-auto h-8 w-8 text-emerald-500" />
                 <p className="mt-3 text-sm font-black text-slate-700">لا توجد إشعارات حاليًا</p>
-                <p className="mt-1 text-xs text-slate-400">ستظهر هنا التنبيهات الموجهة إلى حسابك عند إنشائها.</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {canViewNotifications
+                    ? 'ستظهر هنا التنبيهات الموجهة إلى حسابك عند إنشائها.'
+                    : 'لا توجد مصادر إشعارات تشغيلية مخولة لهذا الحساب حاليًا.'}
+                </p>
               </div>
             )}
           </div>
         </ScrollArea>
 
+        {canViewNotifications && (
         <div className={`grid gap-2 border-t border-slate-200 bg-white p-3 ${canViewMosques && canViewFollowUp ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {canViewFollowUp && (
             <Button
@@ -395,6 +398,7 @@ export const PlatformNotificationCenter: React.FC = () => {
             </Button>
           )}
         </div>
+        )}
       </PopoverContent>
     </Popover>
   );
