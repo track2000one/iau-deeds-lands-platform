@@ -432,19 +432,30 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
 
       <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('nav.confirmLogout')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('nav.confirmLogoutMessage')}</AlertDialogDescription>
+        <AlertDialogContent className="logout-confirm-dialog sm:max-w-[520px]">
+          <AlertDialogHeader className={`gap-3 ${isRTL ? 'text-right sm:text-right' : 'text-left sm:text-left'}`}>
+            <div className="flex items-start gap-3">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-red-400/25 bg-red-500/15 text-red-300 shadow-[0_8px_22px_rgba(127,29,29,.24)]">
+                <LogOut className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <AlertDialogTitle>{t('nav.confirmLogout')}</AlertDialogTitle>
+                <AlertDialogDescription className="mt-2">
+                  {t('nav.confirmLogoutMessage')}
+                </AlertDialogDescription>
+              </div>
+            </div>
           </AlertDialogHeader>
 
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('app.cancel')}</AlertDialogCancel>
+          <AlertDialogFooter className={isRTL ? 'sm:flex-row-reverse sm:justify-start' : ''}>
+            <AlertDialogCancel className="min-w-28">
+              {t('app.cancel')}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleLogout}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="min-w-32 border-red-400/30 bg-red-600 text-white shadow-[0_8px_20px_rgba(153,27,27,.30)] hover:bg-red-500 focus-visible:ring-red-300/50"
             >
-              <LogOut className="h-4 w-4 mr-2" />
+              <LogOut className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
               {t('nav.logout')}
             </AlertDialogAction>
           </AlertDialogFooter>
