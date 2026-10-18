@@ -1936,7 +1936,7 @@ ${styleAssets}
             <div className="overflow-x-auto">
               <table className="followup-recent-table w-full min-w-[920px]">
                 <thead>
-                  <tr>
+                  <tr className="followup-recent-table__head-row">
                     <th>رقم المعاملة</th>
                     <th>الموضوع</th>
                     <th>الإدارة / الوحدة</th>
@@ -1962,7 +1962,7 @@ ${styleAssets}
                       </td>
                     </tr>
                   ) : recentRecords.map((record) => (
-                    <tr key={record.id}>
+                    <tr key={record.id} className="followup-recent-table__row">
                       <td>
                         <button
                           type="button"
