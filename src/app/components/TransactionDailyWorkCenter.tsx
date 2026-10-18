@@ -602,19 +602,23 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
                   setSelectedBucket(bucket);
                 }}
                 className={
-                  'min-h-[72px] rounded-2xl border px-3 py-2.5 text-right transition ' +
+                  'relative min-h-[82px] transform-gpu rounded-[18px] border px-3 py-3 text-right ' +
+                  'transition-all duration-200 ease-out ' +
+                  'shadow-[0_10px_20px_-12px_rgba(15,23,42,0.55),0_5px_10px_-6px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.92)] ' +
+                  'hover:-translate-y-1 hover:shadow-[0_18px_30px_-14px_rgba(15,23,42,0.58),0_8px_14px_-8px_rgba(15,23,42,0.32),inset_0_1px_0_rgba(255,255,255,0.96)] ' +
+                  'active:translate-y-[1px] active:shadow-[0_4px_8px_-5px_rgba(15,23,42,0.34),inset_0_1px_3px_rgba(15,23,42,0.08)] ' +
                   (active
-                    ? meta.className + ' shadow-sm ring-1 ring-current/10'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50')
+                    ? meta.className + ' -translate-y-0.5 ring-1 ring-current/15 shadow-[0_16px_28px_-13px_rgba(15,23,42,0.62),0_7px_13px_-7px_rgba(15,23,42,0.34),inset_0_1px_0_rgba(255,255,255,0.95)]'
+                    : 'border-slate-200 bg-gradient-to-b from-white to-slate-50/80 hover:border-slate-300')
                 }
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/70">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl border border-white/80 bg-white/85 shadow-[0_4px_8px_-5px_rgba(15,23,42,0.45),inset_0_1px_0_rgba(255,255,255,0.95)]">
                     <Icon className="h-4 w-4" />
                   </span>
-                  <b className="text-2xl">{(data.counts[bucket] || 0).toLocaleString('ar-SA')}</b>
+                  <b className="text-2xl drop-shadow-sm">{(data.counts[bucket] || 0).toLocaleString('ar-SA')}</b>
                 </div>
-                <p className="mt-2 text-sm font-black">{meta.shortLabel}</p>
+                <p className="mt-2.5 text-sm font-black tracking-tight">{meta.shortLabel}</p>
               </button>
             );
           })}
