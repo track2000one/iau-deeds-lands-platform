@@ -340,6 +340,14 @@ export const TransactionFollowUpPage: React.FC = () => {
     isAdmin ||
     canDelete ||
     hasPermission('transaction_follow_up', 'canTransfer');
+  const canUploadAttachments =
+    isAdmin ||
+    canDelete ||
+    hasPermission('transaction_follow_up', 'canUploadAttachments');
+  const canDeleteAttachments =
+    isAdmin ||
+    canDelete ||
+    hasPermission('transaction_follow_up', 'canDeleteAttachments');
   const canPrint = isAdmin || hasPermission('transaction_follow_up', 'canPrint');
   const canArchive = isAdmin || hasPermission('archive', 'canAdd');
 
@@ -1661,18 +1669,33 @@ ${styleAssets}
     )
   );
 
-  const canManageAttachments = Boolean(
+  const canUploadSelectedAttachments = Boolean(
     selected &&
+    !['completed', 'closed'].includes(selected.status) &&
     (
       isAdmin ||
       canDelete ||
       (
-        canEdit &&
-        selected.currentAssigneeUserId === currentUser?.uid &&
-        !['completed', 'closed'].includes(selected.status)
+        canUploadAttachments &&
+        selected.currentAssigneeUserId === currentUser?.uid
       )
     )
   );
+
+  const canDeleteSelectedAttachment = (attachment: TransactionFollowUpAttachment) =>
+    Boolean(
+      selected &&
+      (
+        isAdmin ||
+        canDelete ||
+        (
+          canDeleteAttachments &&
+          selected.currentAssigneeUserId === currentUser?.uid &&
+          attachment.createdById === currentUser?.uid &&
+          !['completed', 'closed'].includes(selected.status)
+        )
+      )
+    );
 
   const recentRecords = React.useMemo(
     () =>
