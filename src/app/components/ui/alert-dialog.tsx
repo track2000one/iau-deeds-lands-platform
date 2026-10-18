@@ -37,7 +37,7 @@ const AlertDialogOverlay = React.forwardRef<
       ref={ref}
       data-slot="alert-dialog-overlay"
       className={cn(
-        "fixed inset-0 z-[1000] bg-black/70 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-[5px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className,
       )}
       {...props}
@@ -57,7 +57,7 @@ const AlertDialogContent = React.forwardRef<
         ref={ref}
         data-slot="alert-dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-[1001] grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-slate-300 bg-white p-6 text-slate-900 opacity-100 shadow-2xl backdrop-blur-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:max-w-lg",
+          "app-confirm-dialog fixed left-1/2 top-1/2 z-[1001] grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(145deg,#06283a_0%,#041c2b_100%)] p-6 text-slate-50 opacity-100 shadow-[0_28px_80px_rgba(0,7,18,.68),inset_0_1px_0_rgba(255,255,255,.06)] backdrop-blur-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200 sm:max-w-lg",
           className,
         )}
         {...props}
@@ -103,7 +103,7 @@ function AlertDialogTitle({
   return (
     <AlertDialogPrimitive.Title
       data-slot="alert-dialog-title"
-      className={cn("text-lg font-semibold", className)}
+      className={cn("text-xl font-black tracking-tight text-white", className)}
       {...props}
     />
   );
@@ -116,7 +116,7 @@ function AlertDialogDescription({
   return (
     <AlertDialogPrimitive.Description
       data-slot="alert-dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-sm leading-7 text-slate-300", className)}
       {...props}
     />
   );
@@ -128,7 +128,11 @@ function AlertDialogAction({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Action>) {
   return (
     <AlertDialogPrimitive.Action
-      className={cn(buttonVariants(), className)}
+      className={cn(
+        buttonVariants(),
+        "min-h-10 rounded-xl border border-cyan-300/20 bg-cyan-700 text-white shadow-[0_8px_20px_rgba(0,80,110,.24)] hover:bg-cyan-600 focus-visible:ring-cyan-300/50",
+        className,
+      )}
       {...props}
     />
   );
@@ -140,7 +144,11 @@ function AlertDialogCancel({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Cancel>) {
   return (
     <AlertDialogPrimitive.Cancel
-      className={cn(buttonVariants({ variant: "outline" }), className)}
+      className={cn(
+        buttonVariants({ variant: "outline" }),
+        "min-h-10 rounded-xl border-slate-500/70 bg-slate-800/80 text-slate-100 hover:bg-slate-700 hover:text-white focus-visible:ring-slate-300/40",
+        className,
+      )}
       {...props}
     />
   );
