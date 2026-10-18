@@ -29,6 +29,7 @@ import type {
   TransactionFollowUpRecord,
   TransactionFollowUpStatus,
   TransactionFollowUpType,
+  TransactionFollowUpOrganizationalUnit,
 } from '../api/transactionFollowUp';
 
 const statusLabels: Record<TransactionFollowUpStatus, string> = {
@@ -57,6 +58,11 @@ const typeLabels: Record<TransactionFollowUpType, string> = {
   incoming: 'وارد',
   outgoing: 'صادر',
   internal: 'داخلي',
+};
+
+const organizationalUnitLabels: Record<TransactionFollowUpOrganizationalUnit, string> = {
+  endowments_properties: 'إدارة أوقاف وأملاك الجامعة',
+  mosques_prayer_rooms: 'وحدة العناية بالمساجد والمصليات الجامعية',
 };
 
 const priorityClass: Record<TransactionFollowUpPriority, string> = {
@@ -289,6 +295,11 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
           <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800">
             متأخرة {Math.abs(record.daysUntilDue || 0).toLocaleString('ar-SA')} يوم
           </Badge>
+        )}
+        {record.organizationalUnit && (
+          <span className="max-w-full truncate text-[10px] font-semibold text-slate-600">
+            {organizationalUnitLabels[record.organizationalUnit]}
+          </span>
         )}
         {record.sourceEntity && (
           <span className="max-w-full truncate text-[10px] text-muted-foreground">
