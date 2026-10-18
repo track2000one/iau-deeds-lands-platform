@@ -18,7 +18,12 @@ import { mosqueApi, type MosqueNotification } from '../api/mosques';
 import { transactionFollowUpApi, type TransactionFollowUpAlert } from '../api/transactionFollowUp';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 
 type PlatformNotice = {
@@ -257,150 +262,168 @@ export const PlatformNotificationCenter: React.FC = () => {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          title="مركز الإشعارات"
-          aria-label={unreadCount > 0 ? `مركز الإشعارات، ${unreadCount} غير مقروء` : 'مركز الإشعارات'}
-          variant="ghost"
-          size="icon"
-          className="future-glow-button relative h-10 w-10 rounded-2xl"
-        >
-          <Bell className="h-4 w-4" />
-          {unreadCount > 0 && (
-            <span className="absolute -end-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1 text-[9px] font-black leading-none text-white ring-2 ring-background">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
-
-      <PopoverContent
-        align="start"
-        sideOffset={10}
-        className="w-[min(94vw,430px)] overflow-hidden rounded-2xl border-slate-200 p-0 shadow-2xl"
-        dir="rtl"
+    <>
+      <Button
+        type="button"
+        title="مركز الإشعارات"
+        aria-label={unreadCount > 0 ? `مركز الإشعارات، ${unreadCount} غير مقروء` : 'مركز الإشعارات'}
+        variant="ghost"
+        size="icon"
+        className="future-glow-button relative h-10 w-10 rounded-2xl"
+        onClick={() => setOpen(true)}
       >
-        <div className="border-b border-slate-200 bg-slate-50/80 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-[#0b4a3f]" />
-                <h2 className="font-black text-slate-900">مركز الإشعارات</h2>
-                {unreadCount > 0 && <Badge className="bg-rose-600 text-white">{unreadCount} جديد</Badge>}
-              </div>
-              <p className="mt-1 text-[11px] leading-5 text-slate-500">إشعارات محفوظة على حسابك وموجهة حسب صلاحياتك ومسؤولياتك.</p>
-            </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void loadNotifications()} disabled={loading}>
-              <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
-          <span className="text-[11px] font-bold text-slate-500">{notifications.length} إشعار محفوظ</span>
-          <Button variant="ghost" size="sm" className="h-8 text-xs text-[#0b4a3f]" onClick={() => void markAllRead()} disabled={loading || unreadCount === 0}>
-            <CheckCheck className="ml-1 h-3.5 w-3.5" />
-            تحديد الكل كمقروء
-          </Button>
-        </div>
-
-        <ScrollArea className="max-h-[430px]">
-          <div className="divide-y divide-slate-100">
-            {ordered.slice(0, 30).map((notice) => {
-              const category = notificationCategory(notice);
-              const Icon = category === 'follow_up_risk_policy'
-                ? Settings2
-                : category === 'follow_up_risk_acceptance'
-                  ? FileCheck2
-                : category === 'follow_up_risk'
-                  ? AlertTriangle
-                : category === 'follow_up_preventive'
-                  ? ShieldCheck
-                : category === 'follow_up_early_warning'
-                  ? AlertTriangle
-                : category === 'follow_up_capa' || category === 'follow_up_kpi'
-                  ? Target
-                : category === 'follow_up'
-                  ? notice.severity === 'danger' ? AlertTriangle : ListTodo
-                  : category === 'improvement' || category === 'completion'
-                    ? Target
-                    : Clock3;
-              const iconClass = notice.source === 'follow_up' && notice.severity === 'danger'
-                ? 'border-red-200 bg-red-50 text-red-700'
-                : notice.isRead
-                  ? 'border-slate-200 bg-white text-slate-500'
-                  : 'border-amber-200 bg-white text-amber-700';
-              return (
-                <button
-                  key={`${notice.source}:${notice.id}`}
-                  type="button"
-                  onClick={() => void openNotice(notice)}
-                  className={`flex w-full gap-3 p-4 text-right transition hover:bg-slate-50 ${notice.isRead ? 'bg-white' : 'bg-amber-50/45'}`}
-                >
-                  <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${iconClass}`}>
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-start justify-between gap-2">
-                      <strong className="line-clamp-1 text-xs font-black text-slate-900">{notice.title}</strong>
-                      {!notice.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-rose-600" />}
-                    </span>
-                    <span className="mt-1 line-clamp-2 block text-[11px] leading-5 text-slate-600">{notice.message}</span>
-                    <span className="mt-2 flex items-center justify-between gap-2 text-[10px] text-slate-400">
-                      <span>{formatRelativeTime(notice.createdAt)}</span>
-                      <span className="inline-flex items-center gap-1 font-bold text-[#0b4a3f]"><ExternalLink className="h-3 w-3" />فتح</span>
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-
-            {!ordered.length && (
-              <div className="p-8 text-center">
-                <CheckCheck className="mx-auto h-8 w-8 text-emerald-500" />
-                <p className="mt-3 text-sm font-black text-slate-700">لا توجد إشعارات حاليًا</p>
-                <p className="mt-1 text-xs text-slate-400">
-                  {canViewNotifications
-                    ? 'ستظهر هنا التنبيهات الموجهة إلى حسابك عند إنشائها.'
-                    : 'لا توجد مصادر إشعارات تشغيلية مخولة لهذا الحساب حاليًا.'}
-                </p>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-
-        {canViewNotifications && (
-        <div className={`grid gap-2 border-t border-slate-200 bg-white p-3 ${canViewMosques && canViewFollowUp ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          {canViewFollowUp && (
-            <Button
-              variant="outline"
-              className="border-[#d9c9a5] bg-[#fffdf8] font-bold text-[#0b4a3f]"
-              onClick={() => {
-                setOpen(false);
-                navigate('/follow-up');
-              }}
-            >
-              <ListTodo className="ml-1 h-4 w-4" />
-              نظام المتابعة
-            </Button>
-          )}
-          {canViewMosques && (
-            <Button
-              variant="outline"
-              className="border-[#d9c9a5] bg-[#fffdf8] font-bold text-[#0b4a3f]"
-              onClick={() => {
-                setOpen(false);
-                navigate('/mosques?tab=notifications');
-              }}
-            >
-              إشعارات المساجد
-            </Button>
-          )}
-        </div>
+        <Bell className="h-4 w-4" />
+        {unreadCount > 0 && (
+          <span className="absolute -end-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1 text-[9px] font-black leading-none text-white ring-2 ring-background">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
         )}
-      </PopoverContent>
-    </Popover>
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          className="platform-notification-dialog max-h-[86dvh] overflow-hidden p-0 sm:max-w-[520px]"
+          dir="rtl"
+        >
+          <div className="border-b border-slate-200 bg-slate-50/80 p-4 pe-12">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Bell className="h-5 w-5 text-[#0b4a3f]" />
+                  <DialogTitle className="font-black text-slate-900">مركز الإشعارات</DialogTitle>
+                  {unreadCount > 0 && <Badge className="bg-rose-600 text-white">{unreadCount} جديد</Badge>}
+                </div>
+                <DialogDescription className="mt-1 text-right text-[11px] leading-5 text-slate-500">
+                  إشعارات محفوظة على حسابك وموجهة حسب صلاحياتك ومسؤولياتك.
+                </DialogDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => void loadNotifications()}
+                disabled={loading}
+              >
+                <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+            <span className="text-[11px] font-bold text-slate-500">{notifications.length} إشعار محفوظ</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-[#0b4a3f]"
+              onClick={() => void markAllRead()}
+              disabled={loading || unreadCount === 0}
+            >
+              <CheckCheck className="ml-1 h-3.5 w-3.5" />
+              تحديد الكل كمقروء
+            </Button>
+          </div>
+
+          <ScrollArea className="max-h-[56dvh]">
+            <div className="divide-y divide-slate-100">
+              {ordered.slice(0, 30).map((notice) => {
+                const category = notificationCategory(notice);
+                const Icon = category === 'follow_up_risk_policy'
+                  ? Settings2
+                  : category === 'follow_up_risk_acceptance'
+                    ? FileCheck2
+                  : category === 'follow_up_risk'
+                    ? AlertTriangle
+                  : category === 'follow_up_preventive'
+                    ? ShieldCheck
+                  : category === 'follow_up_early_warning'
+                    ? AlertTriangle
+                  : category === 'follow_up_capa' || category === 'follow_up_kpi'
+                    ? Target
+                  : category === 'follow_up'
+                    ? notice.severity === 'danger' ? AlertTriangle : ListTodo
+                    : category === 'improvement' || category === 'completion'
+                      ? Target
+                      : Clock3;
+                const iconClass = notice.source === 'follow_up' && notice.severity === 'danger'
+                  ? 'border-red-200 bg-red-50 text-red-700'
+                  : notice.isRead
+                    ? 'border-slate-200 bg-white text-slate-500'
+                    : 'border-amber-200 bg-white text-amber-700';
+
+                return (
+                  <button
+                    key={`${notice.source}:${notice.id}`}
+                    type="button"
+                    onClick={() => void openNotice(notice)}
+                    className={`flex w-full gap-3 p-4 text-right transition hover:bg-slate-50 ${notice.isRead ? 'bg-white' : 'bg-amber-50/45'}`}
+                  >
+                    <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${iconClass}`}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-start justify-between gap-2">
+                        <strong className="line-clamp-1 text-xs font-black text-slate-900">{notice.title}</strong>
+                        {!notice.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-rose-600" />}
+                      </span>
+                      <span className="mt-1 line-clamp-2 block text-[11px] leading-5 text-slate-600">{notice.message}</span>
+                      <span className="mt-2 flex items-center justify-between gap-2 text-[10px] text-slate-400">
+                        <span>{formatRelativeTime(notice.createdAt)}</span>
+                        <span className="inline-flex items-center gap-1 font-bold text-[#0b4a3f]">
+                          <ExternalLink className="h-3 w-3" />
+                          فتح
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+
+              {!ordered.length && (
+                <div className="p-8 text-center">
+                  <CheckCheck className="mx-auto h-8 w-8 text-emerald-500" />
+                  <p className="mt-3 text-sm font-black text-slate-700">لا توجد إشعارات حاليًا</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {canViewNotifications
+                      ? 'ستظهر هنا التنبيهات الموجهة إلى حسابك عند إنشائها.'
+                      : 'لا توجد مصادر إشعارات تشغيلية مخولة لهذا الحساب حاليًا.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          {canViewNotifications && (
+            <div className={`grid gap-2 border-t border-slate-200 bg-white p-3 ${canViewMosques && canViewFollowUp ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {canViewFollowUp && (
+                <Button
+                  variant="outline"
+                  className="border-[#d9c9a5] bg-[#fffdf8] font-bold text-[#0b4a3f]"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate('/follow-up');
+                  }}
+                >
+                  <ListTodo className="ml-1 h-4 w-4" />
+                  نظام المتابعة
+                </Button>
+              )}
+              {canViewMosques && (
+                <Button
+                  variant="outline"
+                  className="border-[#d9c9a5] bg-[#fffdf8] font-bold text-[#0b4a3f]"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate('/mosques?tab=notifications');
+                  }}
+                >
+                  إشعارات المساجد
+                </Button>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
