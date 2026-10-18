@@ -1158,6 +1158,10 @@ export type TransactionFollowUpBackupRun = {
   copiedAttachmentCount: number;
   failedAttachmentCount: number;
   errorMessage?: string | null;
+  integrityStatus?: 'success' | 'warning' | 'failed' | null;
+  integrityMessage?: string | null;
+  verifiedFileCount?: number | null;
+  verifiedAt?: string | null;
   startedAt: string;
   completedAt?: string | null;
   createdAt: string;
@@ -1487,6 +1491,12 @@ export const transactionFollowUpApi = {
     }>('/api/transaction-follow-up/reports/backup-schedule/run', {
       method: 'POST',
     }),
+
+  verifyBackupRun: (id: string) =>
+    apiJson<TransactionFollowUpBackupRun>(
+      `/api/transaction-follow-up/reports/backup-runs/${id}/verify`,
+      { method: 'POST' },
+    ),
 
   reportSchedules: () =>
     apiJson<TransactionFollowUpReportSchedule[]>('/api/transaction-follow-up/reports/schedules'),
