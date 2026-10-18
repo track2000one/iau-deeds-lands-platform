@@ -7,6 +7,7 @@ import {
   HardDriveDownload,
   Play,
   RefreshCw,
+  RotateCcw,
   Save,
   ShieldCheck,
 } from 'lucide-react';
@@ -61,6 +62,12 @@ const integrityClass = {
   failed: 'border-red-300 bg-red-50 text-red-800',
 } as const;
 
+const restoreTestLabel = {
+  success: 'الاستعادة التجريبية ناجحة',
+  warning: 'الاستعادة التجريبية مع ملاحظات',
+  failed: 'فشل اختبار الاستعادة',
+} as const;
+
 const defaultSchedule = (): Pick<
   TransactionFollowUpBackupSchedule,
   'frequency' | 'dayOfWeek' | 'dayOfMonth' | 'runHour' | 'includeAttachments' | 'retentionCount' | 'isActive'
@@ -82,6 +89,7 @@ export const TransactionBackupSettings: React.FC = () => {
   const [saving, setSaving] = React.useState(false);
   const [running, setRunning] = React.useState(false);
   const [verifyingId, setVerifyingId] = React.useState<string | null>(null);
+  const [restoreTestingId, setRestoreTestingId] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     try {
@@ -178,7 +186,34 @@ export const TransactionBackupSettings: React.FC = () => {
     }
   };
 
+  const testRestore = async (run: TransactionFollowUpBackupRun) => {
+    if (!window.confirm(
+      'سيتم تنفيذ اختبار استعادة تجريبي داخل الذاكرة فقط، دون إضافة أو تعديل أو حذف أي بيانات في النظام الحالي. هل تريد المتابعة؟',
+    )) {
+      return;
+    }
+
+    try {
+      setRestoreTestingId(run.id);
+      const tested = await transactionFollowUpApi.testBackupRestore(run.id);
+      setRuns((current) => current.map((item) => item.id === tested.id ? tested : item));
+
+      if (tested.restoreTestStatus === 'success') {
+        toast.success('نجح اختبار الاستعادة التجريبي دون المساس بالبيانات الحية');
+      } else if (tested.restoreTestStatus === 'warning') {
+        toast.warning(tested.restoreTestMessage || 'نجح اختبار الاستعادة مع وجود ملاحظات');
+      } else {
+        toast.error(tested.restoreTestMessage || 'فشل اختبار الاستعادة التجريبي');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تنفيذ اختبار الاستعادة');
+    } finally {
+      setRestoreTestingId(null);
+    }
+  };
+
   const latestVerified = runs.find((run) => run.verifiedAt && run.integrityStatus);
+  const latestRestoreTest = runs.find((run) => run.restoreTestAt && run.restoreTestStatus);
 
   return (
     <Card className="border-emerald-200 shadow-none">
@@ -191,7 +226,8 @@ export const TransactionBackupSettings: React.FC = () => {
             </CardTitle>
             <p className="mt-2 max-w-4xl text-xs leading-6 text-muted-foreground">
               ينشئ نسخة مستقلة داخل Google Drive تحتوي على ملف Excel، وملف البيانات الخام،
-              ونسخ فعلية من الصور والمرفقات. الإعداد متوقف افتراضيًا إلى أن تختار الجدول وتحفظه.
+              ونسخ فعلية من الصور والمرفقات. وبعد الإنشاء يُفحص سلامة النسخة ويُجرى اختبار استعادة تجريبي
+              داخل الذاكرة دون المساس بقاعدة البيانات الحية.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -213,6 +249,16 @@ export const TransactionBackupSettings: React.FC = () => {
               >
                 <CheckCircle2 className="ml-1 h-3.5 w-3.5" />
                 آخر نسخة: {integrityLabel[latestVerified.integrityStatus]}
+              </Badge>
+            )}
+            {latestRestoreTest?.restoreTestStatus && (
+              <Badge
+                variant="outline"
+                className={integrityClass[latestRestoreTest.restoreTestStatus]}
+                title={latestRestoreTest.restoreTestMessage || undefined}
+              >
+                <RotateCcw className="ml-1 h-3.5 w-3.5" />
+                {restoreTestLabel[latestRestoreTest.restoreTestStatus]}
               </Badge>
             )}
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || running}>
@@ -409,6 +455,37 @@ export const TransactionBackupSettings: React.FC = () => {
                             {run.integrityMessage}
                           </p>
                         ) : null}
+
+                        {run.restoreTestStatus && (
+                          <div className="mt-2 rounded-xl border bg-slate-50/70 p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline" className={integrityClass[run.restoreTestStatus]}>
+                                <RotateCcw className="ml-1 h-3.5 w-3.5" />
+                                {restoreTestLabel[run.restoreTestStatus]}
+                              </Badge>
+                              <span className="text-[11px] text-muted-foreground">
+                                {run.restoreTestAt ? `اختُبرت ${formatDateTime(run.restoreTestAt)}` : ''}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-600">
+                              {run.restoreTestTransactions != null && (
+                                <span>المعاملات القابلة لإعادة البناء: <b>{run.restoreTestTransactions.toLocaleString('ar-SA')}</b></span>
+                              )}
+                              {run.restoreTestRelations != null && (
+                                <span>العلاقات: <b>{run.restoreTestRelations.toLocaleString('ar-SA')}</b></span>
+                              )}
+                              {run.restoreTestAttachments != null && (
+                                <span>المرفقات المرتبطة: <b>{run.restoreTestAttachments.toLocaleString('ar-SA')}</b></span>
+                              )}
+                            </div>
+                            {run.restoreTestMessage ? (
+                              <p className={`mt-2 text-xs leading-5 ${run.restoreTestStatus === 'failed' ? 'text-red-700' : 'text-slate-600'}`}>
+                                {run.restoreTestMessage}
+                              </p>
+                            ) : null}
+                          </div>
+                        )}
+
                         {run.errorMessage ? (
                           <p className="mt-2 text-xs text-red-700">{run.errorMessage}</p>
                         ) : null}
@@ -416,17 +493,31 @@ export const TransactionBackupSettings: React.FC = () => {
 
                       <div className="flex shrink-0 flex-wrap gap-2">
                         {run.status !== 'running' && run.status !== 'failed' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={verifyingId === run.id}
-                            onClick={() => void verifyRun(run)}
-                          >
-                            {verifyingId === run.id
-                              ? <RefreshCw className="ml-1 h-4 w-4 animate-spin" />
-                              : <ShieldCheck className="ml-1 h-4 w-4" />}
-                            فحص السلامة
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={verifyingId === run.id || restoreTestingId === run.id}
+                              onClick={() => void verifyRun(run)}
+                            >
+                              {verifyingId === run.id
+                                ? <RefreshCw className="ml-1 h-4 w-4 animate-spin" />
+                                : <ShieldCheck className="ml-1 h-4 w-4" />}
+                              فحص السلامة
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-violet-300 text-violet-800 hover:bg-violet-50"
+                              disabled={restoreTestingId === run.id || verifyingId === run.id}
+                              onClick={() => void testRestore(run)}
+                            >
+                              {restoreTestingId === run.id
+                                ? <RefreshCw className="ml-1 h-4 w-4 animate-spin" />
+                                : <RotateCcw className="ml-1 h-4 w-4" />}
+                              اختبار الاستعادة
+                            </Button>
+                          </>
                         )}
                         {run.folderUrl && (
                           <Button size="sm" variant="outline" asChild>
