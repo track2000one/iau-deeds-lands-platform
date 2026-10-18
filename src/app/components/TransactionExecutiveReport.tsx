@@ -4,6 +4,7 @@ import type {
   TransactionFollowUpPriority,
   TransactionFollowUpStatus,
   TransactionFollowUpType,
+  TransactionFollowUpOrganizationalUnit,
 } from '../api/transactionFollowUp';
 
 const statusLabels: Record<TransactionFollowUpStatus, string> = {
@@ -32,6 +33,11 @@ const typeLabels: Record<TransactionFollowUpType, string> = {
   incoming: 'وارد',
   outgoing: 'صادر',
   internal: 'داخلي',
+};
+
+const organizationalUnitLabels: Record<TransactionFollowUpOrganizationalUnit, string> = {
+  endowments_properties: 'إدارة أوقاف وأملاك الجامعة',
+  mosques_prayer_rooms: 'وحدة العناية بالمساجد والمصليات الجامعية',
 };
 
 const formatDate = (value?: string | null) =>
@@ -192,6 +198,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
                     <th className="border border-slate-200 px-1.5 py-2 text-center">التاريخ</th>
                     <th className="border border-slate-200 px-1.5 py-2 text-right">الموضوع</th>
                     <th className="border border-slate-200 px-1.5 py-2 text-center">النوع</th>
+                    <th className="border border-slate-200 px-1.5 py-2 text-right">الإدارة / الوحدة</th>
                     <th className="border border-slate-200 px-1.5 py-2 text-right">الموظف</th>
                     <th className="border border-slate-200 px-1.5 py-2 text-center">الحالة</th>
                     <th className="border border-slate-200 px-1.5 py-2 text-center">الاستحقاق</th>
@@ -204,6 +211,9 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
                       <td className="border border-slate-200 px-1.5 py-2 text-center">{formatDate(row.transactionDate)}</td>
                       <td className="border border-slate-200 px-1.5 py-2">{row.subject}</td>
                       <td className="border border-slate-200 px-1.5 py-2 text-center">{typeLabels[row.transactionType]}</td>
+                      <td className="border border-slate-200 px-1.5 py-2">
+                        {row.organizationalUnit ? organizationalUnitLabels[row.organizationalUnit] : 'غير محددة'}
+                      </td>
                       <td className="border border-slate-200 px-1.5 py-2">{row.currentAssigneeName || 'غير مسندة'}</td>
                       <td className="border border-slate-200 px-1.5 py-2 text-center">{statusLabels[row.status]}</td>
                       <td className="border border-slate-200 px-1.5 py-2 text-center">{formatDate(row.dueDate)}</td>
