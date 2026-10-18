@@ -43,6 +43,8 @@ const ACTIONS: Array<{
   { key: 'canDelete', ar: 'حذف', en: 'Delete' },
   { key: 'canReopen', ar: 'إعادة فتح', en: 'Reopen' },
   { key: 'canTransfer', ar: 'تحويل', en: 'Transfer' },
+  { key: 'canUploadAttachments', ar: 'رفع مرفقات', en: 'Upload Attachments' },
+  { key: 'canDeleteAttachments', ar: 'حذف مرفقاته', en: 'Delete Own Attachments' },
   { key: 'canPrint', ar: 'طباعة', en: 'Print' },
   { key: 'canCreateUser', ar: 'إضافة مستخدم جديد', en: 'Create User' },
   { key: 'canCreateCycle', ar: 'إنشاء دورة جديدة', en: 'Create Cycle' },
@@ -96,6 +98,8 @@ export const PermissionMatrix: React.FC<{
         canDelete: false,
         canReopen: false,
         canTransfer: false,
+        canUploadAttachments: false,
+        canDeleteAttachments: false,
         canPrint: false,
         canCreateUser: false,
         canCreateCycle: false,
@@ -122,7 +126,7 @@ export const PermissionMatrix: React.FC<{
               {ui('سياسة الجولات والزيارات الميدانية: صلاحيتا «تعديل» و«حذف» في وحدة المساجد تسمحان للمستخدم بإدارة الجولات والزيارات التي أنشأها بنفسه فقط. سجلات المستخدمين الآخرين تكون «عرض فقط»، بينما مسؤول النظام أو رئيس الوحدة يستطيع إدارة جميع السجلات وفق الصلاحيات الممنوحة.', 'Field tours and visits policy: Edit and Delete permissions in the Mosques module let a user manage only tours and visits they created. Other users’ records are read-only, while the system administrator or unit head can manage all records according to granted permissions.')}
             </p>
             <p className="mt-1 text-xs font-semibold text-sky-700">
-              {ui('نظام المتابعة: صلاحية «إضافة» تسمح للمستخدم بإنشاء معاملة جديدة عند منحها له صراحةً. «تعديل» لتحديث المعاملات المسندة للمستخدم وتسجيل الإجراءات، و«حذف» للحذف النهائي بصلاحية إشرافية، و«إعادة فتح» لإعادة المنجزة أو المغلقة إلى العمل، و«تحويل» تسمح للمستخدم العادي بتحويل المعاملة المسندة إليه فقط إلى موظف آخر مع إلزامه بتسجيل سبب التحويل.', 'Transaction Follow-up: Add explicitly allows a user to create a new transaction when granted. Edit updates assigned transactions and records actions, Delete is supervisory, Reopen returns completed or closed transactions to active work, and Transfer lets an ordinary user transfer only a transaction assigned to them with a mandatory recorded reason.')}
+              {ui('نظام المتابعة: «إضافة» لإنشاء معاملة جديدة، و«تعديل» لتسجيل الإجراءات وتحديث المعاملة المسندة، و«تحويل» لتحويل المعاملة المسندة للمستخدم، و«رفع مرفقات» لإضافة ملفات إلى المعاملة المسندة دون الحاجة لصلاحية إنشاء معاملة، و«حذف مرفقاته» لحذف الملفات التي رفعها المستخدم بنفسه فقط. صلاحية «حذف» تبقى إشرافية وتسمح بإدارة جميع المرفقات.', 'Transaction Follow-up: Add creates new transactions, Edit records actions and updates assigned transactions, Transfer moves the user’s assigned transaction, Upload Attachments adds files to an assigned transaction without granting transaction creation, and Delete Own Attachments removes only files uploaded by that user. Delete remains supervisory and can manage all attachments.')}
             </p>
             <p className="mt-1 text-xs font-semibold text-amber-700">
               {ui('صفحات المخاطر الأربع (سجل المخاطر التشغيلية، لوحة المخاطر التنفيذية، طلبات قبول المخاطر، شهية المخاطر وإعدادات KRI) تكون للمسؤول افتراضيًا، ولا تظهر للمستخدم العادي إلا إذا منح المسؤول صلاحية «عرض» للصفحة المطلوبة.', 'The four risk pages are administrator-only by default and are shown to an ordinary user only when an administrator grants View permission for the required risk page.')}
@@ -193,7 +197,10 @@ export const PermissionMatrix: React.FC<{
                     ? action.key === 'canView'
                     : action.key === 'canCreateUser'
                       ? moduleName === 'mosques'
-                      : action.key === 'canReopen' || action.key === 'canTransfer'
+                      : action.key === 'canReopen' ||
+                          action.key === 'canTransfer' ||
+                          action.key === 'canUploadAttachments' ||
+                          action.key === 'canDeleteAttachments'
                         ? moduleName === 'transaction_follow_up'
                         : isCyclePermission
                           ? ['assets', 'accounting_transformation'].includes(moduleName)
