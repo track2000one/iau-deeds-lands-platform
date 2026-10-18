@@ -3213,7 +3213,7 @@ ${styleAssets}
           }
         }}
       >
-        <DialogContent className="max-h-[94dvh] overflow-y-auto sm:max-w-5xl" dir="rtl">
+        <DialogContent className="followup-transaction-dialog max-h-[94dvh] overflow-y-auto sm:max-w-5xl" dir="rtl">
           {detailLoading && !selected ? (
             <div className="py-16 text-center"><RefreshCw className="mx-auto h-6 w-6 animate-spin" /></div>
           ) : selected ? (
