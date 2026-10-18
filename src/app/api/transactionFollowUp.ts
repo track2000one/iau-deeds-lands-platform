@@ -1061,6 +1061,7 @@ export type TransactionFollowUpExecutiveReport = {
     transactionNumber: string;
     transactionDate: string;
     transactionType: TransactionFollowUpType;
+    organizationalUnit?: TransactionFollowUpOrganizationalUnit | null;
     subject: string;
     sourceEntity?: string | null;
     priority: TransactionFollowUpPriority;
