@@ -1930,3 +1930,40 @@ label[data-app-required-label="true"]::after {
     }
   }
 }
+
+
+/* ===== Transaction Follow-up: Operational Panels ===== */
+@media screen {
+  .follow-up-page-theme .followup-operational-card,
+  .follow-up-page-theme .followup-executive-card {
+    border-color: rgba(58, 180, 207, .24) !important;
+    background:
+      linear-gradient(145deg, rgba(4, 37, 54, .98), rgba(3, 28, 44, .98)) !important;
+    color: #edfaff !important;
+    box-shadow:
+      0 20px 42px rgba(0, 7, 17, .30),
+      inset 0 1px 0 rgba(255,255,255,.04) !important;
+  }
+
+  .follow-up-page-theme .followup-operational-card > [data-slot="card-header"],
+  .follow-up-page-theme .followup-executive-card > [data-slot="card-header"] {
+    border-color: rgba(67, 178, 205, .17) !important;
+    background:
+      linear-gradient(180deg, rgba(8, 58, 77, .68), rgba(4, 37, 54, .30)) !important;
+  }
+
+  .follow-up-page-theme .followup-operational-card [class*="bg-white"],
+  .follow-up-page-theme .followup-executive-card [class*="bg-white"] {
+    background-color: rgba(8, 50, 67, .74) !important;
+  }
+
+  .follow-up-page-theme .followup-operational-card [class*="border-slate-200"],
+  .follow-up-page-theme .followup-executive-card [class*="border-slate-200"] {
+    border-color: rgba(74, 181, 205, .20) !important;
+  }
+
+  .follow-up-page-theme .followup-operational-card [class*="text-slate-"],
+  .follow-up-page-theme .followup-executive-card [class*="text-slate-"] {
+    color: #dceff5 !important;
+  }
+}
