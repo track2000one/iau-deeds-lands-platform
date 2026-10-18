@@ -52,7 +52,7 @@ export const TransactionExecutiveInbox: React.FC<Props> = ({
   onRefresh,
   onOpenTransaction,
 }) => (
-  <Card className="overflow-hidden rounded-[28px] border-amber-200 bg-gradient-to-l from-amber-50/70 via-white to-white shadow-md">
+  <Card className="followup-executive-card overflow-hidden rounded-[28px] border-amber-200 bg-gradient-to-l from-amber-50/70 via-white to-white shadow-md">
     <CardHeader className="border-b border-amber-100 px-4 py-4 sm:px-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
