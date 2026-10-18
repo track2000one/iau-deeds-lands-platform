@@ -349,6 +349,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [search, setSearch] = React.useState('');
   const [status, setStatus] = React.useState('');
   const [priority, setPriority] = React.useState('');
+  const [organizationalUnitFilter, setOrganizationalUnitFilter] = React.useState<TransactionFollowUpOrganizationalUnit | ''>('');
   const [mine, setMine] = React.useState(false);
   const [activeWorkspace, setActiveWorkspace] = React.useState<'daily' | 'transactions' | 'directives' | 'oversight'>('daily');
   const [createOpen, setCreateOpen] = React.useState(false);
@@ -411,6 +412,7 @@ export const TransactionFollowUpPage: React.FC = () => {
           search,
           status,
           priority,
+          organizationalUnit: organizationalUnitFilter,
           mine,
         }),
         transactionFollowUpApi.dashboard(mine),
@@ -432,7 +434,7 @@ export const TransactionFollowUpPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, priority, search, status, mine, analyticsPeriod]);
+  }, [page, priority, search, status, organizationalUnitFilter, mine, analyticsPeriod]);
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => void load(), search.trim() ? 250 : 0);
@@ -447,7 +449,7 @@ export const TransactionFollowUpPage: React.FC = () => {
 
   React.useEffect(() => {
     setPage(1);
-  }, [status, priority, mine]);
+  }, [status, priority, organizationalUnitFilter, mine]);
 
   React.useEffect(() => {
     if (!(isAdmin || canDelete) && !mine) {
@@ -1661,6 +1663,22 @@ ${styleAssets}
       )
     )
   );
+
+  const recentRecords = React.useMemo(
+    () =>
+      [...records]
+        .sort((left, right) =>
+          new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+        )
+        .slice(0, 5),
+    [records],
+  );
+
+  const openBackupCenter = () => {
+    setReportSection('schedule');
+    setReportOpen(true);
+    void loadReportSchedules();
+  };
 
   return (
     <div className="follow-up-page-theme mx-auto w-full max-w-[1750px] space-y-5">
