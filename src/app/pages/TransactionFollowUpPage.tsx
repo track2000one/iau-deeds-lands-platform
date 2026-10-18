@@ -2779,37 +2779,6 @@ ${styleAssets}
           </DialogHeader>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <Field label="رقم المعاملة *">
-                <Input
-                  value={createForm.transactionNumber}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, transactionNumber: e.target.value }))}
-                  placeholder="مثال: 1234"
-                />
-              </Field>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                رقم المعاملة فريد داخل نفس العام، ويمكن تكراره فقط في عام مختلف.
-              </p>
-            </div>
-            <div className="md:col-span-2">
-              <AppDateField
-                label="تاريخ المعاملة"
-                value={createForm.transactionDate}
-                dateType={createForm.transactionDateType}
-                onValueChange={(value) => setCreateForm((p) => ({ ...p, transactionDate: value }))}
-                onDateTypeChange={(transactionDateType) =>
-                  setCreateForm((p) => ({ ...p, transactionDateType, transactionDate: '' }))
-                }
-                required
-                helperText={
-                  enteredTransactionYear(createForm.transactionDate)
-                    ? `سيتم التحقق من عدم تكرار رقم المعاملة داخل عام ${enteredTransactionYear(createForm.transactionDate)}${createForm.transactionDateType === 'hijri' ? 'هـ' : 'م'}.`
-                    : 'اختر التقويم الميلادي أو الهجري حسب تاريخ أصل المعاملة.'
-                }
-              />
-            </div>
-            <Field label="نوع المعاملة"><NativeSelect value={createForm.transactionType} onChange={(e) => setCreateForm((p) => ({ ...p, transactionType: e.target.value as TransactionFollowUpType }))}>{transactionTypeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</NativeSelect></Field>
-            <Field label="الأولوية"><NativeSelect value={createForm.priority} onChange={(e) => setCreateForm((p) => ({ ...p, priority: e.target.value as TransactionFollowUpPriority }))}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
-            <div className="md:col-span-2">
               <Field label="الإدارة / الوحدة *">
                 <NativeSelect
                   value={createForm.organizationalUnit || ''}
@@ -2830,6 +2799,41 @@ ${styleAssets}
                 حقل إلزامي لتحديد الجهة التنظيمية التي تتبع لها المعاملة داخل نظام المتابعة.
               </p>
             </div>
+
+            <div className="md:col-span-2">
+              <Field label="رقم المعاملة *">
+                <Input
+                  value={createForm.transactionNumber}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, transactionNumber: e.target.value }))}
+                  placeholder="مثال: 1234"
+                />
+              </Field>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                رقم المعاملة فريد داخل نفس العام، ويمكن تكراره فقط في عام مختلف.
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
+              <AppDateField
+                label="تاريخ المعاملة"
+                value={createForm.transactionDate}
+                dateType={createForm.transactionDateType}
+                onValueChange={(value) => setCreateForm((p) => ({ ...p, transactionDate: value }))}
+                onDateTypeChange={(transactionDateType) =>
+                  setCreateForm((p) => ({ ...p, transactionDateType, transactionDate: '' }))
+                }
+                required
+                helperText={
+                  enteredTransactionYear(createForm.transactionDate)
+                    ? `سيتم التحقق من عدم تكرار رقم المعاملة داخل عام ${enteredTransactionYear(createForm.transactionDate)}${createForm.transactionDateType === 'hijri' ? 'هـ' : 'م'}.`
+                    : 'اختر التقويم الميلادي أو الهجري حسب تاريخ أصل المعاملة.'
+                }
+              />
+            </div>
+
+            <Field label="نوع المعاملة"><NativeSelect value={createForm.transactionType} onChange={(e) => setCreateForm((p) => ({ ...p, transactionType: e.target.value as TransactionFollowUpType }))}>{transactionTypeOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</NativeSelect></Field>
+            <Field label="الأولوية"><NativeSelect value={createForm.priority} onChange={(e) => setCreateForm((p) => ({ ...p, priority: e.target.value as TransactionFollowUpPriority }))}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
+
             <div className="md:col-span-2"><Field label="موضوع المعاملة *"><Input value={createForm.subject} onChange={(e) => setCreateForm((p) => ({ ...p, subject: e.target.value }))} /></Field></div>
             <Field label="الجهة"><Input value={createForm.sourceEntity || ''} onChange={(e) => setCreateForm((p) => ({ ...p, sourceEntity: e.target.value }))} placeholder="الجهة الواردة منها أو الموجهة إليها" /></Field>
             <Field label="الموظف المختص"><NativeSelect value={createForm.currentAssigneeUserId || ''} onChange={(e) => setCreateForm((p) => ({ ...p, currentAssigneeUserId: e.target.value }))}><option value="">بدون إسناد حاليًا</option>{assignees.map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}</NativeSelect></Field>
