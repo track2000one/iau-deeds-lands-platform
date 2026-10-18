@@ -1682,31 +1682,49 @@ ${styleAssets}
 
   return (
     <div className="follow-up-page-theme mx-auto w-full max-w-[1750px] space-y-5">
-      <section className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_18px_50px_rgba(15,23,42,.07)]">
-        <div className="flex flex-col gap-5 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-xs font-black text-primary">
-              <ListTodo className="h-4 w-4" />
-              سير ومتابعة المعاملات
+      <section className="followup-hero overflow-hidden rounded-[28px]">
+        <div className="followup-hero__top">
+          <div className="followup-hero__title">
+            <span className="followup-hero__title-icon">
+              <FileText className="h-7 w-7" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-[11px] font-black text-cyan-300">
+                <ListTodo className="h-3.5 w-3.5" />
+                سير ومتابعة المعاملات
+              </div>
+              <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">نظام المتابعة</h1>
+              <p className="mt-1 text-xs leading-6 text-slate-300 sm:text-sm">
+                إدارة ومتابعة معاملات إدارة أوقاف وأملاك الجامعة ووحدة العناية بالمساجد والمصليات الجامعية.
+              </p>
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">نظام المتابعة</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-500">
-              مركز عمل موحد لمتابعة المعاملات والاستحقاقات والإجراءات والاعتمادات حتى الإنجاز والإقفال.
-            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="followup-hero__search">
+            <Search className="h-5 w-5 shrink-0 text-cyan-300" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') setActiveWorkspace('transactions');
+              }}
+              placeholder="البحث في المعاملات..."
+              className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+            />
+          </div>
+
+          <div className="followup-hero__actions">
             {(isAdmin || canDelete) ? (
               <Button
                 variant="outline"
-                className="h-10 rounded-xl border-slate-300 bg-white"
+                className="followup-hero__button"
                 onClick={() => setMine((value) => !value)}
               >
                 <UserRound className="ml-2 h-4 w-4" />
                 {mine ? 'عرض الإدارة' : 'معاملاتي'}
               </Button>
             ) : (
-              <Badge variant="outline" className="h-10 rounded-xl border-primary/20 bg-primary/5 px-3">
+              <Badge variant="outline" className="followup-hero__badge">
                 <UserRound className="ml-2 h-4 w-4" />
                 مهامي المسندة
               </Badge>
@@ -1714,7 +1732,7 @@ ${styleAssets}
 
             <Button
               variant="outline"
-              className="h-10 rounded-xl border-slate-300 bg-white"
+              className="followup-hero__button"
               onClick={() => void load()}
               disabled={loading}
             >
@@ -1725,7 +1743,7 @@ ${styleAssets}
             {canPrint && (
               <Button
                 variant="outline"
-                className="h-10 rounded-xl border-sky-300 bg-sky-50 px-4 text-sky-800 shadow-sm hover:bg-sky-100 hover:text-sky-900"
+                className="followup-hero__button"
                 onClick={() => void openExecutiveReport()}
               >
                 <FileText className="ml-2 h-4 w-4" />
@@ -1735,7 +1753,7 @@ ${styleAssets}
 
             {canAdd && (
               <Button
-                className="h-10 rounded-xl bg-emerald-600 px-4 text-white shadow-sm hover:bg-emerald-700"
+                className="followup-hero__button followup-hero__button--primary"
                 onClick={() => {
                   setCreateForm(emptyCreate());
                   setCreateFiles([]);
@@ -1743,19 +1761,48 @@ ${styleAssets}
                 }}
               >
                 <Plus className="ml-2 h-4 w-4" />
-                تسجيل معاملة
+                إضافة معاملة
               </Button>
             )}
           </div>
         </div>
 
-        <div className="border-t bg-slate-50/70 px-3 py-3 sm:px-5">
+        <div className="followup-unit-grid">
+          <FollowUpUnitCard
+            title="إدارة أوقاف وأملاك الجامعة"
+            subtitle="عرض معاملات الإدارة"
+            icon={<Building2 className="h-8 w-8" />}
+            tone="blue"
+            onClick={() => {
+              setOrganizationalUnitFilter('endowments_properties');
+              setStatus('');
+              setPriority('');
+              setSearch('');
+              setActiveWorkspace('transactions');
+            }}
+          />
+          <FollowUpUnitCard
+            title="وحدة العناية بالمساجد والمصليات الجامعية"
+            subtitle="عرض معاملات الوحدة"
+            icon={<ShieldCheck className="h-8 w-8" />}
+            tone="teal"
+            onClick={() => {
+              setOrganizationalUnitFilter('mosques_prayer_rooms');
+              setStatus('');
+              setPriority('');
+              setSearch('');
+              setActiveWorkspace('transactions');
+            }}
+          />
+        </div>
+
+        <div className="followup-workspace-nav">
           <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             <WorkspaceTab
               active={activeWorkspace === 'daily'}
               icon={<Inbox className="h-4 w-4" />}
-              title="المتابعة اليومية"
-              hint="ما يحتاج إجراء الآن"
+              title="الرئيسية"
+              hint="لوحة المتابعة"
               onClick={() => setActiveWorkspace('daily')}
             />
             <WorkspaceTab
