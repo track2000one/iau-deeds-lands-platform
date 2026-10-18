@@ -3159,6 +3159,7 @@ ${styleAssets}
             <Field label="تنبيه عدم النشاط بعد (أيام)"><Input type="number" min={1} max={90} value={createForm.inactivityAlertDays || 3} onChange={(e) => setCreateForm((p) => ({ ...p, inactivityAlertDays: Number(e.target.value) || 3 }))} /></Field>
             <div className="md:col-span-2"><Field label="ملاحظات"><Textarea rows={3} value={createForm.notes || ''} onChange={(e) => setCreateForm((p) => ({ ...p, notes: e.target.value }))} /></Field></div>
 
+            {canUploadAttachments && (
             <div className="md:col-span-2 rounded-2xl border border-dashed border-sky-200 bg-sky-50/40 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -3212,6 +3213,7 @@ ${styleAssets}
                 </div>
               ) : null}
             </div>
+            )}
 
             <div className="md:col-span-2 flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setCreateOpen(false); setCreateFiles([]); }} disabled={saving || attachmentUploading}>إلغاء</Button>
