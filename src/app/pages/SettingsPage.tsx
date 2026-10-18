@@ -14,13 +14,6 @@ export const SettingsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { currentTheme, setTheme } = useTheme();
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'ar' ? 'en' : 'ar';
-    i18n.changeLanguage(newLang);
-    document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
-    document.documentElement.lang = newLang;
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -29,42 +22,27 @@ export const SettingsPage: React.FC = () => {
         <p className="text-muted-foreground mt-1">تخصيص المنصة حسب تفضيلاتك</p>
       </div>
 
-      {/* Language Settings */}
+      {/* Language Settings */
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Globe className="h-5 w-5" />
-            {t('settings.language')}
+            اللغة
           </CardTitle>
-          <CardDescription>اختر لغة واجهة المنصة</CardDescription>
+          <CardDescription>لغة واجهة المنصة المعتمدة</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-3">
-            <Button
-              variant={i18n.language === 'ar' ? 'default' : 'outline'}
-              onClick={() => {
-                if (i18n.language !== 'ar') toggleLanguage();
-              }}
-              className="flex-1"
-            >
-              العربية
-              {i18n.language === 'ar' && <Check className="mr-2 h-4 w-4" />}
-            </Button>
-            <Button
-              variant={i18n.language === 'en' ? 'default' : 'outline'}
-              onClick={() => {
-                if (i18n.language !== 'en') toggleLanguage();
-              }}
-              className="flex-1"
-            >
-              English
-              {i18n.language === 'en' && <Check className="mr-2 h-4 w-4" />}
-            </Button>
+          <div className="flex items-center justify-between rounded-xl border bg-muted/20 px-4 py-3">
+            <div>
+              <p className="font-bold">العربية</p>
+              <p className="mt-1 text-xs text-muted-foreground">تم اعتماد العربية كلغة وحيدة لواجهة المنصة.</p>
+            </div>
+            <Check className="h-5 w-5 text-emerald-600" />
           </div>
         </CardContent>
       </Card>
 
-      {/* Advanced Appearance Settings Card */}
+      {/* Advanced Appearance Settings Card */}}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
