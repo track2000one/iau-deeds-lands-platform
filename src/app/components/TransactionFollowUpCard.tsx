@@ -215,14 +215,14 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
   };
 
   return (
-    <article className="platform-record-card flex h-full flex-col p-4 sm:p-5">
+    <article className="platform-record-card followup-transaction-card flex h-full flex-col p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">رقم المعاملة</p>
-          <h2 className="mt-1 truncate text-lg font-black text-slate-800">
+          <p className="followup-transaction-card__label text-xs">رقم المعاملة</p>
+          <h2 className="followup-transaction-card__number mt-1 truncate text-lg font-black">
             {record.transactionNumber}
           </h2>
-          <p className="mt-1 truncate font-mono text-[10px] text-slate-400">
+          <p className="followup-transaction-card__tracking mt-1 truncate font-mono text-[10px]">
             {record.trackingNumber}
           </p>
         </div>
@@ -241,29 +241,29 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
       </div>
 
       <div className="platform-record-metric mt-4 p-3">
-        <p className="text-xs text-muted-foreground">موضوع المعاملة</p>
-        <p className="mt-1 min-h-[48px] line-clamp-2 text-sm font-semibold leading-6 text-slate-700">
+        <p className="followup-transaction-card__label text-xs">موضوع المعاملة</p>
+        <p className="followup-transaction-card__subject mt-1 min-h-[48px] line-clamp-2 text-sm font-semibold leading-6">
           {record.subject || '—'}
         </p>
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
         <div className="min-w-0">
-          <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+          <dt className="followup-transaction-card__label flex items-center gap-1 text-xs">
             <UserRound className="h-3.5 w-3.5" />
             الموظف
           </dt>
           <dd className="mt-1 truncate font-semibold">{record.currentAssigneeName || 'غير مسندة'}</dd>
         </div>
         <div>
-          <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+          <dt className="followup-transaction-card__label flex items-center gap-1 text-xs">
             <CalendarDays className="h-3.5 w-3.5" />
             تاريخ المعاملة
           </dt>
           <dd className="mt-1 font-semibold">{formatTransactionDate(record)}</dd>
         </div>
         <div>
-          <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+          <dt className="followup-transaction-card__label flex items-center gap-1 text-xs">
             <FileClock className="h-3.5 w-3.5" />
             الاستحقاق
           </dt>
@@ -272,7 +272,7 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
           </dd>
         </div>
         <div>
-          <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+          <dt className="followup-transaction-card__label flex items-center gap-1 text-xs">
             <Clock3 className="h-3.5 w-3.5" />
             آخر إجراء
           </dt>
@@ -280,9 +280,9 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
         </div>
       </dl>
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/65 px-3 py-2.5">
-        <p className="text-[11px] text-muted-foreground">الإجراء المطلوب</p>
-        <p className="mt-1 min-h-[36px] line-clamp-2 text-xs font-semibold leading-5 text-slate-700">
+      <div className="followup-transaction-card__action mt-4 rounded-xl border px-3 py-2.5">
+        <p className="followup-transaction-card__label text-[11px]">الإجراء المطلوب</p>
+        <p className="followup-transaction-card__action-text mt-1 min-h-[36px] line-clamp-2 text-xs font-semibold leading-5">
           {record.requiredAction || 'لا يوجد إجراء مطلوب مسجل.'}
         </p>
       </div>
@@ -297,12 +297,12 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
           </Badge>
         )}
         {record.organizationalUnit && (
-          <span className="max-w-full truncate text-[10px] font-semibold text-slate-600">
+          <span className="followup-transaction-card__meta max-w-full truncate text-[10px] font-semibold">
             {organizationalUnitLabels[record.organizationalUnit]}
           </span>
         )}
         {record.sourceEntity && (
-          <span className="max-w-full truncate text-[10px] text-muted-foreground">
+          <span className="followup-transaction-card__meta max-w-full truncate text-[10px]">
             الجهة: {record.sourceEntity}
           </span>
         )}
