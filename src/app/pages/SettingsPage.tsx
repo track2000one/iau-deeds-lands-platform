@@ -22,7 +22,7 @@ export const SettingsPage: React.FC = () => {
         <p className="text-muted-foreground mt-1">تخصيص المنصة حسب تفضيلاتك</p>
       </div>
 
-      {/* Language Settings */
+      {/* Language Settings */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -42,7 +42,7 @@ export const SettingsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Advanced Appearance Settings Card */}}
+      {/* Advanced Appearance Settings Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
