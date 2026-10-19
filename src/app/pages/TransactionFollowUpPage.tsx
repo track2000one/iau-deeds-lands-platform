@@ -549,6 +549,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [scheduleDayOfMonth, setScheduleDayOfMonth] = React.useState(1);
   const [scheduleRunHour, setScheduleRunHour] = React.useState(8);
   const [scheduleAssigneeId, setScheduleAssigneeId] = React.useState('');
+  const [scheduleTemplateId, setScheduleTemplateId] = React.useState('');
 
   const managedReportTemplate =
     reportTemplates.find((template) => template.id === reportTemplateManageId) || null;
@@ -1043,8 +1044,19 @@ export const TransactionFollowUpPage: React.FC = () => {
       setReportTo(archive.periodTo.slice(0, 10));
       setReportMode(archive.reportType);
       setReportAssigneeId(archive.assigneeUserId || '');
+      const archivedTemplate = archive.templateSnapshot
+        ? normalizeReportTemplate(archive.templateSnapshot)
+        : null;
+      if (archivedTemplate) {
+        setFlexibleReportOptions(cloneFlexibleReportOptions(archivedTemplate.options));
+        setReportOrientation(archivedTemplate.orientation);
+      }
       setReportSection('preview');
-      toast.success('تم فتح النسخة المؤرشفة');
+      toast.success(
+        archive.templateName
+          ? `تم فتح النسخة المؤرشفة وفق قالب «${archive.templateName}»`
+          : 'تم فتح النسخة المؤرشفة',
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر فتح التقرير المؤرشف');
     } finally {
@@ -1083,6 +1095,10 @@ export const TransactionFollowUpPage: React.FC = () => {
       toast.error('اكتب اسم الجدولة');
       return;
     }
+    if (!scheduleTemplateId) {
+      toast.error('اختر قالب التقرير الذي ستعتمد عليه الجدولة');
+      return;
+    }
     try {
       setReportScheduleLoading(true);
       await transactionFollowUpApi.createReportSchedule({
@@ -1092,9 +1108,10 @@ export const TransactionFollowUpPage: React.FC = () => {
         dayOfMonth: scheduleFrequency === 'monthly' ? scheduleDayOfMonth : null,
         runHour: scheduleRunHour,
         assigneeUserId: isAdmin || canDelete ? scheduleAssigneeId || null : null,
+        templateId: scheduleTemplateId,
         isActive: true,
       });
-      toast.success('تم إنشاء جدولة التقرير الآلي');
+      toast.success('تم إنشاء الجدولة وربطها بقالب التقرير المرن');
       await loadReportSchedules();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر إنشاء جدولة التقرير');
