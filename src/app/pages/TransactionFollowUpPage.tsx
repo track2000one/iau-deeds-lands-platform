@@ -3830,7 +3830,7 @@ ${styleAssets}
 
           {reportSection === 'preview' && (
             <>
-              <div className="grid gap-3 rounded-2xl border border-blue-200 !bg-blue-50 p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8" style={{ backgroundColor: '#EFF6FF' }}>
+              <div className="grid gap-3 rounded-2xl border border-cyan-200 !bg-cyan-50 p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8" style={{ backgroundColor: '#ECFEFF' }}>
                 <Field label="نوع التقرير">
                   <NativeSelect
                     value={reportMode}
@@ -3990,7 +3990,7 @@ ${styleAssets}
                   </Button>
                 </div>
 
-                <div className="rounded-2xl border border-blue-200 !bg-blue-50 p-3" style={{ backgroundColor: '#EFF6FF' }}>
+                <div className="rounded-2xl border border-violet-200 !bg-violet-50 p-3" style={{ backgroundColor: '#F5F3FF' }}>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-black text-slate-900">قوالب التقرير المحفوظة</p>
@@ -4350,7 +4350,7 @@ ${styleAssets}
                   )}
                 </div>
 
-                <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+                <div className="grid gap-3 rounded-2xl border border-sky-200 !bg-sky-50 p-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]" style={{ backgroundColor: '#F0F9FF' }}>
                   <Field label="عنوان التقرير">
                     <Input
                       value={flexibleReportOptions.title}
@@ -4404,7 +4404,7 @@ ${styleAssets}
                   </Field>
                 </div>
 
-                <div>
+                <div className="rounded-2xl border border-emerald-200 !bg-emerald-50 p-3" style={{ backgroundColor: '#ECFDF5' }}>
                   <p className="mb-2 text-xs font-black text-slate-700">الفئات الظاهرة في التقرير</p>
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {FLEXIBLE_REPORT_CATEGORIES.map((category) => {
@@ -4427,7 +4427,7 @@ ${styleAssets}
                   </div>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+                <div className="grid gap-3 rounded-2xl border border-indigo-200 !bg-indigo-50 p-3 md:grid-cols-3 xl:grid-cols-5" style={{ backgroundColor: '#EEF2FF' }}>
                   <Field label="الفرز حسب">
                     <NativeSelect
                       value={flexibleReportOptions.sortBy}
@@ -4490,7 +4490,7 @@ ${styleAssets}
                   </div>
                 </div>
 
-                <div>
+                <div className="rounded-2xl border border-rose-200 !bg-rose-50 p-3" style={{ backgroundColor: '#FFF1F2' }}>
                   <p className="mb-2 text-xs font-black text-slate-700">الأعمدة الظاهرة</p>
                   <div className="flex flex-wrap gap-2">
                     {FLEXIBLE_REPORT_COLUMNS.map((column) => {
@@ -4514,7 +4514,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs leading-6 text-emerald-950">
+              <div className="rounded-2xl border border-lime-200 !bg-lime-50 px-4 py-3 text-xs leading-6 text-lime-950" style={{ backgroundColor: '#F7FEE7' }}>
                 <b>Excel المرن:</b> يصدر نفس نتيجة المعاينة الحالية حرفيًا من حيث الفئات، التصفية، الفرز، الأعمدة والاستبعادات،
                 مع تنسيق احترافي ومرشح تلقائي وتجهيز للطباعة. أما «نسخة احتياطية كاملة» فتبقى منفصلة، وتنشئ ZIP يحتوي على
                 جميع بيانات نظام المتابعة وملف Excel خام وJSON ونسخ فعلية من الصور والمرفقات وأدلة التوجيهات.
