@@ -27,6 +27,7 @@ import {
   RotateCcw,
   ListTodo,
   Printer,
+  GitMerge,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -306,6 +307,12 @@ export const ArchivePage: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [excelImportOpen, setExcelImportOpen] = useState(false);
+
+  const [mergeSelectionMode, setMergeSelectionMode] = useState(false);
+  const [selectedMergeIds, setSelectedMergeIds] = useState<string[]>([]);
+  const [mergeTargetId, setMergeTargetId] = useState('');
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
 
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
@@ -978,6 +985,82 @@ export const ArchivePage: React.FC = () => {
     setSearchQuery('');
     setFilterCategory('');
     setFilterConfidentiality('');
+  };
+
+  const selectedMergeRecords = useMemo(
+    () => documents.filter((doc) => selectedMergeIds.includes(doc.id)),
+    [documents, selectedMergeIds],
+  );
+
+  const toggleMergeSelection = (id: string) => {
+    const next = selectedMergeIds.includes(id)
+      ? selectedMergeIds.filter((item) => item !== id)
+      : [...selectedMergeIds, id];
+
+    setSelectedMergeIds(next);
+    setMergeTargetId((target) => (target && next.includes(target) ? target : next[0] || ''));
+  };
+
+  const stopMergeSelection = () => {
+    setMergeSelectionMode(false);
+    setSelectedMergeIds([]);
+    setMergeTargetId('');
+    setMergeDialogOpen(false);
+  };
+
+  const openMergeRecordsDialog = () => {
+    if (selectedMergeIds.length < 2) {
+      toast.error('حدد سجلين على الأقل للدمج');
+      return;
+    }
+    setMergeTargetId((current) =>
+      current && selectedMergeIds.includes(current) ? current : selectedMergeIds[0],
+    );
+    setMergeDialogOpen(true);
+  };
+
+  const mergeArchiveRecords = async () => {
+    if (!canEdit) {
+      toast.error('لا تملك صلاحية دمج السجلات الأرشيفية');
+      return;
+    }
+    if (selectedMergeIds.length < 2 || !mergeTargetId) {
+      toast.error('حدد سجلين على الأقل واختر السجل الرئيسي');
+      return;
+    }
+
+    try {
+      setIsMerging(true);
+      const result = await archiveRequest<{
+        record: ArchiveDocument;
+        mergedSourceIds: string[];
+        movedAttachmentCount: number;
+      }>('/records/merge', {
+        method: 'POST',
+        body: JSON.stringify({
+          recordIds: selectedMergeIds,
+          targetId: mergeTargetId,
+        }),
+      });
+
+      setDocuments((current) => {
+        const remaining = current.filter(
+          (doc) => !selectedMergeIds.includes(doc.id) || doc.id === mergeTargetId,
+        );
+        const withoutTarget = remaining.filter((doc) => doc.id !== mergeTargetId);
+        return [result.record, ...withoutTarget];
+      });
+
+      toast.success(
+        `تم دمج ${result.mergedSourceIds.length + 1} سجلات في سجل واحد ونقل ${result.movedAttachmentCount} ملف`,
+      );
+      stopMergeSelection();
+    } catch (error) {
+      console.error('Archive merge error:', error);
+      toast.error(error instanceof Error ? error.message : 'تعذر دمج السجلات الأرشيفية');
+    } finally {
+      setIsMerging(false);
+    }
   };
 
   if (isLoading) {
@@ -1784,6 +1867,47 @@ export const ArchivePage: React.FC = () => {
                 جدول
               </Button>
             </div>
+            {canEdit && !mergeSelectionMode && filteredDocuments.length > 1 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setMergeSelectionMode(true);
+                  setSelectedMergeIds([]);
+                  setMergeTargetId('');
+                }}
+                className="h-9 border-violet-300 bg-violet-50 font-bold text-violet-800 hover:bg-violet-100"
+              >
+                <GitMerge className="ml-2 h-4 w-4" />
+                دمج سجلات
+              </Button>
+            )}
+            {canEdit && mergeSelectionMode && (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={stopMergeSelection}
+                  className="h-9"
+                  disabled={isMerging}
+                >
+                  <X className="ml-2 h-4 w-4" />
+                  إلغاء
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={openMergeRecordsDialog}
+                  disabled={selectedMergeIds.length < 2 || isMerging}
+                  className="h-9 bg-violet-700 font-bold text-white hover:bg-violet-800"
+                >
+                  <GitMerge className="ml-2 h-4 w-4" />
+                  دمج المحدد ({selectedMergeIds.length})
+                </Button>
+              </>
+            )}
             <Badge variant="outline" className="w-fit border-slate-300 bg-white/90 px-3 py-1 font-bold text-slate-700 shadow-sm">
               {filteredDocuments.length} سجل · {totalArchiveAttachments.toLocaleString('ar-SA')} ملف
             </Badge>
@@ -1804,6 +1928,17 @@ export const ArchivePage: React.FC = () => {
                   className="group relative flex min-h-[390px] flex-col overflow-hidden rounded-[22px] border border-slate-300/90 bg-gradient-to-b from-white via-white to-sky-50/45 shadow-[0_6px_0_rgba(51,65,85,0.16),0_13px_28px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,1)] transition-all duration-200 hover:-translate-y-1 hover:border-sky-400/80 hover:shadow-[0_9px_0_rgba(37,99,235,0.16),0_20px_34px_rgba(15,23,42,0.13),inset_0_1px_0_rgba(255,255,255,1)]"
                 >
                   <div className="h-1.5 w-full bg-gradient-to-l from-sky-400 via-blue-700 to-slate-800 shadow-[0_2px_5px_rgba(30,64,175,0.20)]" />
+                  {mergeSelectionMode && (
+                    <label className="absolute left-4 top-4 z-10 flex cursor-pointer items-center gap-2 rounded-xl border border-violet-200 bg-white/95 px-3 py-2 text-xs font-black text-violet-800 shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedMergeIds.includes(doc.id)}
+                        onChange={() => toggleMergeSelection(doc.id)}
+                        className="h-4 w-4 accent-violet-700"
+                      />
+                      تحديد للدمج
+                    </label>
+                  )}
 
                   <div className="flex flex-1 flex-col p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-3">
@@ -1831,8 +1966,8 @@ export const ArchivePage: React.FC = () => {
                         <h3 className="line-clamp-2 text-base font-black leading-7 text-slate-800 sm:text-lg">
                           {doc.title}
                         </h3>
-                        <p className="mt-1 truncate text-xs text-slate-500" dir="auto">
-                          {doc.originalName || doc.fileName}
+                        <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                          {getArchiveReference(doc)} · {(doc.attachmentCount || doc.attachments?.length || 1).toLocaleString('ar-SA')} ملف
                         </p>
                       </div>
 
@@ -1949,7 +2084,8 @@ export const ArchivePage: React.FC = () => {
                 <table className="w-full min-w-[1180px] border-collapse text-right text-sm">
                   <thead className="bg-gradient-to-l from-slate-100 via-sky-50 to-slate-50 text-slate-700">
                     <tr className="border-b border-slate-200">
-                      <th className="px-4 py-3 font-black">العنوان / الملف</th>
+                      {mergeSelectionMode && <th className="w-14 px-3 py-3 text-center font-black">دمج</th>}
+                      <th className="px-4 py-3 font-black">العنوان / المرجع</th>
                       <th className="px-4 py-3 font-black">التصنيف</th>
                       <th className="px-4 py-3 font-black">رقم المستند</th>
                       <th className="px-4 py-3 font-black">تاريخ المستند</th>
@@ -1966,10 +2102,21 @@ export const ArchivePage: React.FC = () => {
                         key={doc.id}
                         className={`border-b border-slate-100 transition-colors hover:bg-sky-50/70 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/55'}`}
                       >
+                        {mergeSelectionMode && (
+                          <td className="px-3 py-3 align-top text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedMergeIds.includes(doc.id)}
+                              onChange={() => toggleMergeSelection(doc.id)}
+                              className="h-4 w-4 accent-violet-700"
+                              aria-label={`تحديد ${doc.title} للدمج`}
+                            />
+                          </td>
+                        )}
                         <td className="max-w-[280px] px-4 py-3 align-top">
                           <button type="button" onClick={() => openDetails(doc)} className="block w-full text-right">
                             <span className="line-clamp-2 font-black text-slate-800 hover:text-sky-700">{doc.title}</span>
-                            <span className="mt-1 block truncate text-xs text-slate-500" dir="auto">{doc.originalName || doc.fileName}</span>
+                            <span className="mt-1 block truncate text-xs font-semibold text-slate-500">{getArchiveReference(doc)}</span>
                           </button>
                           <div className="mt-2 flex flex-wrap gap-1">
                             {getArchiveMissingMetadata(doc).length > 0 && (
@@ -2063,6 +2210,92 @@ export const ArchivePage: React.FC = () => {
       />
 
       <ArchiveReportsDialog documents={documents} open={reportsOpen} onOpenChange={setReportsOpen} />
+
+      <AlertDialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
+        <AlertDialogContent className="max-w-2xl" dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <GitMerge className="h-5 w-5 text-violet-700" />
+              دمج السجلات الأرشيفية
+            </AlertDialogTitle>
+            <AlertDialogDescription className="leading-7">
+              سيتم نقل جميع ملفات السجلات المحددة إلى سجل رئيسي واحد، مع الاحتفاظ بسجل تدقيق للعملية.
+              السجلات الأخرى ستُحفظ كـ «مدمجة» ولن تظهر كبطاقات مستقلة.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-3 text-sm text-violet-950">
+              تم تحديد <b>{selectedMergeRecords.length}</b> سجلات تحتوي إجمالًا على{' '}
+              <b>
+                {selectedMergeRecords
+                  .reduce((sum, item) => sum + Number(item.attachmentCount || item.attachments?.length || 1), 0)
+                  .toLocaleString('ar-SA')}
+              </b>{' '}
+              ملف.
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="archive-merge-target">السجل الرئيسي الذي ستبقى بياناته</Label>
+              <NativeSelect
+                id="archive-merge-target"
+                value={mergeTargetId}
+                onChange={(event) => setMergeTargetId(event.target.value)}
+              >
+                {selectedMergeRecords.map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    {getArchiveReference(doc)} — {doc.title}
+                  </option>
+                ))}
+              </NativeSelect>
+              <p className="text-xs leading-6 text-muted-foreground">
+                سيتم الاحتفاظ بعنوان وتصنيف ورقم المستند والجهة والسرية الخاصة بالسجل الرئيسي،
+                بينما تنتقل إليه جميع الملفات الموجودة في السجلات الأخرى.
+              </p>
+            </div>
+
+            <div className="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
+              {selectedMergeRecords.map((doc) => (
+                <label
+                  key={doc.id}
+                  className={doc.id === mergeTargetId
+                    ? "flex items-start gap-3 rounded-lg border border-violet-300 bg-violet-50 p-3"
+                    : "flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3"}
+                >
+                  <input
+                    type="radio"
+                    name="archive-merge-target-radio"
+                    checked={doc.id === mergeTargetId}
+                    onChange={() => setMergeTargetId(doc.id)}
+                    className="mt-1 h-4 w-4 accent-violet-700"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-black text-slate-800">{doc.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {getArchiveReference(doc)} · {(doc.attachmentCount || doc.attachments?.length || 1).toLocaleString('ar-SA')} ملف
+                    </p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isMerging}>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void mergeArchiveRecords();
+              }}
+              disabled={isMerging || selectedMergeRecords.length < 2 || !mergeTargetId}
+              className="bg-violet-700 text-white hover:bg-violet-800"
+            >
+              {isMerging ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <GitMerge className="ml-2 h-4 w-4" />}
+              {isMerging ? 'جاري الدمج...' : 'اعتماد الدمج'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
