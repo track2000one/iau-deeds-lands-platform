@@ -993,13 +993,12 @@ export const ArchivePage: React.FC = () => {
   );
 
   const toggleMergeSelection = (id: string) => {
-    setSelectedMergeIds((current) => {
-      const next = current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id];
-      setMergeTargetId((target) => (target && next.includes(target) ? target : next[0] || ''));
-      return next;
-    });
+    const next = selectedMergeIds.includes(id)
+      ? selectedMergeIds.filter((item) => item !== id)
+      : [...selectedMergeIds, id];
+
+    setSelectedMergeIds(next);
+    setMergeTargetId((target) => (target && next.includes(target) ? target : next[0] || ''));
   };
 
   const stopMergeSelection = () => {
