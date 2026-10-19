@@ -1191,6 +1191,23 @@ export const ArchivePage: React.FC = () => {
               تقارير الأرشفة — طباعة / PDF / Excel
             </Button>
           )}
+          {(canEdit || canDelete) && (
+            <Button
+              variant="outline"
+              onClick={() => void openTrashCenter()}
+              className={trashOpen
+                ? "w-full border-slate-500 bg-slate-800 font-bold text-white hover:bg-slate-700 lg:w-auto"
+                : "w-full border-slate-300 bg-white font-bold text-slate-700 hover:bg-slate-50 lg:w-auto"}
+            >
+              <Trash2 className="ml-2 h-4 w-4" />
+              المحذوفات
+              {trashRecords.length > 0 ? (
+                <Badge variant="secondary" className="mr-2 min-w-6 justify-center bg-slate-100 px-1.5 text-slate-700">
+                  {trashRecords.length.toLocaleString('ar-SA')}
+                </Badge>
+              ) : null}
+            </Button>
+          )}
           {canAdd && (
             <Button
               variant="outline"
@@ -1271,6 +1288,125 @@ export const ArchivePage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {trashOpen && (
+        <Card className="overflow-hidden border-slate-300 bg-gradient-to-l from-slate-50 via-white to-slate-50 shadow-sm">
+          <CardHeader className="border-b border-slate-200 bg-white/80">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Trash2 className="h-5 w-5 text-slate-700" />
+                  مركز المحذوفات
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  يعرض السجلات المحذوفة والسجلات التي تم دمجها، مع إمكانية الاستعادة للسجلات المحذوفة فقط.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="border-slate-300 bg-white text-slate-700">
+                  {trashRecords.length.toLocaleString('ar-SA')} سجل
+                </Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void openTrashCenter()}
+                >
+                  <X className="ml-2 h-4 w-4" />
+                  إغلاق
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-4 sm:p-5">
+            {trashLoading ? (
+              <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                جاري تحميل المحذوفات...
+              </div>
+            ) : trashRecords.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-muted-foreground">
+                لا توجد سجلات في المحذوفات حاليًا.
+              </div>
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+                {trashRecords.map((record) => {
+                  const isMerged = record.status === 'merged';
+                  return (
+                    <article
+                      key={record.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className={isMerged
+                                ? "border-violet-300 bg-violet-50 font-bold text-violet-800"
+                                : "border-red-200 bg-red-50 font-bold text-red-700"}
+                            >
+                              {isMerged ? 'مدمج' : 'محذوف'}
+                            </Badge>
+                            <span className="text-xs font-bold text-slate-500">
+                              {getArchiveReference(record)}
+                            </span>
+                          </div>
+                          <h3 className="mt-2 line-clamp-2 font-black leading-6 text-slate-800">
+                            {record.title}
+                          </h3>
+                        </div>
+                        <Trash2 className={isMerged ? "h-5 w-5 text-violet-600" : "h-5 w-5 text-red-500"} />
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs">
+                        <div>
+                          <p className="text-slate-500">التصنيف</p>
+                          <p className="mt-1 font-bold text-slate-800">{record.category || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500">عدد الملفات</p>
+                          <p className="mt-1 font-bold text-slate-800">
+                            {(record.attachmentCount || record.attachments?.length || 0).toLocaleString('ar-SA')}
+                          </p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-slate-500">{isMerged ? 'تاريخ الدمج' : 'تاريخ الحذف'}</p>
+                          <p className="mt-1 font-bold text-slate-800">
+                            {formatDateTime(isMerged ? record.mergedAt : record.deletedAt)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex justify-end">
+                        {isMerged ? (
+                          <Badge variant="outline" className="border-violet-200 bg-violet-50 px-3 py-2 text-violet-800">
+                            لا يُستعاد كسجل مستقل
+                          </Badge>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void restoreArchiveRecord(record)}
+                            disabled={restoringRecordId === record.id || !canEdit}
+                            className="border-emerald-300 bg-emerald-50 font-bold text-emerald-800 hover:bg-emerald-100"
+                          >
+                            {restoringRecordId === record.id
+                              ? <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                              : <RotateCcw className="ml-2 h-4 w-4" />}
+                            استعادة السجل
+                          </Button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="overflow-hidden border-emerald-200/80 bg-gradient-to-l from-emerald-50/60 via-white to-slate-50/70">
         <CardHeader className="border-b border-emerald-100">
