@@ -955,6 +955,17 @@ export const ArchivePage: React.FC = () => {
       return;
     }
 
+    const reportWindow = window.open('', '_blank', 'width=1100,height=820');
+    if (!reportWindow) {
+      toast.error('تعذر فتح نافذة التقرير. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى.');
+      return;
+    }
+    reportWindow.opener = null;
+    reportWindow.document.write(
+      '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>جاري إعداد التقرير...</title></head><body style="font-family:Arial,Tahoma,sans-serif;padding:40px;text-align:center;color:#123047">جاري إعداد التقرير وعرض المرفقات داخل نفس الملف...</body></html>',
+    );
+    reportWindow.document.close();
+
     try {
       const detailed =
         record.events && record.attachments
@@ -1044,7 +1055,7 @@ export const ArchivePage: React.FC = () => {
         transactionId: detailed.id,
         html,
         attachments: detailed.attachments || [],
-        fileName: `المعاملة-المؤرشفة-${detailed.transactionNumber}.pdf`,
+        popup: reportWindow,
       });
 
       if (result.failed.length) {
@@ -1057,6 +1068,7 @@ export const ArchivePage: React.FC = () => {
         toast.success('تم إعداد تقرير المعاملة');
       }
     } catch (error) {
+      reportWindow.close();
       toast.error(error instanceof Error ? error.message : 'تعذر إعداد تقرير المعاملة مع المرفقات');
     }
   };
