@@ -2812,13 +2812,16 @@ export const ArchivePage: React.FC = () => {
                               </Badge>
                             ) : null;
                           })()}
-                          {getAttachmentVersionGroups(selectedDocument)
-                            .find((item) => item.current.id === attachment.id)
-                            ?.versions.some((item) => getAttachmentVersionStatus(item) === 'draft') ? (
-                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
-                              يوجد إصدار بانتظار الاعتماد
-                            </Badge>
-                          ) : null}
+                          {(() => {
+                            const pending = getAttachmentVersionGroups(selectedDocument)
+                              .find((item) => item.current.id === attachment.id)
+                              ?.versions.find((item) => getAttachmentVersionStatus(item) === 'draft');
+                            return pending ? (
+                              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                                {getApprovalDestinationLabel(pending)}
+                              </Badge>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -2897,6 +2900,16 @@ export const ArchivePage: React.FC = () => {
                                   >
                                     {getAttachmentVersionStatusLabel(version)}
                                   </Badge>
+                                  {getAttachmentVersionStatus(version) === 'draft' ? (
+                                    <Badge
+                                      variant="outline"
+                                      className={version.approvalRoute === 'specific'
+                                        ? "border-blue-200 bg-blue-50 text-blue-800"
+                                        : "border-violet-200 bg-violet-50 text-violet-800"}
+                                    >
+                                      {getApprovalDestinationLabel(version)}
+                                    </Badge>
+                                  ) : null}
                                 </div>
                                 <p className="mt-1 text-xs text-slate-500">
                                   {formatDateTime(version.createdAt)} · {formatFileSize(version.fileSize)}
@@ -2927,28 +2940,32 @@ export const ArchivePage: React.FC = () => {
                               {canApproveVersions && getAttachmentVersionStatus(version) === 'draft' ? (
                                 isOwnVersionDraft(version) ? (
                                   <Badge variant="outline" className="border-amber-300 bg-amber-50 px-3 py-2 text-amber-800">
-                                    يتطلب معتمدًا آخر
+                                    من رفعك — يلزم معتمد آخر
                                   </Badge>
+                                ) : canCurrentUserReviewVersion(version) ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      onClick={() => openVersionGovernanceDialog(version, 'approve')}
+                                    >
+                                      اعتماد
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openVersionGovernanceDialog(version, 'cancel')}
+                                      className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                                    >
+                                      إلغاء المسودة
+                                    </Button>
+                                  </>
                                 ) : (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => openVersionGovernanceDialog(version, 'approve')}
-                                  >
-                                    اعتماد
-                                  </Button>
+                                  <Badge variant="outline" className="border-blue-200 bg-blue-50 px-3 py-2 text-blue-800">
+                                    موجه إلى {version.assignedApproverName || 'معتمد آخر'}
+                                  </Badge>
                                 )
-                              ) : null}
-                              {canApproveVersions && getAttachmentVersionStatus(version) === 'draft' ? (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openVersionGovernanceDialog(version, 'cancel')}
-                                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                                >
-                                  إلغاء المسودة
-                                </Button>
                               ) : null}
                             </div>
                           ))}
