@@ -3541,7 +3541,7 @@ ${styleAssets}
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-black text-violet-950">قوالب التقرير المحفوظة</p>
                       <p className="mt-1 text-[11px] leading-5 text-violet-800/75">
-                        القوالب محفوظة الآن في قاعدة البيانات وتظهر لك من أي جهاز. ويمكن للمستخدم الإشرافي إنشاء قالب عام يظهر لجميع مستخدمي نظام المتابعة.
+                        القوالب محفوظة في قاعدة البيانات وتظهر من أي جهاز. ويمكن للمستخدم الإشرافي إنشاء قالب عام للجميع أو تقييده لمستخدمين محددين.
                       </p>
                     </div>
                     <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:min-w-[600px]">
