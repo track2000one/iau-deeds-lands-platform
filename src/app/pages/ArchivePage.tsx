@@ -429,7 +429,7 @@ export const ArchivePage: React.FC = () => {
   const canEdit = isAdmin || hasPermission('archive', 'canEdit');
   const canDelete = isAdmin || hasPermission('archive', 'canDelete');
   const canPrint = isAdmin || hasPermission('archive', 'canPrint');
-  const canApproveVersions = isAdmin || hasPermission('archive', 'canEdit');
+  const canApproveVersions = isAdmin || hasPermission('archive', 'canApproveArchive');
   const canRestoreTransaction = isAdmin || hasPermission('archive', 'canEdit');
 
   const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
