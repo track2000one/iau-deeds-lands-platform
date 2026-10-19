@@ -2678,9 +2678,9 @@ ${styleAssets}
       <Dialog open={reportOpen} onOpenChange={(open) => !reportExporting && setReportOpen(open)}>
         <DialogContent className="max-h-[96dvh] overflow-hidden sm:max-w-[1180px]" dir="rtl">
           <DialogHeader className="text-right">
-            <DialogTitle>التقارير التنفيذية لمتابعة المعاملات</DialogTitle>
+            <DialogTitle>التقرير المرن لمتابعة المعاملات</DialogTitle>
             <DialogDescription>
-              إعداد التقارير، حفظ النسخ المؤرشفة، المقارنة بين الفترات، وجدولة التقارير الأسبوعية والشهرية.
+              تقرير احترافي قابل للتصفية والفرز والاستبعاد واختيار الأعمدة واتجاه الطباعة، ويعرض فقط: المنجزة، المتأخرة القائمة، بانتظار رد، وتحتاج متابعة.
             </DialogDescription>
           </DialogHeader>
 
@@ -2691,7 +2691,7 @@ ${styleAssets}
               onClick={() => setReportSection('preview')}
             >
               <FileText className="ml-2 h-4 w-4" />
-              معاينة التقرير
+              التقرير المرن
             </Button>
             <Button
               type="button"
@@ -2832,6 +2832,184 @@ ${styleAssets}
                 </div>
               </div>
 
+              <div className="space-y-4 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="font-black text-slate-900">إعداد التقرير المرن</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      اختر الفئات والأعمدة، ثم صفِّ النتائج ورتبها واستبعد أي معاملة لا تريد ظهورها في النسخة المطبوعة.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={resetFlexibleReport}>
+                    <RotateCcw className="ml-2 h-4 w-4" />
+                    استعادة الإعدادات
+                  </Button>
+                </div>
+
+                <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+                  <Field label="عنوان التقرير">
+                    <Input
+                      value={flexibleReportOptions.title}
+                      onChange={(event) =>
+                        setFlexibleReportOptions((current) => ({ ...current, title: event.target.value }))
+                      }
+                      placeholder="عنوان التقرير"
+                    />
+                  </Field>
+                  <Field label="بحث داخل التقرير">
+                    <Input
+                      value={flexibleReportOptions.search}
+                      onChange={(event) =>
+                        setFlexibleReportOptions((current) => ({ ...current, search: event.target.value }))
+                      }
+                      placeholder="رقم، موضوع، موظف..."
+                    />
+                  </Field>
+                  <Field label="الأولوية">
+                    <NativeSelect
+                      value={flexibleReportOptions.priority}
+                      onChange={(event) =>
+                        setFlexibleReportOptions((current) => ({
+                          ...current,
+                          priority: event.target.value as TransactionFollowUpPriority | '',
+                        }))
+                      }
+                    >
+                      <option value="">جميع الأولويات</option>
+                      <option value="urgent">عاجلة</option>
+                      <option value="high">عالية</option>
+                      <option value="normal">عادية</option>
+                      <option value="low">منخفضة</option>
+                    </NativeSelect>
+                  </Field>
+                  <Field label="الإدارة / الوحدة">
+                    <NativeSelect
+                      value={flexibleReportOptions.organizationalUnit}
+                      onChange={(event) =>
+                        setFlexibleReportOptions((current) => ({
+                          ...current,
+                          organizationalUnit: event.target.value as TransactionFollowUpOrganizationalUnit | '',
+                        }))
+                      }
+                    >
+                      <option value="">جميع الإدارات والوحدات</option>
+                      {organizationalUnitOptions.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-black text-slate-700">الفئات الظاهرة في التقرير</p>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    {FLEXIBLE_REPORT_CATEGORIES.map((category) => {
+                      const checked = flexibleReportOptions.categories.includes(category.key);
+                      return (
+                        <label
+                          key={category.key}
+                          className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm font-bold transition ${checked ? 'border-sky-300 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-500'}`}
+                        >
+                          <span>{category.label}</span>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleFlexibleReportCategory(category.key)}
+                            className="h-4 w-4 accent-sky-700"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+                  <Field label="الفرز حسب">
+                    <NativeSelect
+                      value={flexibleReportOptions.sortBy}
+                      onChange={(event) =>
+                        setFlexibleReportOptions((current) => ({
+                          ...current,
+                          sortBy: event.target.value as FlexibleReportSortKey,
+                        }))
+                      }
+                    >
+                      <option value="transactionDate">تاريخ المعاملة</option>
+                      <option value="transactionNumber">رقم المعاملة</option>
+                      <option value="priority">الأولوية</option>
+                      <option value="currentAssigneeName">الموظف</option>
+                      <option value="dueDate">تاريخ الاستحقاق</option>
+                      <option value="category">الفئة</option>
+                    </NativeSelect>
+                  </Field>
+                  <Field label="اتجاه الفرز">
+                    <NativeSelect
+                      value={flexibleReportOptions.sortDirection}
+                      onChange={(event) =>
+                        setFlexibleReportOptions((current) => ({
+                          ...current,
+                          sortDirection: event.target.value as 'asc' | 'desc',
+                        }))
+                      }
+                    >
+                      <option value="desc">تنازلي</option>
+                      <option value="asc">تصاعدي</option>
+                    </NativeSelect>
+                  </Field>
+                  <Field label="اتجاه الطباعة">
+                    <NativeSelect
+                      value={reportOrientation}
+                      onChange={(event) => setReportOrientation(event.target.value as 'portrait' | 'landscape')}
+                    >
+                      <option value="landscape">أفقي — مناسب للجداول</option>
+                      <option value="portrait">عمودي</option>
+                    </NativeSelect>
+                  </Field>
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={!flexibleReportOptions.excludedIds.length}
+                      onClick={() =>
+                        setFlexibleReportOptions((current) => ({ ...current, excludedIds: [] }))
+                      }
+                    >
+                      <RotateCcw className="ml-2 h-4 w-4" />
+                      استعادة المستبعد ({flexibleReportOptions.excludedIds.length.toLocaleString('ar-SA')})
+                    </Button>
+                  </div>
+                  <div className="flex items-end">
+                    <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs text-slate-600">
+                      الاستبعاد يتم من زر <b>«استبعاد»</b> أمام كل معاملة في المعاينة.
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-black text-slate-700">الأعمدة الظاهرة</p>
+                  <div className="flex flex-wrap gap-2">
+                    {FLEXIBLE_REPORT_COLUMNS.map((column) => {
+                      const checked = flexibleReportOptions.visibleColumns.includes(column.key);
+                      return (
+                        <label
+                          key={column.key}
+                          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition ${checked ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-400'}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleFlexibleReportColumn(column.key)}
+                            className="h-3.5 w-3.5 accent-emerald-700"
+                          />
+                          {column.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs leading-6 text-emerald-950">
                 <b>الحفظ الاحتياطي:</b> زر «Excel» يصدر بيانات الفترة المحددة في ملف منظم متعدد الأوراق،
                 بينما «نسخة احتياطية كاملة» تنشئ ملف ZIP مستقل يحتوي على Excel لجميع بيانات نظام المتابعة،
@@ -2849,6 +3027,8 @@ ${styleAssets}
                   <TransactionExecutiveReport
                     ref={reportRef}
                     report={reportData}
+                    options={flexibleReportOptions}
+                    onExclude={excludeFlexibleReportRow}
                     assigneeLabel={
                       reportAssigneeId
                         ? assignees.find((user) => user.id === reportAssigneeId)?.username || null
