@@ -1440,21 +1440,12 @@ export const TransactionFollowUpPage: React.FC = () => {
       ] as const;
 
       const summaryStart = 7;
-      const summaryWidth = Math.max(1, Math.floor(columnCount / summary.length));
       summary.forEach(([label, value, fill, fontColor], index) => {
-        const startColumn = Math.min(columnCount, index * summaryWidth + 1);
-        const endColumn = index === summary.length - 1
-          ? columnCount
-          : Math.min(columnCount, startColumn + summaryWidth - 1);
-        if (startColumn > columnCount) return;
-        if (endColumn > startColumn) {
-          sheet.mergeCells(summaryStart, startColumn, summaryStart + 1, endColumn);
-        } else {
-          sheet.mergeCells(summaryStart, startColumn, summaryStart + 1, startColumn);
-        }
-        const cell = sheet.getCell(summaryStart, startColumn);
-        cell.value = `${label}\n${Number(value).toLocaleString('ar-SA')}`;
-        cell.font = { bold: true, size: 11, color: { argb: fontColor } };
+        const rowNumber = summaryStart + index;
+        sheet.mergeCells(rowNumber, 1, rowNumber, columnCount);
+        const cell = sheet.getCell(rowNumber, 1);
+        cell.value = `${label}: ${Number(value).toLocaleString('ar-SA')}`;
+        cell.font = { bold: true, size: 10, color: { argb: fontColor } };
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
         cell.border = {
@@ -1463,32 +1454,40 @@ export const TransactionFollowUpPage: React.FC = () => {
           left: { style: 'thin', color: { argb: 'FFD7DEE8' } },
           right: { style: 'thin', color: { argb: 'FFD7DEE8' } },
         };
+        sheet.getRow(rowNumber).height = 22;
       });
-      sheet.getRow(summaryStart).height = 24;
-      sheet.getRow(summaryStart + 1).height = 18;
 
-      const filtersRow = 10;
+      const filtersRow = summaryStart + summary.length + 1;
       sheet.mergeCells(filtersRow, 1, filtersRow, columnCount);
+      const sortLabels: Record<FlexibleReportSortKey, string> = {
+        transactionDate: 'تاريخ المعاملة',
+        transactionNumber: 'رقم المعاملة',
+        priority: 'الأولوية',
+        currentAssigneeName: 'الموظف',
+        dueDate: 'تاريخ الاستحقاق',
+        category: 'الفئة',
+      };
       const filterParts = [
         flexibleReportOptions.search.trim()
           ? `بحث: ${flexibleReportOptions.search.trim()}`
           : null,
         flexibleReportOptions.priority
-          ? `الأولوية: ${flexibleReportOptions.priority}`
+          ? `الأولوية: ${priorityLabels[flexibleReportOptions.priority]}`
           : null,
         flexibleReportOptions.organizationalUnit
-          ? `الإدارة/الوحدة: ${flexibleReportOptions.organizationalUnit}`
+          ? `الإدارة/الوحدة: ${organizationalUnitLabels[flexibleReportOptions.organizationalUnit]}`
           : null,
         flexibleReportOptions.excludedIds.length
           ? `المستبعد يدويًا: ${flexibleReportOptions.excludedIds.length.toLocaleString('ar-SA')}`
           : null,
-        `الفرز: ${flexibleReportOptions.sortBy} / ${flexibleReportOptions.sortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}`,
+        `الفرز: ${sortLabels[flexibleReportOptions.sortBy]} / ${flexibleReportOptions.sortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}`,
       ].filter(Boolean);
       sheet.getCell(filtersRow, 1).value = filterParts.join(' · ');
       sheet.getCell(filtersRow, 1).font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
       sheet.getCell(filtersRow, 1).alignment = { horizontal: 'right', vertical: 'middle', wrapText: true };
+      sheet.getRow(filtersRow).height = 28;
 
-      const headerRowNumber = 12;
+      const headerRowNumber = filtersRow + 2;
       visibleColumns.forEach((column, index) => {
         const cell = sheet.getCell(headerRowNumber, index + 1);
         cell.value = column.label;
@@ -1554,7 +1553,7 @@ export const TransactionFollowUpPage: React.FC = () => {
       if (rows.length > 0 && visibleColumns.length > 0) {
         sheet.autoFilter = {
           from: { row: headerRowNumber, column: 1 },
-          to: { row: headerRowNumber + rows.length, column: visibleColumns.length },
+          to: { row: headerRowNumber, column: visibleColumns.length },
         };
       }
 
@@ -1567,9 +1566,8 @@ export const TransactionFollowUpPage: React.FC = () => {
         },
       ];
       sheet.pageSetup.printTitlesRow = `${headerRowNumber}:${headerRowNumber}`;
-      sheet.footer.center = 'صفحة &P من &N';
-      sheet.footer.right = 'نظام متابعة المعاملات';
-      sheet.footer.left = new Intl.DateTimeFormat('ar-SA-u-ca-gregory').format(new Date());
+      sheet.headerFooter.oddFooter =
+        `&Rنظام متابعة المعاملات&Cصفحة &P من &N&L${new Intl.DateTimeFormat('ar-SA-u-ca-gregory').format(new Date())}`;
 
       const buffer = await workbook.xlsx.writeBuffer();
       saveBrowserBlob(
