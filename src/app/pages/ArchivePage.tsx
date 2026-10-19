@@ -2338,6 +2338,15 @@ export const ArchivePage: React.FC = () => {
                                 <Eye className="ml-2 h-4 w-4" />
                                 عرض الإصدار
                               </Button>
+                              {canApproveVersions && getAttachmentVersionStatus(version) === 'draft' ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => openVersionGovernanceDialog(version, 'approve')}
+                                >
+                                  اعتماد
+                                </Button>
+                              ) : null}
                             </div>
                           ))}
                         </div>
