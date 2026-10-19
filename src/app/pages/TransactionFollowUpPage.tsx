@@ -578,27 +578,73 @@ export const TransactionFollowUpPage: React.FC = () => {
   }, []);
 
   React.useEffect(() => {
-    const key = reportTemplateStorageKey(currentUser?.uid);
-    try {
-      const stored = window.localStorage.getItem(key);
-      if (!stored) {
-        setReportTemplates([]);
-        return;
+    let cancelled = false;
+
+    const loadTemplates = async () => {
+      const key = reportTemplateStorageKey(currentUser?.uid);
+      let legacyTemplates: FlexibleReportTemplate[] = [];
+
+      try {
+        const stored = window.localStorage.getItem(key);
+        const parsed = stored ? JSON.parse(stored) : [];
+        if (Array.isArray(parsed)) {
+          legacyTemplates = parsed
+            .map(normalizeReportTemplate)
+            .filter((template): template is FlexibleReportTemplate => Boolean(template))
+            .map((template) => ({
+              ...template,
+              scope: 'personal' as const,
+              createdById: currentUser?.uid || null,
+            }));
+        }
+      } catch {
+        legacyTemplates = [];
       }
-      const parsed = JSON.parse(stored);
-      if (!Array.isArray(parsed)) {
-        setReportTemplates([]);
-        return;
+
+      try {
+        let remoteTemplates = await transactionFollowUpApi.reportTemplates();
+
+        if (legacyTemplates.length) {
+          await Promise.allSettled(
+            legacyTemplates.map((template) =>
+              transactionFollowUpApi.saveReportTemplate({
+                name: template.name,
+                scope: 'personal',
+                reportMode: template.reportMode,
+                customFrom: template.reportMode === 'custom' ? template.customFrom || null : null,
+                customTo: template.reportMode === 'custom' ? template.customTo || null : null,
+                assigneeUserId: template.assigneeUserId || null,
+                orientation: template.orientation,
+                options: reportTemplateOptionsForApi(template.options),
+              }),
+            ),
+          );
+          remoteTemplates = await transactionFollowUpApi.reportTemplates();
+          window.localStorage.removeItem(key);
+        }
+
+        if (cancelled) return;
+        setReportTemplates(
+          remoteTemplates
+            .map(normalizeReportTemplate)
+            .filter((template): template is FlexibleReportTemplate => Boolean(template))
+            .sort((left, right) => {
+              if (left.scope !== right.scope) return left.scope === 'shared' ? -1 : 1;
+              return right.updatedAt.localeCompare(left.updatedAt);
+            }),
+        );
+      } catch {
+        if (cancelled) return;
+        setReportTemplates(
+          legacyTemplates.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
+        );
       }
-      setReportTemplates(
-        parsed
-          .map(normalizeReportTemplate)
-          .filter((template): template is FlexibleReportTemplate => Boolean(template))
-          .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
-      );
-    } catch {
-      setReportTemplates([]);
-    }
+    };
+
+    void loadTemplates();
+    return () => {
+      cancelled = true;
+    };
   }, [currentUser?.uid]);
 
   React.useEffect(() => {
