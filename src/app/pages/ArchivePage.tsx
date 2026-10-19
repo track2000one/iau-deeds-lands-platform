@@ -2322,12 +2322,26 @@ export const ArchivePage: React.FC = () => {
                 المعاملات المؤرشفة من نظام المتابعة
               </CardTitle>
               <CardDescription>
-                تظهر هنا فقط المعاملات المغلقة التي اختار صاحب الصلاحية ترحيلها إلى الأرشفة.
+                المعاملات المنجزة أو المغلقة التي أُنشئت لها نسخة في الأرشفة، مع تقارير مرنة تشمل المرفقات.
               </CardDescription>
             </div>
-            <Badge variant="outline" className="w-fit border-emerald-300 bg-white px-3 py-1 text-emerald-800">
-              {filteredArchivedTransactions.length.toLocaleString('ar-SA')} معاملة
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              {canPrint && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setArchivedTransactionReportsOpen(true)}
+                  className="border-emerald-300 bg-white font-bold text-emerald-800 hover:bg-emerald-50"
+                >
+                  <FileDown className="ml-2 h-4 w-4" />
+                  التقرير المرن
+                </Button>
+              )}
+              <Badge variant="outline" className="w-fit border-emerald-300 bg-white px-3 py-1 text-emerald-800">
+                {filteredArchivedTransactions.length.toLocaleString('ar-SA')} معاملة
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-5">
@@ -3561,6 +3575,12 @@ export const ArchivePage: React.FC = () => {
       />
 
       <ArchiveReportsDialog documents={documents} open={reportsOpen} onOpenChange={setReportsOpen} />
+
+      <ArchivedTransactionsReportsDialog
+        transactions={archivedTransactions}
+        open={archivedTransactionReportsOpen}
+        onOpenChange={setArchivedTransactionReportsOpen}
+      />
 
       <AlertDialog
         open={versionDialogOpen}
