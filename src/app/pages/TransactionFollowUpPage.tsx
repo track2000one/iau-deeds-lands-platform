@@ -1181,55 +1181,56 @@ export const TransactionFollowUpPage: React.FC = () => {
     setReportOrientation('landscape');
   };
 
-  const persistReportTemplates = (templates: FlexibleReportTemplate[]) => {
-    const ordered = templates
-      .slice()
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-      .slice(0, 20);
-    setReportTemplates(ordered);
-    try {
-      window.localStorage.setItem(
-        reportTemplateStorageKey(currentUser?.uid),
-        JSON.stringify(ordered),
-      );
-    } catch {
-      toast.warning('تعذر حفظ قالب التقرير في المتصفح');
-    }
+  const refreshReportTemplates = async () => {
+    const remoteTemplates = await transactionFollowUpApi.reportTemplates();
+    setReportTemplates(
+      remoteTemplates
+        .map(normalizeReportTemplate)
+        .filter((template): template is FlexibleReportTemplate => Boolean(template))
+        .sort((left, right) => {
+          if (left.scope !== right.scope) return left.scope === 'shared' ? -1 : 1;
+          return right.updatedAt.localeCompare(left.updatedAt);
+        }),
+    );
   };
 
-  const saveFlexibleReportTemplate = () => {
+  const saveFlexibleReportTemplate = async () => {
     const name = reportTemplateName.trim();
     if (!name) {
       toast.error('اكتب اسمًا لقالب التقرير');
       return;
     }
 
-    const now = new Date().toISOString();
-    const existing = reportTemplates.find(
-      (template) => template.name.trim().toLocaleLowerCase('ar') === name.toLocaleLowerCase('ar'),
-    );
-    const nextTemplate: FlexibleReportTemplate = {
-      id: existing?.id || `report-template-${Date.now()}`,
-      name,
-      createdAt: existing?.createdAt || now,
-      updatedAt: now,
-      reportMode,
-      customFrom: reportMode === 'custom' ? reportFrom : null,
-      customTo: reportMode === 'custom' ? reportTo : null,
-      assigneeUserId: isAdmin || canDelete ? reportAssigneeId || null : null,
-      orientation: reportOrientation,
-      options: {
-        ...cloneFlexibleReportOptions(flexibleReportOptions),
-        excludedIds: [],
-      },
-    };
+    const scope = isAdmin || canDelete ? reportTemplateScope : 'personal';
 
-    persistReportTemplates([
-      nextTemplate,
-      ...reportTemplates.filter((template) => template.id !== nextTemplate.id),
-    ]);
-    setReportTemplateName('');
-    toast.success(existing ? 'تم تحديث قالب التقرير' : 'تم حفظ قالب التقرير');
+    try {
+      setReportTemplateSaving(true);
+      await transactionFollowUpApi.saveReportTemplate({
+        name,
+        scope,
+        reportMode,
+        customFrom: reportMode === 'custom' ? reportFrom : null,
+        customTo: reportMode === 'custom' ? reportTo : null,
+        assigneeUserId:
+          scope === 'personal' && (isAdmin || canDelete)
+            ? reportAssigneeId || null
+            : null,
+        orientation: reportOrientation,
+        options: reportTemplateOptionsForApi(flexibleReportOptions),
+      });
+
+      await refreshReportTemplates();
+      setReportTemplateName('');
+      toast.success(
+        scope === 'shared'
+          ? 'تم حفظ القالب العام للإدارة'
+          : 'تم حفظ القالب الشخصي في حسابك',
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ قالب التقرير');
+    } finally {
+      setReportTemplateSaving(false);
+    }
   };
 
   const applyFlexibleReportTemplate = async (template: FlexibleReportTemplate) => {
@@ -1257,12 +1258,34 @@ export const TransactionFollowUpPage: React.FC = () => {
     toast.success(`تم تطبيق قالب «${template.name}»`);
   };
 
-  const deleteFlexibleReportTemplate = (template: FlexibleReportTemplate) => {
+  const deleteFlexibleReportTemplate = async (template: FlexibleReportTemplate) => {
     if (!window.confirm(`حذف قالب التقرير «${template.name}»؟`)) return;
-    persistReportTemplates(
-      reportTemplates.filter((item) => item.id !== template.id),
-    );
-    toast.success('تم حذف قالب التقرير');
+
+    if (template.id.startsWith('report-template-')) {
+      const next = reportTemplates.filter((item) => item.id !== template.id);
+      setReportTemplates(next);
+      try {
+        window.localStorage.setItem(
+          reportTemplateStorageKey(currentUser?.uid),
+          JSON.stringify(next.filter((item) => item.scope === 'personal')),
+        );
+      } catch {
+        // Legacy fallback only; database-backed templates are the primary store.
+      }
+      toast.success('تم حذف القالب المحلي');
+      return;
+    }
+
+    try {
+      setReportTemplateSaving(true);
+      await transactionFollowUpApi.deleteReportTemplate(template.id);
+      await refreshReportTemplates();
+      toast.success('تم حذف قالب التقرير');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حذف قالب التقرير');
+    } finally {
+      setReportTemplateSaving(false);
+    }
   };
 
   const buildFollowUpWorkbook = async (backup: TransactionFollowUpBackupData) => {
