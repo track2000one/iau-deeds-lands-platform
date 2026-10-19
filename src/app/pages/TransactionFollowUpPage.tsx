@@ -4916,6 +4916,131 @@ ${styleAssets}
                             </div>
                           </div>
                         )}
+
+                        {archiveGovernanceId === archive.id && canDelete && (
+                          <div className="grid gap-3 border-t border-emerald-100 bg-emerald-50/40 pt-3 md:grid-cols-2 xl:grid-cols-6">
+                            <Field label="حالة التقرير">
+                              <NativeSelect
+                                value={archiveGovernanceStatus}
+                                onChange={(event) =>
+                                  setArchiveGovernanceStatus(event.target.value as 'draft' | 'final')
+                                }
+                              >
+                                <option value="draft">مسودة</option>
+                                <option value="final">نهائي</option>
+                              </NativeSelect>
+                            </Field>
+                            <Field label="سياسة الاحتفاظ">
+                              <NativeSelect
+                                value={archiveGovernanceRetentionPolicy}
+                                onChange={(event) =>
+                                  setArchiveGovernanceRetentionPolicy(
+                                    event.target.value as TransactionFollowUpReportArchive['retentionPolicy'],
+                                  )
+                                }
+                              >
+                                {Object.entries(archiveRetentionLabels).map(([value, label]) => (
+                                  <option key={value} value={value}>{label}</option>
+                                ))}
+                              </NativeSelect>
+                            </Field>
+                            {archiveGovernanceRetentionPolicy === 'custom' && (
+                              <Field label="الاحتفاظ حتى">
+                                <Input
+                                  type="date"
+                                  value={archiveGovernanceRetainUntil}
+                                  onChange={(event) => setArchiveGovernanceRetainUntil(event.target.value)}
+                                />
+                              </Field>
+                            )}
+                            <label className="flex items-end">
+                              <span className="flex h-10 w-full cursor-pointer items-center justify-between rounded-xl border border-amber-200 bg-white px-3 text-xs font-bold text-slate-700">
+                                <span className="inline-flex items-center gap-2">
+                                  <Star className="h-4 w-4 text-amber-500" />
+                                  تثبيت التقرير
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  checked={archiveGovernancePinned}
+                                  onChange={(event) => setArchiveGovernancePinned(event.target.checked)}
+                                  className="h-4 w-4 accent-amber-600"
+                                />
+                              </span>
+                            </label>
+                            <label className="flex items-end">
+                              <span className="flex h-10 w-full cursor-pointer items-center justify-between rounded-xl border border-red-200 bg-white px-3 text-xs font-bold text-slate-700">
+                                <span className="inline-flex items-center gap-2">
+                                  <ShieldCheck className="h-4 w-4 text-red-600" />
+                                  حماية من الحذف
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  checked={archiveGovernanceProtected}
+                                  onChange={(event) => setArchiveGovernanceProtected(event.target.checked)}
+                                  className="h-4 w-4 accent-red-600"
+                                />
+                              </span>
+                            </label>
+                            <div className="flex items-end gap-2 md:col-span-2 xl:col-span-6">
+                              <Button
+                                size="sm"
+                                disabled={reportArchiveLoading}
+                                onClick={() => void saveArchiveGovernance()}
+                              >
+                                <ShieldCheck className="ml-1 h-4 w-4" />
+                                حفظ الحوكمة
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setArchiveGovernanceId('')}
+                              >
+                                إلغاء
+                              </Button>
+                              <span className="self-center text-[10px] text-slate-500">
+                                التقرير النهائي أو المحمي أو الواقع ضمن مدة الاحتفاظ لا يمكن حذفه.
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {archiveActivityId === archive.id && (
+                          <div className="border-t border-slate-100 pt-3">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <p className="text-xs font-black text-slate-800">سجل التقرير</p>
+                              <Badge variant="outline">{archiveActivity.length.toLocaleString('ar-SA')} إجراء</Badge>
+                            </div>
+                            {archiveActivityLoading ? (
+                              <div className="py-5 text-center text-xs text-muted-foreground">
+                                <RefreshCw className="mx-auto mb-2 h-4 w-4 animate-spin" />
+                                جارٍ تحميل السجل...
+                              </div>
+                            ) : archiveActivity.length ? (
+                              <div className="max-h-56 space-y-2 overflow-y-auto">
+                                {archiveActivity.map((entry) => (
+                                  <div key={entry.id} className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <span className="text-[11px] font-bold text-slate-800">
+                                        {entry.description || entry.action}
+                                      </span>
+                                      <span className="text-[10px] text-slate-500">
+                                        {formatDateTime(entry.createdAt)}
+                                      </span>
+                                    </div>
+                                    <p className="mt-1 text-[10px] text-slate-500">
+                                      بواسطة: {entry.username || entry.userEmail || 'النظام'}
+                                      {entry.details?.format ? ` · الصيغة: ${String(entry.details.format).toUpperCase()}` : ''}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="rounded-lg border border-dashed py-5 text-center text-xs text-muted-foreground">
+                                لا توجد إجراءات مسجلة لهذا التقرير حتى الآن.
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
