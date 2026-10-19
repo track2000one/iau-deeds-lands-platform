@@ -2236,6 +2236,13 @@ export const ArchivePage: React.FC = () => {
                               </Badge>
                             ) : null;
                           })()}
+                          {getAttachmentVersionGroups(selectedDocument)
+                            .find((item) => item.current.id === attachment.id)
+                            ?.versions.some((item) => getAttachmentVersionStatus(item) === 'draft') ? (
+                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                              يوجد إصدار بانتظار الاعتماد
+                            </Badge>
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex gap-2">
