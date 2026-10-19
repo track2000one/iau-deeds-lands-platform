@@ -332,6 +332,71 @@ const createDefaultFlexibleReportOptions = (): FlexibleReportOptions => ({
   excludedIds: [],
 });
 
+type FlexibleReportTemplate = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  reportMode: 'weekly' | 'monthly' | 'custom';
+  customFrom?: string | null;
+  customTo?: string | null;
+  assigneeUserId?: string | null;
+  orientation: 'portrait' | 'landscape';
+  options: FlexibleReportOptions;
+};
+
+const cloneFlexibleReportOptions = (
+  options: FlexibleReportOptions,
+): FlexibleReportOptions => ({
+  ...options,
+  categories: [...options.categories],
+  visibleColumns: [...options.visibleColumns],
+  excludedIds: [...options.excludedIds],
+});
+
+const reportTemplateStorageKey = (userId?: string | null) =>
+  `iau-follow-up-report-templates:${userId || 'anonymous'}`;
+
+const normalizeReportTemplate = (value: unknown): FlexibleReportTemplate | null => {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Partial<FlexibleReportTemplate>;
+  if (!raw.id || !raw.name || !raw.options) return null;
+
+  const defaults = createDefaultFlexibleReportOptions();
+  const safeCategories = Array.isArray(raw.options.categories)
+    ? raw.options.categories.filter((category) =>
+        FLEXIBLE_REPORT_CATEGORIES.some((item) => item.key === category),
+      )
+    : defaults.categories;
+  const safeColumns = Array.isArray(raw.options.visibleColumns)
+    ? raw.options.visibleColumns.filter((column) =>
+        FLEXIBLE_REPORT_COLUMNS.some((item) => item.key === column),
+      )
+    : defaults.visibleColumns;
+
+  return {
+    id: String(raw.id),
+    name: String(raw.name),
+    createdAt: String(raw.createdAt || new Date().toISOString()),
+    updatedAt: String(raw.updatedAt || raw.createdAt || new Date().toISOString()),
+    reportMode:
+      raw.reportMode === 'weekly' || raw.reportMode === 'custom'
+        ? raw.reportMode
+        : 'monthly',
+    customFrom: raw.customFrom || null,
+    customTo: raw.customTo || null,
+    assigneeUserId: raw.assigneeUserId || null,
+    orientation: raw.orientation === 'portrait' ? 'portrait' : 'landscape',
+    options: {
+      ...defaults,
+      ...raw.options,
+      categories: safeCategories.length ? safeCategories : defaults.categories,
+      visibleColumns: safeColumns.length ? safeColumns : defaults.visibleColumns,
+      excludedIds: [],
+    },
+  };
+};
+
 const emptyCreate = (): TransactionFollowUpCreateInput => ({
   transactionNumber: '',
   transactionDate: new Date().toISOString().slice(0, 10),
@@ -428,6 +493,8 @@ export const TransactionFollowUpPage: React.FC = () => {
     createDefaultFlexibleReportOptions,
   );
   const [reportOrientation, setReportOrientation] = React.useState<'portrait' | 'landscape'>('landscape');
+  const [reportTemplates, setReportTemplates] = React.useState<FlexibleReportTemplate[]>([]);
+  const [reportTemplateName, setReportTemplateName] = React.useState('');
   const [reportData, setReportData] = React.useState<TransactionFollowUpExecutiveReport | null>(null);
   const [reportSection, setReportSection] = React.useState<'preview' | 'archive' | 'schedule'>('preview');
   const [reportArchives, setReportArchives] = React.useState<TransactionFollowUpReportArchive[]>([]);
@@ -490,6 +557,30 @@ export const TransactionFollowUpPage: React.FC = () => {
       .then(setAssignees)
       .catch((error) => toast.error(error instanceof Error ? error.message : 'تعذر تحميل الموظفين'));
   }, []);
+
+  React.useEffect(() => {
+    const key = reportTemplateStorageKey(currentUser?.uid);
+    try {
+      const stored = window.localStorage.getItem(key);
+      if (!stored) {
+        setReportTemplates([]);
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) {
+        setReportTemplates([]);
+        return;
+      }
+      setReportTemplates(
+        parsed
+          .map(normalizeReportTemplate)
+          .filter((template): template is FlexibleReportTemplate => Boolean(template))
+          .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
+      );
+    } catch {
+      setReportTemplates([]);
+    }
+  }, [currentUser?.uid]);
 
   React.useEffect(() => {
     setPage(1);
@@ -1023,6 +1114,90 @@ export const TransactionFollowUpPage: React.FC = () => {
   const resetFlexibleReport = () => {
     setFlexibleReportOptions(createDefaultFlexibleReportOptions());
     setReportOrientation('landscape');
+  };
+
+  const persistReportTemplates = (templates: FlexibleReportTemplate[]) => {
+    const ordered = templates
+      .slice()
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, 20);
+    setReportTemplates(ordered);
+    try {
+      window.localStorage.setItem(
+        reportTemplateStorageKey(currentUser?.uid),
+        JSON.stringify(ordered),
+      );
+    } catch {
+      toast.warning('تعذر حفظ قالب التقرير في المتصفح');
+    }
+  };
+
+  const saveFlexibleReportTemplate = () => {
+    const name = reportTemplateName.trim();
+    if (!name) {
+      toast.error('اكتب اسمًا لقالب التقرير');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const existing = reportTemplates.find(
+      (template) => template.name.trim().toLocaleLowerCase('ar') === name.toLocaleLowerCase('ar'),
+    );
+    const nextTemplate: FlexibleReportTemplate = {
+      id: existing?.id || `report-template-${Date.now()}`,
+      name,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+      reportMode,
+      customFrom: reportMode === 'custom' ? reportFrom : null,
+      customTo: reportMode === 'custom' ? reportTo : null,
+      assigneeUserId: isAdmin || canDelete ? reportAssigneeId || null : null,
+      orientation: reportOrientation,
+      options: {
+        ...cloneFlexibleReportOptions(flexibleReportOptions),
+        excludedIds: [],
+      },
+    };
+
+    persistReportTemplates([
+      nextTemplate,
+      ...reportTemplates.filter((template) => template.id !== nextTemplate.id),
+    ]);
+    setReportTemplateName('');
+    toast.success(existing ? 'تم تحديث قالب التقرير' : 'تم حفظ قالب التقرير');
+  };
+
+  const applyFlexibleReportTemplate = async (template: FlexibleReportTemplate) => {
+    const nextOptions = cloneFlexibleReportOptions(template.options);
+    nextOptions.excludedIds = [];
+    setFlexibleReportOptions(nextOptions);
+    setReportOrientation(template.orientation);
+    setReportAssigneeId(template.assigneeUserId || '');
+    setReportMode(template.reportMode);
+
+    let from = reportFrom;
+    let to = reportTo;
+    if (template.reportMode === 'weekly' || template.reportMode === 'monthly') {
+      const range = reportRange(template.reportMode);
+      from = range.from;
+      to = range.to;
+    } else {
+      from = template.customFrom || reportFrom;
+      to = template.customTo || reportTo;
+    }
+
+    setReportFrom(from);
+    setReportTo(to);
+    await loadExecutiveReport(from, to, template.assigneeUserId || '');
+    toast.success(`تم تطبيق قالب «${template.name}»`);
+  };
+
+  const deleteFlexibleReportTemplate = (template: FlexibleReportTemplate) => {
+    if (!window.confirm(`حذف قالب التقرير «${template.name}»؟`)) return;
+    persistReportTemplates(
+      reportTemplates.filter((item) => item.id !== template.id),
+    );
+    toast.success('تم حذف قالب التقرير');
   };
 
   const buildFollowUpWorkbook = async (backup: TransactionFollowUpBackupData) => {
