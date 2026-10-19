@@ -72,6 +72,15 @@ type ArchiveAttachment = {
   version?: number;
   versionGroupId?: string;
   versionNote?: string | null;
+  versionStatus?: 'draft' | 'approved' | 'superseded' | 'cancelled';
+  approvedById?: string | null;
+  approvedByName?: string | null;
+  approvedAt?: string | null;
+  approvalNote?: string | null;
+  cancelledById?: string | null;
+  cancelledByName?: string | null;
+  cancelledAt?: string | null;
+  cancelReason?: string | null;
   isCurrent?: boolean;
   addedBy?: string | null;
   createdAt?: string;
@@ -91,6 +100,7 @@ type ArchiveDocument = {
   archiveNumber?: string;
   attachmentCount?: number;
   attachmentVersionCount?: number;
+  pendingVersionCount?: number;
   totalFileSize?: number;
   attachments?: ArchiveAttachment[];
   activities?: ArchiveActivity[];
@@ -298,6 +308,27 @@ const getAttachmentVersionGroups = (doc: ArchiveDocument) => {
   });
 };
 
+const getAttachmentVersionStatus = (attachment: ArchiveAttachment) =>
+  attachment.versionStatus || (attachment.isCurrent ? 'approved' : 'superseded');
+
+const getAttachmentVersionStatusLabel = (attachment: ArchiveAttachment) => {
+  const status = getAttachmentVersionStatus(attachment);
+  if (status === 'draft') return 'بانتظار الاعتماد';
+  if (status === 'approved') return attachment.isCurrent ? 'معتمد — الحالي' : 'معتمد';
+  if (status === 'superseded') return 'إصدار سابق';
+  if (status === 'cancelled') return 'ملغى';
+  return status;
+};
+
+const getAttachmentVersionStatusClassName = (attachment: ArchiveAttachment) => {
+  const status = getAttachmentVersionStatus(attachment);
+  if (status === 'draft') return 'border-amber-300 bg-amber-50 text-amber-800';
+  if (status === 'approved' && attachment.isCurrent) return 'border-emerald-300 bg-emerald-50 text-emerald-800';
+  if (status === 'approved') return 'border-emerald-200 bg-emerald-50/60 text-emerald-700';
+  if (status === 'cancelled') return 'border-red-200 bg-red-50 text-red-700';
+  return 'border-slate-300 bg-slate-50 text-slate-600';
+};
+
 const getArchiveMissingMetadata = (doc: ArchiveDocument) => {
   const missing: string[] = [];
   if (!String(doc.documentNumber || '').trim()) missing.push('رقم المستند');
@@ -314,7 +345,9 @@ const archiveActivityLabels: Record<string, string> = {
   record_updated: 'تحديث البيانات',
   attachments_added: 'إضافة ملفات',
   attachment_removed: 'إزالة ملف',
-  attachment_version_added: 'إضافة إصدار جديد',
+  attachment_version_added: 'إنشاء مسودة إصدار',
+  attachment_version_approved: 'اعتماد إصدار',
+  attachment_version_cancelled: 'إلغاء مسودة إصدار',
   record_deleted: 'نقل إلى المحذوفات',
   record_restored: 'استعادة السجل',
   records_merged: 'دمج سجلات داخل هذا السجل',
@@ -326,8 +359,14 @@ const getArchiveActivityLabel = (action: string) =>
   archiveActivityLabels[action] || action || 'إجراء أرشيفي';
 
 const getArchiveActivityClassName = (action: string) => {
-  if (action.includes('delete') || action.includes('removed')) {
+  if (action.includes('approved')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+  }
+  if (action.includes('cancelled') || action.includes('delete') || action.includes('removed')) {
     return 'border-red-200 bg-red-50 text-red-800';
+  }
+  if (action.includes('version_added')) {
+    return 'border-amber-200 bg-amber-50 text-amber-800';
   }
   if (action.includes('merge')) {
     return 'border-violet-200 bg-violet-50 text-violet-800';
@@ -375,6 +414,7 @@ export const ArchivePage: React.FC = () => {
   const canEdit = isAdmin || hasPermission('archive', 'canEdit');
   const canDelete = isAdmin || hasPermission('archive', 'canDelete');
   const canPrint = isAdmin || hasPermission('archive', 'canPrint');
+  const canApproveVersions = isAdmin || hasPermission('archive', 'canEdit');
   const canRestoreTransaction = isAdmin || hasPermission('archive', 'canEdit');
 
   const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
@@ -415,6 +455,12 @@ export const ArchivePage: React.FC = () => {
   const [versionFile, setVersionFile] = useState<File | null>(null);
   const [versionNote, setVersionNote] = useState('');
   const [versionSaving, setVersionSaving] = useState(false);
+
+  const [versionGovernanceOpen, setVersionGovernanceOpen] = useState(false);
+  const [versionGovernanceAttachment, setVersionGovernanceAttachment] = useState<ArchiveAttachment | null>(null);
+  const [versionGovernanceAction, setVersionGovernanceAction] = useState<'approve' | 'cancel' | null>(null);
+  const [versionGovernanceNote, setVersionGovernanceNote] = useState('');
+  const [versionGovernanceSaving, setVersionGovernanceSaving] = useState(false);
 
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
@@ -1023,7 +1069,7 @@ export const ArchivePage: React.FC = () => {
       );
       setSelectedDocument(updated);
       toast.success(
-        `تم حفظ الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} كنسخة حالية`,
+        `تم حفظ مسودة الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} وبانتظار الاعتماد`,
       );
       setVersionDialogOpen(false);
       setVersionSourceAttachment(null);
@@ -1034,6 +1080,86 @@ export const ArchivePage: React.FC = () => {
       toast.error(error instanceof Error ? error.message : 'تعذر حفظ الإصدار الجديد');
     } finally {
       setVersionSaving(false);
+    }
+  };
+
+  const openVersionGovernanceDialog = (
+    attachment: ArchiveAttachment,
+    action: 'approve' | 'cancel',
+  ) => {
+    if (!canApproveVersions) {
+      toast.error('لا تملك صلاحية اعتماد أو إلغاء إصدارات الملفات');
+      return;
+    }
+    if (getAttachmentVersionStatus(attachment) !== 'draft') {
+      toast.error('هذا الإصدار لم يعد بحالة مسودة');
+      return;
+    }
+    setVersionGovernanceAttachment(attachment);
+    setVersionGovernanceAction(action);
+    setVersionGovernanceNote('');
+    setVersionGovernanceOpen(true);
+  };
+
+  const closeVersionGovernanceDialog = () => {
+    if (versionGovernanceSaving) return;
+    setVersionGovernanceOpen(false);
+    setVersionGovernanceAttachment(null);
+    setVersionGovernanceAction(null);
+    setVersionGovernanceNote('');
+  };
+
+  const approveVersionDraft = async () => {
+    if (!selectedDocument || !versionGovernanceAttachment) return;
+    try {
+      setVersionGovernanceSaving(true);
+      const updated = await archiveRequest<ArchiveDocument>(
+        `/records/${selectedDocument.id}/attachments/${versionGovernanceAttachment.id}/approve`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ note: versionGovernanceNote.trim() }),
+        },
+      );
+      setDocuments((current) =>
+        current.map((doc) => (doc.id === updated.id ? updated : doc)),
+      );
+      setSelectedDocument(updated);
+      toast.success(`تم اعتماد الإصدار V${versionGovernanceAttachment.version || 1} كنسخة رسمية حالية`);
+      setVersionGovernanceOpen(false);
+      setVersionGovernanceAttachment(null);
+      setVersionGovernanceAction(null);
+      setVersionGovernanceNote('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر اعتماد الإصدار');
+    } finally {
+      setVersionGovernanceSaving(false);
+    }
+  };
+
+  const cancelVersionDraft = async () => {
+    if (!selectedDocument || !versionGovernanceAttachment) return;
+    try {
+      setVersionGovernanceSaving(true);
+      const updated = await archiveRequest<ArchiveDocument>(
+        `/records/${selectedDocument.id}/attachments/${versionGovernanceAttachment.id}/cancel`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ reason: versionGovernanceNote.trim() }),
+        },
+      );
+      setDocuments((current) =>
+        current.map((doc) => (doc.id === updated.id ? updated : doc)),
+      );
+      setSelectedDocument(updated);
+      toast.success(`تم إلغاء مسودة الإصدار V${versionGovernanceAttachment.version || 1}`);
+      setVersionGovernanceOpen(false);
+      setVersionGovernanceAttachment(null);
+      setVersionGovernanceAction(null);
+      setVersionGovernanceNote('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إلغاء مسودة الإصدار');
+    } finally {
+      setVersionGovernanceSaving(false);
     }
   };
 
@@ -2058,6 +2184,10 @@ export const ArchivePage: React.FC = () => {
                 label="إجمالي الإصدارات"
                 value={(selectedDocument.attachmentVersionCount || selectedDocument.attachments?.length || selectedDocument.attachmentCount || 1).toLocaleString('ar-SA')}
               />
+              <InfoItem
+                label="بانتظار الاعتماد"
+                value={(selectedDocument.pendingVersionCount || 0).toLocaleString('ar-SA')}
+              />
               <InfoItem label="تاريخ الأرشفة" value={formatDate(selectedDocument.createdAt)} />
               <InfoItem label="آخر تعديل" value={formatDate(selectedDocument.updatedAt)} />
             </div>
@@ -2112,6 +2242,13 @@ export const ArchivePage: React.FC = () => {
                               </Badge>
                             ) : null;
                           })()}
+                          {getAttachmentVersionGroups(selectedDocument)
+                            .find((item) => item.current.id === attachment.id)
+                            ?.versions.some((item) => getAttachmentVersionStatus(item) === 'draft') ? (
+                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                              يوجد إصدار بانتظار الاعتماد
+                            </Badge>
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -2186,11 +2323,9 @@ export const ArchivePage: React.FC = () => {
                                   <b className="text-sm text-slate-800">V{version.version || 1}</b>
                                   <Badge
                                     variant="outline"
-                                    className={version.isCurrent
-                                      ? "border-emerald-200 bg-white text-emerald-800"
-                                      : "border-slate-300 bg-white text-slate-600"}
+                                    className={getAttachmentVersionStatusClassName(version)}
                                   >
-                                    {version.isCurrent ? 'الحالي' : 'سابق'}
+                                    {getAttachmentVersionStatusLabel(version)}
                                   </Badge>
                                 </div>
                                 <p className="mt-1 text-xs text-slate-500">
@@ -2198,6 +2333,16 @@ export const ArchivePage: React.FC = () => {
                                 </p>
                                 {version.versionNote ? (
                                   <p className="mt-1 text-xs leading-5 text-slate-700">{version.versionNote}</p>
+                                ) : null}
+                                {version.approvedAt ? (
+                                  <p className="mt-1 text-xs text-emerald-700">
+                                    معتمد · {formatDateTime(version.approvedAt)}
+                                  </p>
+                                ) : null}
+                                {version.cancelledAt ? (
+                                  <p className="mt-1 text-xs text-red-700">
+                                    ملغى · {formatDateTime(version.cancelledAt)}
+                                  </p>
                                 ) : null}
                               </div>
                               <Button
@@ -2209,6 +2354,26 @@ export const ArchivePage: React.FC = () => {
                                 <Eye className="ml-2 h-4 w-4" />
                                 عرض الإصدار
                               </Button>
+                              {canApproveVersions && getAttachmentVersionStatus(version) === 'draft' ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => openVersionGovernanceDialog(version, 'approve')}
+                                >
+                                  اعتماد
+                                </Button>
+                              ) : null}
+                              {canApproveVersions && getAttachmentVersionStatus(version) === 'draft' ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openVersionGovernanceDialog(version, 'cancel')}
+                                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                                >
+                                  إلغاء المسودة
+                                </Button>
+                              ) : null}
                             </div>
                           ))}
                         </div>
@@ -2722,7 +2887,7 @@ export const ArchivePage: React.FC = () => {
               رفع إصدار جديد للملف
             </AlertDialogTitle>
             <AlertDialogDescription className="leading-7">
-              سيبقى الإصدار السابق محفوظًا للرجوع إليه، ويصبح الملف الجديد هو الإصدار الحالي.
+              سيبقى الإصدار الرسمي الحالي محفوظًا، ويُحفظ الملف الجديد كمسودة بانتظار الاعتماد قبل أن يصبح النسخة الرسمية الحالية.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -2784,7 +2949,44 @@ export const ArchivePage: React.FC = () => {
               className="bg-[#1F4E78] text-white hover:bg-[#173A59]"
             >
               {versionSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
-              {versionSaving ? 'جاري حفظ الإصدار...' : 'حفظ كإصدار جديد'}
+              {versionSaving ? 'جاري حفظ المسودة...' : 'حفظ كمسودة إصدار جديد'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={versionGovernanceOpen} onOpenChange={setVersionGovernanceOpen}>
+        <AlertDialogContent className="max-w-xl" dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>مراجعة إصدار الملف</AlertDialogTitle>
+            <AlertDialogDescription>
+              راجع الإصدار المحدد قبل تنفيذ الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="font-bold">{versionGovernanceAttachment?.originalName || versionGovernanceAttachment?.fileName || 'الإصدار المحدد'}</p>
+            <Textarea
+              value={versionGovernanceNote}
+              onChange={(event) => setVersionGovernanceNote(event.target.value)}
+              rows={3}
+              disabled={versionGovernanceSaving}
+              placeholder="ملاحظة الإجراء"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={closeVersionGovernanceDialog} disabled={versionGovernanceSaving}>رجوع</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={versionGovernanceSaving}
+              onClick={(event) => {
+                event.preventDefault();
+                if (versionGovernanceAction === 'approve') {
+                  void approveVersionDraft();
+                } else {
+                  void cancelVersionDraft();
+                }
+              }}
+            >
+              {versionGovernanceSaving ? 'جاري التنفيذ...' : versionGovernanceAction === 'approve' ? 'اعتماد الإصدار' : 'إلغاء المسودة'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
