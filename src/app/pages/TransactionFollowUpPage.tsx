@@ -4496,49 +4496,156 @@ ${styleAssets}
                     </div>
                   ) : (
                     reportArchives.map((archive) => (
-                      <div key={archive.id} className="flex flex-col gap-3 rounded-xl border bg-white p-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <b className="text-sm">
-                              {archive.reportType === 'weekly' ? 'تقرير أسبوعي' : archive.reportType === 'monthly' ? 'تقرير شهري' : 'تقرير مخصص'}
-                            </b>
-                            <Badge variant="outline">{archive.source === 'scheduled' ? 'آلي' : 'يدوي'}</Badge>
-                            {archive.templateName ? (
-                              <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">
-                                القالب: {archive.templateName}
-                              </Badge>
-                            ) : archive.templateSnapshot ? (
-                              <Badge variant="outline" className="border-sky-300 bg-sky-50 text-sky-800">
-                                إعدادات مرنة محفوظة
-                              </Badge>
-                            ) : null}
-                            {archive.assigneeName && <Badge variant="outline">{archive.assigneeName}</Badge>}
+                      <div key={archive.id} className="space-y-3 rounded-xl border bg-white p-3">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <b className="text-sm">
+                                {archive.archiveName
+                                  || (archive.reportType === 'weekly'
+                                    ? 'تقرير أسبوعي'
+                                    : archive.reportType === 'monthly'
+                                      ? 'تقرير شهري'
+                                      : 'تقرير مخصص')}
+                              </b>
+                              <Badge variant="outline">{archive.source === 'scheduled' ? 'آلي' : 'يدوي'}</Badge>
+                              {archive.templateName ? (
+                                <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">
+                                  القالب: {archive.templateName}
+                                </Badge>
+                              ) : archive.templateSnapshot ? (
+                                <Badge variant="outline" className="border-sky-300 bg-sky-50 text-sky-800">
+                                  إعدادات مرنة محفوظة
+                                </Badge>
+                              ) : null}
+                              {archive.assigneeName && <Badge variant="outline">{archive.assigneeName}</Badge>}
+                            </div>
+
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {formatDate(archive.periodFrom)} — {formatDate(archive.periodTo)}
+                              {' · '}
+                              تم الحفظ {formatDateTime(archive.createdAt)}
+                            </p>
+
+                            {archive.notes && (
+                              <p className="mt-2 max-w-3xl text-[11px] leading-5 text-slate-600">
+                                {archive.notes}
+                              </p>
+                            )}
+
+                            {!!archive.tags?.length && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {archive.tags.map((tag) => (
+                                  <Badge key={tag} variant="outline" className="border-slate-200 bg-slate-50 text-slate-600">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-600">
+                              <span>منجزة: <b>{archive.summary?.completed?.toLocaleString('ar-SA') ?? '—'}</b></span>
+                              <span className={archive.summary?.overdueSnapshot ? 'text-red-700' : ''}>
+                                متأخرة قائمة: <b>{archive.summary?.overdueSnapshot?.toLocaleString('ar-SA') ?? '—'}</b>
+                              </span>
+                              <span>بانتظار رد: <b>{archive.summary?.waiting?.toLocaleString('ar-SA') ?? '—'}</b></span>
+                              <span>تحتاج متابعة: <b>{archive.summary?.needsFollowUp?.toLocaleString('ar-SA') ?? '—'}</b></span>
+                            </div>
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {formatDate(archive.periodFrom)} — {formatDate(archive.periodTo)}
-                            {' · '}
-                            تم الحفظ {formatDateTime(archive.createdAt)}
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-600">
-                            <span>منجزة: <b>{archive.summary?.completed?.toLocaleString('ar-SA') ?? '—'}</b></span>
-                            <span className={archive.summary?.overdueSnapshot ? 'text-red-700' : ''}>متأخرة قائمة: <b>{archive.summary?.overdueSnapshot?.toLocaleString('ar-SA') ?? '—'}</b></span>
-                            <span>بانتظار رد: <b>{archive.summary?.waiting?.toLocaleString('ar-SA') ?? '—'}</b></span>
-                            <span>تحتاج متابعة: <b>{archive.summary?.needsFollowUp?.toLocaleString('ar-SA') ?? '—'}</b></span>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 gap-2">
-                          <Button size="sm" variant="outline" onClick={() => void openArchivedReport(archive.id)}>
-                            <FileText className="ml-1 h-4 w-4" />
-                            فتح
-                          </Button>
-                          {canDelete && (
-                            <Button size="sm" variant="outline" className="border-red-200 text-red-700" onClick={() => void deleteArchivedReport(archive.id)}>
-                              <Trash2 className="h-4 w-4" />
+
+                          <div className="flex shrink-0 flex-wrap gap-2">
+                            <Button size="sm" variant="outline" onClick={() => void openArchivedReport(archive.id)}>
+                              <FileText className="ml-1 h-4 w-4" />
+                              فتح
                             </Button>
-                          )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={reportArchiveLoading || reportExporting}
+                              onClick={() => void exportArchivedReportPdf(archive.id)}
+                            >
+                              <FileDown className="ml-1 h-4 w-4" />
+                              PDF
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-emerald-300 text-emerald-800"
+                              disabled={reportArchiveLoading || reportExporting}
+                              onClick={() => void exportArchivedReportExcel(archive.id)}
+                            >
+                              <FileSpreadsheet className="ml-1 h-4 w-4" />
+                              Excel
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => startArchiveMetadataEdit(archive)}
+                            >
+                              <Pencil className="ml-1 h-4 w-4" />
+                              بيانات
+                            </Button>
+                            {canDelete && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-200 text-red-700"
+                                onClick={() => void deleteArchivedReport(archive.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
+
+                        {archiveEditingId === archive.id && (
+                          <div className="grid gap-3 border-t border-slate-100 pt-3 md:grid-cols-2 xl:grid-cols-6">
+                            <div className="xl:col-span-2">
+                              <Field label="اسم النسخة">
+                                <Input
+                                  value={archiveEditName}
+                                  onChange={(event) => setArchiveEditName(event.target.value)}
+                                />
+                              </Field>
+                            </div>
+                            <div className="xl:col-span-2">
+                              <Field label="الوسوم">
+                                <Input
+                                  value={archiveEditTags}
+                                  onChange={(event) => setArchiveEditTags(event.target.value)}
+                                  placeholder="تفصل بفاصلة"
+                                />
+                              </Field>
+                            </div>
+                            <div className="xl:col-span-2">
+                              <Field label="الملاحظات">
+                                <Input
+                                  value={archiveEditNotes}
+                                  onChange={(event) => setArchiveEditNotes(event.target.value)}
+                                />
+                              </Field>
+                            </div>
+                            <div className="flex gap-2 md:col-span-2 xl:col-span-6">
+                              <Button
+                                size="sm"
+                                disabled={reportArchiveLoading}
+                                onClick={() => void saveArchiveMetadata()}
+                              >
+                                <Save className="ml-1 h-4 w-4" />
+                                حفظ البيانات
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setArchiveEditingId('')}
+                              >
+                                إلغاء
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))
+                    )))
                   )}
 
                   <div className="flex items-center justify-between border-t pt-3">
