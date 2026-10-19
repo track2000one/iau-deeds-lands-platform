@@ -408,6 +408,7 @@ export const ArchivePage: React.FC = () => {
   const canEdit = isAdmin || hasPermission('archive', 'canEdit');
   const canDelete = isAdmin || hasPermission('archive', 'canDelete');
   const canPrint = isAdmin || hasPermission('archive', 'canPrint');
+  const canApproveVersions = isAdmin || hasPermission('archive', 'canEdit');
   const canRestoreTransaction = isAdmin || hasPermission('archive', 'canEdit');
 
   const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
@@ -448,6 +449,12 @@ export const ArchivePage: React.FC = () => {
   const [versionFile, setVersionFile] = useState<File | null>(null);
   const [versionNote, setVersionNote] = useState('');
   const [versionSaving, setVersionSaving] = useState(false);
+
+  const [versionGovernanceOpen, setVersionGovernanceOpen] = useState(false);
+  const [versionGovernanceAttachment, setVersionGovernanceAttachment] = useState<ArchiveAttachment | null>(null);
+  const [versionGovernanceAction, setVersionGovernanceAction] = useState<'approve' | 'cancel' | null>(null);
+  const [versionGovernanceNote, setVersionGovernanceNote] = useState('');
+  const [versionGovernanceSaving, setVersionGovernanceSaving] = useState(false);
 
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
