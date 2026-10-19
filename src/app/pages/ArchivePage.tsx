@@ -181,6 +181,18 @@ const formatDate = (value?: string) => {
   }
 };
 
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-';
+  try {
+    return new Date(value).toLocaleString('ar-SA', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+  } catch {
+    return '-';
+  }
+};
+
 const formatArchiveDocumentDate = (value?: string, type: 'gregorian' | 'hijri' = 'gregorian') => {
   if (!value) return '-';
 
