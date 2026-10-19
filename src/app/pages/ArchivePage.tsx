@@ -1063,7 +1063,7 @@ export const ArchivePage: React.FC = () => {
       );
       setSelectedDocument(updated);
       toast.success(
-        `تم حفظ الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} كنسخة حالية`,
+        `تم حفظ مسودة الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} وبانتظار الاعتماد`,
       );
       setVersionDialogOpen(false);
       setVersionSourceAttachment(null);
