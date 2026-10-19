@@ -2709,6 +2709,87 @@ export const ArchivePage: React.FC = () => {
 
       <ArchiveReportsDialog documents={documents} open={reportsOpen} onOpenChange={setReportsOpen} />
 
+      <AlertDialog
+        open={versionDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) closeAttachmentVersionDialog();
+        }}
+      >
+        <AlertDialogContent className="max-w-xl" dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-[#1F4E78]" />
+              رفع إصدار جديد للملف
+            </AlertDialogTitle>
+            <AlertDialogDescription className="leading-7">
+              سيبقى الإصدار السابق محفوظًا للرجوع إليه، ويصبح الملف الجديد هو الإصدار الحالي.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-sm font-black text-slate-800">
+                {versionSourceAttachment?.originalName || versionSourceAttachment?.fileName || 'الملف الحالي'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                الإصدار الحالي: V{versionSourceAttachment?.version || 1}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="archive-version-file">ملف الإصدار الجديد *</Label>
+              <Input
+                id="archive-version-file"
+                type="file"
+                accept="*/*"
+                disabled={versionSaving}
+                onChange={(event) => setVersionFile(event.target.files?.[0] || null)}
+              />
+              {versionFile ? (
+                <p className="text-xs font-medium text-slate-600">
+                  {versionFile.name} — {formatFileSize(versionFile.size)}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="archive-version-note">ملاحظة الإصدار</Label>
+              <Textarea
+                id="archive-version-note"
+                value={versionNote}
+                onChange={(event) => setVersionNote(event.target.value)}
+                placeholder="مثال: نسخة محدثة بعد اعتماد التعديلات النهائية"
+                rows={3}
+                disabled={versionSaving}
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={versionSaving}
+              onClick={(event) => {
+                event.preventDefault();
+                closeAttachmentVersionDialog();
+              }}
+            >
+              إلغاء
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void saveAttachmentVersion();
+              }}
+              disabled={versionSaving || !versionFile}
+              className="bg-[#1F4E78] text-white hover:bg-[#173A59]"
+            >
+              {versionSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
+              {versionSaving ? 'جاري حفظ الإصدار...' : 'حفظ كإصدار جديد'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
         <AlertDialogContent className="max-w-2xl" dir="rtl">
           <AlertDialogHeader>
