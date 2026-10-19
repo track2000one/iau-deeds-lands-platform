@@ -1152,6 +1152,7 @@ export type TransactionFollowUpReportTemplateOptions = {
     | 'dueDate'
     | 'requiredAction'
   >;
+  excludedIds?: string[];
 };
 
 export type TransactionFollowUpReportTemplate = {
@@ -1528,6 +1529,7 @@ export const transactionFollowUpApi = {
     from: string;
     to: string;
     assigneeUserId?: string | null;
+    templateSnapshot?: TransactionFollowUpReportTemplate | null;
   }) =>
     apiJson<TransactionFollowUpReportArchive>('/api/transaction-follow-up/reports/archives', {
       method: 'POST',
