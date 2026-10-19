@@ -653,7 +653,9 @@ export const TransactionFollowUpPage: React.FC = () => {
             .map(normalizeReportTemplate)
             .filter((template): template is FlexibleReportTemplate => Boolean(template))
             .sort((left, right) => {
-              if (left.scope !== right.scope) return left.scope === 'shared' ? -1 : 1;
+              if (left.isDefault !== right.isDefault) return left.isDefault ? -1 : 1;
+              if (left.scope !== right.scope) return left.scope === 'personal' ? -1 : 1;
+              if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
               return right.updatedAt.localeCompare(left.updatedAt);
             }),
         );
