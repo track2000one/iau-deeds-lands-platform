@@ -74,6 +74,10 @@ type ArchiveAttachment = {
   versionGroupId?: string;
   versionNote?: string | null;
   versionStatus?: 'draft' | 'approved' | 'superseded' | 'cancelled';
+  approvalRoute?: 'pool' | 'specific';
+  assignedApproverId?: string | null;
+  assignedApproverName?: string | null;
+  approvalRequestedAt?: string | null;
   approvedById?: string | null;
   approvedByName?: string | null;
   approvedAt?: string | null;
@@ -87,6 +91,25 @@ type ArchiveAttachment = {
   addedBy?: string | null;
   createdAt?: string;
   updatedAt?: string;
+};
+
+type ArchiveApprover = {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'employee';
+};
+
+type ArchiveApprovalNotification = {
+  id: string;
+  recipientUserId: string;
+  recordId: string;
+  attachmentId: string;
+  type: string;
+  title: string;
+  message?: string | null;
+  readAt?: string | null;
+  createdAt: string;
 };
 
 type ArchiveApprovalItem = ArchiveAttachment & {
@@ -448,6 +471,26 @@ export const ArchivePage: React.FC = () => {
       .map((value) => String(value).trim().toLowerCase())
       .includes(maker);
   };
+  const getApprovalDestinationLabel = (attachment: ArchiveAttachment) => {
+    if (attachment.approvalRoute === 'specific') {
+      return attachment.assignedApproverName
+        ? `بانتظار ${attachment.assignedApproverName}`
+        : 'بانتظار المعتمد المحدد';
+    }
+    return 'بانتظار مجموعة معتمدي الأرشيف';
+  };
+
+  const canCurrentUserReviewVersion = (attachment: ArchiveAttachment) => {
+    if (!canApproveVersions || getAttachmentVersionStatus(attachment) !== 'draft') return false;
+    if (isOwnVersionDraft(attachment)) return false;
+
+    if (attachment.approvalRoute === 'specific' && attachment.assignedApproverId) {
+      return attachment.assignedApproverId === userProfile?.uid;
+    }
+
+    return true;
+  };
+
 
   const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
   const [archivedTransactions, setArchivedTransactions] = useState<TransactionFollowUpRecord[]>([]);
@@ -488,6 +531,11 @@ export const ArchivePage: React.FC = () => {
   const [versionNote, setVersionNote] = useState('');
   const [versionSaving, setVersionSaving] = useState(false);
 
+  const [versionApprovalRoute, setVersionApprovalRoute] = useState<'pool' | 'specific'>('pool');
+  const [versionApproverId, setVersionApproverId] = useState('');
+  const [versionApprovers, setVersionApprovers] = useState<ArchiveApprover[]>([]);
+  const [versionApproversLoading, setVersionApproversLoading] = useState(false);
+
   const [versionGovernanceOpen, setVersionGovernanceOpen] = useState(false);
   const [versionGovernanceAttachment, setVersionGovernanceAttachment] = useState<ArchiveAttachment | null>(null);
   const [versionGovernanceAction, setVersionGovernanceAction] = useState<'approve' | 'cancel' | null>(null);
@@ -505,6 +553,9 @@ export const ArchivePage: React.FC = () => {
   const [approvalDateFrom, setApprovalDateFrom] = useState('');
   const [approvalDateTo, setApprovalDateTo] = useState('');
   const [approvalSort, setApprovalSort] = useState<'newest' | 'oldest'>('newest');
+
+  const [approvalNotifications, setApprovalNotifications] = useState<ArchiveApprovalNotification[]>([]);
+  const [approvalUnreadCount, setApprovalUnreadCount] = useState(0);
 
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
@@ -555,11 +606,39 @@ export const ArchivePage: React.FC = () => {
     return Array.isArray(remote) ? remote : [];
   };
 
+  const loadVersionApprovers = async () => {
+    const remote = await archiveRequest<ArchiveApprover[]>('/records/version-approvers');
+    const items = Array.isArray(remote) ? remote : [];
+    setVersionApprovers(items);
+    return items;
+  };
+
   const loadApprovalCenterItems = async () => {
     const result = await archiveRequest<{ items: ArchiveApprovalItem[]; total: number }>('/records/version-approvals?status=all');
     const items = Array.isArray(result?.items) ? result.items : [];
     setApprovalItems(items);
     return items;
+  };
+
+  const loadApprovalNotifications = async () => {
+    const result = await archiveRequest<{
+      items: ArchiveApprovalNotification[];
+      unreadCount: number;
+    }>('/records/version-approval-notifications');
+    const items = Array.isArray(result?.items) ? result.items : [];
+    setApprovalNotifications(items);
+    setApprovalUnreadCount(Number(result?.unreadCount || 0));
+    return items;
+  };
+
+  const markApprovalNotificationsRead = async () => {
+    await archiveRequest<void>('/records/version-approval-notifications/read-all', {
+      method: 'PATCH',
+    });
+    setApprovalUnreadCount(0);
+    setApprovalNotifications((current) =>
+      current.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })),
+    );
   };
 
   const loadArchivedTransactions = async () => {
@@ -652,6 +731,8 @@ export const ArchivePage: React.FC = () => {
           loadDocumentsFromServer(),
           loadArchivedTransactions(),
           loadTrashRecords(),
+          loadApprovalNotifications(),
+          ...(canApproveVersions ? [loadApprovalCenterItems()] : []),
         ]);
 
         if (!mounted) return;
@@ -679,7 +760,18 @@ export const ArchivePage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [isAdmin]);
+  }, [isAdmin, canApproveVersions]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadApprovalNotifications().catch(() => undefined);
+      if (canApproveVersions) {
+        void loadApprovalCenterItems().catch(() => undefined);
+      }
+    }, 60000);
+
+    return () => window.clearInterval(timer);
+  }, [canApproveVersions]);
 
   const filteredDocuments = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -1067,15 +1159,30 @@ export const ArchivePage: React.FC = () => {
     return body as UploadResponse;
   };
 
-  const openAttachmentVersionDialog = (attachment: ArchiveAttachment) => {
+  const openAttachmentVersionDialog = async (attachment: ArchiveAttachment) => {
     if (!canEdit) {
       toast.error('لا تملك صلاحية إضافة إصدار جديد');
       return;
     }
+
     setVersionSourceAttachment(attachment);
     setVersionFile(null);
     setVersionNote('');
+    setVersionApprovalRoute('pool');
+    setVersionApproverId('');
     setVersionDialogOpen(true);
+
+    try {
+      setVersionApproversLoading(true);
+      const approvers = await loadVersionApprovers();
+      if (!approvers.length) {
+        toast.error('لا يوجد معتمد آخر مخول حاليًا. أضف صلاحية «اعتماد الأرشيف» لمستخدم آخر قبل إرسال إصدار جديد.');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل قائمة معتمدي الأرشيف');
+    } finally {
+      setVersionApproversLoading(false);
+    }
   };
 
   const closeAttachmentVersionDialog = () => {
@@ -1084,6 +1191,8 @@ export const ArchivePage: React.FC = () => {
     setVersionSourceAttachment(null);
     setVersionFile(null);
     setVersionNote('');
+    setVersionApprovalRoute('pool');
+    setVersionApproverId('');
   };
 
   const saveAttachmentVersion = async () => {
@@ -1093,6 +1202,14 @@ export const ArchivePage: React.FC = () => {
     }
     if (!canEdit) {
       toast.error('لا تملك صلاحية إضافة إصدار جديد');
+      return;
+    }
+    if (!versionApprovers.length) {
+      toast.error('لا يوجد معتمد آخر متاح لإرسال طلب الاعتماد إليه');
+      return;
+    }
+    if (versionApprovalRoute === 'specific' && !versionApproverId) {
+      toast.error('اختر المعتمد المحدد قبل حفظ مسودة الإصدار');
       return;
     }
 
@@ -1111,6 +1228,8 @@ export const ArchivePage: React.FC = () => {
             driveUrl: uploaded.driveUrl,
             driveFileId: uploaded.driveFileId,
             versionNote: versionNote.trim(),
+            approvalRoute: versionApprovalRoute,
+            approverUserId: versionApprovalRoute === 'specific' ? versionApproverId : null,
           }),
         },
       );
@@ -1119,13 +1238,19 @@ export const ArchivePage: React.FC = () => {
         current.map((doc) => (doc.id === updated.id ? updated : doc)),
       );
       setSelectedDocument(updated);
+      const approverName =
+        versionApprovalRoute === 'specific'
+          ? versionApprovers.find((item) => item.id === versionApproverId)?.name || 'المعتمد المحدد'
+          : 'مجموعة معتمدي الأرشيف';
       toast.success(
-        `تم حفظ مسودة الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} وبانتظار الاعتماد`,
+        `تم حفظ مسودة الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} وإرسالها للاعتماد إلى ${approverName}`,
       );
       setVersionDialogOpen(false);
       setVersionSourceAttachment(null);
       setVersionFile(null);
       setVersionNote('');
+      setVersionApprovalRoute('pool');
+      setVersionApproverId('');
     } catch (error) {
       console.error('Archive attachment version error:', error);
       toast.error(error instanceof Error ? error.message : 'تعذر حفظ الإصدار الجديد');
@@ -1149,6 +1274,14 @@ export const ArchivePage: React.FC = () => {
     }
     if (action === 'approve' && isOwnVersionDraft(attachment)) {
       toast.error('لا يمكنك اعتماد إصدار قمت برفعه بنفسك. يجب أن يعتمد الإصدار مستخدم آخر مخول.');
+      return;
+    }
+    if (!isOwnVersionDraft(attachment) && !canCurrentUserReviewVersion(attachment)) {
+      toast.error(
+        attachment.approvalRoute === 'specific'
+          ? `طلب الاعتماد موجه إلى ${attachment.assignedApproverName || 'معتمد آخر'}`
+          : 'طلب الاعتماد غير مسند إلى حسابك',
+      );
       return;
     }
     setVersionGovernanceAttachment(attachment);
@@ -1394,8 +1527,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const pendingApprovalCount = useMemo(
-    () => documents.reduce((sum, doc) => sum + Number(doc.pendingVersionCount || 0), 0),
-    [documents],
+    () => approvalItems.filter((item) => getAttachmentVersionStatus(item) === 'draft').length,
+    [approvalItems],
   );
 
   const approvalEmployees = useMemo(
@@ -1423,6 +1556,7 @@ export const ArchivePage: React.FC = () => {
         item.originalName,
         item.fileName,
         item.addedBy,
+        item.assignedApproverName,
         item.versionNote,
         item.record.archiveNumber,
         item.record.title,
@@ -1457,7 +1591,11 @@ export const ArchivePage: React.FC = () => {
 
     try {
       setApprovalLoading(true);
-      await loadApprovalCenterItems();
+      await Promise.all([
+        loadApprovalCenterItems(),
+        loadApprovalNotifications(),
+      ]);
+      await markApprovalNotificationsRead();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل مركز اعتماد الأرشيف');
     } finally {
@@ -1580,6 +1718,11 @@ export const ArchivePage: React.FC = () => {
               {pendingApprovalCount > 0 ? (
                 <Badge variant="secondary" className="mr-2 min-w-6 justify-center bg-white px-1.5 text-amber-800">
                   {pendingApprovalCount.toLocaleString('ar-SA')}
+                </Badge>
+              ) : null}
+              {approvalUnreadCount > 0 ? (
+                <Badge className="mr-1 bg-red-600 text-white hover:bg-red-600">
+                  جديد {approvalUnreadCount.toLocaleString('ar-SA')}
                 </Badge>
               ) : null}
             </Button>
@@ -1707,7 +1850,10 @@ export const ArchivePage: React.FC = () => {
                   onClick={async () => {
                     try {
                       setApprovalLoading(true);
-                      await loadApprovalCenterItems();
+                      await Promise.all([
+                        loadApprovalCenterItems(),
+                        loadApprovalNotifications(),
+                      ]);
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : 'تعذر تحديث مركز الاعتماد');
                     } finally {
@@ -1848,13 +1994,14 @@ export const ArchivePage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-                <table className="min-w-[1180px] w-full text-right text-sm">
+                <table className="min-w-[1320px] w-full text-right text-sm">
                   <thead className="bg-slate-50 text-slate-700">
                     <tr className="border-b border-slate-200">
                       <th className="px-4 py-3 font-black">السجل الأرشيفي</th>
                       <th className="px-4 py-3 font-black">الملف / الإصدار</th>
                       <th className="px-4 py-3 font-black">الحالة</th>
                       <th className="px-4 py-3 font-black">الموظف</th>
+                      <th className="px-4 py-3 font-black">مسار الاعتماد</th>
                       <th className="px-4 py-3 font-black">السرية</th>
                       <th className="px-4 py-3 font-black">تاريخ الطلب</th>
                       <th className="px-4 py-3 font-black">الإجراءات</th>
@@ -1879,12 +2026,25 @@ export const ArchivePage: React.FC = () => {
                           </Badge>
                         </td>
                         <td className="px-4 py-3 align-top font-semibold text-slate-700">{item.addedBy || 'النظام'}</td>
+                        <td className="max-w-[240px] px-4 py-3 align-top">
+                          <Badge
+                            variant="outline"
+                            className={item.approvalRoute === 'specific'
+                              ? "border-blue-200 bg-blue-50 text-blue-800"
+                              : "border-violet-200 bg-violet-50 text-violet-800"}
+                          >
+                            {getApprovalDestinationLabel(item)}
+                          </Badge>
+                          {item.approvalRoute === 'specific' && item.assignedApproverId === userProfile?.uid ? (
+                            <p className="mt-1 text-xs font-bold text-emerald-700">مسند إليك مباشرة</p>
+                          ) : null}
+                        </td>
                         <td className="px-4 py-3 align-top">
                           <Badge variant={getConfidentialityVariant(item.record.confidentiality) as any}>
                             {getConfidentialityLabel(item.record.confidentiality)}
                           </Badge>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 align-top text-slate-600">{formatDateTime(item.createdAt)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 align-top text-slate-600">{formatDateTime(item.approvalRequestedAt || item.createdAt)}</td>
                         <td className="px-4 py-3 align-top">
                           <div className="flex flex-wrap gap-2">
                             <Button type="button" variant="outline" size="sm" onClick={() => window.open(item.driveUrl, '_blank', 'noopener,noreferrer')}>
@@ -1908,25 +2068,31 @@ export const ArchivePage: React.FC = () => {
                                   <Badge variant="outline" className="border-amber-300 bg-amber-50 px-3 py-2 text-amber-800">
                                     من رفعك — يلزم معتمد آخر
                                   </Badge>
+                                ) : canCurrentUserReviewVersion(item) ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      onClick={() => openVersionGovernanceDialog(item, 'approve', item.record.id)}
+                                      className="bg-emerald-600 font-bold text-white hover:bg-emerald-700"
+                                    >
+                                      اعتماد
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openVersionGovernanceDialog(item, 'cancel', item.record.id)}
+                                      className="border-red-200 bg-red-50 font-bold text-red-700 hover:bg-red-100"
+                                    >
+                                      إلغاء
+                                    </Button>
+                                  </>
                                 ) : (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => openVersionGovernanceDialog(item, 'approve', item.record.id)}
-                                    className="bg-emerald-600 font-bold text-white hover:bg-emerald-700"
-                                  >
-                                    اعتماد
-                                  </Button>
+                                  <Badge variant="outline" className="border-blue-200 bg-blue-50 px-3 py-2 text-blue-800">
+                                    موجه إلى {item.assignedApproverName || 'معتمد آخر'}
+                                  </Badge>
                                 )}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openVersionGovernanceDialog(item, 'cancel', item.record.id)}
-                                  className="border-red-200 bg-red-50 font-bold text-red-700 hover:bg-red-100"
-                                >
-                                  إلغاء
-                                </Button>
                               </>
                             ) : null}
                           </div>
@@ -2654,13 +2820,16 @@ export const ArchivePage: React.FC = () => {
                               </Badge>
                             ) : null;
                           })()}
-                          {getAttachmentVersionGroups(selectedDocument)
-                            .find((item) => item.current.id === attachment.id)
-                            ?.versions.some((item) => getAttachmentVersionStatus(item) === 'draft') ? (
-                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
-                              يوجد إصدار بانتظار الاعتماد
-                            </Badge>
-                          ) : null}
+                          {(() => {
+                            const pending = getAttachmentVersionGroups(selectedDocument)
+                              .find((item) => item.current.id === attachment.id)
+                              ?.versions.find((item) => getAttachmentVersionStatus(item) === 'draft');
+                            return pending ? (
+                              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                                {getApprovalDestinationLabel(pending)}
+                              </Badge>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -2739,6 +2908,16 @@ export const ArchivePage: React.FC = () => {
                                   >
                                     {getAttachmentVersionStatusLabel(version)}
                                   </Badge>
+                                  {getAttachmentVersionStatus(version) === 'draft' ? (
+                                    <Badge
+                                      variant="outline"
+                                      className={version.approvalRoute === 'specific'
+                                        ? "border-blue-200 bg-blue-50 text-blue-800"
+                                        : "border-violet-200 bg-violet-50 text-violet-800"}
+                                    >
+                                      {getApprovalDestinationLabel(version)}
+                                    </Badge>
+                                  ) : null}
                                 </div>
                                 <p className="mt-1 text-xs text-slate-500">
                                   {formatDateTime(version.createdAt)} · {formatFileSize(version.fileSize)}
@@ -2769,28 +2948,32 @@ export const ArchivePage: React.FC = () => {
                               {canApproveVersions && getAttachmentVersionStatus(version) === 'draft' ? (
                                 isOwnVersionDraft(version) ? (
                                   <Badge variant="outline" className="border-amber-300 bg-amber-50 px-3 py-2 text-amber-800">
-                                    يتطلب معتمدًا آخر
+                                    من رفعك — يلزم معتمد آخر
                                   </Badge>
+                                ) : canCurrentUserReviewVersion(version) ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      onClick={() => openVersionGovernanceDialog(version, 'approve')}
+                                    >
+                                      اعتماد
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openVersionGovernanceDialog(version, 'cancel')}
+                                      className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                                    >
+                                      إلغاء المسودة
+                                    </Button>
+                                  </>
                                 ) : (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => openVersionGovernanceDialog(version, 'approve')}
-                                  >
-                                    اعتماد
-                                  </Button>
+                                  <Badge variant="outline" className="border-blue-200 bg-blue-50 px-3 py-2 text-blue-800">
+                                    موجه إلى {version.assignedApproverName || 'معتمد آخر'}
+                                  </Badge>
                                 )
-                              ) : null}
-                              {canApproveVersions && getAttachmentVersionStatus(version) === 'draft' ? (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openVersionGovernanceDialog(version, 'cancel')}
-                                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                                >
-                                  إلغاء المسودة
-                                </Button>
                               ) : null}
                             </div>
                           ))}
@@ -3346,6 +3529,58 @@ export const ArchivePage: React.FC = () => {
                 disabled={versionSaving}
               />
             </div>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+              <Label htmlFor="archive-version-approval-route">توجيه طلب الاعتماد *</Label>
+              <NativeSelect
+                id="archive-version-approval-route"
+                value={versionApprovalRoute}
+                onChange={(event) => {
+                  const value = event.target.value === 'specific' ? 'specific' : 'pool';
+                  setVersionApprovalRoute(value);
+                  if (value === 'pool') setVersionApproverId('');
+                }}
+                disabled={versionSaving || versionApproversLoading}
+                className="mt-2"
+              >
+                <option value="pool">مجموعة معتمدي الأرشيف — أول معتمد مخول يمكنه المراجعة</option>
+                <option value="specific">معتمد محدد — توجيه الطلب إلى مستخدم بعينه</option>
+              </NativeSelect>
+
+              {versionApprovalRoute === 'specific' && (
+                <div className="mt-3 space-y-2">
+                  <Label htmlFor="archive-version-approver">المعتمد المحدد *</Label>
+                  <NativeSelect
+                    id="archive-version-approver"
+                    value={versionApproverId}
+                    onChange={(event) => setVersionApproverId(event.target.value)}
+                    disabled={versionSaving || versionApproversLoading}
+                  >
+                    <option value="">
+                      {versionApproversLoading ? 'جاري تحميل المعتمدين...' : 'اختر المعتمد'}
+                    </option>
+                    {versionApprovers.map((approver) => (
+                      <option key={approver.id} value={approver.id}>
+                        {approver.name}{approver.role === 'admin' ? ' — مسؤول النظام' : ''}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+              )}
+
+              <p className="mt-2 text-xs leading-6 text-amber-900">
+                لا يظهر المستخدم الحالي ضمن قائمة المعتمدين تطبيقًا لمبدأ فصل المُعد عن المُعتمد.
+                {versionApprovalRoute === 'specific'
+                  ? ' لن يتمكن من اعتماد الطلب إلا المعتمد المحدد.'
+                  : ' سيتم إشعار جميع المستخدمين المخولين باعتماد الأرشيف.'}
+              </p>
+
+              {!versionApproversLoading && versionApprovers.length === 0 ? (
+                <p className="mt-2 text-xs font-bold text-red-700">
+                  لا يوجد معتمد آخر متاح حاليًا. امنح مستخدمًا آخر صلاحية «اعتماد الأرشيف» أولًا.
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <AlertDialogFooter>
@@ -3363,7 +3598,13 @@ export const ArchivePage: React.FC = () => {
                 event.preventDefault();
                 void saveAttachmentVersion();
               }}
-              disabled={versionSaving || !versionFile}
+              disabled={
+                versionSaving ||
+                versionApproversLoading ||
+                !versionFile ||
+                versionApprovers.length === 0 ||
+                (versionApprovalRoute === 'specific' && !versionApproverId)
+              }
               className="bg-[#1F4E78] text-white hover:bg-[#173A59]"
             >
               {versionSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
