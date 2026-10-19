@@ -3652,7 +3652,7 @@ ${styleAssets}
                     )}
 
                   {reportTemplates.length > 0 ? (
-                    <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
                       {reportTemplates.map((template) => (
                         <div
                           key={template.id}
