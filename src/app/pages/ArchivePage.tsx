@@ -1546,6 +1546,23 @@ export const ArchivePage: React.FC = () => {
               تقارير الأرشفة — طباعة / PDF / Excel
             </Button>
           )}
+          {canApproveVersions && (
+            <Button
+              variant="outline"
+              onClick={() => void openApprovalCenter()}
+              className={approvalCenterOpen
+                ? "w-full border-amber-500 bg-amber-500 font-bold text-white hover:bg-amber-600 lg:w-auto"
+                : "w-full border-amber-300 bg-amber-50 font-bold text-amber-800 hover:bg-amber-100 lg:w-auto"}
+            >
+              <ClipboardCheck className="ml-2 h-4 w-4" />
+              مركز اعتماد الأرشيف
+              {pendingApprovalCount > 0 ? (
+                <Badge variant="secondary" className="mr-2 min-w-6 justify-center bg-white px-1.5 text-amber-800">
+                  {pendingApprovalCount.toLocaleString('ar-SA')}
+                </Badge>
+              ) : null}
+            </Button>
+          )}
           {(canEdit || canDelete) && (
             <Button
               variant="outline"
