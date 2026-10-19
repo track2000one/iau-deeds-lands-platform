@@ -359,8 +359,14 @@ const getArchiveActivityLabel = (action: string) =>
   archiveActivityLabels[action] || action || 'إجراء أرشيفي';
 
 const getArchiveActivityClassName = (action: string) => {
-  if (action.includes('delete') || action.includes('removed')) {
+  if (action.includes('approved')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+  }
+  if (action.includes('cancelled') || action.includes('delete') || action.includes('removed')) {
     return 'border-red-200 bg-red-50 text-red-800';
+  }
+  if (action.includes('version_added')) {
+    return 'border-amber-200 bg-amber-50 text-amber-800';
   }
   if (action.includes('merge')) {
     return 'border-violet-200 bg-violet-50 text-violet-800';
