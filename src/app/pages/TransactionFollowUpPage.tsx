@@ -1004,7 +1004,14 @@ export const TransactionFollowUpPage: React.FC = () => {
   const loadReportArchives = async (page = reportArchivePage) => {
     try {
       setReportArchiveLoading(true);
-      const result = await transactionFollowUpApi.reportArchives({ page, pageSize: 20 });
+      const result = await transactionFollowUpApi.reportArchives({
+        page,
+        pageSize: 20,
+        search: reportArchiveSearch.trim() || undefined,
+        source: reportArchiveSource || undefined,
+        reportType: reportArchiveType || undefined,
+        tag: reportArchiveTag.trim() || undefined,
+      });
       setReportArchives(result.items || []);
       setReportArchivePage(result.page || 1);
       setReportArchiveTotalPages(result.totalPages || 0);
@@ -1058,13 +1065,22 @@ export const TransactionFollowUpPage: React.FC = () => {
       };
 
       await transactionFollowUpApi.archiveReport({
+        archiveName: archiveSaveName.trim() || flexibleReportOptions.title.trim() || null,
+        notes: archiveSaveNotes.trim() || null,
+        tags: archiveSaveTags
+          .split(/[,،]/)
+          .map((tag) => tag.trim())
+          .filter(Boolean),
         reportType: reportMode,
         from: reportFrom,
         to: reportTo,
         assigneeUserId: isAdmin || canDelete ? reportAssigneeId || null : null,
         templateSnapshot: manualSnapshot,
       });
-      toast.success('تم حفظ نسخة ثابتة من التقرير مع جميع إعداداته المرنة');
+      setArchiveSaveName('');
+      setArchiveSaveNotes('');
+      setArchiveSaveTags('');
+      toast.success('تم حفظ نسخة ثابتة من التقرير مع بيانات الأرشفة وإعداداته المرنة');
       setReportSection('archive');
       await loadReportArchives(1);
     } catch (error) {
