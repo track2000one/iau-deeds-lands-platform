@@ -2939,6 +2939,30 @@ export const ArchivePage: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={versionGovernanceOpen} onOpenChange={setVersionGovernanceOpen}>
+        <AlertDialogContent className="max-w-xl" dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>مراجعة إصدار الملف</AlertDialogTitle>
+            <AlertDialogDescription>
+              راجع الإصدار المحدد قبل تنفيذ الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="font-bold">{versionGovernanceAttachment?.originalName || versionGovernanceAttachment?.fileName || 'الإصدار المحدد'}</p>
+            <Textarea
+              value={versionGovernanceNote}
+              onChange={(event) => setVersionGovernanceNote(event.target.value)}
+              rows={3}
+              disabled={versionGovernanceSaving}
+              placeholder="ملاحظة الإجراء"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={closeVersionGovernanceDialog}>رجوع</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
         <AlertDialogContent className="max-w-2xl" dir="rtl">
           <AlertDialogHeader>
