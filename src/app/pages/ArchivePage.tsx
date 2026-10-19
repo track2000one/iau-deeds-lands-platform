@@ -1161,11 +1161,13 @@ export const ArchivePage: React.FC = () => {
       setDocuments((current) =>
         current.map((doc) => (doc.id === updated.id ? updated : doc)),
       );
-      setSelectedDocument(updated);
+      if (selectedDocument?.id === updated.id) setSelectedDocument(updated);
+      if (approvalCenterOpen) await loadApprovalCenterItems();
       toast.success(`تم اعتماد الإصدار V${versionGovernanceAttachment.version || 1} كنسخة رسمية حالية`);
       setVersionGovernanceOpen(false);
       setVersionGovernanceAttachment(null);
       setVersionGovernanceAction(null);
+      setVersionGovernanceRecordId('');
       setVersionGovernanceNote('');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر اعتماد الإصدار');
@@ -1189,11 +1191,13 @@ export const ArchivePage: React.FC = () => {
       setDocuments((current) =>
         current.map((doc) => (doc.id === updated.id ? updated : doc)),
       );
-      setSelectedDocument(updated);
+      if (selectedDocument?.id === updated.id) setSelectedDocument(updated);
+      if (approvalCenterOpen) await loadApprovalCenterItems();
       toast.success(`تم إلغاء مسودة الإصدار V${versionGovernanceAttachment.version || 1}`);
       setVersionGovernanceOpen(false);
       setVersionGovernanceAttachment(null);
       setVersionGovernanceAction(null);
+      setVersionGovernanceRecordId('');
       setVersionGovernanceNote('');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر إلغاء مسودة الإصدار');
