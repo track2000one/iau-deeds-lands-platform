@@ -948,63 +948,134 @@ export const ArchivePage: React.FC = () => {
     }
   };
 
-  const printArchivedTransaction = (record: TransactionFollowUpRecord) => {
+  const printArchivedTransaction = async (record: TransactionFollowUpRecord) => {
     if (!canPrint) {
       toast.error('لا تملك صلاحية طباعة المعاملات المؤرشفة');
       return;
     }
 
-    const popup = window.open('', '_blank', 'width=980,height=760');
+    const popup = window.open('', '_blank', 'width=1100,height=820');
     if (!popup) {
       toast.error('تعذر فتح نافذة الطباعة. تحقق من السماح بالنوافذ المنبثقة.');
       return;
     }
     popup.opener = null;
+    popup.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>جاري إعداد التقرير...</title></head><body style="font-family:Arial,Tahoma,sans-serif;padding:32px;text-align:center">جاري إعداد التقرير والمرفقات...</body></html>');
+    popup.document.close();
 
-    const rows = [
-      ['رقم المعاملة', record.transactionNumber],
-      ['السنة', record.transactionYear ? `${record.transactionYear}${record.transactionDateType === 'hijri' ? 'هـ' : 'م'}` : '—'],
-      ['تاريخ المعاملة', formatArchivedTransactionDate(record)],
-      ['رقم المتابعة', record.trackingNumber],
-      ['الإدارة / الوحدة', archivedOrganizationalUnitLabel(record.organizationalUnit)],
-      ['الموضوع', record.subject],
-      ['الجهة', record.sourceEntity || '—'],
-      ['الموظف المختص', record.currentAssigneeName || '—'],
-      ['تاريخ الإقفال', formatDate(record.closedAt || undefined)],
-      ['تاريخ الأرشفة', formatDate(record.archivedAt || undefined)],
-      ['تمت الأرشفة بواسطة', record.archivedByName || '—'],
-      ['ملاحظات الأرشفة', record.archiveNote || '—'],
-    ];
+    try {
+      const detailed =
+        record.events && record.attachments
+          ? record
+          : await transactionFollowUpApi.archivedRecord(record.id);
 
-    popup.document.write(`<!doctype html>
+      const rows = [
+        ['رقم المعاملة', detailed.transactionNumber],
+        ['السنة', detailed.transactionYear ? `${detailed.transactionYear}${detailed.transactionDateType === 'hijri' ? 'هـ' : 'م'}` : '—'],
+        ['تاريخ المعاملة', formatArchivedTransactionDate(detailed)],
+        ['رقم المتابعة', detailed.trackingNumber],
+        ['الإدارة / الوحدة', archivedOrganizationalUnitLabel(detailed.organizationalUnit)],
+        ['الموضوع', detailed.subject],
+        ['الجهة', detailed.sourceEntity || '—'],
+        ['الموظف المختص', detailed.currentAssigneeName || '—'],
+        ['الحالة', detailed.status === 'completed' ? 'منجزة' : detailed.status === 'closed' ? 'مغلقة' : detailed.status],
+        ['تاريخ الإقفال', formatDate(detailed.closedAt || undefined)],
+        ['تاريخ الأرشفة', formatDate(detailed.archivedAt || undefined)],
+        ['تمت الأرشفة بواسطة', detailed.archivedByName || '—'],
+        ['ملاحظات الأرشفة', detailed.archiveNote || '—'],
+        ['عدد المرفقات', String(detailed.attachments?.length || 0)],
+      ];
+
+      const attachmentRows = (detailed.attachments || []).map((attachment, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapePrintHtml(attachment.title || 'مرفق')}</td>
+          <td>${escapePrintHtml(attachment.mimeType || 'ملف')}</td>
+          <td>${escapePrintHtml(attachment.createdBy || '—')}</td>
+          <td>${escapePrintHtml(formatDate(attachment.createdAt))}</td>
+          <td><a href="${escapePrintHtml(attachment.driveUrl)}" target="_blank">فتح المرفق</a></td>
+        </tr>
+      `).join('');
+
+      const eventRows = (detailed.events || []).map((event) => `
+        <tr>
+          <td>${escapePrintHtml(formatDateTime(event.createdAt))}</td>
+          <td>${escapePrintHtml(event.actionText || 'تحديث المعاملة')}</td>
+          <td>${escapePrintHtml(event.createdByName || '—')}</td>
+          <td>${escapePrintHtml(event.note || '—')}</td>
+        </tr>
+      `).join('');
+
+      popup.document.open();
+      popup.document.write(`<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8" />
-<title>المعاملة المؤرشفة ${escapePrintHtml(record.transactionNumber)}</title>
+<title>المعاملة المؤرشفة ${escapePrintHtml(detailed.transactionNumber)}</title>
 <style>
-  body{font-family:Arial,"Segoe UI",sans-serif;margin:32px;color:#0f172a}
-  h1{font-size:24px;margin:0 0 8px}
-  .sub{color:#64748b;margin-bottom:22px}
+  @page{size:A4 portrait;margin:10mm}
+  *{box-sizing:border-box}
+  body{font-family:Arial,"Segoe UI",sans-serif;margin:0;color:#0f172a;font-size:11px}
+  h1{font-size:24px;margin:0 0 6px;color:#123047}
+  h2{font-size:16px;margin:18px 0 8px;color:#123047;border-right:4px solid #0f766e;padding-right:8px}
+  .head{border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;padding:14px;margin-bottom:12px}
+  .uni{font-size:11px;color:#0f766e;font-weight:700}
+  .sub{color:#64748b;margin-top:4px}
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+  .metric{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px;text-align:center}
+  .metric b{display:block;font-size:16px;color:#0369a1;margin-top:2px}
   table{width:100%;border-collapse:collapse}
-  th,td{border:1px solid #cbd5e1;padding:10px;text-align:right;vertical-align:top}
-  th{width:190px;background:#f8fafc}
-  .foot{margin-top:20px;color:#64748b;font-size:12px}
-  @media print{body{margin:12mm}}
+  th,td{border:1px solid #cbd5e1;padding:8px;text-align:right;vertical-align:top;word-break:break-word}
+  th{background:#eef3f8;font-weight:800}
+  .main th{width:190px}
+  .attachments thead th,.events thead th{background:#123047;color:#fff}
+  a{color:#0563c1;text-decoration:underline}
+  .empty{border:1px dashed #cbd5e1;border-radius:8px;padding:14px;color:#64748b;text-align:center}
+  .foot{margin-top:18px;padding-top:8px;border-top:1px solid #e2e8f0;color:#64748b;font-size:10px}
+  @media print{
+    h2{break-after:avoid}
+    tr{break-inside:avoid}
+    .head{break-inside:avoid}
+  }
 </style>
 </head>
 <body>
-  <h1>بيانات المعاملة المؤرشفة</h1>
-  <div class="sub">نظام المتابعة — قسم الأرشفة</div>
-  <table>
+  <div class="head">
+    <div class="uni">جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الأصول والأملاك والأوقاف الجامعية</div>
+    <h1>بيانات المعاملة المؤرشفة</h1>
+    <div class="sub">نظام المتابعة — قسم الأرشفة · تاريخ الطباعة: ${escapePrintHtml(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</div>
+    <div class="summary">
+      <div class="metric">رقم المعاملة<b>${escapePrintHtml(detailed.transactionNumber)}</b></div>
+      <div class="metric">الحالة<b>${detailed.status === 'completed' ? 'منجزة' : detailed.status === 'closed' ? 'مغلقة' : escapePrintHtml(detailed.status)}</b></div>
+      <div class="metric">المرفقات<b>${detailed.attachments?.length || 0}</b></div>
+    </div>
+  </div>
+
+  <table class="main">
     <tbody>
       ${rows.map(([label, value]) => `<tr><th>${escapePrintHtml(label)}</th><td>${escapePrintHtml(value)}</td></tr>`).join('')}
     </tbody>
   </table>
-  <div class="foot">تم إنشاء نسخة الطباعة من منصة إدارة الأصول والأملاك والأوقاف الجامعية.</div>
-  <script>window.onload=()=>{window.print();}</script>
+
+  <h2>مرفقات المعاملة</h2>
+  ${attachmentRows
+    ? `<table class="attachments"><thead><tr><th>#</th><th>اسم المرفق</th><th>النوع</th><th>أضيف بواسطة</th><th>التاريخ</th><th>الرابط</th></tr></thead><tbody>${attachmentRows}</tbody></table>`
+    : '<div class="empty">لا توجد مرفقات مرتبطة بهذه المعاملة.</div>'}
+
+  <h2>سجل الإجراءات والتحويلات</h2>
+  ${eventRows
+    ? `<table class="events"><thead><tr><th>التاريخ</th><th>الإجراء</th><th>بواسطة</th><th>الملاحظة</th></tr></thead><tbody>${eventRows}</tbody></table>`
+    : '<div class="empty">لا توجد أحداث مسجلة.</div>'}
+
+  <div class="foot">تم إنشاء التقرير من منصة إدارة الأصول والأملاك والأوقاف الجامعية. روابط المرفقات قابلة للفتح من نسخة PDF عند دعم قارئ PDF للروابط.</div>
+  <script>window.onload=()=>setTimeout(()=>window.print(),250);<\/script>
 </body>
 </html>`);
-    popup.document.close();
+      popup.document.close();
+    } catch (error) {
+      popup.close();
+      toast.error(error instanceof Error ? error.message : 'تعذر إعداد تقرير المعاملة مع المرفقات');
+    }
   };
 
   const openAddForm = () => {
