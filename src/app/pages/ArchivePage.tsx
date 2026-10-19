@@ -1077,6 +1077,32 @@ export const ArchivePage: React.FC = () => {
     }
   };
 
+  const openVersionGovernanceDialog = (
+    attachment: ArchiveAttachment,
+    action: 'approve' | 'cancel',
+  ) => {
+    if (!canApproveVersions) {
+      toast.error('لا تملك صلاحية اعتماد أو إلغاء إصدارات الملفات');
+      return;
+    }
+    if (getAttachmentVersionStatus(attachment) !== 'draft') {
+      toast.error('هذا الإصدار لم يعد بحالة مسودة');
+      return;
+    }
+    setVersionGovernanceAttachment(attachment);
+    setVersionGovernanceAction(action);
+    setVersionGovernanceNote('');
+    setVersionGovernanceOpen(true);
+  };
+
+  const closeVersionGovernanceDialog = () => {
+    if (versionGovernanceSaving) return;
+    setVersionGovernanceOpen(false);
+    setVersionGovernanceAttachment(null);
+    setVersionGovernanceAction(null);
+    setVersionGovernanceNote('');
+  };
+
   const handleSubmit = async () => {
     if ((formMode === 'add' && !canAdd) || (formMode === 'edit' && !canEdit)) {
       toast.error('لا تملك الصلاحية المطلوبة لتنفيذ عملية الأرشفة');
