@@ -74,6 +74,10 @@ type ArchiveAttachment = {
   versionGroupId?: string;
   versionNote?: string | null;
   versionStatus?: 'draft' | 'approved' | 'superseded' | 'cancelled';
+  approvalRoute?: 'pool' | 'specific';
+  assignedApproverId?: string | null;
+  assignedApproverName?: string | null;
+  approvalRequestedAt?: string | null;
   approvedById?: string | null;
   approvedByName?: string | null;
   approvedAt?: string | null;
@@ -87,6 +91,13 @@ type ArchiveAttachment = {
   addedBy?: string | null;
   createdAt?: string;
   updatedAt?: string;
+};
+
+type ArchiveApprover = {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'employee';
 };
 
 type ArchiveApprovalItem = ArchiveAttachment & {
@@ -488,6 +499,11 @@ export const ArchivePage: React.FC = () => {
   const [versionNote, setVersionNote] = useState('');
   const [versionSaving, setVersionSaving] = useState(false);
 
+  const [versionApprovalRoute, setVersionApprovalRoute] = useState<'pool' | 'specific'>('pool');
+  const [versionApproverId, setVersionApproverId] = useState('');
+  const [versionApprovers, setVersionApprovers] = useState<ArchiveApprover[]>([]);
+  const [versionApproversLoading, setVersionApproversLoading] = useState(false);
+
   const [versionGovernanceOpen, setVersionGovernanceOpen] = useState(false);
   const [versionGovernanceAttachment, setVersionGovernanceAttachment] = useState<ArchiveAttachment | null>(null);
   const [versionGovernanceAction, setVersionGovernanceAction] = useState<'approve' | 'cancel' | null>(null);
@@ -553,6 +569,13 @@ export const ArchivePage: React.FC = () => {
     const remote = await archiveRequest<ArchiveDocument[]>('/records/trash');
     setTrashRecords(Array.isArray(remote) ? remote : []);
     return Array.isArray(remote) ? remote : [];
+  };
+
+  const loadVersionApprovers = async () => {
+    const remote = await archiveRequest<ArchiveApprover[]>('/records/version-approvers');
+    const items = Array.isArray(remote) ? remote : [];
+    setVersionApprovers(items);
+    return items;
   };
 
   const loadApprovalCenterItems = async () => {
