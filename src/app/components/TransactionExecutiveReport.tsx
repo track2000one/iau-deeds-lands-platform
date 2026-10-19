@@ -510,27 +510,28 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
     return (
       <div
         ref={ref}
-        className="report-sheet mx-auto w-full max-w-[1180px] bg-white p-5 text-slate-900 sm:p-8"
+        className="report-sheet mx-auto w-full max-w-[1180px] !bg-white p-5 !text-slate-900 sm:p-8"
+        style={{ backgroundColor: '#FFFFFF', color: '#0F172A' }}
         dir="rtl"
       >
         <header className="border-b-2 border-[#0b4a3f] pb-5 text-center">
           <div className="text-sm font-black text-[#0b4a3f]">جامعة الإمام عبدالرحمن بن فيصل</div>
-          <div className="mt-1 text-xs font-bold text-slate-600">إدارة أوقاف وأملاك الجامعة</div>
-          <h1 className="mt-4 text-2xl font-black">
+          <div className="mt-1 text-xs font-bold text-slate-700">إدارة أوقاف وأملاك الجامعة</div>
+          <h1 className="mt-4 text-2xl font-black !text-slate-950" style={{ color: '#0F172A' }}>
             {options.title.trim() || 'التقرير المرن لمتابعة المعاملات'}
           </h1>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-slate-700">
             الفترة من {formatDate(report.period.from)} إلى {formatDate(report.period.to)}
             {assigneeLabel ? <> · الموظف: {assigneeLabel}</> : null}
           </p>
-          <p className="mt-1 text-[10px] text-slate-400">
+          <p className="mt-1 text-[10px] text-slate-600">
             تاريخ إعداد التقرير: {formatDateTime(report.generatedAt)}
           </p>
-          <p className="mt-2 text-[10px] font-bold text-slate-500">
+          <p className="mt-2 text-[10px] font-bold text-slate-700">
             الفئات المعروضة: {options.categories.map((category) => categoryLabels[category]).join('، ') || 'لا توجد فئات محددة'}
           </p>
           {activeFilters.length > 0 && (
-            <p className="mt-1 text-[10px] text-slate-400">{activeFilters.join(' · ')}</p>
+            <p className="mt-1 text-[10px] text-slate-600">{activeFilters.join(' · ')}</p>
           )}
         </header>
 
@@ -544,7 +545,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
         <section className="mt-6">
           <div className="mb-2 flex items-center justify-between gap-3">
             <h2 className="text-sm font-black text-[#0b4a3f]">تفاصيل التقرير</h2>
-            <span className="text-[10px] font-bold text-slate-500">
+            <span className="text-[10px] font-bold text-slate-700">
               عدد النتائج: {rows.length.toLocaleString('ar-SA')}
             </span>
           </div>
@@ -557,7 +558,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
                     {visibleColumns.map((column) => (
                       <th
                         key={column.key}
-                        className="border border-slate-200 px-1.5 py-2 text-right font-black"
+                        className="border border-slate-200 px-1.5 py-2 text-right font-black text-slate-900"
                       >
                         {column.label}
                       </th>
@@ -575,7 +576,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
                       {visibleColumns.map((column) => (
                         <td
                           key={column.key}
-                          className="border border-slate-200 px-1.5 py-2 align-top"
+                          className="border border-slate-200 px-1.5 py-2 align-top text-slate-800"
                         >
                           {renderCell(row, column.key)}
                         </td>
@@ -597,13 +598,13 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
               </table>
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed border-slate-300 py-10 text-center text-xs text-slate-500">
+            <div className="rounded-lg border border-dashed border-slate-300 py-10 text-center text-xs text-slate-700">
               لا توجد نتائج مطابقة لمعايير التقرير الحالية.
             </div>
           )}
         </section>
 
-        <footer className="mt-8 border-t border-slate-300 pt-4 text-center text-[9px] leading-5 text-slate-400">
+        <footer className="mt-8 border-t border-slate-300 pt-4 text-center text-[9px] leading-5 text-slate-600">
           تقرير مرن مولد من نظام متابعة المعاملات. لا يعرض إلا: المنجزة، المتأخرة القائمة، بانتظار رد، وتحتاج متابعة،
           مع تطبيق التصفية والفرز والاستبعاد واختيار الأعمدة المحددة وقت الطباعة.
         </footer>
