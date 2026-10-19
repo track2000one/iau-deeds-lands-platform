@@ -4379,7 +4379,7 @@ ${styleAssets}
                       <option value="">التقرير اللاحق</option>
                       {reportArchives.map((archive) => (
                         <option key={archive.id} value={archive.id}>
-                          {archive.reportType === 'weekly' ? 'أسبوعي' : archive.reportType === 'monthly' ? 'شهري' : 'مخصص'} — {formatDate(archive.periodFrom)} إلى {formatDate(archive.periodTo)}
+                          {archive.archiveName || (archive.reportType === 'weekly' ? 'تقرير أسبوعي' : archive.reportType === 'monthly' ? 'تقرير شهري' : 'تقرير مخصص')} — {formatDate(archive.periodFrom)} إلى {formatDate(archive.periodTo)}
                         </option>
                       ))}
                     </NativeSelect>
@@ -4492,7 +4492,9 @@ ${styleAssets}
                     <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل الأرشيف...</div>
                   ) : reportArchives.length === 0 ? (
                     <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
-                      لا توجد تقارير مؤرشفة حتى الآن.
+                      {reportArchiveSearch || reportArchiveSource || reportArchiveType || reportArchiveTag
+                        ? 'لا توجد تقارير مطابقة لمعايير البحث والتصفية الحالية.'
+                        : 'لا توجد تقارير مؤرشفة حتى الآن.'}
                     </div>
                   ) : (
                     reportArchives.map((archive) => (
