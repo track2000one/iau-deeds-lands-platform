@@ -3021,7 +3021,7 @@ ${styleAssets}
                 {reportLoading && !reportData ? (
                   <div className="py-24 text-center text-sm text-muted-foreground">
                     <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />
-                    جارٍ إعداد التقرير التنفيذي...
+                    جارٍ إعداد التقرير المرن...
                   </div>
                 ) : reportData ? (
                   <TransactionExecutiveReport
@@ -3086,14 +3086,10 @@ ${styleAssets}
 
                   {reportComparison && (
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                      <ComparisonMetric label="إجمالي المعاملات" value={reportComparison.delta.totalIncluded} />
-                      <ComparisonMetric label="المفتوحة" value={reportComparison.delta.open} inverse />
                       <ComparisonMetric label="المنجزة" value={reportComparison.delta.completed} />
-                      <ComparisonMetric label="المتأخرة" value={reportComparison.delta.overdueSnapshot} inverse />
-                      <ComparisonMetric label="الإنجاز في الموعد" value={reportComparison.delta.onTimeRate} suffix="%" />
-                      <ComparisonMetric label="متوسط الإنجاز" value={reportComparison.delta.avgCompletionDays} suffix=" يوم" inverse />
-                      <ComparisonMetric label="متوسط أول إجراء" value={reportComparison.delta.avgFirstActionHours} suffix=" س" inverse />
+                      <ComparisonMetric label="المتأخرة القائمة" value={reportComparison.delta.overdueSnapshot} inverse />
                       <ComparisonMetric label="بانتظار رد" value={reportComparison.delta.waiting} inverse />
+                      <ComparisonMetric label="تحتاج متابعة" value={reportComparison.delta.needsFollowUp} inverse />
                     </div>
                   )}
                 </CardContent>
@@ -3136,10 +3132,10 @@ ${styleAssets}
                             تم الحفظ {formatDateTime(archive.createdAt)}
                           </p>
                           <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-600">
-                            <span>الإجمالي: <b>{archive.summary?.totalIncluded?.toLocaleString('ar-SA') ?? '—'}</b></span>
                             <span>منجزة: <b>{archive.summary?.completed?.toLocaleString('ar-SA') ?? '—'}</b></span>
-                            <span className={archive.summary?.overdueSnapshot ? 'text-red-700' : ''}>متأخرة: <b>{archive.summary?.overdueSnapshot?.toLocaleString('ar-SA') ?? '—'}</b></span>
-                            <span>في الموعد: <b>{archive.summary?.onTimeRate == null ? '—' : `${archive.summary.onTimeRate}%`}</b></span>
+                            <span className={archive.summary?.overdueSnapshot ? 'text-red-700' : ''}>متأخرة قائمة: <b>{archive.summary?.overdueSnapshot?.toLocaleString('ar-SA') ?? '—'}</b></span>
+                            <span>بانتظار رد: <b>{archive.summary?.waiting?.toLocaleString('ar-SA') ?? '—'}</b></span>
+                            <span>تحتاج متابعة: <b>{archive.summary?.needsFollowUp?.toLocaleString('ar-SA') ?? '—'}</b></span>
                           </div>
                         </div>
                         <div className="flex shrink-0 gap-2">
