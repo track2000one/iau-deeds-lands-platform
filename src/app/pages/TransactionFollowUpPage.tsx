@@ -3669,6 +3669,27 @@ ${styleAssets}
                               >
                                 {template.scope === 'shared' ? 'عام للإدارة' : 'شخصي'}
                               </Badge>
+                              {template.isDefault && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-amber-300 bg-amber-50 text-amber-800"
+                                >
+                                  <Star className="ml-1 h-3 w-3 fill-current" />
+                                  افتراضي
+                                </Badge>
+                              )}
+                              {template.scope === 'shared' && (
+                                <Badge
+                                  variant="outline"
+                                  className={template.accessMode === 'selected'
+                                    ? 'border-sky-300 bg-sky-50 text-sky-800'
+                                    : 'border-emerald-300 bg-emerald-50 text-emerald-800'}
+                                >
+                                  {template.accessMode === 'selected'
+                                    ? `${template.allowedUserIds.length.toLocaleString('ar-SA')} مستخدم محدد`
+                                    : 'متاح للجميع'}
+                                </Badge>
+                              )}
                             </div>
                             <p className="mt-1 text-[10px] text-slate-500">
                               {template.reportMode === 'weekly'
