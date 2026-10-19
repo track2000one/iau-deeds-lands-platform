@@ -335,6 +335,9 @@ const createDefaultFlexibleReportOptions = (): FlexibleReportOptions => ({
 type FlexibleReportTemplate = {
   id: string;
   name: string;
+  scope: 'personal' | 'shared';
+  createdById?: string | null;
+  createdByName?: string | null;
   createdAt: string;
   updatedAt: string;
   reportMode: 'weekly' | 'monthly' | 'custom';
@@ -352,6 +355,17 @@ const cloneFlexibleReportOptions = (
   categories: [...options.categories],
   visibleColumns: [...options.visibleColumns],
   excludedIds: [...options.excludedIds],
+});
+
+const reportTemplateOptionsForApi = (options: FlexibleReportOptions) => ({
+  title: options.title,
+  categories: [...options.categories],
+  search: options.search,
+  priority: options.priority,
+  organizationalUnit: options.organizationalUnit,
+  sortBy: options.sortBy,
+  sortDirection: options.sortDirection,
+  visibleColumns: [...options.visibleColumns],
 });
 
 const reportTemplateStorageKey = (userId?: string | null) =>
@@ -377,6 +391,9 @@ const normalizeReportTemplate = (value: unknown): FlexibleReportTemplate | null 
   return {
     id: String(raw.id),
     name: String(raw.name),
+    scope: raw.scope === 'shared' ? 'shared' : 'personal',
+    createdById: raw.createdById || null,
+    createdByName: raw.createdByName || null,
     createdAt: String(raw.createdAt || new Date().toISOString()),
     updatedAt: String(raw.updatedAt || raw.createdAt || new Date().toISOString()),
     reportMode:
@@ -495,6 +512,8 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [reportOrientation, setReportOrientation] = React.useState<'portrait' | 'landscape'>('landscape');
   const [reportTemplates, setReportTemplates] = React.useState<FlexibleReportTemplate[]>([]);
   const [reportTemplateName, setReportTemplateName] = React.useState('');
+  const [reportTemplateScope, setReportTemplateScope] = React.useState<'personal' | 'shared'>('personal');
+  const [reportTemplateSaving, setReportTemplateSaving] = React.useState(false);
   const [reportData, setReportData] = React.useState<TransactionFollowUpExecutiveReport | null>(null);
   const [reportSection, setReportSection] = React.useState<'preview' | 'archive' | 'schedule'>('preview');
   const [reportArchives, setReportArchives] = React.useState<TransactionFollowUpReportArchive[]>([]);
