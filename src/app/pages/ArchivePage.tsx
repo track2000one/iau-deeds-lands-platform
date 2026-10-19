@@ -30,6 +30,7 @@ import {
   GitMerge,
   History,
   Clock3,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -85,6 +86,20 @@ type ArchiveAttachment = {
   addedBy?: string | null;
   createdAt?: string;
   updatedAt?: string;
+};
+
+type ArchiveApprovalItem = ArchiveAttachment & {
+  record: {
+    id: string;
+    archiveNumber: string;
+    title: string;
+    category: string;
+    documentNumber?: string | null;
+    documentDate?: string | null;
+    issuingAuthority?: string | null;
+    confidentiality: 'public' | 'internal' | 'confidential';
+    updatedAt?: string;
+  };
 };
 
 type ArchiveActivity = {
@@ -462,6 +477,18 @@ export const ArchivePage: React.FC = () => {
   const [versionGovernanceNote, setVersionGovernanceNote] = useState('');
   const [versionGovernanceSaving, setVersionGovernanceSaving] = useState(false);
 
+  const [versionGovernanceRecordId, setVersionGovernanceRecordId] = useState('');
+  const [approvalCenterOpen, setApprovalCenterOpen] = useState(false);
+  const [approvalItems, setApprovalItems] = useState<ArchiveApprovalItem[]>([]);
+  const [approvalLoading, setApprovalLoading] = useState(false);
+  const [approvalSearch, setApprovalSearch] = useState('');
+  const [approvalStatus, setApprovalStatus] = useState<'draft' | 'approved' | 'superseded' | 'cancelled' | 'all'>('draft');
+  const [approvalConfidentiality, setApprovalConfidentiality] = useState('');
+  const [approvalEmployee, setApprovalEmployee] = useState('');
+  const [approvalDateFrom, setApprovalDateFrom] = useState('');
+  const [approvalDateTo, setApprovalDateTo] = useState('');
+  const [approvalSort, setApprovalSort] = useState<'newest' | 'oldest'>('newest');
+
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
   const [selectedDocument, setSelectedDocument] = useState<ArchiveDocument | null>(null);
@@ -509,6 +536,13 @@ export const ArchivePage: React.FC = () => {
     const remote = await archiveRequest<ArchiveDocument[]>('/records/trash');
     setTrashRecords(Array.isArray(remote) ? remote : []);
     return Array.isArray(remote) ? remote : [];
+  };
+
+  const loadApprovalCenterItems = async () => {
+    const result = await archiveRequest<{ items: ArchiveApprovalItem[]; total: number }>('/records/version-approvals?status=all');
+    const items = Array.isArray(result?.items) ? result.items : [];
+    setApprovalItems(items);
+    return items;
   };
 
   const loadArchivedTransactions = async () => {
