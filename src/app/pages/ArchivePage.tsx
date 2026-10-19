@@ -72,6 +72,15 @@ type ArchiveAttachment = {
   version?: number;
   versionGroupId?: string;
   versionNote?: string | null;
+  versionStatus?: 'draft' | 'approved' | 'superseded' | 'cancelled';
+  approvedById?: string | null;
+  approvedByName?: string | null;
+  approvedAt?: string | null;
+  approvalNote?: string | null;
+  cancelledById?: string | null;
+  cancelledByName?: string | null;
+  cancelledAt?: string | null;
+  cancelReason?: string | null;
   isCurrent?: boolean;
   addedBy?: string | null;
   createdAt?: string;
@@ -91,6 +100,7 @@ type ArchiveDocument = {
   archiveNumber?: string;
   attachmentCount?: number;
   attachmentVersionCount?: number;
+  pendingVersionCount?: number;
   totalFileSize?: number;
   attachments?: ArchiveAttachment[];
   activities?: ArchiveActivity[];
@@ -298,6 +308,27 @@ const getAttachmentVersionGroups = (doc: ArchiveDocument) => {
   });
 };
 
+const getAttachmentVersionStatus = (attachment: ArchiveAttachment) =>
+  attachment.versionStatus || (attachment.isCurrent ? 'approved' : 'superseded');
+
+const getAttachmentVersionStatusLabel = (attachment: ArchiveAttachment) => {
+  const status = getAttachmentVersionStatus(attachment);
+  if (status === 'draft') return 'بانتظار الاعتماد';
+  if (status === 'approved') return attachment.isCurrent ? 'معتمد — الحالي' : 'معتمد';
+  if (status === 'superseded') return 'إصدار سابق';
+  if (status === 'cancelled') return 'ملغى';
+  return status;
+};
+
+const getAttachmentVersionStatusClassName = (attachment: ArchiveAttachment) => {
+  const status = getAttachmentVersionStatus(attachment);
+  if (status === 'draft') return 'border-amber-300 bg-amber-50 text-amber-800';
+  if (status === 'approved' && attachment.isCurrent) return 'border-emerald-300 bg-emerald-50 text-emerald-800';
+  if (status === 'approved') return 'border-emerald-200 bg-emerald-50/60 text-emerald-700';
+  if (status === 'cancelled') return 'border-red-200 bg-red-50 text-red-700';
+  return 'border-slate-300 bg-slate-50 text-slate-600';
+};
+
 const getArchiveMissingMetadata = (doc: ArchiveDocument) => {
   const missing: string[] = [];
   if (!String(doc.documentNumber || '').trim()) missing.push('رقم المستند');
@@ -314,7 +345,9 @@ const archiveActivityLabels: Record<string, string> = {
   record_updated: 'تحديث البيانات',
   attachments_added: 'إضافة ملفات',
   attachment_removed: 'إزالة ملف',
-  attachment_version_added: 'إضافة إصدار جديد',
+  attachment_version_added: 'إنشاء مسودة إصدار',
+  attachment_version_approved: 'اعتماد إصدار',
+  attachment_version_cancelled: 'إلغاء مسودة إصدار',
   record_deleted: 'نقل إلى المحذوفات',
   record_restored: 'استعادة السجل',
   records_merged: 'دمج سجلات داخل هذا السجل',
