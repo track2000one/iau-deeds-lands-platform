@@ -83,6 +83,7 @@ type ArchiveAttachment = {
   cancelledAt?: string | null;
   cancelReason?: string | null;
   isCurrent?: boolean;
+  addedById?: string | null;
   addedBy?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -424,13 +425,29 @@ const escapePrintHtml = (value: unknown) =>
 
 export const ArchivePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { isAdmin, hasPermission } = usePermissions();
+  const { isAdmin, hasPermission, userProfile } = usePermissions();
   const canAdd = isAdmin || hasPermission('archive', 'canAdd');
   const canEdit = isAdmin || hasPermission('archive', 'canEdit');
   const canDelete = isAdmin || hasPermission('archive', 'canDelete');
   const canPrint = isAdmin || hasPermission('archive', 'canPrint');
   const canApproveVersions = isAdmin || hasPermission('archive', 'canApproveArchive');
   const canRestoreTransaction = isAdmin || hasPermission('archive', 'canEdit');
+
+  const isOwnVersionDraft = (attachment: ArchiveAttachment) => {
+    if (getAttachmentVersionStatus(attachment) !== 'draft') return false;
+
+    if (attachment.addedById && userProfile?.uid) {
+      return attachment.addedById === userProfile.uid;
+    }
+
+    const maker = String(attachment.addedBy || '').trim().toLowerCase();
+    if (!maker) return false;
+
+    return [userProfile?.username, userProfile?.email]
+      .filter(Boolean)
+      .map((value) => String(value).trim().toLowerCase())
+      .includes(maker);
+  };
 
   const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
   const [archivedTransactions, setArchivedTransactions] = useState<TransactionFollowUpRecord[]>([]);
@@ -1128,6 +1145,10 @@ export const ArchivePage: React.FC = () => {
     }
     if (getAttachmentVersionStatus(attachment) !== 'draft') {
       toast.error('هذا الإصدار لم يعد بحالة مسودة');
+      return;
+    }
+    if (action === 'approve' && isOwnVersionDraft(attachment)) {
+      toast.error('لا يمكنك اعتماد إصدار قمت برفعه بنفسك. يجب أن يعتمد الإصدار مستخدم آخر مخول.');
       return;
     }
     setVersionGovernanceAttachment(attachment);
@@ -1883,14 +1904,20 @@ export const ArchivePage: React.FC = () => {
                             </Button>
                             {getAttachmentVersionStatus(item) === 'draft' && canApproveVersions ? (
                               <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() => openVersionGovernanceDialog(item, 'approve', item.record.id)}
-                                  className="bg-emerald-600 font-bold text-white hover:bg-emerald-700"
-                                >
-                                  اعتماد
-                                </Button>
+                                {isOwnVersionDraft(item) ? (
+                                  <Badge variant="outline" className="border-amber-300 bg-amber-50 px-3 py-2 text-amber-800">
+                                    من رفعك — يلزم معتمد آخر
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => openVersionGovernanceDialog(item, 'approve', item.record.id)}
+                                    className="bg-emerald-600 font-bold text-white hover:bg-emerald-700"
+                                  >
+                                    اعتماد
+                                  </Button>
+                                )}
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -2740,13 +2767,19 @@ export const ArchivePage: React.FC = () => {
                                 عرض الإصدار
                               </Button>
                               {canApproveVersions && getAttachmentVersionStatus(version) === 'draft' ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() => openVersionGovernanceDialog(version, 'approve')}
-                                >
-                                  اعتماد
-                                </Button>
+                                isOwnVersionDraft(version) ? (
+                                  <Badge variant="outline" className="border-amber-300 bg-amber-50 px-3 py-2 text-amber-800">
+                                    يتطلب معتمدًا آخر
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => openVersionGovernanceDialog(version, 'approve')}
+                                  >
+                                    اعتماد
+                                  </Button>
+                                )
                               ) : null}
                               {canApproveVersions && getAttachmentVersionStatus(version) === 'draft' ? (
                                 <Button
@@ -3345,7 +3378,7 @@ export const ArchivePage: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>مراجعة إصدار الملف</AlertDialogTitle>
             <AlertDialogDescription>
-              راجع الإصدار المحدد قبل تنفيذ الإجراء.
+              راجع الإصدار المحدد قبل تنفيذ الإجراء. وفق مبدأ فصل المُعد عن المُعتمد، لا يجوز للمستخدم اعتماد إصدار قام برفعه بنفسه.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 py-2">
