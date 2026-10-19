@@ -1929,6 +1929,17 @@ export const ArchivePage: React.FC = () => {
                   className="group relative flex min-h-[390px] flex-col overflow-hidden rounded-[22px] border border-slate-300/90 bg-gradient-to-b from-white via-white to-sky-50/45 shadow-[0_6px_0_rgba(51,65,85,0.16),0_13px_28px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,1)] transition-all duration-200 hover:-translate-y-1 hover:border-sky-400/80 hover:shadow-[0_9px_0_rgba(37,99,235,0.16),0_20px_34px_rgba(15,23,42,0.13),inset_0_1px_0_rgba(255,255,255,1)]"
                 >
                   <div className="h-1.5 w-full bg-gradient-to-l from-sky-400 via-blue-700 to-slate-800 shadow-[0_2px_5px_rgba(30,64,175,0.20)]" />
+                  {mergeSelectionMode && (
+                    <label className="absolute left-4 top-4 z-10 flex cursor-pointer items-center gap-2 rounded-xl border border-violet-200 bg-white/95 px-3 py-2 text-xs font-black text-violet-800 shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedMergeIds.includes(doc.id)}
+                        onChange={() => toggleMergeSelection(doc.id)}
+                        className="h-4 w-4 accent-violet-700"
+                      />
+                      تحديد للدمج
+                    </label>
+                  )}
 
                   <div className="flex flex-1 flex-col p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-3">
@@ -1956,8 +1967,8 @@ export const ArchivePage: React.FC = () => {
                         <h3 className="line-clamp-2 text-base font-black leading-7 text-slate-800 sm:text-lg">
                           {doc.title}
                         </h3>
-                        <p className="mt-1 truncate text-xs text-slate-500" dir="auto">
-                          {doc.originalName || doc.fileName}
+                        <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                          {getArchiveReference(doc)} · {(doc.attachmentCount || doc.attachments?.length || 1).toLocaleString('ar-SA')} ملف
                         </p>
                       </div>
 
@@ -2074,7 +2085,8 @@ export const ArchivePage: React.FC = () => {
                 <table className="w-full min-w-[1180px] border-collapse text-right text-sm">
                   <thead className="bg-gradient-to-l from-slate-100 via-sky-50 to-slate-50 text-slate-700">
                     <tr className="border-b border-slate-200">
-                      <th className="px-4 py-3 font-black">العنوان / الملف</th>
+                      {mergeSelectionMode && <th className="w-14 px-3 py-3 text-center font-black">دمج</th>}
+                      <th className="px-4 py-3 font-black">العنوان / المرجع</th>
                       <th className="px-4 py-3 font-black">التصنيف</th>
                       <th className="px-4 py-3 font-black">رقم المستند</th>
                       <th className="px-4 py-3 font-black">تاريخ المستند</th>
@@ -2091,10 +2103,21 @@ export const ArchivePage: React.FC = () => {
                         key={doc.id}
                         className={`border-b border-slate-100 transition-colors hover:bg-sky-50/70 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/55'}`}
                       >
+                        {mergeSelectionMode && (
+                          <td className="px-3 py-3 align-top text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedMergeIds.includes(doc.id)}
+                              onChange={() => toggleMergeSelection(doc.id)}
+                              className="h-4 w-4 accent-violet-700"
+                              aria-label={`تحديد ${doc.title} للدمج`}
+                            />
+                          </td>
+                        )}
                         <td className="max-w-[280px] px-4 py-3 align-top">
                           <button type="button" onClick={() => openDetails(doc)} className="block w-full text-right">
                             <span className="line-clamp-2 font-black text-slate-800 hover:text-sky-700">{doc.title}</span>
-                            <span className="mt-1 block truncate text-xs text-slate-500" dir="auto">{doc.originalName || doc.fileName}</span>
+                            <span className="mt-1 block truncate text-xs font-semibold text-slate-500">{getArchiveReference(doc)}</span>
                           </button>
                           <div className="mt-2 flex flex-wrap gap-1">
                             {getArchiveMissingMetadata(doc).length > 0 && (
