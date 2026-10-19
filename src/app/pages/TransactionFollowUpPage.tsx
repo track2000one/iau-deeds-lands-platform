@@ -63,6 +63,8 @@ import {
   DEFAULT_FLEXIBLE_REPORT_COLUMNS,
   FLEXIBLE_REPORT_CATEGORIES,
   FLEXIBLE_REPORT_COLUMNS,
+  buildFlexibleReportRows,
+  flexibleReportCellText,
   type FlexibleReportOptions,
   type FlexibleReportSortKey,
 } from '../components/TransactionExecutiveReport';
@@ -1341,26 +1343,247 @@ export const TransactionFollowUpPage: React.FC = () => {
   };
 
   const exportFollowUpExcel = async () => {
+    if (!reportData) {
+      toast.error('أنشئ التقرير أولًا قبل التصدير إلى Excel');
+      return;
+    }
+
     try {
       setReportExporting(true);
-      setBackupProgress('جارٍ تجهيز بيانات Excel...');
-      const backup = await transactionFollowUpApi.backupData({
-        from: reportFrom,
-        to: reportTo,
-        assigneeUserId: isAdmin || canDelete ? reportAssigneeId || undefined : undefined,
-        mine: !(isAdmin || canDelete),
+      setBackupProgress('جارٍ إنشاء Excel مطابق للتقرير المرن...');
+
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'IAU Deeds and Lands Platform';
+      workbook.company = 'جامعة الإمام عبدالرحمن بن فيصل';
+      workbook.subject = flexibleReportOptions.title.trim() || 'التقرير المرن لمتابعة المعاملات';
+      workbook.created = new Date();
+
+      const rows = buildFlexibleReportRows(reportData, flexibleReportOptions);
+      const visibleColumns = FLEXIBLE_REPORT_COLUMNS.filter((column) =>
+        flexibleReportOptions.visibleColumns.includes(column.key),
+      );
+
+      const sheet = workbook.addWorksheet('التقرير المرن', {
+        views: [{ rightToLeft: true }],
+        pageSetup: {
+          orientation: reportOrientation,
+          paperSize: 9,
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+          horizontalCentered: true,
+          margins: {
+            left: 0.25,
+            right: 0.25,
+            top: 0.45,
+            bottom: 0.45,
+            header: 0.2,
+            footer: 0.2,
+          },
+        },
       });
-      const { workbook } = await buildFollowUpWorkbook(backup);
+
+      const columnCount = Math.max(1, visibleColumns.length);
+      const lastColumnLetter = sheet.getColumn(columnCount).letter;
+      const title = flexibleReportOptions.title.trim() || 'التقرير المرن لمتابعة المعاملات';
+      const assigneeLabel = reportAssigneeId
+        ? assignees.find((user) => user.id === reportAssigneeId)?.username || 'الموظف المحدد'
+        : !(isAdmin || canDelete)
+          ? currentUser?.username || 'المستخدم الحالي'
+          : 'جميع الموظفين';
+
+      sheet.mergeCells(`A1:${lastColumnLetter}1`);
+      sheet.getCell('A1').value = 'جامعة الإمام عبدالرحمن بن فيصل';
+      sheet.getCell('A1').font = { bold: true, size: 13, color: { argb: 'FF0B4A3F' } };
+      sheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+      sheet.getRow(1).height = 24;
+
+      sheet.mergeCells(`A2:${lastColumnLetter}2`);
+      sheet.getCell('A2').value = 'إدارة أوقاف وأملاك الجامعة';
+      sheet.getCell('A2').font = { bold: true, size: 10, color: { argb: 'FF475569' } };
+      sheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
+
+      sheet.mergeCells(`A3:${lastColumnLetter}3`);
+      sheet.getCell('A3').value = title;
+      sheet.getCell('A3').font = { bold: true, size: 16, color: { argb: 'FF0F172A' } };
+      sheet.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
+      sheet.getRow(3).height = 28;
+
+      sheet.mergeCells(`A4:${lastColumnLetter}4`);
+      sheet.getCell('A4').value =
+        `الفترة: ${formatDate(reportData.period.from)} إلى ${formatDate(reportData.period.to)} · الموظف: ${assigneeLabel}`;
+      sheet.getCell('A4').font = { size: 9, color: { argb: 'FF64748B' } };
+      sheet.getCell('A4').alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const categoryLabelByKey = new Map(
+        FLEXIBLE_REPORT_CATEGORIES.map((item) => [item.key, item.label]),
+      );
+      sheet.mergeCells(`A5:${lastColumnLetter}5`);
+      sheet.getCell('A5').value =
+        `الفئات: ${flexibleReportOptions.categories.map((key) => categoryLabelByKey.get(key) || key).join('، ')}`;
+      sheet.getCell('A5').font = { size: 9, color: { argb: 'FF64748B' } };
+      sheet.getCell('A5').alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const counts = {
+        completed: rows.filter((row) => row.category === 'completed').length,
+        overdue: rows.filter((row) => row.category === 'overdue').length,
+        waiting: rows.filter((row) => row.category === 'waiting_response').length,
+        needsFollowUp: rows.filter((row) => row.category === 'needs_follow_up').length,
+      };
+
+      const summary = [
+        ['المنجزة', counts.completed, 'FFE8F5EE', 'FF166534'],
+        ['المتأخرة القائمة', counts.overdue, 'FFFDECEC', 'FFB91C1C'],
+        ['بانتظار رد', counts.waiting, 'FFEFF8FF', 'FF0369A1'],
+        ['تحتاج متابعة', counts.needsFollowUp, 'FFFFF7E6', 'FFB45309'],
+      ] as const;
+
+      const summaryStart = 7;
+      const summaryWidth = Math.max(1, Math.floor(columnCount / summary.length));
+      summary.forEach(([label, value, fill, fontColor], index) => {
+        const startColumn = Math.min(columnCount, index * summaryWidth + 1);
+        const endColumn = index === summary.length - 1
+          ? columnCount
+          : Math.min(columnCount, startColumn + summaryWidth - 1);
+        if (startColumn > columnCount) return;
+        if (endColumn > startColumn) {
+          sheet.mergeCells(summaryStart, startColumn, summaryStart + 1, endColumn);
+        } else {
+          sheet.mergeCells(summaryStart, startColumn, summaryStart + 1, startColumn);
+        }
+        const cell = sheet.getCell(summaryStart, startColumn);
+        cell.value = `${label}\n${Number(value).toLocaleString('ar-SA')}`;
+        cell.font = { bold: true, size: 11, color: { argb: fontColor } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD7DEE8' } },
+          bottom: { style: 'thin', color: { argb: 'FFD7DEE8' } },
+          left: { style: 'thin', color: { argb: 'FFD7DEE8' } },
+          right: { style: 'thin', color: { argb: 'FFD7DEE8' } },
+        };
+      });
+      sheet.getRow(summaryStart).height = 24;
+      sheet.getRow(summaryStart + 1).height = 18;
+
+      const filtersRow = 10;
+      sheet.mergeCells(filtersRow, 1, filtersRow, columnCount);
+      const filterParts = [
+        flexibleReportOptions.search.trim()
+          ? `بحث: ${flexibleReportOptions.search.trim()}`
+          : null,
+        flexibleReportOptions.priority
+          ? `الأولوية: ${flexibleReportOptions.priority}`
+          : null,
+        flexibleReportOptions.organizationalUnit
+          ? `الإدارة/الوحدة: ${flexibleReportOptions.organizationalUnit}`
+          : null,
+        flexibleReportOptions.excludedIds.length
+          ? `المستبعد يدويًا: ${flexibleReportOptions.excludedIds.length.toLocaleString('ar-SA')}`
+          : null,
+        `الفرز: ${flexibleReportOptions.sortBy} / ${flexibleReportOptions.sortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}`,
+      ].filter(Boolean);
+      sheet.getCell(filtersRow, 1).value = filterParts.join(' · ');
+      sheet.getCell(filtersRow, 1).font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
+      sheet.getCell(filtersRow, 1).alignment = { horizontal: 'right', vertical: 'middle', wrapText: true };
+
+      const headerRowNumber = 12;
+      visibleColumns.forEach((column, index) => {
+        const cell = sheet.getCell(headerRowNumber, index + 1);
+        cell.value = column.label;
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+          right: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+        };
+      });
+      sheet.getRow(headerRowNumber).height = 26;
+
+      rows.forEach((record, rowIndex) => {
+        const excelRow = sheet.getRow(headerRowNumber + rowIndex + 1);
+        visibleColumns.forEach((column, columnIndex) => {
+          const cell = excelRow.getCell(columnIndex + 1);
+          cell.value = flexibleReportCellText(record, column.key);
+          cell.alignment = {
+            horizontal: column.key === 'subject' || column.key === 'requiredAction'
+              ? 'right'
+              : 'center',
+            vertical: 'top',
+            wrapText: true,
+            readingOrder: 'rtl',
+          };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          };
+          if (record.category === 'overdue') {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF5F5' } };
+          } else if (record.category === 'completed') {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4FBF7' } };
+          } else if (record.category === 'needs_follow_up') {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBEB' } };
+          } else {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7FBFF' } };
+          }
+        });
+      });
+
+      const widthByKey: Record<string, number> = {
+        transactionNumber: 18,
+        transactionDate: 16,
+        subject: 44,
+        transactionType: 17,
+        organizationalUnit: 34,
+        currentAssigneeName: 22,
+        category: 20,
+        priority: 13,
+        dueDate: 16,
+        requiredAction: 38,
+      };
+      visibleColumns.forEach((column, index) => {
+        sheet.getColumn(index + 1).width = widthByKey[column.key] || 18;
+      });
+
+      if (rows.length > 0 && visibleColumns.length > 0) {
+        sheet.autoFilter = {
+          from: { row: headerRowNumber, column: 1 },
+          to: { row: headerRowNumber + rows.length, column: visibleColumns.length },
+        };
+      }
+
+      sheet.views = [
+        {
+          state: 'frozen',
+          ySplit: headerRowNumber,
+          rightToLeft: true,
+          activeCell: `A${headerRowNumber + 1}`,
+        },
+      ];
+      sheet.pageSetup.printTitlesRow = `${headerRowNumber}:${headerRowNumber}`;
+      sheet.footer.center = 'صفحة &P من &N';
+      sheet.footer.right = 'نظام متابعة المعاملات';
+      sheet.footer.left = new Intl.DateTimeFormat('ar-SA-u-ca-gregory').format(new Date());
+
       const buffer = await workbook.xlsx.writeBuffer();
       saveBrowserBlob(
         new Blob([buffer], {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         }),
-        `تقرير-متابعة-المعاملات-${reportFrom}-إلى-${reportTo}.xlsx`,
+        `${safeBackupFileName(title, 'التقرير-المرن')}-${reportFrom}-إلى-${reportTo}.xlsx`,
       );
-      toast.success(`تم إنشاء تقرير Excel ويحتوي على ${backup.totals.transactions} معاملة وبيانات المرفقات`);
+
+      toast.success(
+        `تم إنشاء Excel مطابق للمعاينة الحالية ويحتوي على ${rows.length.toLocaleString('ar-SA')} معاملة`,
+      );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء تقرير Excel');
+      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء تقرير Excel المرن');
     } finally {
       setBackupProgress('');
       setReportExporting(false);
@@ -2812,7 +3035,7 @@ ${styleAssets}
                     type="button"
                     variant="outline"
                     className="flex-1 border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:text-emerald-900"
-                    disabled={reportLoading || reportExporting}
+                    disabled={!reportData || reportLoading || reportExporting}
                     onClick={() => void exportFollowUpExcel()}
                   >
                     <FileSpreadsheet className="ml-2 h-4 w-4" />
@@ -3011,10 +3234,9 @@ ${styleAssets}
               </div>
 
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs leading-6 text-emerald-950">
-                <b>الحفظ الاحتياطي:</b> زر «Excel» يصدر بيانات الفترة المحددة في ملف منظم متعدد الأوراق،
-                بينما «نسخة احتياطية كاملة» تنشئ ملف ZIP مستقل يحتوي على Excel لجميع بيانات نظام المتابعة،
-                وملف بيانات خام JSON، ونسخ فعلية من الصور والمرفقات وأدلة التوجيهات. الهدف أن تبقى لديك نسخة قابلة للفتح
-                حتى في حال تعذر الوصول إلى الخدمة لاحقًا.
+                <b>Excel المرن:</b> يصدر نفس نتيجة المعاينة الحالية حرفيًا من حيث الفئات، التصفية، الفرز، الأعمدة والاستبعادات،
+                مع تنسيق احترافي ومرشح تلقائي وتجهيز للطباعة. أما «نسخة احتياطية كاملة» فتبقى منفصلة، وتنشئ ZIP يحتوي على
+                جميع بيانات نظام المتابعة وملف Excel خام وJSON ونسخ فعلية من الصور والمرفقات وأدلة التوجيهات.
               </div>
 
               <div className="max-h-[68dvh] overflow-auto rounded-2xl border bg-slate-100 p-2 sm:p-4">
