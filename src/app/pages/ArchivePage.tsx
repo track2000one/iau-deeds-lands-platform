@@ -949,6 +949,10 @@ export const ArchivePage: React.FC = () => {
   };
 
   const openFile = (doc: ArchiveDocument) => {
+    if ((doc.attachmentCount || doc.attachments?.length || 1) > 1) {
+      openDetails(doc);
+      return;
+    }
     window.open(doc.driveUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -1021,7 +1025,7 @@ export const ArchivePage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <Card>
           <CardContent className="p-5 flex items-center justify-between">
             <div>
@@ -1029,6 +1033,16 @@ export const ArchivePage: React.FC = () => {
               <p className="text-2xl font-bold">{documents.length}</p>
             </div>
             <Archive className="h-9 w-9 text-primary" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">إجمالي الملفات</p>
+              <p className="text-2xl font-bold">{totalArchiveAttachments.toLocaleString('ar-SA')}</p>
+            </div>
+            <Paperclip className="h-9 w-9 text-primary" />
           </CardContent>
         </Card>
 
@@ -1676,14 +1690,12 @@ export const ArchivePage: React.FC = () => {
               </CardContent>
             </Card>
 
-            </Card>
-
             {(canEdit || canDelete) && (
               <div className="flex flex-col md:flex-row justify-end gap-2">
                 {canEdit && (
                   <Button variant="outline" onClick={() => openEditForm(selectedDocument)}>
                     <Edit className="ml-2 h-4 w-4" />
-                    تعديل البيانات
+                    تحديث السجل وإضافة ملفات
                   </Button>
                 )}
                 {canDelete && (
