@@ -474,7 +474,19 @@ export const ArchivePage: React.FC = () => {
     return documents.filter((doc) => {
       const matchesSearch =
         !query ||
-        [doc.title, doc.category, doc.documentNumber, doc.documentDate, doc.issuingAuthority, doc.tags, doc.description, doc.originalName, doc.mimeType]
+        [
+          doc.title,
+          doc.archiveNumber,
+          doc.category,
+          doc.documentNumber,
+          doc.documentDate,
+          doc.issuingAuthority,
+          doc.tags,
+          doc.description,
+          doc.originalName,
+          doc.mimeType,
+          ...(doc.attachments || []).flatMap((item) => [item.originalName, item.mimeType]),
+        ]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(query));
 
@@ -506,7 +518,14 @@ export const ArchivePage: React.FC = () => {
     );
   }, [archivedTransactions, searchQuery]);
 
-  const totalSize = useMemo(() => documents.reduce((sum, doc) => sum + Number(doc.fileSize || 0), 0), [documents]);
+  const totalSize = useMemo(
+    () => documents.reduce((sum, doc) => sum + Number(doc.totalFileSize ?? doc.fileSize ?? 0), 0),
+    [documents],
+  );
+  const totalArchiveAttachments = useMemo(
+    () => documents.reduce((sum, doc) => sum + Number(doc.attachmentCount || doc.attachments?.length || 1), 0),
+    [documents],
+  );
   const availableCategories = useMemo(() => Array.from(new Set([...categories, ...documents.map((doc) => doc.category).filter(Boolean)])), [documents]);
   const archiveQuality = useMemo(() => {
     const numberCounts = new Map<string, number>();
@@ -996,7 +1015,7 @@ export const ArchivePage: React.FC = () => {
           {canAdd && (
             <Button onClick={openAddForm} className="w-full lg:w-auto">
               <Plus className="ml-2 h-4 w-4" />
-              إضافة ملف للأرشفة
+              إنشاء سجل أرشيفي
             </Button>
           )}
         </div>
@@ -1006,7 +1025,7 @@ export const ArchivePage: React.FC = () => {
         <Card>
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">إجمالي الملفات</p>
+              <p className="text-sm text-muted-foreground">السجلات الأرشيفية</p>
               <p className="text-2xl font-bold">{documents.length}</p>
             </div>
             <Archive className="h-9 w-9 text-primary" />
@@ -1331,8 +1350,8 @@ export const ArchivePage: React.FC = () => {
         <div id="archive-form" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
           <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl md:text-2xl font-bold">{formMode === 'add' ? 'إضافة ملف للأرشفة' : 'تعديل بيانات الملف'}</h2>
-              <p className="text-sm text-muted-foreground mt-1">أضف عنوانًا وتصنيفًا وبيانات وصفية، ثم ارفع الملف إلى Google Drive.</p>
+              <h2 className="text-xl md:text-2xl font-bold">{formMode === 'add' ? 'إنشاء سجل أرشيفي' : 'تحديث السجل وإضافة ملفات'}</h2>
+              <p className="text-sm text-muted-foreground mt-1">أنشئ سجلًا واحدًا للموضوع، ثم أرفق داخله ملفًا واحدًا أو عدة ملفات. ويمكن إضافة ملفات جديدة لاحقًا دون إنشاء سجل جديد.</p>
             </div>
 
             <Button
@@ -1454,7 +1473,7 @@ export const ArchivePage: React.FC = () => {
               <CardContent className="space-y-4">
                 <div className="rounded-xl border border-dashed p-6 text-center bg-muted/20">
                   <Upload className="h-12 w-12 mx-auto mb-3 text-primary" />
-                  <p className="font-semibold mb-1">{form.files.length > 0 ? `تم اختيار ${form.files.length} ملف` : formMode === 'edit' ? 'اختيار ملفات جديدة اختياري' : 'اختر ملفًا أو أكثر للأرشفة'}</p>
+                  <p className="font-semibold mb-1">{form.files.length > 0 ? `تم اختيار ${form.files.length} ملف` : formMode === 'edit' ? 'إضافة ملفات جديدة إلى السجل (اختياري)' : 'اختر ملفًا أو أكثر داخل السجل الأرشيفي'}</p>
                   <p className="text-sm text-muted-foreground mb-4">
                     {form.files.length > 0
                       ? `إجمالي الحجم: ${formatFileSize(form.files.reduce((sum, file) => sum + file.size, 0))}`
@@ -1511,8 +1530,12 @@ export const ArchivePage: React.FC = () => {
 
                 {formMode === 'edit' && selectedDocument && (
                   <div className="rounded-lg border p-3 bg-muted/20">
-                    <p className="text-sm font-medium">الملف الحالي</p>
-                    <p className="text-sm text-muted-foreground mt-1">{selectedDocument.originalName} — {formatFileSize(selectedDocument.fileSize)}</p>
+                    <p className="text-sm font-medium">الملفات الموجودة حاليًا</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {(selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1).toLocaleString('ar-SA')} ملف
+                      {' — '}
+                      {formatFileSize(selectedDocument.totalFileSize ?? selectedDocument.fileSize)}
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -1545,8 +1568,8 @@ export const ArchivePage: React.FC = () => {
         <div id="archive-details" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
           <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl md:text-2xl font-bold">تفاصيل ملف الأرشفة</h2>
-              <p className="text-sm text-muted-foreground mt-1">عرض بيانات الملف والإجراءات المتاحة.</p>
+              <h2 className="text-xl md:text-2xl font-bold">تفاصيل السجل الأرشيفي</h2>
+              <p className="text-sm text-muted-foreground mt-1">عرض البيانات الوصفية وجميع الملفات والتحديثات التابعة للسجل.</p>
             </div>
 
             <Button variant="outline" onClick={() => { setDetailsOpen(false); setSelectedDocument(null); }} className="w-full md:w-auto">
@@ -1559,7 +1582,9 @@ export const ArchivePage: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
                 <h3 className="text-xl font-bold">{selectedDocument.title}</h3>
-                <p className="text-muted-foreground">{selectedDocument.originalName}</p>
+                <p className="text-muted-foreground">
+                  {getArchiveReference(selectedDocument)} · {(selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1).toLocaleString('ar-SA')} ملف
+                </p>
               </div>
 
               <Badge variant={getConfidentialityVariant(selectedDocument.confidentiality) as any}>
@@ -1578,9 +1603,8 @@ export const ArchivePage: React.FC = () => {
               <InfoItem label="نوع التاريخ" value={selectedDocument.documentDateType === 'hijri' ? 'هجري' : 'ميلادي'} />
               <InfoItem label="الجهة / المصدر" value={selectedDocument.issuingAuthority || '-'} />
               <InfoItem label="الكلمات المفتاحية" value={selectedDocument.tags || '-'} />
-              <InfoItem label="اسم الملف" value={selectedDocument.originalName} />
-              <InfoItem label="نوع الملف" value={selectedDocument.mimeType || '-'} />
-              <InfoItem label="الحجم" value={formatFileSize(selectedDocument.fileSize)} />
+              <InfoItem label="عدد الملفات" value={(selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1).toLocaleString('ar-SA')} />
+              <InfoItem label="إجمالي الحجم" value={formatFileSize(selectedDocument.totalFileSize ?? selectedDocument.fileSize)} />
               <InfoItem label="تاريخ الأرشفة" value={formatDate(selectedDocument.createdAt)} />
               <InfoItem label="آخر تعديل" value={formatDate(selectedDocument.updatedAt)} />
             </div>
@@ -1683,10 +1707,10 @@ export const ArchivePage: React.FC = () => {
           <div>
             <h2 className="flex items-center gap-2 text-lg font-black text-slate-800 sm:text-xl">
               <Archive className="h-5 w-5 text-sky-700" />
-              ملفات الأرشفة ({filteredDocuments.length})
+              السجلات الأرشيفية ({filteredDocuments.length})
             </h2>
             <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              اختر طريقة العرض المناسبة: بطاقات مرئية أو جدول تفصيلي مضغوط.
+              كل بطاقة تمثل سجلًا أرشيفيًا واحدًا، ويمكن أن يحتوي السجل على عدة ملفات ومرفقات.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1715,7 +1739,7 @@ export const ArchivePage: React.FC = () => {
               </Button>
             </div>
             <Badge variant="outline" className="w-fit border-slate-300 bg-white/90 px-3 py-1 font-bold text-slate-700 shadow-sm">
-              {filteredDocuments.length} ملف
+              {filteredDocuments.length} سجل · {totalArchiveAttachments.toLocaleString('ar-SA')} ملف
             </Badge>
           </div>
         </div>
@@ -1952,7 +1976,7 @@ export const ArchivePage: React.FC = () => {
                 </table>
               </div>
               <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-2 text-xs text-slate-500">
-                يعرض الجدول {filteredDocuments.length} ملفًا. استخدم البحث والتصفية لتقليل النتائج، ويمكن التمرير أفقيًا على الشاشات الصغيرة.
+                يعرض الجدول {filteredDocuments.length} سجلًا أرشيفيًا و{totalArchiveAttachments.toLocaleString('ar-SA')} ملفًا مرفقًا. استخدم البحث والتصفية لتقليل النتائج، ويمكن التمرير أفقيًا على الشاشات الصغيرة.
               </div>
             </div>
           )}
