@@ -471,6 +471,26 @@ export const ArchivePage: React.FC = () => {
       .map((value) => String(value).trim().toLowerCase())
       .includes(maker);
   };
+  const getApprovalDestinationLabel = (attachment: ArchiveAttachment) => {
+    if (attachment.approvalRoute === 'specific') {
+      return attachment.assignedApproverName
+        ? `بانتظار ${attachment.assignedApproverName}`
+        : 'بانتظار المعتمد المحدد';
+    }
+    return 'بانتظار مجموعة معتمدي الأرشيف';
+  };
+
+  const canCurrentUserReviewVersion = (attachment: ArchiveAttachment) => {
+    if (!canApproveVersions || getAttachmentVersionStatus(attachment) !== 'draft') return false;
+    if (isOwnVersionDraft(attachment)) return false;
+
+    if (attachment.approvalRoute === 'specific' && attachment.assignedApproverId) {
+      return attachment.assignedApproverId === userProfile?.uid;
+    }
+
+    return true;
+  };
+
 
   const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
   const [archivedTransactions, setArchivedTransactions] = useState<TransactionFollowUpRecord[]>([]);
@@ -1562,7 +1582,13 @@ export const ArchivePage: React.FC = () => {
 
     try {
       setApprovalLoading(true);
-      await loadApprovalCenterItems();
+      await Promise.all([
+        loadApprovalCenterItems(),
+        loadApprovalNotifications(),
+      ]);
+      if (approvalUnreadCount > 0) {
+        await markApprovalNotificationsRead();
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل مركز اعتماد الأرشيف');
     } finally {
