@@ -1124,6 +1124,133 @@ export const TransactionFollowUpPage: React.FC = () => {
     }
   };
 
+  const archivedReportPresentation = (archive: TransactionFollowUpReportArchive) => {
+    const archivedTemplate = archive.templateSnapshot
+      ? normalizeReportTemplate(archive.templateSnapshot)
+      : null;
+    return {
+      options: archivedTemplate
+        ? cloneFlexibleReportOptions(archivedTemplate.options)
+        : createDefaultFlexibleReportOptions(),
+      orientation: archivedTemplate?.orientation || 'landscape' as const,
+    };
+  };
+
+  const exportArchivedReportExcel = async (archiveId: string) => {
+    try {
+      setReportArchiveLoading(true);
+      const archive = await transactionFollowUpApi.reportArchive(archiveId);
+      const presentation = archivedReportPresentation(archive);
+      const from = archive.periodFrom.slice(0, 10);
+      const to = archive.periodTo.slice(0, 10);
+      const name = archive.archiveName || archive.templateName || presentation.options.title || 'تقرير-مؤرشف';
+
+      await exportFollowUpExcel({
+        data: archive.snapshot,
+        options: presentation.options,
+        orientation: presentation.orientation,
+        assigneeLabel: archive.assigneeName || 'جميع الموظفين',
+        from,
+        to,
+        fileName: `${safeBackupFileName(name, 'تقرير-مؤرشف')}-${from}-إلى-${to}.xlsx`,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تصدير التقرير المؤرشف إلى Excel');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
+  const exportArchivedReportPdf = async (archiveId: string) => {
+    try {
+      setReportArchiveLoading(true);
+      const archive = await transactionFollowUpApi.reportArchive(archiveId);
+      const presentation = archivedReportPresentation(archive);
+      const from = archive.periodFrom.slice(0, 10);
+      const to = archive.periodTo.slice(0, 10);
+      const name = archive.archiveName || archive.templateName || presentation.options.title || 'تقرير-مؤرشف';
+
+      setReportData(archive.snapshot);
+      setReportFrom(from);
+      setReportTo(to);
+      setReportMode(archive.reportType);
+      setReportAssigneeId(archive.assigneeUserId || '');
+      setFlexibleReportOptions(presentation.options);
+      setReportOrientation(presentation.orientation);
+      setReportSection('preview');
+
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
+        });
+      });
+
+      await exportExecutiveReportPdf({
+        orientation: presentation.orientation,
+        from,
+        to,
+        fileName: `${safeBackupFileName(name, 'تقرير-مؤرشف')}-${from}-إلى-${to}.pdf`,
+      });
+
+      setReportSection('archive');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تصدير التقرير المؤرشف إلى PDF');
+      setReportSection('archive');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
+  const startArchiveMetadataEdit = (archive: TransactionFollowUpReportArchive) => {
+    setArchiveEditingId(archive.id);
+    setArchiveEditName(archive.archiveName || '');
+    setArchiveEditNotes(archive.notes || '');
+    setArchiveEditTags((archive.tags || []).join('، '));
+  };
+
+  const saveArchiveMetadata = async () => {
+    if (!archiveEditingId) return;
+    try {
+      setReportArchiveLoading(true);
+      await transactionFollowUpApi.updateReportArchive(archiveEditingId, {
+        archiveName: archiveEditName.trim() || null,
+        notes: archiveEditNotes.trim() || null,
+        tags: archiveEditTags
+          .split(/[,،]/)
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      });
+      setArchiveEditingId('');
+      setArchiveEditName('');
+      setArchiveEditNotes('');
+      setArchiveEditTags('');
+      toast.success('تم تحديث بيانات التقرير المؤرشف');
+      await loadReportArchives(reportArchivePage);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحديث بيانات التقرير المؤرشف');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
+  const clearArchiveFilters = async () => {
+    setReportArchiveSearch('');
+    setReportArchiveSource('');
+    setReportArchiveType('');
+    setReportArchiveTag('');
+    try {
+      setReportArchiveLoading(true);
+      const result = await transactionFollowUpApi.reportArchives({ page: 1, pageSize: 20 });
+      setReportArchives(result.items || []);
+      setReportArchivePage(result.page || 1);
+      setReportArchiveTotalPages(result.totalPages || 0);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل أرشيف التقارير');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
   const deleteArchivedReport = async (id: string) => {
     if (!window.confirm('حذف هذه النسخة المؤرشفة من التقرير؟')) return;
     try {
