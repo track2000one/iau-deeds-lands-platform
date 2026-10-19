@@ -28,6 +28,8 @@ import {
   ListTodo,
   Printer,
   GitMerge,
+  History,
+  Clock3,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -89,6 +91,11 @@ type ArchiveDocument = {
   totalFileSize?: number;
   attachments?: ArchiveAttachment[];
   activities?: ArchiveActivity[];
+  status?: string;
+  deletedAt?: string | null;
+  mergedAt?: string | null;
+  mergedIntoId?: string | null;
+  updatedBy?: string | null;
   title: string;
   category: string;
   documentNumber: string;
@@ -248,6 +255,37 @@ const getArchiveMissingMetadata = (doc: ArchiveDocument) => {
   if (!String(doc.description || '').trim()) missing.push('الوصف');
   if (!(doc.attachments?.length || String(doc.driveUrl || '').trim())) missing.push('الملفات المرفقة');
   return missing;
+};
+
+const archiveActivityLabels: Record<string, string> = {
+  record_created: 'إنشاء السجل',
+  record_updated: 'تحديث البيانات',
+  attachments_added: 'إضافة ملفات',
+  attachment_removed: 'إزالة ملف',
+  record_deleted: 'نقل إلى المحذوفات',
+  record_restored: 'استعادة السجل',
+  records_merged: 'دمج سجلات داخل هذا السجل',
+  record_merged: 'دمج هذا السجل في سجل آخر',
+  legacy_migrated: 'نقل من الأرشيف السابق',
+};
+
+const getArchiveActivityLabel = (action: string) =>
+  archiveActivityLabels[action] || action || 'إجراء أرشيفي';
+
+const getArchiveActivityClassName = (action: string) => {
+  if (action.includes('delete') || action.includes('removed')) {
+    return 'border-red-200 bg-red-50 text-red-800';
+  }
+  if (action.includes('merge')) {
+    return 'border-violet-200 bg-violet-50 text-violet-800';
+  }
+  if (action.includes('restore') || action.includes('created')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+  }
+  if (action.includes('attachment')) {
+    return 'border-sky-200 bg-sky-50 text-sky-800';
+  }
+  return 'border-slate-200 bg-slate-50 text-slate-700';
 };
 
 const getArchiveFileTypeLabel = (doc: ArchiveDocument) => {
