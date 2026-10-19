@@ -3776,10 +3776,10 @@ ${styleAssets}
           style={{ backgroundColor: '#F8FAFC', color: '#0F172A', colorScheme: 'light' }}
           dir="rtl"
         >
-          <DialogHeader className="rounded-xl border border-slate-200 !bg-white p-4 text-right shadow-sm" style={{ backgroundColor: '#FFFFFF' }}>
+          <DialogHeader className="rounded-xl border border-blue-200 !bg-blue-50 p-4 text-right shadow-sm" style={{ backgroundColor: '#EFF6FF' }}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <DialogTitle className="text-slate-950">التقرير المرن لمتابعة المعاملات</DialogTitle>
-              <Badge variant="outline" className="border-slate-300 bg-slate-100 text-slate-700">واجهة تجريبية</Badge>
+              <Badge variant="outline" className="border-blue-200 bg-white text-blue-800">واجهة تجريبية</Badge>
             </div>
             <DialogDescription className="text-slate-600">
               تقرير احترافي قابل للتصفية والفرز والاستبعاد واختيار الأعمدة واتجاه الطباعة، ويعرض فقط: المنجزة، المتأخرة القائمة، بانتظار رد، وتحتاج متابعة.
@@ -3830,7 +3830,7 @@ ${styleAssets}
 
           {reportSection === 'preview' && (
             <>
-              <div className="grid gap-3 rounded-2xl border border-slate-200 !bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8" style={{ backgroundColor: '#FFFFFF' }}>
+              <div className="grid gap-3 rounded-2xl border border-blue-200 !bg-blue-50 p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8" style={{ backgroundColor: '#EFF6FF' }}>
                 <Field label="نوع التقرير">
                   <NativeSelect
                     value={reportMode}
@@ -3943,7 +3943,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="grid gap-3 rounded-2xl border border-slate-200 !bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6" style={{ backgroundColor: '#FFFFFF' }}>
+              <div className="grid gap-3 rounded-2xl border border-amber-300 !bg-amber-50 p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6" style={{ backgroundColor: '#FFFBEB' }}>
                 <div className="xl:col-span-2">
                   <Field label="اسم النسخة المؤرشفة">
                     <Input
@@ -3976,7 +3976,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-2xl border border-slate-200 !bg-white p-4 shadow-sm" style={{ backgroundColor: '#FFFFFF' }}>
+              <div className="space-y-4 rounded-2xl border border-orange-200 !bg-orange-50 p-4 shadow-sm" style={{ backgroundColor: '#FFF7ED' }}>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h3 className="font-black text-slate-900">إعداد التقرير المرن</h3>
@@ -3990,7 +3990,7 @@ ${styleAssets}
                   </Button>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 !bg-slate-50 p-3" style={{ backgroundColor: '#F8FAFC' }}>
+                <div className="rounded-2xl border border-blue-200 !bg-blue-50 p-3" style={{ backgroundColor: '#EFF6FF' }}>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-black text-slate-900">قوالب التقرير المحفوظة</p>
@@ -4042,7 +4042,7 @@ ${styleAssets}
                     </div>
                   </div>
 
-                  <div className="mt-3 grid gap-3 rounded-xl border border-slate-200 !bg-white p-3 md:grid-cols-2" style={{ backgroundColor: '#FFFFFF' }}>
+                  <div className="mt-3 grid gap-3 rounded-xl border border-blue-100 !bg-white p-3 md:grid-cols-2" style={{ backgroundColor: '#FFFFFF' }}>
                     <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700">
                       <span className="inline-flex items-center gap-2">
                         <Star className="h-4 w-4 text-amber-500" />
@@ -4075,7 +4075,7 @@ ${styleAssets}
                   {(isAdmin || canDelete)
                     && reportTemplateScope === 'shared'
                     && reportTemplateAccessMode === 'selected' && (
-                      <div className="mt-3 rounded-xl border border-slate-200 !bg-white p-3" style={{ backgroundColor: '#FFFFFF' }}>
+                      <div className="mt-3 rounded-xl border border-blue-100 !bg-white p-3" style={{ backgroundColor: '#FFFFFF' }}>
                         <p className="mb-2 text-[11px] font-black text-slate-700">المستخدمون المسموح لهم باستخدام القالب</p>
                         <div className="grid max-h-36 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
                           {assignees.map((user) => {
@@ -4110,7 +4110,7 @@ ${styleAssets}
                       {reportTemplates.map((template) => (
                         <div
                           key={template.id}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 !bg-white px-3 py-2.5 shadow-sm"
+                          className="flex items-center justify-between gap-3 rounded-xl border border-blue-100 !bg-white px-3 py-2.5 shadow-sm"
                         >
                           <div className="min-w-0">
                             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -4232,7 +4232,7 @@ ${styleAssets}
                       ))}
                     </div>
                   ) : (
-                    <div className="mt-3 rounded-xl border border-dashed border-slate-300 !bg-white px-3 py-4 text-center text-[11px] text-slate-500">
+                    <div className="mt-3 rounded-xl border border-dashed border-blue-200 !bg-white px-3 py-4 text-center text-[11px] text-slate-500">
                       لا توجد قوالب محفوظة بعد. جهّز التقرير بالشكل المطلوب ثم اكتب اسم القالب واضغط «حفظ كقالب».
                     </div>
                   )}
