@@ -2842,7 +2842,7 @@ export const ArchivePage: React.FC = () => {
               رفع إصدار جديد للملف
             </AlertDialogTitle>
             <AlertDialogDescription className="leading-7">
-              سيبقى الإصدار السابق محفوظًا للرجوع إليه، ويصبح الملف الجديد هو الإصدار الحالي.
+              سيبقى الإصدار الرسمي الحالي محفوظًا، ويُحفظ الملف الجديد كمسودة بانتظار الاعتماد قبل أن يصبح النسخة الرسمية الحالية.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -2904,7 +2904,7 @@ export const ArchivePage: React.FC = () => {
               className="bg-[#1F4E78] text-white hover:bg-[#173A59]"
             >
               {versionSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
-              {versionSaving ? 'جاري حفظ الإصدار...' : 'حفظ كإصدار جديد'}
+              {versionSaving ? 'جاري حفظ المسودة...' : 'حفظ كمسودة إصدار جديد'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
