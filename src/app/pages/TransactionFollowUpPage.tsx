@@ -3771,18 +3771,24 @@ ${styleAssets}
       )}
 
       <Dialog open={reportOpen} onOpenChange={(open) => !reportExporting && setReportOpen(open)}>
-        <DialogContent className="max-h-[96dvh] overflow-hidden sm:max-w-[1180px]" dir="rtl">
-          <DialogHeader className="text-right">
-            <DialogTitle>التقرير المرن لمتابعة المعاملات</DialogTitle>
-            <DialogDescription>
+        <DialogContent
+          className="max-h-[94dvh] overflow-y-auto overscroll-contain border-slate-300 bg-slate-50 text-slate-950 shadow-2xl [scrollbar-gutter:stable] [&_input]:!bg-white [&_input]:!text-slate-900 [&_label]:!text-slate-800 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
+          dir="rtl"
+        >
+          <DialogHeader className="rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm">
+            <DialogTitle className="text-slate-950">التقرير المرن لمتابعة المعاملات</DialogTitle>
+            <DialogDescription className="text-slate-600">
               تقرير احترافي قابل للتصفية والفرز والاستبعاد واختيار الأعمدة واتجاه الطباعة، ويعرض فقط: المنجزة، المتأخرة القائمة، بانتظار رد، وتحتاج متابعة.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-wrap gap-2 border-b pb-3">
+          <div className="sticky top-0 z-20 -mx-1 flex flex-wrap gap-2 border-b border-slate-300 bg-slate-50/95 px-1 py-3 backdrop-blur">
             <Button
               type="button"
               variant={reportSection === 'preview' ? 'default' : 'outline'}
+              className={reportSection === 'preview'
+                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'}
               onClick={() => setReportSection('preview')}
             >
               <FileText className="ml-2 h-4 w-4" />
@@ -3791,6 +3797,9 @@ ${styleAssets}
             <Button
               type="button"
               variant={reportSection === 'archive' ? 'default' : 'outline'}
+              className={reportSection === 'archive'
+                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'}
               onClick={() => {
                 setReportSection('archive');
                 void loadReportArchives(reportArchivePage);
@@ -3802,6 +3811,9 @@ ${styleAssets}
             <Button
               type="button"
               variant={reportSection === 'schedule' ? 'default' : 'outline'}
+              className={reportSection === 'schedule'
+                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'}
               onClick={() => {
                 setReportSection('schedule');
                 void loadReportSchedules();
@@ -3814,7 +3826,7 @@ ${styleAssets}
 
           {reportSection === 'preview' && (
             <>
-              <div className="grid gap-3 rounded-2xl border bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-8">
+              <div className="grid gap-3 rounded-2xl border border-slate-300 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8">
                 <Field label="نوع التقرير">
                   <NativeSelect
                     value={reportMode}
@@ -3927,7 +3939,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="grid gap-3 rounded-2xl border border-amber-200 bg-amber-50/40 p-3 md:grid-cols-2 xl:grid-cols-6">
+              <div className="grid gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6">
                 <div className="xl:col-span-2">
                   <Field label="اسم النسخة المؤرشفة">
                     <Input
@@ -3960,7 +3972,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm">
+              <div className="space-y-4 rounded-2xl border border-sky-300 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h3 className="font-black text-slate-900">إعداد التقرير المرن</h3>
