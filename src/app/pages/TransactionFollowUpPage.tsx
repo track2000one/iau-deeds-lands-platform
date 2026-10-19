@@ -2312,8 +2312,16 @@ ${styleAssets}
     }, 700);
   };
 
-  const exportExecutiveReportPdf = async () => {
-    if (!reportRef.current || !reportData) return;
+  const exportExecutiveReportPdf = async (override?: {
+    orientation?: 'portrait' | 'landscape';
+    from?: string;
+    to?: string;
+    fileName?: string;
+  }) => {
+    if (!reportRef.current) return;
+    const exportOrientation = override?.orientation || reportOrientation;
+    const exportFrom = override?.from || reportFrom;
+    const exportTo = override?.to || reportTo;
     try {
       setReportExporting(true);
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
@@ -2328,8 +2336,8 @@ ${styleAssets}
         logging: false,
       });
 
-      const landscape = reportOrientation === 'landscape';
-      const pdf = new jsPDF({ orientation: reportOrientation, unit: 'mm', format: 'a4' });
+      const landscape = exportOrientation === 'landscape';
+      const pdf = new jsPDF({ orientation: exportOrientation, unit: 'mm', format: 'a4' });
       const margin = 8;
       const pageWidth = landscape ? 297 : 210;
       const pageHeight = landscape ? 210 : 297;
@@ -2375,7 +2383,7 @@ ${styleAssets}
         pageIndex += 1;
       }
 
-      pdf.save(`تقرير-متابعة-المعاملات-${reportFrom}-إلى-${reportTo}.pdf`);
+      pdf.save(override?.fileName || `تقرير-متابعة-المعاملات-${exportFrom}-إلى-${exportTo}.pdf`);
       toast.success('تم إنشاء ملف PDF للتقرير المرن');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر إنشاء ملف PDF');
