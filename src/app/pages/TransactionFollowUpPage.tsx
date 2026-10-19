@@ -3772,16 +3772,16 @@ ${styleAssets}
 
       <Dialog open={reportOpen} onOpenChange={(open) => !reportExporting && setReportOpen(open)}>
         <DialogContent
-          className="max-h-[94dvh] overflow-y-auto overscroll-contain !border-slate-200 !bg-[#F8FAFC] !text-slate-950 shadow-2xl [color-scheme:light] [scrollbar-gutter:stable] [&_button]:transition-colors [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:placeholder:!text-slate-400 [&_label]:!text-slate-700 [&_select]:!border-slate-300 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!border-slate-300 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
+          className="max-h-[94dvh] overflow-y-auto overscroll-contain !border-slate-200 !bg-[#F8FAFC] !text-slate-950 shadow-2xl [color-scheme:light] [scrollbar-gutter:stable] [&_button]:transition-colors [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:placeholder:!text-slate-600 [&_label]:!text-slate-800 [&_select]:!border-slate-300 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!border-slate-300 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
           style={{ backgroundColor: '#F8FAFC', color: '#0F172A', colorScheme: 'light' }}
           dir="rtl"
         >
           <DialogHeader className="rounded-xl border border-blue-200 !bg-blue-50 p-4 text-right shadow-sm" style={{ backgroundColor: '#EFF6FF' }}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <DialogTitle className="text-slate-950">التقرير المرن لمتابعة المعاملات</DialogTitle>
+              <DialogTitle className="!text-slate-950" style={{ color: '#0F172A' }}>التقرير المرن لمتابعة المعاملات</DialogTitle>
               <Badge variant="outline" className="border-blue-200 bg-white text-blue-800">واجهة تجريبية</Badge>
             </div>
-            <DialogDescription className="text-slate-600">
+            <DialogDescription className="!text-slate-700">
               تقرير احترافي قابل للتصفية والفرز والاستبعاد واختيار الأعمدة واتجاه الطباعة، ويعرض فقط: المنجزة، المتأخرة القائمة، بانتظار رد، وتحتاج متابعة.
             </DialogDescription>
           </DialogHeader>
@@ -3971,7 +3971,7 @@ ${styleAssets}
                     />
                   </Field>
                 </div>
-                <div className="md:col-span-2 xl:col-span-6 text-[11px] leading-5 text-slate-500">
+                <div className="md:col-span-2 xl:col-span-6 text-[11px] leading-5 text-slate-600">
                   هذه البيانات اختيارية وتستخدم لاحقًا في البحث والتصفية داخل أرشيف التقارير.
                 </div>
               </div>
@@ -3979,8 +3979,8 @@ ${styleAssets}
               <div className="space-y-4 rounded-2xl border border-orange-200 !bg-orange-50 p-4 shadow-sm" style={{ backgroundColor: '#FFF7ED' }}>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h3 className="font-black text-slate-900">إعداد التقرير المرن</h3>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <h3 className="font-black !text-slate-950" style={{ color: '#0F172A' }}>إعداد التقرير المرن</h3>
+                    <p className="mt-1 text-xs text-slate-600">
                       اختر الفئات والأعمدة، ثم صفِّ النتائج ورتبها واستبعد أي معاملة لا تريد ظهورها في النسخة المطبوعة.
                     </p>
                   </div>
@@ -3993,7 +3993,7 @@ ${styleAssets}
                 <div className="rounded-2xl border border-violet-200 !bg-violet-50 p-3" style={{ backgroundColor: '#F5F3FF' }}>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-black text-slate-900">قوالب التقرير المحفوظة</p>
+                      <p className="text-xs font-black !text-slate-950">قوالب التقرير المحفوظة</p>
                       <p className="mt-1 text-[11px] leading-5 text-slate-600">
                         القوالب محفوظة في قاعدة البيانات وتظهر من أي جهاز. ويمكن للمستخدم الإشرافي إنشاء قالب عام للجميع أو تقييده لمستخدمين محددين.
                       </p>
@@ -4145,7 +4145,7 @@ ${styleAssets}
                                 </Badge>
                               )}
                             </div>
-                            <p className="mt-1 text-[10px] text-slate-500">
+                            <p className="mt-1 text-[10px] text-slate-600">
                               {template.reportMode === 'weekly'
                                 ? 'أسبوعي'
                                 : template.reportMode === 'monthly'
@@ -4232,7 +4232,7 @@ ${styleAssets}
                       ))}
                     </div>
                   ) : (
-                    <div className="mt-3 rounded-xl border border-dashed border-blue-200 !bg-white px-3 py-4 text-center text-[11px] text-slate-500">
+                    <div className="mt-3 rounded-xl border border-dashed border-blue-200 !bg-white px-3 py-4 text-center text-[11px] text-slate-600">
                       لا توجد قوالب محفوظة بعد. جهّز التقرير بالشكل المطلوب ثم اكتب اسم القالب واضغط «حفظ كقالب».
                     </div>
                   )}
@@ -4253,7 +4253,7 @@ ${styleAssets}
                             ))}
                           </NativeSelect>
                         </Field>
-                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-600">
                           من هنا يمكن تحديد القالب الافتراضي وصلاحية استخدام القالب العام. ترتيب القوالب يتم من أسهم أعلى/أسفل في البطاقة.
                         </div>
                       </div>
@@ -4412,7 +4412,7 @@ ${styleAssets}
                       return (
                         <label
                           key={category.key}
-                          className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm font-bold transition ${checked ? 'border-sky-300 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-500'}`}
+                          className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm font-bold transition ${checked ? 'border-sky-300 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-600'}`}
                         >
                           <span>{category.label}</span>
                           <input
@@ -4498,7 +4498,7 @@ ${styleAssets}
                       return (
                         <label
                           key={column.key}
-                          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition ${checked ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-400'}`}
+                          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition ${checked ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`}
                         >
                           <input
                             type="checkbox"
@@ -4522,7 +4522,7 @@ ${styleAssets}
 
               <div className="max-h-[68dvh] overflow-auto rounded-2xl border bg-slate-100 p-2 sm:p-4">
                 {reportLoading && !reportData ? (
-                  <div className="py-24 text-center text-sm text-muted-foreground">
+                  <div className="py-24 text-center text-sm text-slate-600">
                     <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />
                     جارٍ إعداد التقرير المرن...
                   </div>
@@ -4541,7 +4541,7 @@ ${styleAssets}
                     }
                   />
                 ) : (
-                  <div className="py-24 text-center text-sm text-muted-foreground">
+                  <div className="py-24 text-center text-sm text-slate-600">
                     حدد فترة التقرير ثم اضغط «تحديث».
                   </div>
                 )}
@@ -4603,7 +4603,7 @@ ${styleAssets}
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <CardTitle className="text-base">التقارير المحفوظة</CardTitle>
-                      <p className="mt-1 text-xs text-muted-foreground">كل تقرير هنا يمثل نسخة ثابتة من البيانات وقت الحفظ.</p>
+                      <p className="mt-1 text-xs text-slate-600">كل تقرير هنا يمثل نسخة ثابتة من البيانات وقت الحفظ.</p>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => void loadReportArchives(reportArchivePage)} disabled={reportArchiveLoading}>
                       <RefreshCw className={`ml-1 h-4 w-4 ${reportArchiveLoading ? 'animate-spin' : ''}`} />
@@ -4708,9 +4708,9 @@ ${styleAssets}
                   </div>
 
                   {reportArchiveLoading && !reportArchives.length ? (
-                    <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل الأرشيف...</div>
+                    <div className="py-12 text-center text-sm text-slate-600">جارٍ تحميل الأرشيف...</div>
                   ) : reportArchives.length === 0 ? (
-                    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-slate-600">
                       {reportArchiveSearch || reportArchiveSource || reportArchiveType || reportArchiveTag || reportArchiveGovernanceStatus || reportArchivePinnedOnly
                         ? 'لا توجد تقارير مطابقة لمعايير البحث والتصفية الحالية.'
                         : 'لا توجد تقارير مؤرشفة حتى الآن.'}
@@ -4770,7 +4770,7 @@ ${styleAssets}
                               {archive.assigneeName && <Badge variant="outline">{archive.assigneeName}</Badge>}
                             </div>
 
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="mt-1 text-xs text-slate-600">
                               {formatDate(archive.periodFrom)} — {formatDate(archive.periodTo)}
                               {' · '}
                               تم الحفظ {formatDateTime(archive.createdAt)}
@@ -5019,7 +5019,7 @@ ${styleAssets}
                               >
                                 إلغاء
                               </Button>
-                              <span className="self-center text-[10px] text-slate-500">
+                              <span className="self-center text-[10px] text-slate-600">
                                 التقرير النهائي أو المحمي أو الواقع ضمن مدة الاحتفاظ لا يمكن حذفه.
                               </span>
                             </div>
@@ -5033,7 +5033,7 @@ ${styleAssets}
                               <Badge variant="outline">{archiveActivity.length.toLocaleString('ar-SA')} إجراء</Badge>
                             </div>
                             {archiveActivityLoading ? (
-                              <div className="py-5 text-center text-xs text-muted-foreground">
+                              <div className="py-5 text-center text-xs text-slate-600">
                                 <RefreshCw className="mx-auto mb-2 h-4 w-4 animate-spin" />
                                 جارٍ تحميل السجل...
                               </div>
@@ -5045,11 +5045,11 @@ ${styleAssets}
                                       <span className="text-[11px] font-bold text-slate-800">
                                         {entry.description || entry.action}
                                       </span>
-                                      <span className="text-[10px] text-slate-500">
+                                      <span className="text-[10px] text-slate-600">
                                         {formatDateTime(entry.createdAt)}
                                       </span>
                                     </div>
-                                    <p className="mt-1 text-[10px] text-slate-500">
+                                    <p className="mt-1 text-[10px] text-slate-600">
                                       بواسطة: {entry.username || entry.userEmail || 'النظام'}
                                       {entry.details?.format ? ` · الصيغة: ${String(entry.details.format).toUpperCase()}` : ''}
                                     </p>
@@ -5057,7 +5057,7 @@ ${styleAssets}
                                 ))}
                               </div>
                             ) : (
-                              <div className="rounded-lg border border-dashed py-5 text-center text-xs text-muted-foreground">
+                              <div className="rounded-lg border border-dashed py-5 text-center text-xs text-slate-600">
                                 لا توجد إجراءات مسجلة لهذا التقرير حتى الآن.
                               </div>
                             )}
@@ -5068,7 +5068,7 @@ ${styleAssets}
                   )}
 
                   <div className="flex items-center justify-between border-t pt-3">
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-slate-600">
                       صفحة {reportArchivePage.toLocaleString('ar-SA')} من {Math.max(1, reportArchiveTotalPages).toLocaleString('ar-SA')}
                     </span>
                     <div className="flex gap-2">
@@ -5218,7 +5218,7 @@ ${styleAssets}
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <CardTitle className="text-base">الجدولات النشطة والمحـفوظة</CardTitle>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-xs text-slate-600">
                         كل جدولة مرتبطة بقالب مرن؛ التقرير الأسبوعي يغطي الأسبوع المكتمل السابق، والشهري يغطي الشهر المكتمل السابق، مع تطبيق إعدادات القالب تلقائيًا.
                       </p>
                     </div>
@@ -5230,9 +5230,9 @@ ${styleAssets}
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {reportScheduleLoading && !reportSchedules.length ? (
-                    <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل الجدولات...</div>
+                    <div className="py-12 text-center text-sm text-slate-600">جارٍ تحميل الجدولات...</div>
                   ) : reportSchedules.length === 0 ? (
-                    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-slate-600">
                       لا توجد جدولات تقارير حتى الآن. أنشئ قالب تقرير مرن أولًا ثم اربطه بجدولة أسبوعية أو شهرية.
                     </div>
                   ) : (
@@ -5256,14 +5256,14 @@ ${styleAssets}
                             )}
                             {schedule.assigneeName && <Badge variant="outline">{schedule.assigneeName}</Badge>}
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
+                          <p className="mt-1 text-xs text-slate-600">
                             {schedule.frequency === 'weekly'
                               ? `يوم ${['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][schedule.dayOfWeek ?? 0]}`
                               : `يوم ${schedule.dayOfMonth ?? 1} من كل شهر`}
                             {' · '}
                             الساعة {String(schedule.runHour).padStart(2, '0')}:00
                           </p>
-                          <p className="mt-1 text-[11px] text-muted-foreground">
+                          <p className="mt-1 text-[11px] text-slate-600">
                             الإصدار القادم: {formatDateTime(schedule.nextRunAt)}
                             {schedule.lastRunAt ? <> · آخر تشغيل: {formatDateTime(schedule.lastRunAt)}</> : null}
                           </p>
