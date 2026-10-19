@@ -27,6 +27,7 @@ import {
   RotateCcw,
   ListTodo,
   Printer,
+  GitMerge,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -306,6 +307,12 @@ export const ArchivePage: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [excelImportOpen, setExcelImportOpen] = useState(false);
+
+  const [mergeSelectionMode, setMergeSelectionMode] = useState(false);
+  const [selectedMergeIds, setSelectedMergeIds] = useState<string[]>([]);
+  const [mergeTargetId, setMergeTargetId] = useState('');
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
 
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
@@ -978,6 +985,83 @@ export const ArchivePage: React.FC = () => {
     setSearchQuery('');
     setFilterCategory('');
     setFilterConfidentiality('');
+  };
+
+  const selectedMergeRecords = useMemo(
+    () => documents.filter((doc) => selectedMergeIds.includes(doc.id)),
+    [documents, selectedMergeIds],
+  );
+
+  const toggleMergeSelection = (id: string) => {
+    setSelectedMergeIds((current) => {
+      const next = current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id];
+      setMergeTargetId((target) => (target && next.includes(target) ? target : next[0] || ''));
+      return next;
+    });
+  };
+
+  const stopMergeSelection = () => {
+    setMergeSelectionMode(false);
+    setSelectedMergeIds([]);
+    setMergeTargetId('');
+    setMergeDialogOpen(false);
+  };
+
+  const openMergeRecordsDialog = () => {
+    if (selectedMergeIds.length < 2) {
+      toast.error('حدد سجلين على الأقل للدمج');
+      return;
+    }
+    setMergeTargetId((current) =>
+      current && selectedMergeIds.includes(current) ? current : selectedMergeIds[0],
+    );
+    setMergeDialogOpen(true);
+  };
+
+  const mergeArchiveRecords = async () => {
+    if (!canEdit) {
+      toast.error('لا تملك صلاحية دمج السجلات الأرشيفية');
+      return;
+    }
+    if (selectedMergeIds.length < 2 || !mergeTargetId) {
+      toast.error('حدد سجلين على الأقل واختر السجل الرئيسي');
+      return;
+    }
+
+    try {
+      setIsMerging(true);
+      const result = await archiveRequest<{
+        record: ArchiveDocument;
+        mergedSourceIds: string[];
+        movedAttachmentCount: number;
+      }>('/records/merge', {
+        method: 'POST',
+        body: JSON.stringify({
+          recordIds: selectedMergeIds,
+          targetId: mergeTargetId,
+        }),
+      });
+
+      setDocuments((current) => {
+        const remaining = current.filter(
+          (doc) => !selectedMergeIds.includes(doc.id) || doc.id === mergeTargetId,
+        );
+        const withoutTarget = remaining.filter((doc) => doc.id !== mergeTargetId);
+        return [result.record, ...withoutTarget];
+      });
+
+      toast.success(
+        `تم دمج ${result.mergedSourceIds.length + 1} سجلات في سجل واحد ونقل ${result.movedAttachmentCount} ملف`,
+      );
+      stopMergeSelection();
+    } catch (error) {
+      console.error('Archive merge error:', error);
+      toast.error(error instanceof Error ? error.message : 'تعذر دمج السجلات الأرشيفية');
+    } finally {
+      setIsMerging(false);
+    }
   };
 
   if (isLoading) {
