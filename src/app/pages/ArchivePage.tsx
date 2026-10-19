@@ -1025,7 +1025,10 @@ export const ArchivePage: React.FC = () => {
       toast.success(
         `تم حفظ الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} كنسخة حالية`,
       );
-      closeAttachmentVersionDialog();
+      setVersionDialogOpen(false);
+      setVersionSourceAttachment(null);
+      setVersionFile(null);
+      setVersionNote('');
     } catch (error) {
       console.error('Archive attachment version error:', error);
       toast.error(error instanceof Error ? error.message : 'تعذر حفظ الإصدار الجديد');
