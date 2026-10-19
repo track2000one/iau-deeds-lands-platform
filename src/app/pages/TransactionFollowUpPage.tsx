@@ -4259,10 +4259,38 @@ ${styleAssets}
                       إنشاء جدولة تقرير
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                  <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
                     <div className="xl:col-span-2">
                       <Field label="اسم الجدولة">
                         <Input value={scheduleName} onChange={(e) => setScheduleName(e.target.value)} />
+                      </Field>
+                    </div>
+                    <div className="xl:col-span-2">
+                      <Field label="قالب التقرير المرن">
+                        <NativeSelect
+                          value={scheduleTemplateId}
+                          onChange={(e) => {
+                            const templateId = e.target.value;
+                            setScheduleTemplateId(templateId);
+                            const template = reportTemplates.find((item) => item.id === templateId);
+                            if (template) {
+                              setScheduleName(
+                                `${template.name} - ${scheduleFrequency === 'weekly' ? 'أسبوعي' : 'شهري'}`,
+                              );
+                              if ((isAdmin || canDelete) && template.assigneeUserId) {
+                                setScheduleAssigneeId(template.assigneeUserId);
+                              }
+                            }
+                          }}
+                        >
+                          <option value="">اختر قالبًا محفوظًا</option>
+                          {reportTemplates.map((template) => (
+                            <option key={template.id} value={template.id}>
+                              {template.scope === 'shared' ? 'عام' : 'شخصي'} — {template.name}
+                              {template.isDefault ? ' — افتراضي' : ''}
+                            </option>
+                          ))}
+                        </NativeSelect>
                       </Field>
                     </div>
                     <Field label="التكرار">
@@ -4271,7 +4299,14 @@ ${styleAssets}
                         onChange={(e) => {
                           const value = e.target.value as 'weekly' | 'monthly';
                           setScheduleFrequency(value);
-                          setScheduleName(value === 'weekly' ? 'التقرير الأسبوعي للمتابعة' : 'التقرير الشهري للمتابعة');
+                          const template = reportTemplates.find((item) => item.id === scheduleTemplateId);
+                          setScheduleName(
+                            template
+                              ? `${template.name} - ${value === 'weekly' ? 'أسبوعي' : 'شهري'}`
+                              : value === 'weekly'
+                                ? 'التقرير الأسبوعي للمتابعة'
+                                : 'التقرير الشهري للمتابعة',
+                          );
                         }}
                       >
                         <option value="weekly">أسبوعي</option>
@@ -4317,7 +4352,11 @@ ${styleAssets}
                       </Field>
                     )}
                     <div className="flex items-end">
-                      <Button className="w-full" disabled={reportScheduleLoading} onClick={() => void createReportSchedule()}>
+                      <Button
+                        className="w-full"
+                        disabled={reportScheduleLoading || !scheduleTemplateId}
+                        onClick={() => void createReportSchedule()}
+                      >
                         <Plus className="ml-2 h-4 w-4" />
                         إنشاء الجدولة
                       </Button>
@@ -4332,7 +4371,7 @@ ${styleAssets}
                     <div>
                       <CardTitle className="text-base">الجدولات النشطة والمحـفوظة</CardTitle>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        التقرير الأسبوعي يغطي الأسبوع المكتمل السابق، والشهري يغطي الشهر المكتمل السابق.
+                        كل جدولة مرتبطة بقالب مرن؛ التقرير الأسبوعي يغطي الأسبوع المكتمل السابق، والشهري يغطي الشهر المكتمل السابق، مع تطبيق إعدادات القالب تلقائيًا.
                       </p>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => void loadReportSchedules()} disabled={reportScheduleLoading}>
@@ -4358,6 +4397,15 @@ ${styleAssets}
                             <Badge variant="outline" className={schedule.isActive ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-600'}>
                               {schedule.isActive ? 'نشطة' : 'متوقفة'}
                             </Badge>
+                            {schedule.templateName ? (
+                              <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">
+                                القالب: {schedule.templateName}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                                جدولة قديمة بدون قالب
+                              </Badge>
+                            )}
                             {schedule.assigneeName && <Badge variant="outline">{schedule.assigneeName}</Badge>}
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
@@ -4371,6 +4419,15 @@ ${styleAssets}
                             الإصدار القادم: {formatDateTime(schedule.nextRunAt)}
                             {schedule.lastRunAt ? <> · آخر تشغيل: {formatDateTime(schedule.lastRunAt)}</> : null}
                           </p>
+                          {schedule.templateSnapshot?.options && (
+                            <p className="mt-1 text-[10px] text-violet-700">
+                              يطبّق تلقائيًا: {schedule.templateSnapshot.options.categories.length.toLocaleString('ar-SA')} فئات
+                              {' · '}
+                              {schedule.templateSnapshot.options.visibleColumns.length.toLocaleString('ar-SA')} أعمدة
+                              {' · '}
+                              {schedule.templateSnapshot.orientation === 'landscape' ? 'طباعة أفقية' : 'طباعة عمودية'}
+                            </p>
+                          )}
                         </div>
                         <div className="flex shrink-0 flex-wrap gap-2">
                           <Button size="sm" variant="outline" onClick={() => void runReportScheduleNow(schedule)} disabled={reportScheduleLoading}>
