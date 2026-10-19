@@ -410,6 +410,12 @@ export const ArchivePage: React.FC = () => {
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
 
+  const [versionDialogOpen, setVersionDialogOpen] = useState(false);
+  const [versionSourceAttachment, setVersionSourceAttachment] = useState<ArchiveAttachment | null>(null);
+  const [versionFile, setVersionFile] = useState<File | null>(null);
+  const [versionNote, setVersionNote] = useState('');
+  const [versionSaving, setVersionSaving] = useState(false);
+
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
   const [selectedDocument, setSelectedDocument] = useState<ArchiveDocument | null>(null);
@@ -962,6 +968,70 @@ export const ArchivePage: React.FC = () => {
       throw new Error('تم رفع الملف لكن لم يتم إرجاع رابط Google Drive');
     }
     return body as UploadResponse;
+  };
+
+  const openAttachmentVersionDialog = (attachment: ArchiveAttachment) => {
+    if (!canEdit) {
+      toast.error('لا تملك صلاحية إضافة إصدار جديد');
+      return;
+    }
+    setVersionSourceAttachment(attachment);
+    setVersionFile(null);
+    setVersionNote('');
+    setVersionDialogOpen(true);
+  };
+
+  const closeAttachmentVersionDialog = () => {
+    if (versionSaving) return;
+    setVersionDialogOpen(false);
+    setVersionSourceAttachment(null);
+    setVersionFile(null);
+    setVersionNote('');
+  };
+
+  const saveAttachmentVersion = async () => {
+    if (!selectedDocument || !versionSourceAttachment || !versionFile) {
+      toast.error('اختر ملف الإصدار الجديد أولًا');
+      return;
+    }
+    if (!canEdit) {
+      toast.error('لا تملك صلاحية إضافة إصدار جديد');
+      return;
+    }
+
+    try {
+      setVersionSaving(true);
+      const uploaded = await uploadFileToGoogleDrive(versionFile);
+      const updated = await archiveRequest<ArchiveDocument>(
+        `/records/${selectedDocument.id}/attachments/${versionSourceAttachment.id}/versions`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            fileName: uploaded.fileName || versionFile.name,
+            originalName: versionFile.name,
+            mimeType: uploaded.mimeType || versionFile.type || 'application/octet-stream',
+            fileSize: versionFile.size,
+            driveUrl: uploaded.driveUrl,
+            driveFileId: uploaded.driveFileId,
+            versionNote: versionNote.trim(),
+          }),
+        },
+      );
+
+      setDocuments((current) =>
+        current.map((doc) => (doc.id === updated.id ? updated : doc)),
+      );
+      setSelectedDocument(updated);
+      toast.success(
+        `تم حفظ الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} كنسخة حالية`,
+      );
+      closeAttachmentVersionDialog();
+    } catch (error) {
+      console.error('Archive attachment version error:', error);
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ الإصدار الجديد');
+    } finally {
+      setVersionSaving(false);
+    }
   };
 
   const handleSubmit = async () => {
