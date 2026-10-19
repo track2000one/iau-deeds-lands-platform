@@ -3708,7 +3708,7 @@ ${styleAssets}
                                 : ''}
                             </p>
                           </div>
-                          <div className="flex shrink-0 gap-1.5">
+                          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                             <Button
                               type="button"
                               variant="outline"
@@ -3719,19 +3719,59 @@ ${styleAssets}
                               <FileText className="ml-1 h-3.5 w-3.5" />
                               تطبيق
                             </Button>
-                            {(template.scope === 'personal' || isAdmin || canDelete) && (
+                            {template.scope === 'shared' && (
                               <Button
                                 type="button"
                                 variant="outline"
                                 size="icon"
-                                className="h-8 w-8 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
-                                title="حذف القالب"
-                                aria-label={`حذف قالب ${template.name}`}
+                                className="h-8 w-8"
+                                title="نسخ إلى قالب شخصي"
+                                aria-label={`نسخ قالب ${template.name} إلى قالب شخصي`}
                                 disabled={reportTemplateSaving}
-                                onClick={() => void deleteFlexibleReportTemplate(template)}
+                                onClick={() => void cloneFlexibleReportTemplateToPersonal(template)}
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Copy className="h-3.5 w-3.5" />
                               </Button>
+                            )}
+                            {(template.scope === 'personal' || isAdmin || canDelete) && (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  title="تحريك لأعلى"
+                                  aria-label={`تحريك قالب ${template.name} لأعلى`}
+                                  disabled={reportTemplateSaving}
+                                  onClick={() => void moveFlexibleReportTemplate(template, 'up')}
+                                >
+                                  <ArrowUp className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  title="تحريك لأسفل"
+                                  aria-label={`تحريك قالب ${template.name} لأسفل`}
+                                  disabled={reportTemplateSaving}
+                                  onClick={() => void moveFlexibleReportTemplate(template, 'down')}
+                                >
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                                  title="حذف القالب"
+                                  aria-label={`حذف قالب ${template.name}`}
+                                  disabled={reportTemplateSaving}
+                                  onClick={() => void deleteFlexibleReportTemplate(template)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
                             )}
                           </div>
                         </div>
