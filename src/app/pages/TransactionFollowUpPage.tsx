@@ -4222,11 +4222,15 @@ ${styleAssets}
                               {archive.reportType === 'weekly' ? 'تقرير أسبوعي' : archive.reportType === 'monthly' ? 'تقرير شهري' : 'تقرير مخصص'}
                             </b>
                             <Badge variant="outline">{archive.source === 'scheduled' ? 'آلي' : 'يدوي'}</Badge>
-                            {archive.templateName && (
+                            {archive.templateName ? (
                               <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">
                                 القالب: {archive.templateName}
                               </Badge>
-                            )}
+                            ) : archive.templateSnapshot ? (
+                              <Badge variant="outline" className="border-sky-300 bg-sky-50 text-sky-800">
+                                إعدادات مرنة محفوظة
+                              </Badge>
+                            ) : null}
                             {archive.assigneeName && <Badge variant="outline">{archive.assigneeName}</Badge>}
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
