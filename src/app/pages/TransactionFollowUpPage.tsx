@@ -3772,23 +3772,24 @@ ${styleAssets}
 
       <Dialog open={reportOpen} onOpenChange={(open) => !reportExporting && setReportOpen(open)}>
         <DialogContent
-          className="max-h-[94dvh] overflow-y-auto overscroll-contain border-slate-300 bg-slate-50 text-slate-950 shadow-2xl [scrollbar-gutter:stable] [&_input]:!bg-white [&_input]:!text-slate-900 [&_label]:!text-slate-800 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
+          className="max-h-[94dvh] overflow-y-auto overscroll-contain !border-slate-200 !bg-[#F5F7FA] !text-slate-950 shadow-2xl [color-scheme:light] [scrollbar-gutter:stable] [&_button]:transition-colors [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:placeholder:!text-slate-500 [&_label]:!text-slate-800 [&_select]:!border-slate-300 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!border-slate-300 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
+          style={{ backgroundColor: '#F5F7FA', color: '#172033', colorScheme: 'light' }}
           dir="rtl"
         >
-          <DialogHeader className="rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm">
-            <DialogTitle className="text-slate-950">التقرير المرن لمتابعة المعاملات</DialogTitle>
-            <DialogDescription className="text-slate-600">
+          <DialogHeader className="rounded-xl border border-slate-200 border-r-4 border-r-[#1F4E78] !bg-white p-4 text-right shadow-sm" style={{ backgroundColor: '#FFFFFF' }}>
+            <DialogTitle className="!text-slate-950" style={{ color: '#0F172A' }}>التقرير المرن لمتابعة المعاملات</DialogTitle>
+            <DialogDescription className="!text-slate-700">
               تقرير احترافي قابل للتصفية والفرز والاستبعاد واختيار الأعمدة واتجاه الطباعة، ويعرض فقط: المنجزة، المتأخرة القائمة، بانتظار رد، وتحتاج متابعة.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="sticky top-0 z-20 -mx-1 flex flex-wrap gap-2 border-b border-slate-300 bg-slate-50/95 px-1 py-3 backdrop-blur">
+          <div className="sticky top-0 z-20 -mx-1 flex flex-wrap gap-2 border-b border-slate-200 !bg-[#F5F7FA] px-1 py-3" style={{ backgroundColor: '#F5F7FA' }}>
             <Button
               type="button"
               variant={reportSection === 'preview' ? 'default' : 'outline'}
               className={reportSection === 'preview'
-                ? 'bg-slate-900 text-white hover:bg-slate-800'
-                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'}
+                ? 'bg-[#1F4E78] text-white hover:bg-[#173A59]'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}
               onClick={() => setReportSection('preview')}
             >
               <FileText className="ml-2 h-4 w-4" />
@@ -3798,8 +3799,8 @@ ${styleAssets}
               type="button"
               variant={reportSection === 'archive' ? 'default' : 'outline'}
               className={reportSection === 'archive'
-                ? 'bg-slate-900 text-white hover:bg-slate-800'
-                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'}
+                ? 'bg-[#1F4E78] text-white hover:bg-[#173A59]'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}
               onClick={() => {
                 setReportSection('archive');
                 void loadReportArchives(reportArchivePage);
@@ -3812,8 +3813,8 @@ ${styleAssets}
               type="button"
               variant={reportSection === 'schedule' ? 'default' : 'outline'}
               className={reportSection === 'schedule'
-                ? 'bg-slate-900 text-white hover:bg-slate-800'
-                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'}
+                ? 'bg-[#1F4E78] text-white hover:bg-[#173A59]'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}
               onClick={() => {
                 setReportSection('schedule');
                 void loadReportSchedules();
@@ -3826,7 +3827,7 @@ ${styleAssets}
 
           {reportSection === 'preview' && (
             <>
-              <div className="grid gap-3 rounded-2xl border border-slate-300 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8">
+              <div className="grid gap-3 rounded-2xl border border-[#D6E3EF] !bg-[#F7FAFD] p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8" style={{ backgroundColor: '#F7FAFD' }}>
                 <Field label="نوع التقرير">
                   <NativeSelect
                     value={reportMode}
@@ -3927,7 +3928,7 @@ ${styleAssets}
                   </Button>
                   <Button
                     type="button"
-                    className="flex-[1.4] bg-slate-800 text-white hover:bg-slate-900"
+                    className="flex-[1.4] bg-[#1F4E78] text-white hover:bg-[#173A59]"
                     disabled={reportLoading || reportExporting}
                     onClick={() => void exportFullFollowUpBackup()}
                   >
@@ -3939,7 +3940,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="grid gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6">
+              <div className="grid gap-3 rounded-2xl border border-[#E6D8B9] !bg-[#FFFCF5] p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6" style={{ backgroundColor: '#FFFCF5' }}>
                 <div className="xl:col-span-2">
                   <Field label="اسم النسخة المؤرشفة">
                     <Input
@@ -3967,16 +3968,16 @@ ${styleAssets}
                     />
                   </Field>
                 </div>
-                <div className="md:col-span-2 xl:col-span-6 text-[11px] leading-5 text-amber-900/75">
+                <div className="md:col-span-2 xl:col-span-6 text-[11px] leading-5 text-slate-600">
                   هذه البيانات اختيارية وتستخدم لاحقًا في البحث والتصفية داخل أرشيف التقارير.
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-2xl border border-sky-300 bg-white p-4 shadow-sm">
+              <div className="space-y-4 rounded-2xl border border-[#D7E0E7] !bg-white p-4 shadow-sm" style={{ backgroundColor: '#FFFFFF' }}>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h3 className="font-black text-slate-900">إعداد التقرير المرن</h3>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <h3 className="font-black !text-slate-950" style={{ color: '#0F172A' }}>إعداد التقرير المرن</h3>
+                    <p className="mt-1 text-xs text-slate-600">
                       اختر الفئات والأعمدة، ثم صفِّ النتائج ورتبها واستبعد أي معاملة لا تريد ظهورها في النسخة المطبوعة.
                     </p>
                   </div>
@@ -3986,11 +3987,11 @@ ${styleAssets}
                   </Button>
                 </div>
 
-                <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-3">
+                <div className="rounded-2xl border border-[#D9DDE8] !bg-[#F8F9FC] p-3" style={{ backgroundColor: '#F8F9FC' }}>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-black text-violet-950">قوالب التقرير المحفوظة</p>
-                      <p className="mt-1 text-[11px] leading-5 text-violet-800/75">
+                      <p className="text-xs font-black !text-slate-950">قوالب التقرير المحفوظة</p>
+                      <p className="mt-1 text-[11px] leading-5 text-slate-600">
                         القوالب محفوظة في قاعدة البيانات وتظهر من أي جهاز. ويمكن للمستخدم الإشرافي إنشاء قالب عام للجميع أو تقييده لمستخدمين محددين.
                       </p>
                     </div>
@@ -4026,7 +4027,7 @@ ${styleAssets}
                       )}
                       <Button
                         type="button"
-                        className="shrink-0"
+                        className="shrink-0 bg-[#1F4E78] text-white hover:bg-[#173A59]"
                         disabled={reportTemplateSaving}
                         onClick={() => void saveFlexibleReportTemplate()}
                       >
@@ -4038,7 +4039,7 @@ ${styleAssets}
                     </div>
                   </div>
 
-                  <div className="mt-3 grid gap-3 rounded-xl border border-violet-100 bg-white/80 p-3 md:grid-cols-2">
+                  <div className="mt-3 grid gap-3 rounded-xl border border-blue-100 !bg-white p-3 md:grid-cols-2" style={{ backgroundColor: '#FFFFFF' }}>
                     <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700">
                       <span className="inline-flex items-center gap-2">
                         <Star className="h-4 w-4 text-amber-500" />
@@ -4071,7 +4072,7 @@ ${styleAssets}
                   {(isAdmin || canDelete)
                     && reportTemplateScope === 'shared'
                     && reportTemplateAccessMode === 'selected' && (
-                      <div className="mt-3 rounded-xl border border-violet-100 bg-white p-3">
+                      <div className="mt-3 rounded-xl border border-blue-100 !bg-white p-3" style={{ backgroundColor: '#FFFFFF' }}>
                         <p className="mb-2 text-[11px] font-black text-slate-700">المستخدمون المسموح لهم باستخدام القالب</p>
                         <div className="grid max-h-36 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
                           {assignees.map((user) => {
@@ -4079,7 +4080,7 @@ ${styleAssets}
                             return (
                               <label
                                 key={user.id}
-                                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-[11px] font-bold ${checked ? 'border-violet-300 bg-violet-50 text-violet-900' : 'border-slate-200 bg-white text-slate-600'}`}
+                                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-[11px] font-bold ${checked ? 'border-[#B9C9D8] bg-[#EEF4F8] text-[#24425A]' : 'border-slate-200 bg-white text-slate-600'}`}
                               >
                                 <span className="truncate">{user.username}</span>
                                 <input
@@ -4092,7 +4093,7 @@ ${styleAssets}
                                         : [...current, user.id],
                                     )
                                   }
-                                  className="h-4 w-4 accent-violet-700"
+                                  className="h-4 w-4 accent-[#1F4E78]"
                                 />
                               </label>
                             );
@@ -4106,7 +4107,7 @@ ${styleAssets}
                       {reportTemplates.map((template) => (
                         <div
                           key={template.id}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-violet-200 bg-white px-3 py-2.5 shadow-sm"
+                          className="flex items-center justify-between gap-3 rounded-xl border border-blue-100 !bg-white px-3 py-2.5 shadow-sm"
                         >
                           <div className="min-w-0">
                             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -4114,7 +4115,7 @@ ${styleAssets}
                               <Badge
                                 variant="outline"
                                 className={template.scope === 'shared'
-                                  ? 'border-violet-300 bg-violet-50 text-violet-800'
+                                  ? 'border-[#C9D6E2] bg-[#F4F7FA] text-[#2F4F67]'
                                   : 'border-slate-200 bg-slate-50 text-slate-600'}
                               >
                                 {template.scope === 'shared' ? 'عام للإدارة' : 'شخصي'}
@@ -4141,7 +4142,7 @@ ${styleAssets}
                                 </Badge>
                               )}
                             </div>
-                            <p className="mt-1 text-[10px] text-slate-500">
+                            <p className="mt-1 text-[10px] text-slate-600">
                               {template.reportMode === 'weekly'
                                 ? 'أسبوعي'
                                 : template.reportMode === 'monthly'
@@ -4228,7 +4229,7 @@ ${styleAssets}
                       ))}
                     </div>
                   ) : (
-                    <div className="mt-3 rounded-xl border border-dashed border-violet-200 bg-white/70 px-3 py-4 text-center text-[11px] text-violet-800/70">
+                    <div className="mt-3 rounded-xl border border-dashed border-blue-200 !bg-white px-3 py-4 text-center text-[11px] text-slate-600">
                       لا توجد قوالب محفوظة بعد. جهّز التقرير بالشكل المطلوب ثم اكتب اسم القالب واضغط «حفظ كقالب».
                     </div>
                   )}
@@ -4249,7 +4250,7 @@ ${styleAssets}
                             ))}
                           </NativeSelect>
                         </Field>
-                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-600">
                           من هنا يمكن تحديد القالب الافتراضي وصلاحية استخدام القالب العام. ترتيب القوالب يتم من أسهم أعلى/أسفل في البطاقة.
                         </div>
                       </div>
@@ -4346,7 +4347,7 @@ ${styleAssets}
                   )}
                 </div>
 
-                <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+                <div className="grid gap-3 rounded-2xl border border-[#D6E3EF] !bg-[#F7FAFD] p-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]" style={{ backgroundColor: '#F7FAFD' }}>
                   <Field label="عنوان التقرير">
                     <Input
                       value={flexibleReportOptions.title}
@@ -4400,7 +4401,7 @@ ${styleAssets}
                   </Field>
                 </div>
 
-                <div>
+                <div className="rounded-2xl border border-[#D5E3DB] !bg-[#F7FAF8] p-3" style={{ backgroundColor: '#F7FAF8' }}>
                   <p className="mb-2 text-xs font-black text-slate-700">الفئات الظاهرة في التقرير</p>
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {FLEXIBLE_REPORT_CATEGORIES.map((category) => {
@@ -4408,7 +4409,7 @@ ${styleAssets}
                       return (
                         <label
                           key={category.key}
-                          className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm font-bold transition ${checked ? 'border-sky-300 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-500'}`}
+                          className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm font-bold transition ${checked ? 'border-sky-300 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-600'}`}
                         >
                           <span>{category.label}</span>
                           <input
@@ -4423,7 +4424,7 @@ ${styleAssets}
                   </div>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+                <div className="grid gap-3 rounded-2xl border border-[#DCE2E8] !bg-[#F8FAFC] p-3 md:grid-cols-3 xl:grid-cols-5" style={{ backgroundColor: '#F8FAFC' }}>
                   <Field label="الفرز حسب">
                     <NativeSelect
                       value={flexibleReportOptions.sortBy}
@@ -4486,7 +4487,7 @@ ${styleAssets}
                   </div>
                 </div>
 
-                <div>
+                <div className="rounded-2xl border border-[#D6E3EF] !bg-[#F7FAFD] p-3" style={{ backgroundColor: '#F7FAFD' }}>
                   <p className="mb-2 text-xs font-black text-slate-700">الأعمدة الظاهرة</p>
                   <div className="flex flex-wrap gap-2">
                     {FLEXIBLE_REPORT_COLUMNS.map((column) => {
@@ -4494,7 +4495,7 @@ ${styleAssets}
                       return (
                         <label
                           key={column.key}
-                          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition ${checked ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-400'}`}
+                          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition ${checked ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`}
                         >
                           <input
                             type="checkbox"
@@ -4510,7 +4511,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs leading-6 text-emerald-950">
+              <div className="rounded-2xl border border-[#D6E3EF] !bg-[#F7FAFD] px-4 py-3 text-xs leading-6 text-slate-700" style={{ backgroundColor: '#F7FAFD' }}>
                 <b>Excel المرن:</b> يصدر نفس نتيجة المعاينة الحالية حرفيًا من حيث الفئات، التصفية، الفرز، الأعمدة والاستبعادات،
                 مع تنسيق احترافي ومرشح تلقائي وتجهيز للطباعة. أما «نسخة احتياطية كاملة» فتبقى منفصلة، وتنشئ ZIP يحتوي على
                 جميع بيانات نظام المتابعة وملف Excel خام وJSON ونسخ فعلية من الصور والمرفقات وأدلة التوجيهات.
@@ -4518,7 +4519,7 @@ ${styleAssets}
 
               <div className="max-h-[68dvh] overflow-auto rounded-2xl border bg-slate-100 p-2 sm:p-4">
                 {reportLoading && !reportData ? (
-                  <div className="py-24 text-center text-sm text-muted-foreground">
+                  <div className="py-24 text-center text-sm text-slate-600">
                     <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />
                     جارٍ إعداد التقرير المرن...
                   </div>
@@ -4537,7 +4538,7 @@ ${styleAssets}
                     }
                   />
                 ) : (
-                  <div className="py-24 text-center text-sm text-muted-foreground">
+                  <div className="py-24 text-center text-sm text-slate-600">
                     حدد فترة التقرير ثم اضغط «تحديث».
                   </div>
                 )}
@@ -4599,7 +4600,7 @@ ${styleAssets}
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <CardTitle className="text-base">التقارير المحفوظة</CardTitle>
-                      <p className="mt-1 text-xs text-muted-foreground">كل تقرير هنا يمثل نسخة ثابتة من البيانات وقت الحفظ.</p>
+                      <p className="mt-1 text-xs text-slate-600">كل تقرير هنا يمثل نسخة ثابتة من البيانات وقت الحفظ.</p>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => void loadReportArchives(reportArchivePage)} disabled={reportArchiveLoading}>
                       <RefreshCw className={`ml-1 h-4 w-4 ${reportArchiveLoading ? 'animate-spin' : ''}`} />
@@ -4704,9 +4705,9 @@ ${styleAssets}
                   </div>
 
                   {reportArchiveLoading && !reportArchives.length ? (
-                    <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل الأرشيف...</div>
+                    <div className="py-12 text-center text-sm text-slate-600">جارٍ تحميل الأرشيف...</div>
                   ) : reportArchives.length === 0 ? (
-                    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-slate-600">
                       {reportArchiveSearch || reportArchiveSource || reportArchiveType || reportArchiveTag || reportArchiveGovernanceStatus || reportArchivePinnedOnly
                         ? 'لا توجد تقارير مطابقة لمعايير البحث والتصفية الحالية.'
                         : 'لا توجد تقارير مؤرشفة حتى الآن.'}
@@ -4755,7 +4756,7 @@ ${styleAssets}
                                 </Badge>
                               )}
                               {archive.templateName ? (
-                                <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">
+                                <Badge variant="outline" className="border-[#C9D6E2] bg-[#F4F7FA] text-[#2F4F67]">
                                   القالب: {archive.templateName}
                                 </Badge>
                               ) : archive.templateSnapshot ? (
@@ -4766,7 +4767,7 @@ ${styleAssets}
                               {archive.assigneeName && <Badge variant="outline">{archive.assigneeName}</Badge>}
                             </div>
 
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="mt-1 text-xs text-slate-600">
                               {formatDate(archive.periodFrom)} — {formatDate(archive.periodTo)}
                               {' · '}
                               تم الحفظ {formatDateTime(archive.createdAt)}
@@ -5015,7 +5016,7 @@ ${styleAssets}
                               >
                                 إلغاء
                               </Button>
-                              <span className="self-center text-[10px] text-slate-500">
+                              <span className="self-center text-[10px] text-slate-600">
                                 التقرير النهائي أو المحمي أو الواقع ضمن مدة الاحتفاظ لا يمكن حذفه.
                               </span>
                             </div>
@@ -5029,7 +5030,7 @@ ${styleAssets}
                               <Badge variant="outline">{archiveActivity.length.toLocaleString('ar-SA')} إجراء</Badge>
                             </div>
                             {archiveActivityLoading ? (
-                              <div className="py-5 text-center text-xs text-muted-foreground">
+                              <div className="py-5 text-center text-xs text-slate-600">
                                 <RefreshCw className="mx-auto mb-2 h-4 w-4 animate-spin" />
                                 جارٍ تحميل السجل...
                               </div>
@@ -5041,11 +5042,11 @@ ${styleAssets}
                                       <span className="text-[11px] font-bold text-slate-800">
                                         {entry.description || entry.action}
                                       </span>
-                                      <span className="text-[10px] text-slate-500">
+                                      <span className="text-[10px] text-slate-600">
                                         {formatDateTime(entry.createdAt)}
                                       </span>
                                     </div>
-                                    <p className="mt-1 text-[10px] text-slate-500">
+                                    <p className="mt-1 text-[10px] text-slate-600">
                                       بواسطة: {entry.username || entry.userEmail || 'النظام'}
                                       {entry.details?.format ? ` · الصيغة: ${String(entry.details.format).toUpperCase()}` : ''}
                                     </p>
@@ -5053,7 +5054,7 @@ ${styleAssets}
                                 ))}
                               </div>
                             ) : (
-                              <div className="rounded-lg border border-dashed py-5 text-center text-xs text-muted-foreground">
+                              <div className="rounded-lg border border-dashed py-5 text-center text-xs text-slate-600">
                                 لا توجد إجراءات مسجلة لهذا التقرير حتى الآن.
                               </div>
                             )}
@@ -5064,7 +5065,7 @@ ${styleAssets}
                   )}
 
                   <div className="flex items-center justify-between border-t pt-3">
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-slate-600">
                       صفحة {reportArchivePage.toLocaleString('ar-SA')} من {Math.max(1, reportArchiveTotalPages).toLocaleString('ar-SA')}
                     </span>
                     <div className="flex gap-2">
@@ -5214,7 +5215,7 @@ ${styleAssets}
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <CardTitle className="text-base">الجدولات النشطة والمحـفوظة</CardTitle>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-xs text-slate-600">
                         كل جدولة مرتبطة بقالب مرن؛ التقرير الأسبوعي يغطي الأسبوع المكتمل السابق، والشهري يغطي الشهر المكتمل السابق، مع تطبيق إعدادات القالب تلقائيًا.
                       </p>
                     </div>
@@ -5226,9 +5227,9 @@ ${styleAssets}
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {reportScheduleLoading && !reportSchedules.length ? (
-                    <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل الجدولات...</div>
+                    <div className="py-12 text-center text-sm text-slate-600">جارٍ تحميل الجدولات...</div>
                   ) : reportSchedules.length === 0 ? (
-                    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed py-12 text-center text-sm text-slate-600">
                       لا توجد جدولات تقارير حتى الآن. أنشئ قالب تقرير مرن أولًا ثم اربطه بجدولة أسبوعية أو شهرية.
                     </div>
                   ) : (
@@ -5242,7 +5243,7 @@ ${styleAssets}
                               {schedule.isActive ? 'نشطة' : 'متوقفة'}
                             </Badge>
                             {schedule.templateName ? (
-                              <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">
+                              <Badge variant="outline" className="border-[#C9D6E2] bg-[#F4F7FA] text-[#2F4F67]">
                                 القالب: {schedule.templateName}
                               </Badge>
                             ) : (
@@ -5252,14 +5253,14 @@ ${styleAssets}
                             )}
                             {schedule.assigneeName && <Badge variant="outline">{schedule.assigneeName}</Badge>}
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
+                          <p className="mt-1 text-xs text-slate-600">
                             {schedule.frequency === 'weekly'
                               ? `يوم ${['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][schedule.dayOfWeek ?? 0]}`
                               : `يوم ${schedule.dayOfMonth ?? 1} من كل شهر`}
                             {' · '}
                             الساعة {String(schedule.runHour).padStart(2, '0')}:00
                           </p>
-                          <p className="mt-1 text-[11px] text-muted-foreground">
+                          <p className="mt-1 text-[11px] text-slate-600">
                             الإصدار القادم: {formatDateTime(schedule.nextRunAt)}
                             {schedule.lastRunAt ? <> · آخر تشغيل: {formatDateTime(schedule.lastRunAt)}</> : null}
                           </p>
