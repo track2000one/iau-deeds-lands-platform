@@ -514,8 +514,8 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
         style={{ backgroundColor: '#FFFFFF', color: '#0F172A' }}
         dir="rtl"
       >
-        <header className="border-b-2 border-[#0b4a3f] pb-5 text-center">
-          <div className="text-sm font-black text-[#0b4a3f]">جامعة الإمام عبدالرحمن بن فيصل</div>
+        <header className="border-b-2 border-[#1F4E78] pb-5 text-center">
+          <div className="text-sm font-black text-[#1F4E78]">جامعة الإمام عبدالرحمن بن فيصل</div>
           <div className="mt-1 text-xs font-bold text-slate-700">إدارة أوقاف وأملاك الجامعة</div>
           <h1 className="mt-4 text-2xl font-black !text-slate-950" style={{ color: '#0F172A' }}>
             {options.title.trim() || 'التقرير المرن لمتابعة المعاملات'}
@@ -544,7 +544,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
 
         <section className="mt-6">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-black text-[#0b4a3f]">تفاصيل التقرير</h2>
+            <h2 className="text-sm font-black text-[#1F4E78]">تفاصيل التقرير</h2>
             <span className="text-[10px] font-bold text-slate-700">
               عدد النتائج: {rows.length.toLocaleString('ar-SA')}
             </span>
@@ -553,7 +553,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
           {rows.length && visibleColumns.length ? (
             <div className="overflow-hidden rounded-lg border border-slate-200">
               <table className="w-full border-collapse text-[8.5px]">
-                <thead className="bg-slate-100">
+                <thead className="bg-[#EEF3F8]">
                   <tr>
                     {visibleColumns.map((column) => (
                       <th
