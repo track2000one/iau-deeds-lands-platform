@@ -2317,11 +2317,9 @@ export const ArchivePage: React.FC = () => {
                                   <b className="text-sm text-slate-800">V{version.version || 1}</b>
                                   <Badge
                                     variant="outline"
-                                    className={version.isCurrent
-                                      ? "border-emerald-200 bg-white text-emerald-800"
-                                      : "border-slate-300 bg-white text-slate-600"}
+                                    className={getAttachmentVersionStatusClassName(version)}
                                   >
-                                    {version.isCurrent ? 'الحالي' : 'سابق'}
+                                    {getAttachmentVersionStatusLabel(version)}
                                   </Badge>
                                 </div>
                                 <p className="mt-1 text-xs text-slate-500">
