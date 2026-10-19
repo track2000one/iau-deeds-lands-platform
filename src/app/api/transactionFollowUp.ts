@@ -1091,6 +1091,9 @@ export type TransactionFollowUpExecutiveReport = {
 
 export type TransactionFollowUpReportArchive = {
   id: string;
+  archiveName?: string | null;
+  notes?: string | null;
+  tags?: string[];
   reportType: 'weekly' | 'monthly' | 'custom';
   periodFrom: string;
   periodTo: string;
@@ -1107,6 +1110,7 @@ export type TransactionFollowUpReportArchive = {
   generatedById?: string | null;
   generatedByName?: string | null;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type TransactionFollowUpReportArchivePage = {
