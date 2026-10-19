@@ -296,6 +296,11 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
             متأخرة {Math.abs(record.daysUntilDue || 0).toLocaleString('ar-SA')} يوم
           </Badge>
         )}
+        {record.archivedAt && (
+          <Badge variant="outline" className="border-sky-300 bg-sky-50 text-sky-800">
+            نسخة محفوظة في الأرشفة
+          </Badge>
+        )}
         {record.organizationalUnit && (
           <span className="followup-transaction-card__meta max-w-full truncate text-[10px] font-semibold">
             {organizationalUnitLabels[record.organizationalUnit]}
