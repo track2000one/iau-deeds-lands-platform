@@ -2212,6 +2212,92 @@ export const ArchivePage: React.FC = () => {
 
       <ArchiveReportsDialog documents={documents} open={reportsOpen} onOpenChange={setReportsOpen} />
 
+      <AlertDialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
+        <AlertDialogContent className="max-w-2xl" dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <GitMerge className="h-5 w-5 text-violet-700" />
+              دمج السجلات الأرشيفية
+            </AlertDialogTitle>
+            <AlertDialogDescription className="leading-7">
+              سيتم نقل جميع ملفات السجلات المحددة إلى سجل رئيسي واحد، مع الاحتفاظ بسجل تدقيق للعملية.
+              السجلات الأخرى ستُحفظ كـ «مدمجة» ولن تظهر كبطاقات مستقلة.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-3 text-sm text-violet-950">
+              تم تحديد <b>{selectedMergeRecords.length}</b> سجلات تحتوي إجمالًا على{' '}
+              <b>
+                {selectedMergeRecords
+                  .reduce((sum, item) => sum + Number(item.attachmentCount || item.attachments?.length || 1), 0)
+                  .toLocaleString('ar-SA')}
+              </b>{' '}
+              ملف.
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="archive-merge-target">السجل الرئيسي الذي ستبقى بياناته</Label>
+              <NativeSelect
+                id="archive-merge-target"
+                value={mergeTargetId}
+                onChange={(event) => setMergeTargetId(event.target.value)}
+              >
+                {selectedMergeRecords.map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    {getArchiveReference(doc)} — {doc.title}
+                  </option>
+                ))}
+              </NativeSelect>
+              <p className="text-xs leading-6 text-muted-foreground">
+                سيتم الاحتفاظ بعنوان وتصنيف ورقم المستند والجهة والسرية الخاصة بالسجل الرئيسي،
+                بينما تنتقل إليه جميع الملفات الموجودة في السجلات الأخرى.
+              </p>
+            </div>
+
+            <div className="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
+              {selectedMergeRecords.map((doc) => (
+                <label
+                  key={doc.id}
+                  className={doc.id === mergeTargetId
+                    ? "flex items-start gap-3 rounded-lg border border-violet-300 bg-violet-50 p-3"
+                    : "flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3"}
+                >
+                  <input
+                    type="radio"
+                    name="archive-merge-target-radio"
+                    checked={doc.id === mergeTargetId}
+                    onChange={() => setMergeTargetId(doc.id)}
+                    className="mt-1 h-4 w-4 accent-violet-700"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-black text-slate-800">{doc.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {getArchiveReference(doc)} · {(doc.attachmentCount || doc.attachments?.length || 1).toLocaleString('ar-SA')} ملف
+                    </p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isMerging}>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void mergeArchiveRecords();
+              }}
+              disabled={isMerging || selectedMergeRecords.length < 2 || !mergeTargetId}
+              className="bg-violet-700 text-white hover:bg-violet-800"
+            >
+              {isMerging ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <GitMerge className="ml-2 h-4 w-4" />}
+              {isMerging ? 'جاري الدمج...' : 'اعتماد الدمج'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
