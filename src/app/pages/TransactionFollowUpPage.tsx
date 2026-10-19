@@ -423,7 +423,9 @@ const normalizeReportTemplate = (value: unknown): FlexibleReportTemplate | null 
       ...raw.options,
       categories: safeCategories.length ? safeCategories : defaults.categories,
       visibleColumns: safeColumns.length ? safeColumns : defaults.visibleColumns,
-      excludedIds: [],
+      excludedIds: Array.isArray(raw.options.excludedIds)
+        ? raw.options.excludedIds.map((value) => String(value))
+        : [],
     },
   };
 };
@@ -1019,13 +1021,38 @@ export const TransactionFollowUpPage: React.FC = () => {
     }
     try {
       setReportArchiveLoading(true);
+      const now = new Date().toISOString();
+      const manualSnapshot = {
+        id: `manual-archive-${Date.now()}`,
+        name: flexibleReportOptions.title.trim() || 'التقرير المرن المحفوظ',
+        scope: 'personal' as const,
+        reportMode,
+        customFrom: reportMode === 'custom' ? reportFrom : null,
+        customTo: reportMode === 'custom' ? reportTo : null,
+        assigneeUserId: isAdmin || canDelete ? reportAssigneeId || null : null,
+        orientation: reportOrientation,
+        options: {
+          ...reportTemplateOptionsForApi(flexibleReportOptions),
+          excludedIds: [...flexibleReportOptions.excludedIds],
+        },
+        accessMode: 'all' as const,
+        allowedUserIds: [],
+        isDefault: false,
+        sortOrder: 0,
+        createdById: currentUser?.uid || 'manual',
+        createdByName: currentUser?.displayName || currentUser?.email || null,
+        createdAt: now,
+        updatedAt: now,
+      };
+
       await transactionFollowUpApi.archiveReport({
         reportType: reportMode,
         from: reportFrom,
         to: reportTo,
         assigneeUserId: isAdmin || canDelete ? reportAssigneeId || null : null,
+        templateSnapshot: manualSnapshot,
       });
-      toast.success('تم حفظ نسخة ثابتة من التقرير في الأرشيف');
+      toast.success('تم حفظ نسخة ثابتة من التقرير مع جميع إعداداته المرنة');
       setReportSection('archive');
       await loadReportArchives(1);
     } catch (error) {
@@ -1058,7 +1085,9 @@ export const TransactionFollowUpPage: React.FC = () => {
       toast.success(
         archive.templateName
           ? `تم فتح النسخة المؤرشفة وفق قالب «${archive.templateName}»`
-          : 'تم فتح النسخة المؤرشفة',
+          : archive.templateSnapshot
+            ? 'تم فتح النسخة المؤرشفة مع إعدادات التقرير المرن المحفوظة'
+            : 'تم فتح النسخة المؤرشفة',
       );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر فتح التقرير المؤرشف');
