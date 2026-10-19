@@ -1101,6 +1101,9 @@ export type TransactionFollowUpReportArchive = {
   snapshot?: TransactionFollowUpExecutiveReport;
   summary?: TransactionFollowUpExecutiveReport['summary'] | null;
   scheduleId?: string | null;
+  templateId?: string | null;
+  templateName?: string | null;
+  templateSnapshot?: TransactionFollowUpReportTemplate | null;
   generatedById?: string | null;
   generatedByName?: string | null;
   createdAt: string;
@@ -1180,6 +1183,9 @@ export type TransactionFollowUpReportSchedule = {
   runHour: number;
   assigneeUserId?: string | null;
   assigneeName?: string | null;
+  templateId?: string | null;
+  templateName?: string | null;
+  templateSnapshot?: TransactionFollowUpReportTemplate | null;
   isActive: boolean;
   lastRunAt?: string | null;
   nextRunAt?: string | null;
@@ -1655,6 +1661,7 @@ export const transactionFollowUpApi = {
     dayOfMonth?: number | null;
     runHour: number;
     assigneeUserId?: string | null;
+    templateId?: string | null;
     isActive?: boolean;
   }) =>
     apiJson<TransactionFollowUpReportSchedule>('/api/transaction-follow-up/reports/schedules', {
@@ -1671,6 +1678,7 @@ export const transactionFollowUpApi = {
       dayOfMonth: number | null;
       runHour: number;
       assigneeUserId: string | null;
+      templateId: string | null;
       isActive: boolean;
     }>,
   ) =>
