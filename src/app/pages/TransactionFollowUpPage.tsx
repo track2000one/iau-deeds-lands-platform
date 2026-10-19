@@ -4596,7 +4596,7 @@ ${styleAssets}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-6">
+                  <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-8">
                     <div className="xl:col-span-2">
                       <Field label="بحث في الأرشيف">
                         <Input
@@ -4644,6 +4644,32 @@ ${styleAssets}
                         placeholder="مثال: متأخرات"
                       />
                     </Field>
+                    <Field label="حالة التقرير">
+                      <NativeSelect
+                        value={reportArchiveGovernanceStatus}
+                        onChange={(event) =>
+                          setReportArchiveGovernanceStatus(event.target.value as 'draft' | 'final' | '')
+                        }
+                      >
+                        <option value="">الكل</option>
+                        <option value="draft">مسودة</option>
+                        <option value="final">نهائي</option>
+                      </NativeSelect>
+                    </Field>
+                    <label className="flex items-end">
+                      <span className="flex h-10 w-full cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700">
+                        <span className="inline-flex items-center gap-2">
+                          <Star className="h-4 w-4 text-amber-500" />
+                          المثبتة فقط
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={reportArchivePinnedOnly}
+                          onChange={(event) => setReportArchivePinnedOnly(event.target.checked)}
+                          className="h-4 w-4 accent-amber-600"
+                        />
+                      </span>
+                    </label>
                     <div className="flex items-end gap-2">
                       <Button
                         type="button"
@@ -4669,7 +4695,7 @@ ${styleAssets}
                     <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل الأرشيف...</div>
                   ) : reportArchives.length === 0 ? (
                     <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
-                      {reportArchiveSearch || reportArchiveSource || reportArchiveType || reportArchiveTag
+                      {reportArchiveSearch || reportArchiveSource || reportArchiveType || reportArchiveTag || reportArchiveGovernanceStatus || reportArchivePinnedOnly
                         ? 'لا توجد تقارير مطابقة لمعايير البحث والتصفية الحالية.'
                         : 'لا توجد تقارير مؤرشفة حتى الآن.'}
                     </div>
