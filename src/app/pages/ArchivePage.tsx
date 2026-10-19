@@ -2178,6 +2178,10 @@ export const ArchivePage: React.FC = () => {
                 label="إجمالي الإصدارات"
                 value={(selectedDocument.attachmentVersionCount || selectedDocument.attachments?.length || selectedDocument.attachmentCount || 1).toLocaleString('ar-SA')}
               />
+              <InfoItem
+                label="بانتظار الاعتماد"
+                value={(selectedDocument.pendingVersionCount || 0).toLocaleString('ar-SA')}
+              />
               <InfoItem label="تاريخ الأرشفة" value={formatDate(selectedDocument.createdAt)} />
               <InfoItem label="آخر تعديل" value={formatDate(selectedDocument.updatedAt)} />
             </div>
