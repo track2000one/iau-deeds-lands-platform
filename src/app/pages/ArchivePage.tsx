@@ -70,6 +70,8 @@ type ArchiveAttachment = {
   driveUrl: string;
   driveFileId: string;
   version?: number;
+  versionGroupId?: string;
+  versionNote?: string | null;
   isCurrent?: boolean;
   addedBy?: string | null;
   createdAt?: string;
@@ -88,6 +90,7 @@ type ArchiveDocument = {
   id: string;
   archiveNumber?: string;
   attachmentCount?: number;
+  attachmentVersionCount?: number;
   totalFileSize?: number;
   attachments?: ArchiveAttachment[];
   activities?: ArchiveActivity[];
@@ -258,6 +261,43 @@ const getArchiveReference = (doc: ArchiveDocument) =>
   doc.archiveNumber ||
   `ARC-${String(doc.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || '00000000'}`;
 
+const getAttachmentVersionGroups = (doc: ArchiveDocument) => {
+  const source = doc.attachments?.length
+    ? doc.attachments
+    : [{
+        id: doc.id,
+        fileName: doc.fileName,
+        originalName: doc.originalName,
+        mimeType: doc.mimeType,
+        fileSize: doc.fileSize,
+        driveUrl: doc.driveUrl,
+        driveFileId: doc.driveFileId,
+        version: 1,
+        versionGroupId: doc.id,
+        isCurrent: true,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+      } as ArchiveAttachment];
+
+  const groups = new Map<string, ArchiveAttachment[]>();
+  source.forEach((attachment) => {
+    const key = attachment.versionGroupId || attachment.id;
+    const bucket = groups.get(key) || [];
+    bucket.push(attachment);
+    groups.set(key, bucket);
+  });
+
+  return Array.from(groups.entries()).map(([groupId, versions]) => {
+    const sorted = [...versions].sort((a, b) => {
+      const versionDiff = Number(b.version || 1) - Number(a.version || 1);
+      if (versionDiff !== 0) return versionDiff;
+      return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    });
+    const current = sorted.find((item) => item.isCurrent) || sorted[0];
+    return { groupId, current, versions: sorted };
+  });
+};
+
 const getArchiveMissingMetadata = (doc: ArchiveDocument) => {
   const missing: string[] = [];
   if (!String(doc.documentNumber || '').trim()) missing.push('رقم المستند');
@@ -274,6 +314,7 @@ const archiveActivityLabels: Record<string, string> = {
   record_updated: 'تحديث البيانات',
   attachments_added: 'إضافة ملفات',
   attachment_removed: 'إزالة ملف',
+  attachment_version_added: 'إضافة إصدار جديد',
   record_deleted: 'نقل إلى المحذوفات',
   record_restored: 'استعادة السجل',
   records_merged: 'دمج سجلات داخل هذا السجل',
@@ -368,6 +409,12 @@ export const ArchivePage: React.FC = () => {
   const [mergeTargetId, setMergeTargetId] = useState('');
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
+
+  const [versionDialogOpen, setVersionDialogOpen] = useState(false);
+  const [versionSourceAttachment, setVersionSourceAttachment] = useState<ArchiveAttachment | null>(null);
+  const [versionFile, setVersionFile] = useState<File | null>(null);
+  const [versionNote, setVersionNote] = useState('');
+  const [versionSaving, setVersionSaving] = useState(false);
 
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
@@ -921,6 +968,73 @@ export const ArchivePage: React.FC = () => {
       throw new Error('تم رفع الملف لكن لم يتم إرجاع رابط Google Drive');
     }
     return body as UploadResponse;
+  };
+
+  const openAttachmentVersionDialog = (attachment: ArchiveAttachment) => {
+    if (!canEdit) {
+      toast.error('لا تملك صلاحية إضافة إصدار جديد');
+      return;
+    }
+    setVersionSourceAttachment(attachment);
+    setVersionFile(null);
+    setVersionNote('');
+    setVersionDialogOpen(true);
+  };
+
+  const closeAttachmentVersionDialog = () => {
+    if (versionSaving) return;
+    setVersionDialogOpen(false);
+    setVersionSourceAttachment(null);
+    setVersionFile(null);
+    setVersionNote('');
+  };
+
+  const saveAttachmentVersion = async () => {
+    if (!selectedDocument || !versionSourceAttachment || !versionFile) {
+      toast.error('اختر ملف الإصدار الجديد أولًا');
+      return;
+    }
+    if (!canEdit) {
+      toast.error('لا تملك صلاحية إضافة إصدار جديد');
+      return;
+    }
+
+    try {
+      setVersionSaving(true);
+      const uploaded = await uploadFileToGoogleDrive(versionFile);
+      const updated = await archiveRequest<ArchiveDocument>(
+        `/records/${selectedDocument.id}/attachments/${versionSourceAttachment.id}/versions`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            fileName: uploaded.fileName || versionFile.name,
+            originalName: versionFile.name,
+            mimeType: uploaded.mimeType || versionFile.type || 'application/octet-stream',
+            fileSize: versionFile.size,
+            driveUrl: uploaded.driveUrl,
+            driveFileId: uploaded.driveFileId,
+            versionNote: versionNote.trim(),
+          }),
+        },
+      );
+
+      setDocuments((current) =>
+        current.map((doc) => (doc.id === updated.id ? updated : doc)),
+      );
+      setSelectedDocument(updated);
+      toast.success(
+        `تم حفظ الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} كنسخة حالية`,
+      );
+      setVersionDialogOpen(false);
+      setVersionSourceAttachment(null);
+      setVersionFile(null);
+      setVersionNote('');
+    } catch (error) {
+      console.error('Archive attachment version error:', error);
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ الإصدار الجديد');
+    } finally {
+      setVersionSaving(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -1940,6 +2054,10 @@ export const ArchivePage: React.FC = () => {
               <InfoItem label="الكلمات المفتاحية" value={selectedDocument.tags || '-'} />
               <InfoItem label="عدد الملفات" value={(selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1).toLocaleString('ar-SA')} />
               <InfoItem label="إجمالي الحجم" value={formatFileSize(selectedDocument.totalFileSize ?? selectedDocument.fileSize)} />
+              <InfoItem
+                label="إجمالي الإصدارات"
+                value={(selectedDocument.attachmentVersionCount || selectedDocument.attachments?.length || selectedDocument.attachmentCount || 1).toLocaleString('ar-SA')}
+              />
               <InfoItem label="تاريخ الأرشفة" value={formatDate(selectedDocument.createdAt)} />
               <InfoItem label="آخر تعديل" value={formatDate(selectedDocument.updatedAt)} />
             </div>
@@ -1953,13 +2071,13 @@ export const ArchivePage: React.FC = () => {
                   الملفات المرفقة ({selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1})
                 </CardTitle>
                 <CardDescription>
-                  يمكن إضافة ملفات جديدة في أي وقت من خلال «تحديث السجل وإضافة ملفات».
+                  يمكن إضافة ملفات جديدة للسجل، أو رفع إصدار أحدث لملف قائم مع الاحتفاظ بجميع نسخه السابقة.
                 </CardDescription>
               </CardHeader>
 
               <CardContent className="space-y-3">
                 {(selectedDocument.attachments?.length
-                  ? selectedDocument.attachments
+                  ? selectedDocument.attachments.filter((item) => item.isCurrent !== false)
                   : [{
                       id: selectedDocument.id,
                       fileName: selectedDocument.fileName,
@@ -1980,6 +2098,21 @@ export const ArchivePage: React.FC = () => {
                         <p className="text-sm text-muted-foreground">
                           {attachment.mimeType || 'نوع غير معروف'} — {formatFileSize(attachment.fileSize)}
                         </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">
+                            الإصدار الحالي V{attachment.version || 1}
+                          </Badge>
+                          {(() => {
+                            const group = getAttachmentVersionGroups(selectedDocument).find(
+                              (item) => item.current.id === attachment.id,
+                            );
+                            return group && group.versions.length > 1 ? (
+                              <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
+                                {group.versions.length.toLocaleString('ar-SA')} إصدارات
+                              </Badge>
+                            ) : null;
+                          })()}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <Button
@@ -2003,6 +2136,16 @@ export const ArchivePage: React.FC = () => {
                           <Download className="ml-2 h-4 w-4" />
                           تنزيل
                         </Button>
+                        {canEdit && (
+                          <Button
+                            type="button"
+                            onClick={() => openAttachmentVersionDialog(attachment)}
+                            className="bg-[#1F4E78] font-bold text-white hover:bg-[#173A59]"
+                          >
+                            <History className="ml-2 h-4 w-4" />
+                            إصدار جديد
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <AttachmentPreviewCard attachment={attachment as any} />
@@ -2010,6 +2153,70 @@ export const ArchivePage: React.FC = () => {
                 ))}
               </CardContent>
             </Card>
+
+            {getAttachmentVersionGroups(selectedDocument).some((group) => group.versions.length > 1) && (
+              <Card className="border-slate-200">
+                <CardHeader className="border-b border-slate-100 bg-slate-50/70">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <History className="h-4 w-4 text-[#1F4E78]" />
+                    سجل إصدارات الملفات
+                  </CardTitle>
+                  <CardDescription>
+                    يحتفظ النظام بجميع النسخ السابقة ويحدد الإصدار الحالي لكل ملف.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 p-4">
+                  {getAttachmentVersionGroups(selectedDocument)
+                    .filter((group) => group.versions.length > 1)
+                    .map((group) => (
+                      <div key={group.groupId} className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="font-black text-slate-800">
+                          {group.current.originalName || group.current.fileName}
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {group.versions.map((version) => (
+                            <div
+                              key={version.id}
+                              className={version.isCurrent
+                                ? "flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 sm:flex-row sm:items-center sm:justify-between"
+                                : "flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"}
+                            >
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <b className="text-sm text-slate-800">V{version.version || 1}</b>
+                                  <Badge
+                                    variant="outline"
+                                    className={version.isCurrent
+                                      ? "border-emerald-200 bg-white text-emerald-800"
+                                      : "border-slate-300 bg-white text-slate-600"}
+                                  >
+                                    {version.isCurrent ? 'الحالي' : 'سابق'}
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {formatDateTime(version.createdAt)} · {formatFileSize(version.fileSize)}
+                                </p>
+                                {version.versionNote ? (
+                                  <p className="mt-1 text-xs leading-5 text-slate-700">{version.versionNote}</p>
+                                ) : null}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(version.driveUrl, '_blank', 'noopener,noreferrer')}
+                              >
+                                <Eye className="ml-2 h-4 w-4" />
+                                عرض الإصدار
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="border-slate-200">
               <CardHeader className="border-b border-slate-100 bg-slate-50/70">
@@ -2501,6 +2708,87 @@ export const ArchivePage: React.FC = () => {
       />
 
       <ArchiveReportsDialog documents={documents} open={reportsOpen} onOpenChange={setReportsOpen} />
+
+      <AlertDialog
+        open={versionDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) closeAttachmentVersionDialog();
+        }}
+      >
+        <AlertDialogContent className="max-w-xl" dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-[#1F4E78]" />
+              رفع إصدار جديد للملف
+            </AlertDialogTitle>
+            <AlertDialogDescription className="leading-7">
+              سيبقى الإصدار السابق محفوظًا للرجوع إليه، ويصبح الملف الجديد هو الإصدار الحالي.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-sm font-black text-slate-800">
+                {versionSourceAttachment?.originalName || versionSourceAttachment?.fileName || 'الملف الحالي'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                الإصدار الحالي: V{versionSourceAttachment?.version || 1}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="archive-version-file">ملف الإصدار الجديد *</Label>
+              <Input
+                id="archive-version-file"
+                type="file"
+                accept="*/*"
+                disabled={versionSaving}
+                onChange={(event) => setVersionFile(event.target.files?.[0] || null)}
+              />
+              {versionFile ? (
+                <p className="text-xs font-medium text-slate-600">
+                  {versionFile.name} — {formatFileSize(versionFile.size)}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="archive-version-note">ملاحظة الإصدار</Label>
+              <Textarea
+                id="archive-version-note"
+                value={versionNote}
+                onChange={(event) => setVersionNote(event.target.value)}
+                placeholder="مثال: نسخة محدثة بعد اعتماد التعديلات النهائية"
+                rows={3}
+                disabled={versionSaving}
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={versionSaving}
+              onClick={(event) => {
+                event.preventDefault();
+                closeAttachmentVersionDialog();
+              }}
+            >
+              إلغاء
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void saveAttachmentVersion();
+              }}
+              disabled={versionSaving || !versionFile}
+              className="bg-[#1F4E78] text-white hover:bg-[#173A59]"
+            >
+              {versionSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
+              {versionSaving ? 'جاري حفظ الإصدار...' : 'حفظ كإصدار جديد'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
         <AlertDialogContent className="max-w-2xl" dir="rtl">
