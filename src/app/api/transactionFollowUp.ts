@@ -1094,6 +1094,16 @@ export type TransactionFollowUpReportArchive = {
   archiveName?: string | null;
   notes?: string | null;
   tags?: string[];
+  governanceStatus: 'draft' | 'final';
+  isPinned: boolean;
+  isDeletionProtected: boolean;
+  retentionPolicy: 'none' | 'one_year' | 'three_years' | 'five_years' | 'permanent' | 'custom';
+  retainUntil?: string | null;
+  finalizedAt?: string | null;
+  finalizedById?: string | null;
+  finalizedByName?: string | null;
+  updatedById?: string | null;
+  updatedByName?: string | null;
   reportType: 'weekly' | 'monthly' | 'custom';
   periodFrom: string;
   periodTo: string;
@@ -1111,6 +1121,17 @@ export type TransactionFollowUpReportArchive = {
   generatedByName?: string | null;
   createdAt: string;
   updatedAt?: string;
+};
+
+export type TransactionFollowUpReportArchiveActivity = {
+  id: string;
+  action: string;
+  description?: string | null;
+  details?: Record<string, unknown> | null;
+  username?: string | null;
+  userEmail?: string | null;
+  userRole?: string | null;
+  createdAt: string;
 };
 
 export type TransactionFollowUpReportArchivePage = {
@@ -1520,6 +1541,10 @@ export const transactionFollowUpApi = {
     source?: 'manual' | 'scheduled' | '';
     reportType?: 'weekly' | 'monthly' | 'custom' | '';
     tag?: string;
+    governanceStatus?: 'draft' | 'final' | '';
+    retentionPolicy?: TransactionFollowUpReportArchive['retentionPolicy'] | '';
+    pinned?: boolean;
+    protected?: boolean;
   } = {}) => {
     const query = new URLSearchParams();
     if (input.page) query.set('page', String(input.page));
@@ -1529,6 +1554,10 @@ export const transactionFollowUpApi = {
     if (input.source) query.set('source', input.source);
     if (input.reportType) query.set('reportType', input.reportType);
     if (input.tag) query.set('tag', input.tag);
+    if (input.governanceStatus) query.set('governanceStatus', input.governanceStatus);
+    if (input.retentionPolicy) query.set('retentionPolicy', input.retentionPolicy);
+    if (input.pinned !== undefined) query.set('pinned', String(input.pinned));
+    if (input.protected !== undefined) query.set('protected', String(input.protected));
     const suffix = query.toString();
     return apiJson<TransactionFollowUpReportArchivePage>(
       `/api/transaction-follow-up/reports/archives${suffix ? `?${suffix}` : ''}`,
@@ -1570,6 +1599,41 @@ export const transactionFollowUpApi = {
       `/api/transaction-follow-up/reports/archives/${id}`,
       {
         method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  updateReportArchiveGovernance: (
+    id: string,
+    input: Partial<{
+      governanceStatus: 'draft' | 'final';
+      isPinned: boolean;
+      isDeletionProtected: boolean;
+      retentionPolicy: TransactionFollowUpReportArchive['retentionPolicy'];
+      retainUntil: string | null;
+    }>,
+  ) =>
+    apiJson<TransactionFollowUpReportArchive>(
+      `/api/transaction-follow-up/reports/archives/${id}/governance`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  reportArchiveActivity: (id: string) =>
+    apiJson<TransactionFollowUpReportArchiveActivity[]>(
+      `/api/transaction-follow-up/reports/archives/${id}/activity`,
+    ),
+
+  recordReportArchiveExport: (
+    id: string,
+    input: { format: 'pdf' | 'excel' | 'print'; fileName?: string | null },
+  ) =>
+    apiJson<{ recorded: boolean }>(
+      `/api/transaction-follow-up/reports/archives/${id}/export-event`,
+      {
+        method: 'POST',
         body: JSON.stringify(input),
       },
     ),
