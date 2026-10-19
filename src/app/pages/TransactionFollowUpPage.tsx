@@ -103,6 +103,7 @@ import {
   type TransactionFollowUpExecutiveInbox,
   type TransactionFollowUpExecutiveReport,
   type TransactionFollowUpReportArchive,
+  type TransactionFollowUpReportArchiveActivity,
   type TransactionFollowUpReportComparison,
   type TransactionFollowUpReportSchedule,
   type TransactionFollowUpPriority,
@@ -545,6 +546,8 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [reportArchiveSource, setReportArchiveSource] = React.useState<'manual' | 'scheduled' | ''>('');
   const [reportArchiveType, setReportArchiveType] = React.useState<'weekly' | 'monthly' | 'custom' | ''>('');
   const [reportArchiveTag, setReportArchiveTag] = React.useState('');
+  const [reportArchiveGovernanceStatus, setReportArchiveGovernanceStatus] = React.useState<'draft' | 'final' | ''>('');
+  const [reportArchivePinnedOnly, setReportArchivePinnedOnly] = React.useState(false);
   const [archiveSaveName, setArchiveSaveName] = React.useState('');
   const [archiveSaveNotes, setArchiveSaveNotes] = React.useState('');
   const [archiveSaveTags, setArchiveSaveTags] = React.useState('');
@@ -552,6 +555,15 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [archiveEditName, setArchiveEditName] = React.useState('');
   const [archiveEditNotes, setArchiveEditNotes] = React.useState('');
   const [archiveEditTags, setArchiveEditTags] = React.useState('');
+  const [archiveGovernanceId, setArchiveGovernanceId] = React.useState('');
+  const [archiveGovernanceStatus, setArchiveGovernanceStatus] = React.useState<'draft' | 'final'>('draft');
+  const [archiveGovernancePinned, setArchiveGovernancePinned] = React.useState(false);
+  const [archiveGovernanceProtected, setArchiveGovernanceProtected] = React.useState(false);
+  const [archiveGovernanceRetentionPolicy, setArchiveGovernanceRetentionPolicy] = React.useState<TransactionFollowUpReportArchive['retentionPolicy']>('none');
+  const [archiveGovernanceRetainUntil, setArchiveGovernanceRetainUntil] = React.useState('');
+  const [archiveActivityId, setArchiveActivityId] = React.useState('');
+  const [archiveActivity, setArchiveActivity] = React.useState<TransactionFollowUpReportArchiveActivity[]>([]);
+  const [archiveActivityLoading, setArchiveActivityLoading] = React.useState(false);
   const [compareLeftId, setCompareLeftId] = React.useState('');
   const [compareRightId, setCompareRightId] = React.useState('');
   const [reportComparison, setReportComparison] = React.useState<TransactionFollowUpReportComparison | null>(null);
