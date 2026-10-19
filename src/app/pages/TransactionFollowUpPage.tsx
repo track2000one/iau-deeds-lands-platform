@@ -3782,6 +3782,118 @@ ${styleAssets}
                       لا توجد قوالب محفوظة بعد. جهّز التقرير بالشكل المطلوب ثم اكتب اسم القالب واضغط «حفظ كقالب».
                     </div>
                   )}
+
+                  {manageableReportTemplates.length > 0 && (
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="grid gap-3 md:grid-cols-[1.2fr_2fr] md:items-end">
+                        <Field label="إدارة قالب محفوظ">
+                          <NativeSelect
+                            value={reportTemplateManageId}
+                            onChange={(event) => setReportTemplateManageId(event.target.value)}
+                          >
+                            <option value="">اختر قالبًا لإدارة الإعدادات</option>
+                            {manageableReportTemplates.map((template) => (
+                              <option key={template.id} value={template.id}>
+                                {template.scope === 'shared' ? 'عام' : 'شخصي'} — {template.name}
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        </Field>
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+                          من هنا يمكن تحديد القالب الافتراضي وصلاحية استخدام القالب العام. ترتيب القوالب يتم من أسهم أعلى/أسفل في البطاقة.
+                        </div>
+                      </div>
+
+                      {managedReportTemplate && (
+                        <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-xs font-bold text-slate-700">
+                              <span className="inline-flex items-center gap-2">
+                                <Star className="h-4 w-4 text-amber-500" />
+                                استخدامه تلقائيًا عند فتح التقارير
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={managedReportTemplate.isDefault}
+                                onChange={(event) =>
+                                  updateFlexibleReportTemplateDraft(managedReportTemplate.id, {
+                                    isDefault: event.target.checked,
+                                  })
+                                }
+                                className="h-4 w-4 accent-amber-600"
+                              />
+                            </label>
+
+                            {managedReportTemplate.scope === 'shared' && (isAdmin || canDelete) && (
+                              <Field label="صلاحية استخدام القالب العام">
+                                <NativeSelect
+                                  value={managedReportTemplate.accessMode}
+                                  onChange={(event) =>
+                                    updateFlexibleReportTemplateDraft(managedReportTemplate.id, {
+                                      accessMode: event.target.value as 'all' | 'selected',
+                                    })
+                                  }
+                                >
+                                  <option value="all">جميع مستخدمي نظام المتابعة</option>
+                                  <option value="selected">مستخدمون محددون فقط</option>
+                                </NativeSelect>
+                              </Field>
+                            )}
+                          </div>
+
+                          {managedReportTemplate.scope === 'shared'
+                            && managedReportTemplate.accessMode === 'selected'
+                            && (isAdmin || canDelete) && (
+                              <div>
+                                <p className="mb-2 text-[11px] font-black text-slate-700">
+                                  المستخدمون المسموح لهم باستخدام القالب
+                                </p>
+                                <div className="grid max-h-40 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+                                  {assignees.map((user) => {
+                                    const checked = managedReportTemplate.allowedUserIds.includes(user.id);
+                                    return (
+                                      <label
+                                        key={user.id}
+                                        className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-[11px] font-bold ${checked ? 'border-sky-300 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-600'}`}
+                                      >
+                                        <span className="truncate">{user.username}</span>
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() =>
+                                            toggleFlexibleReportTemplateAudienceUser(
+                                              managedReportTemplate,
+                                              user.id,
+                                            )
+                                          }
+                                          className="h-4 w-4 accent-sky-700"
+                                        />
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={reportTemplateSaving}
+                              onClick={() =>
+                                void saveFlexibleReportTemplateGovernance(managedReportTemplate)
+                              }
+                            >
+                              {reportTemplateSaving
+                                ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" />
+                                : <Save className="ml-2 h-4 w-4" />}
+                              حفظ إعدادات القالب
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
