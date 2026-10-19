@@ -530,6 +530,7 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [reportTemplateAccessMode, setReportTemplateAccessMode] = React.useState<'all' | 'selected'>('all');
   const [reportTemplateAllowedUserIds, setReportTemplateAllowedUserIds] = React.useState<string[]>([]);
   const [reportTemplateDefault, setReportTemplateDefault] = React.useState(false);
+  const [reportTemplateManageId, setReportTemplateManageId] = React.useState('');
   const [reportTemplateSaving, setReportTemplateSaving] = React.useState(false);
   const [reportData, setReportData] = React.useState<TransactionFollowUpExecutiveReport | null>(null);
   const [reportSection, setReportSection] = React.useState<'preview' | 'archive' | 'schedule'>('preview');
@@ -548,6 +549,12 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [scheduleDayOfMonth, setScheduleDayOfMonth] = React.useState(1);
   const [scheduleRunHour, setScheduleRunHour] = React.useState(8);
   const [scheduleAssigneeId, setScheduleAssigneeId] = React.useState('');
+
+  const managedReportTemplate =
+    reportTemplates.find((template) => template.id === reportTemplateManageId) || null;
+  const manageableReportTemplates = reportTemplates.filter(
+    (template) => template.scope === 'personal' || isAdmin || canDelete,
+  );
 
   const load = React.useCallback(async () => {
     try {
