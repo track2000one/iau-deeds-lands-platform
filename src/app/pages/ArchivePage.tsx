@@ -1103,6 +1103,33 @@ export const ArchivePage: React.FC = () => {
     setVersionGovernanceNote('');
   };
 
+  const approveVersionDraft = async () => {
+    if (!selectedDocument || !versionGovernanceAttachment) return;
+    try {
+      setVersionGovernanceSaving(true);
+      const updated = await archiveRequest<ArchiveDocument>(
+        `/records/${selectedDocument.id}/attachments/${versionGovernanceAttachment.id}/approve`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ note: versionGovernanceNote.trim() }),
+        },
+      );
+      setDocuments((current) =>
+        current.map((doc) => (doc.id === updated.id ? updated : doc)),
+      );
+      setSelectedDocument(updated);
+      toast.success(`تم اعتماد الإصدار V${versionGovernanceAttachment.version || 1} كنسخة رسمية حالية`);
+      setVersionGovernanceOpen(false);
+      setVersionGovernanceAttachment(null);
+      setVersionGovernanceAction(null);
+      setVersionGovernanceNote('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر اعتماد الإصدار');
+    } finally {
+      setVersionGovernanceSaving(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if ((formMode === 'add' && !canAdd) || (formMode === 'edit' && !canEdit)) {
       toast.error('لا تملك الصلاحية المطلوبة لتنفيذ عملية الأرشفة');
