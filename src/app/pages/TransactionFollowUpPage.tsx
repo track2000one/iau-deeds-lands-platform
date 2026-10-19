@@ -998,8 +998,12 @@ export const TransactionFollowUpPage: React.FC = () => {
   };
 
   const recordAction = async () => {
-    if (!selected || !actionText.trim()) {
-      toast.error('اكتب الإجراء الذي تم اتخاذه');
+    if (!selected || actionText.trim().length < 2) {
+      toast.error('اكتب الإجراء الذي تم اتخاذه قبل التسجيل');
+      return;
+    }
+    if (actionRequiresNextDueDate && !nextDueDate) {
+      toast.error('حدد الاستحقاق القادم للحالة غير النهائية');
       return;
     }
     try {
@@ -1008,10 +1012,10 @@ export const TransactionFollowUpPage: React.FC = () => {
         actionText: actionText.trim(),
         note: actionNote || null,
         status: actionStatus,
-        requiredAction: nextAction || null,
-        dueDate: nextDueDate || null,
+        requiredAction: actionIsFinal ? null : nextAction || null,
+        dueDate: actionIsFinal ? null : nextDueDate || null,
       });
-      toast.success(actionStatus === 'completed' || actionStatus === 'closed' ? 'تم تحديث وإنهاء حالة المعاملة' : 'تم تسجيل الإجراء');
+      toast.success(actionIsFinal ? 'تم تحديث وإنهاء حالة المعاملة' : 'تم تسجيل الإجراء');
       window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
       await openDetails(updated.id);
       await load();
@@ -2807,6 +2811,12 @@ ${styleAssets}
       selected.currentAssigneeUserId === currentUser?.uid
     )
   );
+
+  const actionIsFinal = ['completed', 'closed'].includes(actionStatus);
+  const actionRequiresNextDueDate = ['in_progress', 'waiting_response', 'needs_follow_up'].includes(actionStatus);
+  const actionHasRequiredText = actionText.trim().length >= 2;
+  const actionHasRequiredDueDate = !actionRequiresNextDueDate || Boolean(nextDueDate);
+  const actionFormReady = actionHasRequiredText && actionHasRequiredDueDate;
 
   const canAssignSelected = Boolean(
     selected &&
@@ -5790,16 +5800,78 @@ ${styleAssets}
 
                   {canManageSelected && (
                     <Card className="border-emerald-200">
-                      <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CircleDot className="h-4 w-4" />تسجيل إجراء</CardTitle></CardHeader>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <CircleDot className="h-4 w-4" />
+                          تسجيل إجراء
+                        </CardTitle>
+                      </CardHeader>
                       <CardContent className="space-y-3">
-                        <Field label="الإجراء الذي تم اتخاذه *"><Textarea rows={2} value={actionText} onChange={(e) => setActionText(e.target.value)} placeholder="مثال: تم إعداد الخطاب ورفعه للاعتماد" /></Field>
+                        <Field label="الإجراء الذي تم اتخاذه *">
+                          <Textarea
+                            rows={2}
+                            value={actionText}
+                            onChange={(e) => setActionText(e.target.value)}
+                            placeholder="مثال: تم إعداد الخطاب ورفعه للاعتماد"
+                            className={!actionHasRequiredText ? 'border-amber-300 bg-amber-50/80 focus-visible:ring-amber-400' : ''}
+                          />
+                        </Field>
                         <div className="grid gap-3 sm:grid-cols-2">
-                          <Field label="الحالة بعد الإجراء"><NativeSelect value={actionStatus} onChange={(e) => setActionStatus(e.target.value as TransactionFollowUpStatus)}>{Object.entries(statusLabels).filter(([value]) => value !== 'new' && value !== 'assigned').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
-                          <Field label="الاستحقاق القادم"><Input type="date" value={nextDueDate} onChange={(e) => setNextDueDate(e.target.value)} /></Field>
+                          <Field label="الحالة بعد الإجراء">
+                            <NativeSelect
+                              value={actionStatus}
+                              onChange={(e) => setActionStatus(e.target.value as TransactionFollowUpStatus)}
+                            >
+                              {Object.entries(statusLabels)
+                                .filter(([value]) => value !== 'new' && value !== 'assigned')
+                                .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            </NativeSelect>
+                          </Field>
+                          <Field label={actionRequiresNextDueDate ? 'الاستحقاق القادم *' : 'الاستحقاق القادم'}>
+                            <Input
+                              type="date"
+                              value={nextDueDate}
+                              onChange={(e) => setNextDueDate(e.target.value)}
+                              disabled={actionIsFinal}
+                              className={actionRequiresNextDueDate && !nextDueDate ? 'border-amber-300 bg-amber-50/80 focus-visible:ring-amber-400' : ''}
+                            />
+                          </Field>
                         </div>
-                        <Field label="الإجراء القادم"><Input value={nextAction} onChange={(e) => setNextAction(e.target.value)} /></Field>
-                        <Field label="ملاحظة"><Textarea rows={2} value={actionNote} onChange={(e) => setActionNote(e.target.value)} /></Field>
-                        <Button onClick={() => void recordAction()} disabled={saving || !actionText.trim()}><CheckCircle2 className="ml-2 h-4 w-4" />تسجيل الإجراء</Button>
+                        <Field label="الإجراء القادم">
+                          <Input
+                            value={nextAction}
+                            onChange={(e) => setNextAction(e.target.value)}
+                            disabled={actionIsFinal}
+                            placeholder={actionIsFinal ? 'لا يلزم إجراء قادم للحالة النهائية' : 'اختياري: الإجراء المطلوب بعد ذلك'}
+                          />
+                        </Field>
+                        <Field label="ملاحظة">
+                          <Textarea rows={2} value={actionNote} onChange={(e) => setActionNote(e.target.value)} />
+                        </Field>
+
+                        {!actionFormReady && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs font-semibold leading-5 text-amber-900">
+                            {!actionHasRequiredText
+                              ? 'اكتب الإجراء الذي تم اتخاذه. زر التسجيل سيبقى قابلًا للضغط وسيعرض لك الحقل الناقص.'
+                              : actionRequiresNextDueDate && !nextDueDate
+                                ? 'حدد الاستحقاق القادم لأن الحالة المختارة غير نهائية.'
+                                : 'أكمل الحقول المطلوبة لتسجيل الإجراء.'}
+                          </div>
+                        )}
+
+                        <Button
+                          onClick={() => void recordAction()}
+                          disabled={saving}
+                          className="relative h-12 w-full overflow-hidden border border-emerald-400/70 bg-gradient-to-b from-emerald-500 via-emerald-600 to-emerald-700 text-base font-black text-white shadow-[0_5px_0_#065f46,0_10px_18px_rgba(6,78,59,0.30)] transition-all duration-150 hover:-translate-y-0.5 hover:from-emerald-400 hover:to-emerald-700 hover:shadow-[0_7px_0_#065f46,0_14px_24px_rgba(6,78,59,0.34)] active:translate-y-[3px] active:shadow-[0_2px_0_#065f46,0_5px_10px_rgba(6,78,59,0.28)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+                        >
+                          <span className="pointer-events-none absolute inset-x-1 top-1 h-[38%] rounded-lg bg-white/12" />
+                          {saving ? (
+                            <RefreshCw className="ml-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="ml-2 h-4 w-4" />
+                          )}
+                          {saving ? 'جاري تسجيل الإجراء...' : 'تسجيل الإجراء'}
+                        </Button>
                       </CardContent>
                     </Card>
                   )}
