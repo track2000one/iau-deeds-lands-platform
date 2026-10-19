@@ -1888,8 +1888,22 @@ export const TransactionFollowUpPage: React.FC = () => {
     };
   };
 
-  const exportFollowUpExcel = async () => {
-    if (!reportData) {
+  const exportFollowUpExcel = async (override?: {
+    data?: TransactionFollowUpExecutiveReport;
+    options?: FlexibleReportOptions;
+    orientation?: 'portrait' | 'landscape';
+    assigneeLabel?: string;
+    from?: string;
+    to?: string;
+    fileName?: string;
+  }) => {
+    const exportData = override?.data || reportData;
+    const exportOptions = override?.options || flexibleReportOptions;
+    const exportOrientation = override?.orientation || reportOrientation;
+    const exportFrom = override?.from || reportFrom;
+    const exportTo = override?.to || reportTo;
+
+    if (!exportData) {
       toast.error('أنشئ التقرير أولًا قبل التصدير إلى Excel');
       return;
     }
@@ -1902,18 +1916,18 @@ export const TransactionFollowUpPage: React.FC = () => {
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'IAU Deeds and Lands Platform';
       workbook.company = 'جامعة الإمام عبدالرحمن بن فيصل';
-      workbook.subject = flexibleReportOptions.title.trim() || 'التقرير المرن لمتابعة المعاملات';
+      workbook.subject = exportOptions.title.trim() || 'التقرير المرن لمتابعة المعاملات';
       workbook.created = new Date();
 
-      const rows = buildFlexibleReportRows(reportData, flexibleReportOptions);
+      const rows = buildFlexibleReportRows(exportData, exportOptions);
       const visibleColumns = FLEXIBLE_REPORT_COLUMNS.filter((column) =>
-        flexibleReportOptions.visibleColumns.includes(column.key),
+        exportOptions.visibleColumns.includes(column.key),
       );
 
       const sheet = workbook.addWorksheet('التقرير المرن', {
         views: [{ rightToLeft: true }],
         pageSetup: {
-          orientation: reportOrientation,
+          orientation: exportOrientation,
           paperSize: 9,
           fitToPage: true,
           fitToWidth: 1,
@@ -1932,12 +1946,14 @@ export const TransactionFollowUpPage: React.FC = () => {
 
       const columnCount = Math.max(1, visibleColumns.length);
       const lastColumnLetter = sheet.getColumn(columnCount).letter;
-      const title = flexibleReportOptions.title.trim() || 'التقرير المرن لمتابعة المعاملات';
-      const assigneeLabel = reportAssigneeId
-        ? assignees.find((user) => user.id === reportAssigneeId)?.username || 'الموظف المحدد'
-        : !(isAdmin || canDelete)
-          ? currentUser?.username || 'المستخدم الحالي'
-          : 'جميع الموظفين';
+      const title = exportOptions.title.trim() || 'التقرير المرن لمتابعة المعاملات';
+      const assigneeLabel = override?.assigneeLabel || (
+        reportAssigneeId
+          ? assignees.find((user) => user.id === reportAssigneeId)?.username || 'الموظف المحدد'
+          : !(isAdmin || canDelete)
+            ? currentUser?.username || 'المستخدم الحالي'
+            : 'جميع الموظفين'
+      );
 
       sheet.mergeCells(`A1:${lastColumnLetter}1`);
       sheet.getCell('A1').value = 'جامعة الإمام عبدالرحمن بن فيصل';
@@ -1958,7 +1974,7 @@ export const TransactionFollowUpPage: React.FC = () => {
 
       sheet.mergeCells(`A4:${lastColumnLetter}4`);
       sheet.getCell('A4').value =
-        `الفترة: ${formatDate(reportData.period.from)} إلى ${formatDate(reportData.period.to)} · الموظف: ${assigneeLabel}`;
+        `الفترة: ${formatDate(exportData.period.from)} إلى ${formatDate(exportData.period.to)} · الموظف: ${assigneeLabel}`;
       sheet.getCell('A4').font = { size: 9, color: { argb: 'FF64748B' } };
       sheet.getCell('A4').alignment = { horizontal: 'center', vertical: 'middle' };
 
@@ -1967,7 +1983,7 @@ export const TransactionFollowUpPage: React.FC = () => {
       );
       sheet.mergeCells(`A5:${lastColumnLetter}5`);
       sheet.getCell('A5').value =
-        `الفئات: ${flexibleReportOptions.categories.map((key) => categoryLabelByKey.get(key) || key).join('، ')}`;
+        `الفئات: ${exportOptions.categories.map((key) => categoryLabelByKey.get(key) || key).join('، ')}`;
       sheet.getCell('A5').font = { size: 9, color: { argb: 'FF64748B' } };
       sheet.getCell('A5').alignment = { horizontal: 'center', vertical: 'middle' };
 
@@ -2014,19 +2030,19 @@ export const TransactionFollowUpPage: React.FC = () => {
         category: 'الفئة',
       };
       const filterParts = [
-        flexibleReportOptions.search.trim()
-          ? `بحث: ${flexibleReportOptions.search.trim()}`
+        exportOptions.search.trim()
+          ? `بحث: ${exportOptions.search.trim()}`
           : null,
-        flexibleReportOptions.priority
-          ? `الأولوية: ${priorityLabels[flexibleReportOptions.priority]}`
+        exportOptions.priority
+          ? `الأولوية: ${priorityLabels[exportOptions.priority]}`
           : null,
-        flexibleReportOptions.organizationalUnit
-          ? `الإدارة/الوحدة: ${organizationalUnitLabels[flexibleReportOptions.organizationalUnit]}`
+        exportOptions.organizationalUnit
+          ? `الإدارة/الوحدة: ${organizationalUnitLabels[exportOptions.organizationalUnit]}`
           : null,
-        flexibleReportOptions.excludedIds.length
-          ? `المستبعد يدويًا: ${flexibleReportOptions.excludedIds.length.toLocaleString('ar-SA')}`
+        exportOptions.excludedIds.length
+          ? `المستبعد يدويًا: ${exportOptions.excludedIds.length.toLocaleString('ar-SA')}`
           : null,
-        `الفرز: ${sortLabels[flexibleReportOptions.sortBy]} / ${flexibleReportOptions.sortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}`,
+        `الفرز: ${sortLabels[exportOptions.sortBy]} / ${exportOptions.sortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}`,
       ].filter(Boolean);
       sheet.getCell(filtersRow, 1).value = filterParts.join(' · ');
       sheet.getCell(filtersRow, 1).font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
@@ -2120,7 +2136,7 @@ export const TransactionFollowUpPage: React.FC = () => {
         new Blob([buffer], {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         }),
-        `${safeBackupFileName(title, 'التقرير-المرن')}-${reportFrom}-إلى-${reportTo}.xlsx`,
+        override?.fileName || `${safeBackupFileName(title, 'التقرير-المرن')}-${exportFrom}-إلى-${exportTo}.xlsx`,
       );
 
       toast.success(
