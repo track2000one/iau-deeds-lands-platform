@@ -4371,7 +4371,7 @@ ${styleAssets}
                       <option value="">التقرير السابق</option>
                       {reportArchives.map((archive) => (
                         <option key={archive.id} value={archive.id}>
-                          {archive.reportType === 'weekly' ? 'أسبوعي' : archive.reportType === 'monthly' ? 'شهري' : 'مخصص'} — {formatDate(archive.periodFrom)} إلى {formatDate(archive.periodTo)}
+                          {archive.archiveName || (archive.reportType === 'weekly' ? 'تقرير أسبوعي' : archive.reportType === 'monthly' ? 'تقرير شهري' : 'تقرير مخصص')} — {formatDate(archive.periodFrom)} إلى {formatDate(archive.periodTo)}
                         </option>
                       ))}
                     </NativeSelect>
@@ -4418,7 +4418,76 @@ ${styleAssets}
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-3">
+                  <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-2 xl:grid-cols-6">
+                    <div className="xl:col-span-2">
+                      <Field label="بحث في الأرشيف">
+                        <Input
+                          value={reportArchiveSearch}
+                          onChange={(event) => setReportArchiveSearch(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              void loadReportArchives(1);
+                            }
+                          }}
+                          placeholder="اسم التقرير، الملاحظات، القالب، الموظف..."
+                        />
+                      </Field>
+                    </div>
+                    <Field label="المصدر">
+                      <NativeSelect
+                        value={reportArchiveSource}
+                        onChange={(event) =>
+                          setReportArchiveSource(event.target.value as 'manual' | 'scheduled' | '')
+                        }
+                      >
+                        <option value="">الكل</option>
+                        <option value="manual">يدوي</option>
+                        <option value="scheduled">آلي</option>
+                      </NativeSelect>
+                    </Field>
+                    <Field label="نوع التقرير">
+                      <NativeSelect
+                        value={reportArchiveType}
+                        onChange={(event) =>
+                          setReportArchiveType(event.target.value as 'weekly' | 'monthly' | 'custom' | '')
+                        }
+                      >
+                        <option value="">الكل</option>
+                        <option value="weekly">أسبوعي</option>
+                        <option value="monthly">شهري</option>
+                        <option value="custom">مخصص</option>
+                      </NativeSelect>
+                    </Field>
+                    <Field label="وسم">
+                      <Input
+                        value={reportArchiveTag}
+                        onChange={(event) => setReportArchiveTag(event.target.value)}
+                        placeholder="مثال: متأخرات"
+                      />
+                    </Field>
+                    <div className="flex items-end gap-2">
+                      <Button
+                        type="button"
+                        className="flex-1"
+                        disabled={reportArchiveLoading}
+                        onClick={() => void loadReportArchives(1)}
+                      >
+                        <Search className="ml-2 h-4 w-4" />
+                        تطبيق
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={reportArchiveLoading}
+                        onClick={() => void clearArchiveFilters()}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
                   {reportArchiveLoading && !reportArchives.length ? (
                     <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل الأرشيف...</div>
                   ) : reportArchives.length === 0 ? (
