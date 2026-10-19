@@ -1128,6 +1128,7 @@ export const TransactionFollowUpPage: React.FC = () => {
       loadExecutiveReport(range.from, range.to, ''),
       loadReportArchives(1),
       loadReportSchedules(),
+      refreshReportTemplates().catch(() => undefined),
     ]);
   };
 
@@ -3335,28 +3336,43 @@ ${styleAssets}
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-black text-violet-950">قوالب التقرير المحفوظة</p>
                       <p className="mt-1 text-[11px] leading-5 text-violet-800/75">
-                        احفظ إعدادات التصفية والفرز والأعمدة واتجاه الطباعة باسم واضح، ثم أعد تطبيقها بضغطة واحدة.
+                        القوالب محفوظة الآن في قاعدة البيانات وتظهر لك من أي جهاز. ويمكن للمستخدم الإشرافي إنشاء قالب عام يظهر لجميع مستخدمي نظام المتابعة.
                       </p>
                     </div>
-                    <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:min-w-[430px]">
+                    <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:min-w-[600px]">
                       <Input
                         value={reportTemplateName}
                         onChange={(event) => setReportTemplateName(event.target.value)}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') {
                             event.preventDefault();
-                            saveFlexibleReportTemplate();
+                            void saveFlexibleReportTemplate();
                           }
                         }}
                         placeholder="مثال: تقرير المتأخرات الأسبوعي"
                         className="bg-white"
                       />
+                      {(isAdmin || canDelete) && (
+                        <NativeSelect
+                          value={reportTemplateScope}
+                          onChange={(event) =>
+                            setReportTemplateScope(event.target.value as 'personal' | 'shared')
+                          }
+                          className="bg-white sm:w-[170px]"
+                        >
+                          <option value="personal">قالب شخصي</option>
+                          <option value="shared">قالب عام للإدارة</option>
+                        </NativeSelect>
+                      )}
                       <Button
                         type="button"
                         className="shrink-0"
-                        onClick={saveFlexibleReportTemplate}
+                        disabled={reportTemplateSaving}
+                        onClick={() => void saveFlexibleReportTemplate()}
                       >
-                        <Save className="ml-2 h-4 w-4" />
+                        {reportTemplateSaving
+                          ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" />
+                          : <Save className="ml-2 h-4 w-4" />}
                         حفظ كقالب
                       </Button>
                     </div>
@@ -3370,7 +3386,17 @@ ${styleAssets}
                           className="flex items-center justify-between gap-3 rounded-xl border border-violet-200 bg-white px-3 py-2.5 shadow-sm"
                         >
                           <div className="min-w-0">
-                            <p className="truncate text-xs font-black text-slate-900">{template.name}</p>
+                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                              <p className="truncate text-xs font-black text-slate-900">{template.name}</p>
+                              <Badge
+                                variant="outline"
+                                className={template.scope === 'shared'
+                                  ? 'border-violet-300 bg-violet-50 text-violet-800'
+                                  : 'border-slate-200 bg-slate-50 text-slate-600'}
+                              >
+                                {template.scope === 'shared' ? 'عام للإدارة' : 'شخصي'}
+                              </Badge>
+                            </div>
                             <p className="mt-1 text-[10px] text-slate-500">
                               {template.reportMode === 'weekly'
                                 ? 'أسبوعي'
@@ -3383,6 +3409,9 @@ ${styleAssets}
                               {template.options.categories.length.toLocaleString('ar-SA')} فئات
                               {' · '}
                               {template.options.visibleColumns.length.toLocaleString('ar-SA')} أعمدة
+                              {template.scope === 'shared' && template.createdByName
+                                ? ` · بواسطة ${template.createdByName}`
+                                : ''}
                             </p>
                           </div>
                           <div className="flex shrink-0 gap-1.5">
@@ -3396,17 +3425,20 @@ ${styleAssets}
                               <FileText className="ml-1 h-3.5 w-3.5" />
                               تطبيق
                             </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
-                              title="حذف القالب"
-                              aria-label={`حذف قالب ${template.name}`}
-                              onClick={() => deleteFlexibleReportTemplate(template)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            {(template.scope === 'personal' || isAdmin || canDelete) && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                                title="حذف القالب"
+                                aria-label={`حذف قالب ${template.name}`}
+                                disabled={reportTemplateSaving}
+                                onClick={() => void deleteFlexibleReportTemplate(template)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}
