@@ -58,7 +58,14 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { NativeSelect } from '../components/ui/native-select';
 import { Textarea } from '../components/ui/textarea';
-import { TransactionExecutiveReport } from '../components/TransactionExecutiveReport';
+import {
+  TransactionExecutiveReport,
+  DEFAULT_FLEXIBLE_REPORT_COLUMNS,
+  FLEXIBLE_REPORT_CATEGORIES,
+  FLEXIBLE_REPORT_COLUMNS,
+  type FlexibleReportOptions,
+  type FlexibleReportSortKey,
+} from '../components/TransactionExecutiveReport';
 import { TransactionExecutiveInbox } from '../components/TransactionExecutiveInbox';
 import { TransactionDailyWorkCenter } from '../components/TransactionDailyWorkCenter';
 import { TransactionBackupSettings } from '../components/TransactionBackupSettings';
@@ -311,6 +318,18 @@ const reportRange = (mode: 'weekly' | 'monthly') => {
   return { from: toInputDate(start), to: toInputDate(end) };
 };
 
+const createDefaultFlexibleReportOptions = (): FlexibleReportOptions => ({
+  title: 'التقرير المرن لمتابعة المعاملات',
+  categories: ['completed', 'overdue', 'waiting_response', 'needs_follow_up'],
+  search: '',
+  priority: '',
+  organizationalUnit: '',
+  sortBy: 'transactionDate',
+  sortDirection: 'desc',
+  visibleColumns: [...DEFAULT_FLEXIBLE_REPORT_COLUMNS],
+  excludedIds: [],
+});
+
 const emptyCreate = (): TransactionFollowUpCreateInput => ({
   transactionNumber: '',
   transactionDate: new Date().toISOString().slice(0, 10),
@@ -403,6 +422,10 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [reportFrom, setReportFrom] = React.useState(reportRange('monthly').from);
   const [reportTo, setReportTo] = React.useState(reportRange('monthly').to);
   const [reportAssigneeId, setReportAssigneeId] = React.useState('');
+  const [flexibleReportOptions, setFlexibleReportOptions] = React.useState<FlexibleReportOptions>(
+    createDefaultFlexibleReportOptions,
+  );
+  const [reportOrientation, setReportOrientation] = React.useState<'portrait' | 'landscape'>('landscape');
   const [reportData, setReportData] = React.useState<TransactionFollowUpExecutiveReport | null>(null);
   const [reportSection, setReportSection] = React.useState<'preview' | 'archive' | 'schedule'>('preview');
   const [reportArchives, setReportArchives] = React.useState<TransactionFollowUpReportArchive[]>([]);
