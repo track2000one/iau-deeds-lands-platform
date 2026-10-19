@@ -1120,6 +1120,7 @@ export const ArchivePage: React.FC = () => {
   const openVersionGovernanceDialog = (
     attachment: ArchiveAttachment,
     action: 'approve' | 'cancel',
+    recordId?: string,
   ) => {
     if (!canApproveVersions) {
       toast.error('لا تملك صلاحية اعتماد أو إلغاء إصدارات الملفات');
@@ -1131,6 +1132,7 @@ export const ArchivePage: React.FC = () => {
     }
     setVersionGovernanceAttachment(attachment);
     setVersionGovernanceAction(action);
+    setVersionGovernanceRecordId(recordId || selectedDocument?.id || '');
     setVersionGovernanceNote('');
     setVersionGovernanceOpen(true);
   };
@@ -1140,15 +1142,17 @@ export const ArchivePage: React.FC = () => {
     setVersionGovernanceOpen(false);
     setVersionGovernanceAttachment(null);
     setVersionGovernanceAction(null);
+    setVersionGovernanceRecordId('');
     setVersionGovernanceNote('');
   };
 
   const approveVersionDraft = async () => {
-    if (!selectedDocument || !versionGovernanceAttachment) return;
+    const recordId = versionGovernanceRecordId || selectedDocument?.id || '';
+    if (!recordId || !versionGovernanceAttachment) return;
     try {
       setVersionGovernanceSaving(true);
       const updated = await archiveRequest<ArchiveDocument>(
-        `/records/${selectedDocument.id}/attachments/${versionGovernanceAttachment.id}/approve`,
+        `/records/${recordId}/attachments/${versionGovernanceAttachment.id}/approve`,
         {
           method: 'PATCH',
           body: JSON.stringify({ note: versionGovernanceNote.trim() }),
@@ -1171,11 +1175,12 @@ export const ArchivePage: React.FC = () => {
   };
 
   const cancelVersionDraft = async () => {
-    if (!selectedDocument || !versionGovernanceAttachment) return;
+    const recordId = versionGovernanceRecordId || selectedDocument?.id || '';
+    if (!recordId || !versionGovernanceAttachment) return;
     try {
       setVersionGovernanceSaving(true);
       const updated = await archiveRequest<ArchiveDocument>(
-        `/records/${selectedDocument.id}/attachments/${versionGovernanceAttachment.id}/cancel`,
+        `/records/${recordId}/attachments/${versionGovernanceAttachment.id}/cancel`,
         {
           method: 'PATCH',
           body: JSON.stringify({ reason: versionGovernanceNote.trim() }),
