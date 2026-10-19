@@ -219,9 +219,16 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="followup-transaction-card__label text-xs">رقم المعاملة</p>
-          <h2 className="followup-transaction-card__number mt-1 truncate text-lg font-black">
-            {record.transactionNumber}
-          </h2>
+          <div className="mt-1 flex min-w-0 items-center gap-2">
+            <h2 className="followup-transaction-card__number min-w-0 truncate text-lg font-black">
+              {record.transactionNumber}
+            </h2>
+            {record.archivedAt && (
+              <Badge className="shrink-0 border border-emerald-300/80 bg-emerald-600 px-2.5 py-0.5 font-black text-white shadow-[0_0_14px_rgba(16,185,129,0.28)] hover:bg-emerald-600">
+                مؤرشفة
+              </Badge>
+            )}
+          </div>
           <p className="followup-transaction-card__tracking mt-1 truncate font-mono text-[10px]">
             {record.trackingNumber}
           </p>
