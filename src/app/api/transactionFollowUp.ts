@@ -1317,11 +1317,17 @@ export const transactionFollowUpApi = {
     return apiJson<TransactionFollowUpPage>(`/api/transaction-follow-up?${query.toString()}`);
   },
 
-  archived: (input: { page?: number; pageSize?: number; search?: string } = {}) => {
+  archived: (input: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    includeAttachments?: boolean;
+  } = {}) => {
     const query = new URLSearchParams();
     if (input.page) query.set('page', String(input.page));
     if (input.pageSize) query.set('pageSize', String(input.pageSize));
     if (input.search?.trim()) query.set('search', input.search.trim());
+    if (input.includeAttachments) query.set('includeAttachments', 'true');
     const suffix = query.toString();
     return apiJson<TransactionFollowUpPage>(
       `/api/archive/transactions${suffix ? `?${suffix}` : ''}`,
