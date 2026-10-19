@@ -1661,6 +1661,259 @@ export const ArchivePage: React.FC = () => {
         </Card>
       </div>
 
+      {approvalCenterOpen && (
+        <Card className="overflow-hidden border-amber-200 bg-gradient-to-l from-amber-50/60 via-white to-slate-50 shadow-sm">
+          <CardHeader className="border-b border-amber-100 bg-white/90">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <ClipboardCheck className="h-5 w-5 text-amber-700" />
+                  مركز اعتماد الأرشيف
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  شاشة موحدة لمراجعة إصدارات الملفات واعتمادها أو إلغائها دون الدخول إلى كل سجل على حدة.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="border-amber-300 bg-amber-50 font-bold text-amber-800">
+                  {approvalItems.filter((item) => getAttachmentVersionStatus(item) === 'draft').length.toLocaleString('ar-SA')} بانتظار الاعتماد
+                </Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={approvalLoading}
+                  onClick={async () => {
+                    try {
+                      setApprovalLoading(true);
+                      await loadApprovalCenterItems();
+                    } catch (error) {
+                      toast.error(error instanceof Error ? error.message : 'تعذر تحديث مركز الاعتماد');
+                    } finally {
+                      setApprovalLoading(false);
+                    }
+                  }}
+                >
+                  {approvalLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RotateCcw className="ml-2 h-4 w-4" />}
+                  تحديث
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setApprovalCenterOpen(false)}>
+                  <X className="ml-2 h-4 w-4" />
+                  إغلاق
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-4 p-4 sm:p-5">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <Card className="border-amber-200 bg-amber-50/50 shadow-none">
+                <CardContent className="p-4">
+                  <p className="text-xs font-bold text-amber-700">بانتظار الاعتماد</p>
+                  <p className="mt-1 text-2xl font-black text-amber-900">
+                    {approvalItems.filter((item) => getAttachmentVersionStatus(item) === 'draft').length.toLocaleString('ar-SA')}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="border-emerald-200 bg-emerald-50/50 shadow-none">
+                <CardContent className="p-4">
+                  <p className="text-xs font-bold text-emerald-700">معتمدة</p>
+                  <p className="mt-1 text-2xl font-black text-emerald-900">
+                    {approvalItems.filter((item) => getAttachmentVersionStatus(item) === 'approved').length.toLocaleString('ar-SA')}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="border-red-200 bg-red-50/50 shadow-none">
+                <CardContent className="p-4">
+                  <p className="text-xs font-bold text-red-700">ملغاة</p>
+                  <p className="mt-1 text-2xl font-black text-red-900">
+                    {approvalItems.filter((item) => getAttachmentVersionStatus(item) === 'cancelled').length.toLocaleString('ar-SA')}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="border-slate-200 bg-slate-50 shadow-none">
+                <CardContent className="p-4">
+                  <p className="text-xs font-bold text-slate-600">نتائج التصفية</p>
+                  <p className="mt-1 text-2xl font-black text-slate-900">{filteredApprovalItems.length.toLocaleString('ar-SA')}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="space-y-1.5 xl:col-span-2">
+                  <Label htmlFor="approval-search">بحث في السجل أو الملف</Label>
+                  <Input
+                    id="approval-search"
+                    value={approvalSearch}
+                    onChange={(event) => setApprovalSearch(event.target.value)}
+                    placeholder="رقم الأرشيف، عنوان السجل، اسم الملف، الجهة..."
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="approval-status">حالة الطلب</Label>
+                  <NativeSelect id="approval-status" value={approvalStatus} onChange={(event) => setApprovalStatus(event.target.value as any)}>
+                    <option value="draft">بانتظار الاعتماد</option>
+                    <option value="approved">معتمد</option>
+                    <option value="superseded">إصدار سابق</option>
+                    <option value="cancelled">ملغى</option>
+                    <option value="all">جميع الحالات</option>
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="approval-confidentiality">درجة السرية</Label>
+                  <NativeSelect id="approval-confidentiality" value={approvalConfidentiality} onChange={(event) => setApprovalConfidentiality(event.target.value)}>
+                    <option value="">الكل</option>
+                    <option value="public">عام</option>
+                    <option value="internal">داخلي</option>
+                    <option value="confidential">سري</option>
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="approval-employee">الموظف الرافع</Label>
+                  <NativeSelect id="approval-employee" value={approvalEmployee} onChange={(event) => setApprovalEmployee(event.target.value)}>
+                    <option value="">جميع الموظفين</option>
+                    {approvalEmployees.map((employee) => (
+                      <option key={employee} value={employee || ''}>{employee}</option>
+                    ))}
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="approval-from">من تاريخ</Label>
+                  <Input id="approval-from" type="date" value={approvalDateFrom} onChange={(event) => setApprovalDateFrom(event.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="approval-to">إلى تاريخ</Label>
+                  <Input id="approval-to" type="date" value={approvalDateTo} onChange={(event) => setApprovalDateTo(event.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="approval-sort">الترتيب</Label>
+                  <NativeSelect id="approval-sort" value={approvalSort} onChange={(event) => setApprovalSort(event.target.value as any)}>
+                    <option value="newest">الأحدث أولًا</option>
+                    <option value="oldest">الأقدم أولًا</option>
+                  </NativeSelect>
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setApprovalSearch('');
+                    setApprovalStatus('draft');
+                    setApprovalConfidentiality('');
+                    setApprovalEmployee('');
+                    setApprovalDateFrom('');
+                    setApprovalDateTo('');
+                    setApprovalSort('newest');
+                  }}
+                >
+                  مسح التصفية
+                </Button>
+              </div>
+            </div>
+
+            {approvalLoading ? (
+              <div className="flex min-h-36 items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                جاري تحميل طلبات الاعتماد...
+              </div>
+            ) : filteredApprovalItems.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+                <ShieldCheck className="mx-auto h-9 w-9 text-emerald-600" />
+                <p className="mt-3 font-black text-slate-800">لا توجد طلبات مطابقة</p>
+                <p className="mt-1 text-sm text-muted-foreground">غيّر عوامل التصفية أو حدّث المركز لعرض أحدث الطلبات.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                <table className="min-w-[1180px] w-full text-right text-sm">
+                  <thead className="bg-slate-50 text-slate-700">
+                    <tr className="border-b border-slate-200">
+                      <th className="px-4 py-3 font-black">السجل الأرشيفي</th>
+                      <th className="px-4 py-3 font-black">الملف / الإصدار</th>
+                      <th className="px-4 py-3 font-black">الحالة</th>
+                      <th className="px-4 py-3 font-black">الموظف</th>
+                      <th className="px-4 py-3 font-black">السرية</th>
+                      <th className="px-4 py-3 font-black">تاريخ الطلب</th>
+                      <th className="px-4 py-3 font-black">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredApprovalItems.map((item) => (
+                      <tr key={item.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">
+                        <td className="max-w-[300px] px-4 py-3 align-top">
+                          <p className="font-black text-slate-800">{item.record.title}</p>
+                          <p className="mt-1 text-xs font-bold text-slate-500">{item.record.archiveNumber}</p>
+                          <p className="mt-1 text-xs text-slate-500">{item.record.category}{item.record.documentNumber ? ` · ${item.record.documentNumber}` : ''}</p>
+                        </td>
+                        <td className="max-w-[300px] px-4 py-3 align-top">
+                          <p className="break-all font-bold text-slate-800">{item.originalName || item.fileName}</p>
+                          <p className="mt-1 text-xs text-slate-500">V{item.version || 1} · {formatFileSize(item.fileSize)}</p>
+                          {item.versionNote ? <p className="mt-1 line-clamp-2 text-xs text-slate-600">{item.versionNote}</p> : null}
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <Badge variant="outline" className={getAttachmentVersionStatusClassName(item)}>
+                            {getAttachmentVersionStatusLabel(item)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 align-top font-semibold text-slate-700">{item.addedBy || 'النظام'}</td>
+                        <td className="px-4 py-3 align-top">
+                          <Badge variant={getConfidentialityVariant(item.record.confidentiality) as any}>
+                            {getConfidentialityLabel(item.record.confidentiality)}
+                          </Badge>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 align-top text-slate-600">{formatDateTime(item.createdAt)}</td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => window.open(item.driveUrl, '_blank', 'noopener,noreferrer')}>
+                              <Eye className="ml-2 h-4 w-4" />
+                              عرض
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const record = documents.find((doc) => doc.id === item.record.id);
+                                if (record) openDetails(record);
+                              }}
+                            >
+                              فتح السجل
+                            </Button>
+                            {getAttachmentVersionStatus(item) === 'draft' && canApproveVersions ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => openVersionGovernanceDialog(item, 'approve', item.record.id)}
+                                  className="bg-emerald-600 font-bold text-white hover:bg-emerald-700"
+                                >
+                                  اعتماد
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openVersionGovernanceDialog(item, 'cancel', item.record.id)}
+                                  className="border-red-200 bg-red-50 font-bold text-red-700 hover:bg-red-100"
+                                >
+                                  إلغاء
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {trashOpen && (
         <Card className="overflow-hidden border-slate-300 bg-gradient-to-l from-slate-50 via-white to-slate-50 shadow-sm">
           <CardHeader className="border-b border-slate-200 bg-white/80">
