@@ -70,6 +70,8 @@ type ArchiveAttachment = {
   driveUrl: string;
   driveFileId: string;
   version?: number;
+  versionGroupId?: string;
+  versionNote?: string | null;
   isCurrent?: boolean;
   addedBy?: string | null;
   createdAt?: string;
@@ -88,6 +90,7 @@ type ArchiveDocument = {
   id: string;
   archiveNumber?: string;
   attachmentCount?: number;
+  attachmentVersionCount?: number;
   totalFileSize?: number;
   attachments?: ArchiveAttachment[];
   activities?: ArchiveActivity[];
@@ -258,6 +261,43 @@ const getArchiveReference = (doc: ArchiveDocument) =>
   doc.archiveNumber ||
   `ARC-${String(doc.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || '00000000'}`;
 
+const getAttachmentVersionGroups = (doc: ArchiveDocument) => {
+  const source = doc.attachments?.length
+    ? doc.attachments
+    : [{
+        id: doc.id,
+        fileName: doc.fileName,
+        originalName: doc.originalName,
+        mimeType: doc.mimeType,
+        fileSize: doc.fileSize,
+        driveUrl: doc.driveUrl,
+        driveFileId: doc.driveFileId,
+        version: 1,
+        versionGroupId: doc.id,
+        isCurrent: true,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+      } as ArchiveAttachment];
+
+  const groups = new Map<string, ArchiveAttachment[]>();
+  source.forEach((attachment) => {
+    const key = attachment.versionGroupId || attachment.id;
+    const bucket = groups.get(key) || [];
+    bucket.push(attachment);
+    groups.set(key, bucket);
+  });
+
+  return Array.from(groups.entries()).map(([groupId, versions]) => {
+    const sorted = [...versions].sort((a, b) => {
+      const versionDiff = Number(b.version || 1) - Number(a.version || 1);
+      if (versionDiff !== 0) return versionDiff;
+      return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    });
+    const current = sorted.find((item) => item.isCurrent) || sorted[0];
+    return { groupId, current, versions: sorted };
+  });
+};
+
 const getArchiveMissingMetadata = (doc: ArchiveDocument) => {
   const missing: string[] = [];
   if (!String(doc.documentNumber || '').trim()) missing.push('رقم المستند');
@@ -274,6 +314,7 @@ const archiveActivityLabels: Record<string, string> = {
   record_updated: 'تحديث البيانات',
   attachments_added: 'إضافة ملفات',
   attachment_removed: 'إزالة ملف',
+  attachment_version_added: 'إضافة إصدار جديد',
   record_deleted: 'نقل إلى المحذوفات',
   record_restored: 'استعادة السجل',
   records_merged: 'دمج سجلات داخل هذا السجل',
