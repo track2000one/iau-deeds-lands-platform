@@ -1363,6 +1363,78 @@ export const ArchivePage: React.FC = () => {
     setFilterConfidentiality('');
   };
 
+  const pendingApprovalCount = useMemo(
+    () => documents.reduce((sum, doc) => sum + Number(doc.pendingVersionCount || 0), 0),
+    [documents],
+  );
+
+  const approvalEmployees = useMemo(
+    () => Array.from(new Set(approvalItems.map((item) => item.addedBy).filter(Boolean))).sort(),
+    [approvalItems],
+  );
+
+  const filteredApprovalItems = useMemo(() => {
+    const query = approvalSearch.trim().toLowerCase();
+    const from = approvalDateFrom ? new Date(`${approvalDateFrom}T00:00:00`) : null;
+    const to = approvalDateTo ? new Date(`${approvalDateTo}T23:59:59`) : null;
+
+    const items = approvalItems.filter((item) => {
+      const status = getAttachmentVersionStatus(item);
+      if (approvalStatus !== 'all' && status !== approvalStatus) return false;
+      if (approvalConfidentiality && item.record.confidentiality !== approvalConfidentiality) return false;
+      if (approvalEmployee && item.addedBy !== approvalEmployee) return false;
+
+      const createdAt = item.createdAt ? new Date(item.createdAt) : null;
+      if (from && createdAt && createdAt < from) return false;
+      if (to && createdAt && createdAt > to) return false;
+
+      if (!query) return true;
+      return [
+        item.originalName,
+        item.fileName,
+        item.addedBy,
+        item.versionNote,
+        item.record.archiveNumber,
+        item.record.title,
+        item.record.category,
+        item.record.documentNumber,
+        item.record.issuingAuthority,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    });
+
+    return [...items].sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return approvalSort === 'newest' ? bTime - aTime : aTime - bTime;
+    });
+  }, [
+    approvalItems,
+    approvalSearch,
+    approvalStatus,
+    approvalConfidentiality,
+    approvalEmployee,
+    approvalDateFrom,
+    approvalDateTo,
+    approvalSort,
+  ]);
+
+  const openApprovalCenter = async () => {
+    const opening = !approvalCenterOpen;
+    setApprovalCenterOpen(opening);
+    if (!opening) return;
+
+    try {
+      setApprovalLoading(true);
+      await loadApprovalCenterItems();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل مركز اعتماد الأرشيف');
+    } finally {
+      setApprovalLoading(false);
+    }
+  };
+
   const selectedMergeRecords = useMemo(
     () => documents.filter((doc) => selectedMergeIds.includes(doc.id)),
     [documents, selectedMergeIds],
