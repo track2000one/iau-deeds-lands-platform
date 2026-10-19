@@ -1868,6 +1868,47 @@ export const ArchivePage: React.FC = () => {
                 جدول
               </Button>
             </div>
+            {canEdit && !mergeSelectionMode && filteredDocuments.length > 1 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setMergeSelectionMode(true);
+                  setSelectedMergeIds([]);
+                  setMergeTargetId('');
+                }}
+                className="h-9 border-violet-300 bg-violet-50 font-bold text-violet-800 hover:bg-violet-100"
+              >
+                <GitMerge className="ml-2 h-4 w-4" />
+                دمج سجلات
+              </Button>
+            )}
+            {canEdit && mergeSelectionMode && (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={stopMergeSelection}
+                  className="h-9"
+                  disabled={isMerging}
+                >
+                  <X className="ml-2 h-4 w-4" />
+                  إلغاء
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={openMergeRecordsDialog}
+                  disabled={selectedMergeIds.length < 2 || isMerging}
+                  className="h-9 bg-violet-700 font-bold text-white hover:bg-violet-800"
+                >
+                  <GitMerge className="ml-2 h-4 w-4" />
+                  دمج المحدد ({selectedMergeIds.length})
+                </Button>
+              </>
+            )}
             <Badge variant="outline" className="w-fit border-slate-300 bg-white/90 px-3 py-1 font-bold text-slate-700 shadow-sm">
               {filteredDocuments.length} سجل · {totalArchiveAttachments.toLocaleString('ar-SA')} ملف
             </Badge>
