@@ -2132,6 +2132,16 @@ export const ArchivePage: React.FC = () => {
                           <Download className="ml-2 h-4 w-4" />
                           تنزيل
                         </Button>
+                        {canEdit && (
+                          <Button
+                            type="button"
+                            onClick={() => openAttachmentVersionDialog(attachment)}
+                            className="bg-[#1F4E78] font-bold text-white hover:bg-[#173A59]"
+                          >
+                            <History className="ml-2 h-4 w-4" />
+                            إصدار جديد
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <AttachmentPreviewCard attachment={attachment as any} />
