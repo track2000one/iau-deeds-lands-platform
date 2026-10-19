@@ -346,6 +346,11 @@ export const ArchivePage: React.FC = () => {
   const [reportsOpen, setReportsOpen] = useState(false);
   const [excelImportOpen, setExcelImportOpen] = useState(false);
 
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashRecords, setTrashRecords] = useState<ArchiveDocument[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [restoringRecordId, setRestoringRecordId] = useState<string | null>(null);
+
   const [mergeSelectionMode, setMergeSelectionMode] = useState(false);
   const [selectedMergeIds, setSelectedMergeIds] = useState<string[]>([]);
   const [mergeTargetId, setMergeTargetId] = useState('');
@@ -392,6 +397,12 @@ export const ArchivePage: React.FC = () => {
   const loadDocumentsFromServer = async () => {
     const remote = await archiveRequest<ArchiveDocument[]>('/records');
     setDocuments(Array.isArray(remote) ? remote : []);
+    return Array.isArray(remote) ? remote : [];
+  };
+
+  const loadTrashRecords = async () => {
+    const remote = await archiveRequest<ArchiveDocument[]>('/records/trash');
+    setTrashRecords(Array.isArray(remote) ? remote : []);
     return Array.isArray(remote) ? remote : [];
   };
 
@@ -484,6 +495,7 @@ export const ArchivePage: React.FC = () => {
         const [remote] = await Promise.all([
           loadDocumentsFromServer(),
           loadArchivedTransactions(),
+          loadTrashRecords(),
         ]);
 
         if (!mounted) return;
@@ -777,6 +789,45 @@ export const ArchivePage: React.FC = () => {
     setTimeout(() => document.getElementById('archive-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   };
 
+  const openTrashCenter = async () => {
+    setTrashOpen((current) => !current);
+    if (!trashOpen) {
+      try {
+        setTrashLoading(true);
+        await loadTrashRecords();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'تعذر تحميل المحذوفات');
+      } finally {
+        setTrashLoading(false);
+      }
+    }
+  };
+
+  const restoreArchiveRecord = async (record: ArchiveDocument) => {
+    if (!canEdit) {
+      toast.error('لا تملك صلاحية استعادة السجلات الأرشيفية');
+      return;
+    }
+    if (record.status === 'merged') {
+      toast.error('السجل المدمج لا يمكن استعادته كسجل مستقل');
+      return;
+    }
+
+    try {
+      setRestoringRecordId(record.id);
+      const restored = await archiveRequest<ArchiveDocument>(`/records/${record.id}/restore`, {
+        method: 'PATCH',
+      });
+      setTrashRecords((current) => current.filter((item) => item.id !== record.id));
+      setDocuments((current) => [restored, ...current]);
+      toast.success('تمت استعادة السجل الأرشيفي بنجاح');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر استعادة السجل الأرشيفي');
+    } finally {
+      setRestoringRecordId(null);
+    }
+  };
+
   const requestDelete = (doc: ArchiveDocument) => {
     if (!canDelete) {
       toast.error('لا تملك صلاحية حذف سجلات الأرشفة');
@@ -805,6 +856,7 @@ export const ArchivePage: React.FC = () => {
       );
 
       toast.success('تم نقل السجل الأرشيفي إلى المحذوفات');
+      void loadTrashRecords().catch(() => undefined);
       setDeleteDialogOpen(false);
       setDocumentToDelete(null);
 
