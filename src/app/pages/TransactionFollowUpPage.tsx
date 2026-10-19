@@ -1207,6 +1207,10 @@ export const TransactionFollowUpPage: React.FC = () => {
         to,
         fileName: `${safeBackupFileName(name, 'تقرير-مؤرشف')}-${from}-إلى-${to}.xlsx`,
       });
+      await transactionFollowUpApi.recordReportArchiveExport(archive.id, {
+        format: 'excel',
+        fileName: `${safeBackupFileName(name, 'تقرير-مؤرشف')}-${from}-إلى-${to}.xlsx`,
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تصدير التقرير المؤرشف إلى Excel');
     } finally {
@@ -1244,6 +1248,10 @@ export const TransactionFollowUpPage: React.FC = () => {
         to,
         fileName: `${safeBackupFileName(name, 'تقرير-مؤرشف')}-${from}-إلى-${to}.pdf`,
       });
+      await transactionFollowUpApi.recordReportArchiveExport(archive.id, {
+        format: 'pdf',
+        fileName: `${safeBackupFileName(name, 'تقرير-مؤرشف')}-${from}-إلى-${to}.pdf`,
+      });
 
       setReportSection('archive');
     } catch (error) {
@@ -1251,6 +1259,120 @@ export const TransactionFollowUpPage: React.FC = () => {
       setReportSection('archive');
     } finally {
       setReportArchiveLoading(false);
+    }
+  };
+
+  const printArchivedReport = async (archiveId: string) => {
+    try {
+      setReportArchiveLoading(true);
+      const archive = await transactionFollowUpApi.reportArchive(archiveId);
+      const presentation = archivedReportPresentation(archive);
+      setReportData(archive.snapshot);
+      setReportFrom(archive.periodFrom.slice(0, 10));
+      setReportTo(archive.periodTo.slice(0, 10));
+      setReportMode(archive.reportType);
+      setReportAssigneeId(archive.assigneeUserId || '');
+      setFlexibleReportOptions(presentation.options);
+      setReportOrientation(presentation.orientation);
+      setReportSection('preview');
+
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
+        });
+      });
+
+      printExecutiveReport();
+      await transactionFollowUpApi.recordReportArchiveExport(archive.id, {
+        format: 'print',
+        fileName: archive.archiveName || archive.templateName || null,
+      });
+      setReportSection('archive');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر طباعة التقرير المؤرشف');
+      setReportSection('archive');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
+  const startArchiveGovernanceEdit = (archive: TransactionFollowUpReportArchive) => {
+    setArchiveGovernanceId(archive.id);
+    setArchiveGovernanceStatus(archive.governanceStatus || 'draft');
+    setArchiveGovernancePinned(Boolean(archive.isPinned));
+    setArchiveGovernanceProtected(Boolean(archive.isDeletionProtected));
+    setArchiveGovernanceRetentionPolicy(archive.retentionPolicy || 'none');
+    setArchiveGovernanceRetainUntil(
+      archive.retainUntil ? archive.retainUntil.slice(0, 10) : '',
+    );
+  };
+
+  const saveArchiveGovernance = async () => {
+    if (!archiveGovernanceId) return;
+    if (
+      archiveGovernanceRetentionPolicy === 'custom'
+      && !archiveGovernanceRetainUntil
+    ) {
+      toast.error('حدد تاريخ انتهاء مدة الاحتفاظ المخصصة');
+      return;
+    }
+
+    try {
+      setReportArchiveLoading(true);
+      await transactionFollowUpApi.updateReportArchiveGovernance(
+        archiveGovernanceId,
+        {
+          governanceStatus: archiveGovernanceStatus,
+          isPinned: archiveGovernancePinned,
+          isDeletionProtected: archiveGovernanceProtected,
+          retentionPolicy: archiveGovernanceRetentionPolicy,
+          retainUntil:
+            archiveGovernanceRetentionPolicy === 'custom'
+              ? archiveGovernanceRetainUntil
+              : null,
+        },
+      );
+      setArchiveGovernanceId('');
+      toast.success('تم حفظ إعدادات حوكمة التقرير');
+      await loadReportArchives(reportArchivePage);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ حوكمة التقرير');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
+  const toggleArchivePinned = async (archive: TransactionFollowUpReportArchive) => {
+    try {
+      setReportArchiveLoading(true);
+      await transactionFollowUpApi.updateReportArchiveGovernance(archive.id, {
+        isPinned: !archive.isPinned,
+      });
+      toast.success(archive.isPinned ? 'تم إلغاء تثبيت التقرير' : 'تم تثبيت التقرير أعلى الأرشيف');
+      await loadReportArchives(reportArchivePage);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحديث تثبيت التقرير');
+    } finally {
+      setReportArchiveLoading(false);
+    }
+  };
+
+  const toggleArchiveActivity = async (archiveId: string) => {
+    if (archiveActivityId === archiveId) {
+      setArchiveActivityId('');
+      setArchiveActivity([]);
+      return;
+    }
+    try {
+      setArchiveActivityLoading(true);
+      setArchiveActivityId(archiveId);
+      setArchiveActivity(await transactionFollowUpApi.reportArchiveActivity(archiveId));
+    } catch (error) {
+      setArchiveActivityId('');
+      setArchiveActivity([]);
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل سجل التقرير');
+    } finally {
+      setArchiveActivityLoading(false);
     }
   };
 
