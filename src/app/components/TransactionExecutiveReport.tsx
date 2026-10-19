@@ -215,7 +215,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
 
       const statusRows: FlexibleRow[] = report.transactions
         .filter((row) => !overdueIds.has(row.id))
-        .map((row) => {
+        .map((row): FlexibleRow | null => {
           const category = categoryForStatus(row.status);
           if (!category) return null;
           return {
@@ -231,9 +231,9 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
             dueDate: row.dueDate || null,
             requiredAction: row.requiredAction || null,
             overdueDays: null,
-          } satisfies FlexibleRow;
+          };
         })
-        .filter((row): row is FlexibleRow => Boolean(row));
+        .filter((row): row is FlexibleRow => row !== null);
 
       const excluded = new Set(options.excludedIds);
       const selectedCategories = new Set(options.categories);
