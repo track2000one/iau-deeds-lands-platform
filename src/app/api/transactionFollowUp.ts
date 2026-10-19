@@ -1512,11 +1512,23 @@ export const transactionFollowUpApi = {
     );
   },
 
-  reportArchives: (input: { page?: number; pageSize?: number; assigneeUserId?: string } = {}) => {
+  reportArchives: (input: {
+    page?: number;
+    pageSize?: number;
+    assigneeUserId?: string;
+    search?: string;
+    source?: 'manual' | 'scheduled' | '';
+    reportType?: 'weekly' | 'monthly' | 'custom' | '';
+    tag?: string;
+  } = {}) => {
     const query = new URLSearchParams();
     if (input.page) query.set('page', String(input.page));
     if (input.pageSize) query.set('pageSize', String(input.pageSize));
     if (input.assigneeUserId) query.set('assigneeUserId', input.assigneeUserId);
+    if (input.search) query.set('search', input.search);
+    if (input.source) query.set('source', input.source);
+    if (input.reportType) query.set('reportType', input.reportType);
+    if (input.tag) query.set('tag', input.tag);
     const suffix = query.toString();
     return apiJson<TransactionFollowUpReportArchivePage>(
       `/api/transaction-follow-up/reports/archives${suffix ? `?${suffix}` : ''}`,
@@ -1529,6 +1541,9 @@ export const transactionFollowUpApi = {
     ),
 
   archiveReport: (input: {
+    archiveName?: string | null;
+    notes?: string | null;
+    tags?: string[];
     reportType: 'weekly' | 'monthly' | 'custom';
     from: string;
     to: string;
@@ -1546,6 +1561,18 @@ export const transactionFollowUpApi = {
       `/api/transaction-follow-up/reports/archives/compare?${query.toString()}`,
     );
   },
+
+  updateReportArchive: (
+    id: string,
+    input: { archiveName?: string | null; notes?: string | null; tags?: string[] },
+  ) =>
+    apiJson<TransactionFollowUpReportArchive>(
+      `/api/transaction-follow-up/reports/archives/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
 
   deleteReportArchive: (id: string) =>
     apiJson<void>(`/api/transaction-follow-up/reports/archives/${id}`, {
