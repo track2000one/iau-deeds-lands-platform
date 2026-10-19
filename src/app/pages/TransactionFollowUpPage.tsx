@@ -3242,6 +3242,94 @@ ${styleAssets}
                   </Button>
                 </div>
 
+                <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-black text-violet-950">قوالب التقرير المحفوظة</p>
+                      <p className="mt-1 text-[11px] leading-5 text-violet-800/75">
+                        احفظ إعدادات التصفية والفرز والأعمدة واتجاه الطباعة باسم واضح، ثم أعد تطبيقها بضغطة واحدة.
+                      </p>
+                    </div>
+                    <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:min-w-[430px]">
+                      <Input
+                        value={reportTemplateName}
+                        onChange={(event) => setReportTemplateName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            saveFlexibleReportTemplate();
+                          }
+                        }}
+                        placeholder="مثال: تقرير المتأخرات الأسبوعي"
+                        className="bg-white"
+                      />
+                      <Button
+                        type="button"
+                        className="shrink-0"
+                        onClick={saveFlexibleReportTemplate}
+                      >
+                        <Save className="ml-2 h-4 w-4" />
+                        حفظ كقالب
+                      </Button>
+                    </div>
+                  </div>
+
+                  {reportTemplates.length > 0 ? (
+                    <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {reportTemplates.map((template) => (
+                        <div
+                          key={template.id}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-violet-200 bg-white px-3 py-2.5 shadow-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-black text-slate-900">{template.name}</p>
+                            <p className="mt-1 text-[10px] text-slate-500">
+                              {template.reportMode === 'weekly'
+                                ? 'أسبوعي'
+                                : template.reportMode === 'monthly'
+                                  ? 'شهري'
+                                  : 'فترة مخصصة'}
+                              {' · '}
+                              {template.orientation === 'landscape' ? 'أفقي' : 'عمودي'}
+                              {' · '}
+                              {template.options.categories.length.toLocaleString('ar-SA')} فئات
+                              {' · '}
+                              {template.options.visibleColumns.length.toLocaleString('ar-SA')} أعمدة
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void applyFlexibleReportTemplate(template)}
+                              disabled={reportLoading}
+                            >
+                              <FileText className="ml-1 h-3.5 w-3.5" />
+                              تطبيق
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                              title="حذف القالب"
+                              aria-label={`حذف قالب ${template.name}`}
+                              onClick={() => deleteFlexibleReportTemplate(template)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-xl border border-dashed border-violet-200 bg-white/70 px-3 py-4 text-center text-[11px] text-violet-800/70">
+                      لا توجد قوالب محفوظة بعد. جهّز التقرير بالشكل المطلوب ثم اكتب اسم القالب واضغط «حفظ كقالب».
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
                   <Field label="عنوان التقرير">
                     <Input
