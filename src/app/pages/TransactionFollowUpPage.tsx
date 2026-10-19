@@ -1050,6 +1050,9 @@ export const TransactionFollowUpPage: React.FC = () => {
       if (archivedTemplate) {
         setFlexibleReportOptions(cloneFlexibleReportOptions(archivedTemplate.options));
         setReportOrientation(archivedTemplate.orientation);
+      } else {
+        setFlexibleReportOptions(createDefaultFlexibleReportOptions());
+        setReportOrientation('landscape');
       }
       setReportSection('preview');
       toast.success(
