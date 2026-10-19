@@ -146,7 +146,7 @@ const formatDateTime = (value?: string | null) =>
       }).format(new Date(value))
     : '—';
 
-type FlexibleRow = {
+export type FlexibleReportRow = {
   id: string;
   transactionNumber: string;
   transactionDate?: string | null;
@@ -189,13 +189,154 @@ const categoryForStatus = (
   return null;
 };
 
+export const buildFlexibleReportRows = (
+  report: TransactionFollowUpExecutiveReport,
+  options: FlexibleReportOptions,
+): FlexibleReportRow[] => {
+  const transactionById = new Map(report.transactions.map((row) => [row.id, row]));
+  const overdueIds = new Set(report.overdueSnapshot.map((row) => row.id));
+
+  const overdueRows: FlexibleReportRow[] = report.overdueSnapshot.map((row) => {
+    const source = transactionById.get(row.id);
+    return {
+      id: row.id,
+      transactionNumber: row.transactionNumber,
+      transactionDate: source?.transactionDate || null,
+      subject: row.subject,
+      transactionType: source?.transactionType || null,
+      organizationalUnit: source?.organizationalUnit || null,
+      currentAssigneeName: row.currentAssigneeName || source?.currentAssigneeName || null,
+      category: 'overdue',
+      priority: row.priority,
+      dueDate: row.dueDate,
+      requiredAction: source?.requiredAction || null,
+      overdueDays: row.overdueDays,
+    };
+  });
+
+  const statusRows: FlexibleReportRow[] = report.transactions
+    .filter((row) => !overdueIds.has(row.id))
+    .map((row): FlexibleReportRow | null => {
+      const category = categoryForStatus(row.status);
+      if (!category) return null;
+      return {
+        id: row.id,
+        transactionNumber: row.transactionNumber,
+        transactionDate: row.transactionDate,
+        subject: row.subject,
+        transactionType: row.transactionType,
+        organizationalUnit: row.organizationalUnit || null,
+        currentAssigneeName: row.currentAssigneeName || null,
+        category,
+        priority: row.priority,
+        dueDate: row.dueDate || null,
+        requiredAction: row.requiredAction || null,
+        overdueDays: null,
+      };
+    })
+    .filter((row): row is FlexibleReportRow => row !== null);
+
+  const excluded = new Set(options.excludedIds);
+  const selectedCategories = new Set(options.categories);
+  const search = options.search.trim().toLocaleLowerCase('ar');
+
+  const filtered = [...overdueRows, ...statusRows].filter((row) => {
+    if (excluded.has(row.id)) return false;
+    if (!selectedCategories.has(row.category)) return false;
+    if (options.priority && row.priority !== options.priority) return false;
+    if (
+      options.organizationalUnit
+      && row.organizationalUnit !== options.organizationalUnit
+    ) return false;
+
+    if (search) {
+      const haystack = [
+        row.transactionNumber,
+        row.subject,
+        row.currentAssigneeName || '',
+        row.requiredAction || '',
+        row.organizationalUnit
+          ? organizationalUnitLabels[row.organizationalUnit]
+          : '',
+        categoryLabels[row.category],
+      ]
+        .join(' ')
+        .toLocaleLowerCase('ar');
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const valueForSort = (row: FlexibleReportRow) => {
+    switch (options.sortBy) {
+      case 'transactionNumber':
+        return row.transactionNumber;
+      case 'priority':
+        return priorityRank[row.priority];
+      case 'currentAssigneeName':
+        return row.currentAssigneeName || '';
+      case 'dueDate':
+        return row.dueDate ? new Date(row.dueDate).getTime() : 0;
+      case 'category':
+        return categoryRank[row.category];
+      case 'transactionDate':
+      default:
+        return row.transactionDate ? new Date(row.transactionDate).getTime() : 0;
+    }
+  };
+
+  return filtered.sort((left, right) => {
+    const a = valueForSort(left);
+    const b = valueForSort(right);
+    const comparison =
+      typeof a === 'number' && typeof b === 'number'
+        ? a - b
+        : String(a).localeCompare(String(b), 'ar', { numeric: true });
+    return options.sortDirection === 'asc' ? comparison : -comparison;
+  });
+};
+
+export const flexibleReportCellText = (
+  row: FlexibleReportRow,
+  key: FlexibleReportColumnKey,
+): string => {
+  switch (key) {
+    case 'transactionNumber':
+      return row.transactionNumber;
+    case 'transactionDate':
+      return formatDate(row.transactionDate);
+    case 'subject':
+      return row.subject;
+    case 'transactionType':
+      return row.transactionType ? typeLabels[row.transactionType] : '—';
+    case 'organizationalUnit':
+      return row.organizationalUnit
+        ? organizationalUnitLabels[row.organizationalUnit]
+        : 'غير محددة';
+    case 'currentAssigneeName':
+      return row.currentAssigneeName || 'غير مسندة';
+    case 'category':
+      return row.category === 'overdue' && row.overdueDays
+        ? `${categoryLabels[row.category]} (${row.overdueDays.toLocaleString('ar-SA')} يوم)`
+        : categoryLabels[row.category];
+    case 'priority':
+      return priorityLabels[row.priority];
+    case 'dueDate':
+      return formatDate(row.dueDate);
+    case 'requiredAction':
+      return row.requiredAction || '—';
+    default:
+      return '—';
+  }
+};
+
 export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props>(
   ({ report, assigneeLabel, options = fallbackOptions, onExclude }, ref) => {
     const rows = React.useMemo(() => {
       const transactionById = new Map(report.transactions.map((row) => [row.id, row]));
       const overdueIds = new Set(report.overdueSnapshot.map((row) => row.id));
 
-      const overdueRows: FlexibleRow[] = report.overdueSnapshot.map((row) => {
+      const overdueRows: FlexibleReportRow[] = report.overdueSnapshot.map((row) => {
         const source = transactionById.get(row.id);
         return {
           id: row.id,
@@ -213,9 +354,9 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
         };
       });
 
-      const statusRows: FlexibleRow[] = report.transactions
+      const statusRows: FlexibleReportRow[] = report.transactions
         .filter((row) => !overdueIds.has(row.id))
-        .map((row): FlexibleRow | null => {
+        .map((row): FlexibleReportRow | null => {
           const category = categoryForStatus(row.status);
           if (!category) return null;
           return {
@@ -233,7 +374,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
             overdueDays: null,
           };
         })
-        .filter((row): row is FlexibleRow => row !== null);
+        .filter((row): row is FlexibleReportRow => row !== null);
 
       const excluded = new Set(options.excludedIds);
       const selectedCategories = new Set(options.categories);
@@ -266,7 +407,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
         return true;
       });
 
-      const valueForSort = (row: FlexibleRow) => {
+      const valueForSort = (row: FlexibleReportRow) => {
         switch (options.sortBy) {
           case 'transactionNumber':
             return row.transactionNumber;
@@ -309,7 +450,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
       options.visibleColumns.includes(column.key),
     );
 
-    const renderCell = (row: FlexibleRow, key: FlexibleReportColumnKey) => {
+    const renderCell = (row: FlexibleReportRow, key: FlexibleReportColumnKey) => {
       switch (key) {
         case 'transactionNumber':
           return <span className="font-black">{row.transactionNumber}</span>;
