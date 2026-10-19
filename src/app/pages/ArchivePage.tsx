@@ -1548,6 +1548,7 @@ export const ArchivePage: React.FC = () => {
         item.originalName,
         item.fileName,
         item.addedBy,
+        item.assignedApproverName,
         item.versionNote,
         item.record.archiveNumber,
         item.record.title,
@@ -1586,9 +1587,7 @@ export const ArchivePage: React.FC = () => {
         loadApprovalCenterItems(),
         loadApprovalNotifications(),
       ]);
-      if (approvalUnreadCount > 0) {
-        await markApprovalNotificationsRead();
-      }
+      await markApprovalNotificationsRead();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر تحميل مركز اعتماد الأرشيف');
     } finally {
@@ -1711,6 +1710,11 @@ export const ArchivePage: React.FC = () => {
               {pendingApprovalCount > 0 ? (
                 <Badge variant="secondary" className="mr-2 min-w-6 justify-center bg-white px-1.5 text-amber-800">
                   {pendingApprovalCount.toLocaleString('ar-SA')}
+                </Badge>
+              ) : null}
+              {approvalUnreadCount > 0 ? (
+                <Badge className="mr-1 bg-red-600 text-white hover:bg-red-600">
+                  جديد {approvalUnreadCount.toLocaleString('ar-SA')}
                 </Badge>
               ) : null}
             </Button>
@@ -1838,7 +1842,10 @@ export const ArchivePage: React.FC = () => {
                   onClick={async () => {
                     try {
                       setApprovalLoading(true);
-                      await loadApprovalCenterItems();
+                      await Promise.all([
+                        loadApprovalCenterItems(),
+                        loadApprovalNotifications(),
+                      ]);
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : 'تعذر تحديث مركز الاعتماد');
                     } finally {
@@ -1979,13 +1986,14 @@ export const ArchivePage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-                <table className="min-w-[1180px] w-full text-right text-sm">
+                <table className="min-w-[1320px] w-full text-right text-sm">
                   <thead className="bg-slate-50 text-slate-700">
                     <tr className="border-b border-slate-200">
                       <th className="px-4 py-3 font-black">السجل الأرشيفي</th>
                       <th className="px-4 py-3 font-black">الملف / الإصدار</th>
                       <th className="px-4 py-3 font-black">الحالة</th>
                       <th className="px-4 py-3 font-black">الموظف</th>
+                      <th className="px-4 py-3 font-black">مسار الاعتماد</th>
                       <th className="px-4 py-3 font-black">السرية</th>
                       <th className="px-4 py-3 font-black">تاريخ الطلب</th>
                       <th className="px-4 py-3 font-black">الإجراءات</th>
@@ -2010,12 +2018,25 @@ export const ArchivePage: React.FC = () => {
                           </Badge>
                         </td>
                         <td className="px-4 py-3 align-top font-semibold text-slate-700">{item.addedBy || 'النظام'}</td>
+                        <td className="max-w-[240px] px-4 py-3 align-top">
+                          <Badge
+                            variant="outline"
+                            className={item.approvalRoute === 'specific'
+                              ? "border-blue-200 bg-blue-50 text-blue-800"
+                              : "border-violet-200 bg-violet-50 text-violet-800"}
+                          >
+                            {getApprovalDestinationLabel(item)}
+                          </Badge>
+                          {item.approvalRoute === 'specific' && item.assignedApproverId === userProfile?.uid ? (
+                            <p className="mt-1 text-xs font-bold text-emerald-700">مسند إليك مباشرة</p>
+                          ) : null}
+                        </td>
                         <td className="px-4 py-3 align-top">
                           <Badge variant={getConfidentialityVariant(item.record.confidentiality) as any}>
                             {getConfidentialityLabel(item.record.confidentiality)}
                           </Badge>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 align-top text-slate-600">{formatDateTime(item.createdAt)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 align-top text-slate-600">{formatDateTime(item.approvalRequestedAt || item.createdAt)}</td>
                         <td className="px-4 py-3 align-top">
                           <div className="flex flex-wrap gap-2">
                             <Button type="button" variant="outline" size="sm" onClick={() => window.open(item.driveUrl, '_blank', 'noopener,noreferrer')}>
@@ -2039,25 +2060,31 @@ export const ArchivePage: React.FC = () => {
                                   <Badge variant="outline" className="border-amber-300 bg-amber-50 px-3 py-2 text-amber-800">
                                     من رفعك — يلزم معتمد آخر
                                   </Badge>
+                                ) : canCurrentUserReviewVersion(item) ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      onClick={() => openVersionGovernanceDialog(item, 'approve', item.record.id)}
+                                      className="bg-emerald-600 font-bold text-white hover:bg-emerald-700"
+                                    >
+                                      اعتماد
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openVersionGovernanceDialog(item, 'cancel', item.record.id)}
+                                      className="border-red-200 bg-red-50 font-bold text-red-700 hover:bg-red-100"
+                                    >
+                                      إلغاء
+                                    </Button>
+                                  </>
                                 ) : (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => openVersionGovernanceDialog(item, 'approve', item.record.id)}
-                                    className="bg-emerald-600 font-bold text-white hover:bg-emerald-700"
-                                  >
-                                    اعتماد
-                                  </Button>
+                                  <Badge variant="outline" className="border-blue-200 bg-blue-50 px-3 py-2 text-blue-800">
+                                    موجه إلى {item.assignedApproverName || 'معتمد آخر'}
+                                  </Badge>
                                 )}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openVersionGovernanceDialog(item, 'cancel', item.record.id)}
-                                  className="border-red-200 bg-red-50 font-bold text-red-700 hover:bg-red-100"
-                                >
-                                  إلغاء
-                                </Button>
                               </>
                             ) : null}
                           </div>
