@@ -1614,34 +1614,68 @@ export const ArchivePage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  الملف المؤرشف
+                  <Paperclip className="h-4 w-4" />
+                  الملفات المرفقة ({selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1})
                 </CardTitle>
+                <CardDescription>
+                  يمكن إضافة ملفات جديدة في أي وقت من خلال «تحديث السجل وإضافة ملفات».
+                </CardDescription>
               </CardHeader>
 
-              <CardContent className="space-y-4">
-                <AttachmentPreviewCard
-                  attachment={selectedDocument}
-                />
-
-                <div className="rounded-lg border p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{selectedDocument.originalName}</p>
-                    <p className="text-sm text-muted-foreground">{selectedDocument.mimeType || 'نوع غير معروف'} — {formatFileSize(selectedDocument.fileSize)}</p>
+              <CardContent className="space-y-3">
+                {(selectedDocument.attachments?.length
+                  ? selectedDocument.attachments
+                  : [{
+                      id: selectedDocument.id,
+                      fileName: selectedDocument.fileName,
+                      originalName: selectedDocument.originalName,
+                      mimeType: selectedDocument.mimeType,
+                      fileSize: selectedDocument.fileSize,
+                      driveUrl: selectedDocument.driveUrl,
+                      driveFileId: selectedDocument.driveFileId,
+                    }]
+                ).map((attachment) => (
+                  <div
+                    key={attachment.id || attachment.driveFileId || attachment.driveUrl}
+                    className="rounded-xl border border-slate-200 bg-white p-4"
+                  >
+                    <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-semibold">{attachment.originalName || attachment.fileName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {attachment.mimeType || 'نوع غير معروف'} — {formatFileSize(attachment.fileSize)}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => window.open(attachment.driveUrl, '_blank', 'noopener,noreferrer')}
+                        >
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                          فتح
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = attachment.driveUrl;
+                            link.target = '_blank';
+                            link.rel = 'noreferrer';
+                            link.download = attachment.originalName || attachment.fileName;
+                            link.click();
+                          }}
+                        >
+                          <Download className="ml-2 h-4 w-4" />
+                          تنزيل
+                        </Button>
+                      </div>
+                    </div>
+                    <AttachmentPreviewCard attachment={attachment as any} />
                   </div>
-
-                  <div className="flex flex-col md:flex-row gap-2">
-                    <Button variant="outline" onClick={() => openFile(selectedDocument)}>
-                      <ExternalLink className="ml-2 h-4 w-4" />
-                      فتح
-                    </Button>
-                    <Button variant="outline" onClick={() => downloadFile(selectedDocument)}>
-                      <Download className="ml-2 h-4 w-4" />
-                      تنزيل
-                    </Button>
-                  </div>
-                </div>
+                ))}
               </CardContent>
+            </Card>
+
             </Card>
 
             {(canEdit || canDelete) && (
@@ -1815,12 +1849,12 @@ export const ArchivePage: React.FC = () => {
                           <p className="mt-1 line-clamp-2 font-bold text-slate-700">{doc.issuingAuthority || '-'}</p>
                         </div>
                         <div>
-                          <p className="text-[11px] font-medium text-slate-400">نوع الملف</p>
-                          <p className="mt-1 font-black text-slate-700">{getArchiveFileTypeLabel(doc)}</p>
+                          <p className="text-[11px] font-medium text-slate-400">عدد الملفات</p>
+                          <p className="mt-1 font-black text-slate-700">{(doc.attachmentCount || doc.attachments?.length || 1).toLocaleString('ar-SA')} ملف</p>
                         </div>
                         <div>
-                          <p className="text-[11px] font-medium text-slate-400">الحجم</p>
-                          <p className="mt-1 font-black text-slate-700">{formatFileSize(doc.fileSize)}</p>
+                          <p className="text-[11px] font-medium text-slate-400">إجمالي الحجم</p>
+                          <p className="mt-1 font-black text-slate-700">{formatFileSize(doc.totalFileSize ?? doc.fileSize)}</p>
                         </div>
                       </div>
                     </div>
@@ -1909,8 +1943,8 @@ export const ArchivePage: React.FC = () => {
                       <th className="px-4 py-3 font-black">تاريخ المستند</th>
                       <th className="px-4 py-3 font-black">الجهة / المصدر</th>
                       <th className="px-4 py-3 font-black">السرية</th>
-                      <th className="px-4 py-3 font-black">النوع</th>
-                      <th className="px-4 py-3 font-black">الحجم</th>
+                      <th className="px-4 py-3 font-black">الملفات</th>
+                      <th className="px-4 py-3 font-black">إجمالي الحجم</th>
                       <th className="px-4 py-3 text-center font-black">الإجراءات</th>
                     </tr>
                   </thead>
@@ -1945,8 +1979,8 @@ export const ArchivePage: React.FC = () => {
                             {getConfidentialityLabel(doc.confidentiality)}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 align-top font-black text-slate-700">{getArchiveFileTypeLabel(doc)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 align-top font-semibold text-slate-700">{formatFileSize(doc.fileSize)}</td>
+                        <td className="px-4 py-3 align-top font-black text-slate-700">{(doc.attachmentCount || doc.attachments?.length || 1).toLocaleString('ar-SA')}</td>
+                        <td className="whitespace-nowrap px-4 py-3 align-top font-semibold text-slate-700">{formatFileSize(doc.totalFileSize ?? doc.fileSize)}</td>
                         <td className="px-4 py-3 align-top">
                           <div className="flex min-w-max items-center justify-center gap-1.5">
                             <Button type="button" variant="outline" size="sm" onClick={() => openDetails(doc)} title="عرض التفاصيل" className="h-8 px-2.5">
@@ -1988,9 +2022,27 @@ export const ArchivePage: React.FC = () => {
         onOpenChange={setExcelImportOpen}
         existingDocuments={documents}
         createArchiveDocument={(payload: ArchiveExcelImportPayload) =>
-          archiveRequest<ArchiveDocument>('', {
+          archiveRequest<ArchiveDocument>('/records', {
             method: 'POST',
-            body: JSON.stringify(payload),
+            body: JSON.stringify({
+              title: payload.title,
+              category: payload.category,
+              documentNumber: payload.documentNumber,
+              documentDate: payload.documentDate,
+              documentDateType: payload.documentDateType,
+              issuingAuthority: payload.issuingAuthority,
+              confidentiality: payload.confidentiality,
+              tags: payload.tags,
+              description: payload.description,
+              attachments: [{
+                fileName: payload.fileName,
+                originalName: payload.originalName,
+                mimeType: payload.mimeType,
+                fileSize: payload.fileSize,
+                driveUrl: payload.driveUrl,
+                driveFileId: payload.driveFileId,
+              }],
+            }),
           })
         }
         onImported={async () => {
@@ -2003,9 +2055,9 @@ export const ArchivePage: React.FC = () => {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>حذف ملف من الأرشفة</AlertDialogTitle>
+            <AlertDialogTitle>حذف سجل أرشيفي</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم حذف بيانات الملف من الأرشفة داخل المنصة. لن يتم حذف الملف من Google Drive تلقائيًا.
+              سيتم نقل السجل الأرشيفي إلى المحذوفات داخل المنصة، مع بقاء الملفات الأصلية في Google Drive. يمكن إضافة الاستعادة والحذف النهائي ضمن إدارة المحذوفات لاحقًا.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
