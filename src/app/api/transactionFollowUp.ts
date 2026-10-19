@@ -1161,6 +1161,10 @@ export type TransactionFollowUpReportTemplate = {
   assigneeUserId?: string | null;
   orientation: 'portrait' | 'landscape';
   options: TransactionFollowUpReportTemplateOptions;
+  accessMode: 'all' | 'selected';
+  allowedUserIds?: string[] | null;
+  isDefault: boolean;
+  sortOrder: number;
   createdById: string;
   createdByName?: string | null;
   createdAt: string;
@@ -1586,6 +1590,10 @@ export const transactionFollowUpApi = {
     assigneeUserId?: string | null;
     orientation: 'portrait' | 'landscape';
     options: TransactionFollowUpReportTemplateOptions;
+    accessMode?: 'all' | 'selected';
+    allowedUserIds?: string[];
+    isDefault?: boolean;
+    sortOrder?: number;
   }) =>
     apiJson<TransactionFollowUpReportTemplate>('/api/transaction-follow-up/reports/templates', {
       method: 'POST',
@@ -1603,6 +1611,10 @@ export const transactionFollowUpApi = {
       assigneeUserId: string | null;
       orientation: 'portrait' | 'landscape';
       options: TransactionFollowUpReportTemplateOptions;
+      accessMode: 'all' | 'selected';
+      allowedUserIds: string[];
+      isDefault: boolean;
+      sortOrder: number;
     }>,
   ) =>
     apiJson<TransactionFollowUpReportTemplate>(
@@ -1616,6 +1628,21 @@ export const transactionFollowUpApi = {
   deleteReportTemplate: (id: string) =>
     apiJson<void>(`/api/transaction-follow-up/reports/templates/${id}`, {
       method: 'DELETE',
+    }),
+
+  reorderReportTemplates: (
+    scope: 'personal' | 'shared',
+    orderedIds: string[],
+  ) =>
+    apiJson<{ updated: number }>('/api/transaction-follow-up/reports/templates/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ scope, orderedIds }),
+    }),
+
+  cloneReportTemplate: (templateId: string, name?: string) =>
+    apiJson<TransactionFollowUpReportTemplate>('/api/transaction-follow-up/reports/templates/clone', {
+      method: 'POST',
+      body: JSON.stringify({ templateId, ...(name ? { name } : {}) }),
     }),
 
   reportSchedules: () =>
