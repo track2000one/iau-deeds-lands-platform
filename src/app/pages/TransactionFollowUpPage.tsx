@@ -259,6 +259,45 @@ const formatDateTime = (value?: string | null) =>
       }).format(new Date(value))
     : '—';
 
+const archiveRetentionLabels: Record<TransactionFollowUpReportArchive['retentionPolicy'], string> = {
+  none: 'بدون مدة احتفاظ',
+  one_year: 'سنة واحدة',
+  three_years: '3 سنوات',
+  five_years: '5 سنوات',
+  permanent: 'احتفاظ دائم',
+  custom: 'مدة مخصصة',
+};
+
+const archiveRetentionExpiry = (archive: TransactionFollowUpReportArchive) => {
+  if (archive.retentionPolicy === 'custom') {
+    return archive.retainUntil ? new Date(archive.retainUntil) : null;
+  }
+  if (archive.retentionPolicy === 'permanent' || archive.retentionPolicy === 'none') return null;
+
+  const created = new Date(archive.createdAt);
+  if (Number.isNaN(created.getTime())) return null;
+  const years =
+    archive.retentionPolicy === 'one_year'
+      ? 1
+      : archive.retentionPolicy === 'three_years'
+        ? 3
+        : 5;
+  const expiry = new Date(created);
+  expiry.setUTCFullYear(expiry.getUTCFullYear() + years);
+  return expiry;
+};
+
+const archiveDeleteBlockReason = (archive: TransactionFollowUpReportArchive) => {
+  if (archive.governanceStatus === 'final') return 'التقرير نهائي';
+  if (archive.isDeletionProtected) return 'محمي من الحذف';
+  if (archive.retentionPolicy === 'permanent') return 'احتفاظ دائم';
+  const expiry = archiveRetentionExpiry(archive);
+  if (expiry && expiry.getTime() > Date.now()) {
+    return `محفوظ حتى ${new Intl.DateTimeFormat('ar-SA-u-ca-gregory').format(expiry)}`;
+  }
+  return '';
+};
+
 const formatTransactionDate = (record?: Pick<
   TransactionFollowUpRecord,
   'transactionDate' | 'transactionDateType' | 'transactionDateInput'
@@ -1023,6 +1062,8 @@ export const TransactionFollowUpPage: React.FC = () => {
         source: reportArchiveSource || undefined,
         reportType: reportArchiveType || undefined,
         tag: reportArchiveTag.trim() || undefined,
+        governanceStatus: reportArchiveGovernanceStatus || undefined,
+        pinned: reportArchivePinnedOnly ? true : undefined,
       });
       setReportArchives(result.items || []);
       setReportArchivePage(result.page || 1);
@@ -1250,6 +1291,8 @@ export const TransactionFollowUpPage: React.FC = () => {
     setReportArchiveSource('');
     setReportArchiveType('');
     setReportArchiveTag('');
+    setReportArchiveGovernanceStatus('');
+    setReportArchivePinnedOnly(false);
     try {
       setReportArchiveLoading(true);
       const result = await transactionFollowUpApi.reportArchives({ page: 1, pageSize: 20 });
