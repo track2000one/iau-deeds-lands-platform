@@ -1130,6 +1130,33 @@ export const ArchivePage: React.FC = () => {
     }
   };
 
+  const cancelVersionDraft = async () => {
+    if (!selectedDocument || !versionGovernanceAttachment) return;
+    try {
+      setVersionGovernanceSaving(true);
+      const updated = await archiveRequest<ArchiveDocument>(
+        `/records/${selectedDocument.id}/attachments/${versionGovernanceAttachment.id}/cancel`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ reason: versionGovernanceNote.trim() }),
+        },
+      );
+      setDocuments((current) =>
+        current.map((doc) => (doc.id === updated.id ? updated : doc)),
+      );
+      setSelectedDocument(updated);
+      toast.success(`تم إلغاء مسودة الإصدار V${versionGovernanceAttachment.version || 1}`);
+      setVersionGovernanceOpen(false);
+      setVersionGovernanceAttachment(null);
+      setVersionGovernanceAction(null);
+      setVersionGovernanceNote('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إلغاء مسودة الإصدار');
+    } finally {
+      setVersionGovernanceSaving(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if ((formMode === 'add' && !canAdd) || (formMode === 'edit' && !canEdit)) {
       toast.error('لا تملك الصلاحية المطلوبة لتنفيذ عملية الأرشفة');
