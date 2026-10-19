@@ -22,6 +22,7 @@ import {
   FileSpreadsheet,
   FileText,
   Paperclip,
+  Pencil,
   Upload,
   ExternalLink,
   Printer,
@@ -540,6 +541,17 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [reportArchiveLoading, setReportArchiveLoading] = React.useState(false);
   const [reportArchivePage, setReportArchivePage] = React.useState(1);
   const [reportArchiveTotalPages, setReportArchiveTotalPages] = React.useState(0);
+  const [reportArchiveSearch, setReportArchiveSearch] = React.useState('');
+  const [reportArchiveSource, setReportArchiveSource] = React.useState<'manual' | 'scheduled' | ''>('');
+  const [reportArchiveType, setReportArchiveType] = React.useState<'weekly' | 'monthly' | 'custom' | ''>('');
+  const [reportArchiveTag, setReportArchiveTag] = React.useState('');
+  const [archiveSaveName, setArchiveSaveName] = React.useState('');
+  const [archiveSaveNotes, setArchiveSaveNotes] = React.useState('');
+  const [archiveSaveTags, setArchiveSaveTags] = React.useState('');
+  const [archiveEditingId, setArchiveEditingId] = React.useState('');
+  const [archiveEditName, setArchiveEditName] = React.useState('');
+  const [archiveEditNotes, setArchiveEditNotes] = React.useState('');
+  const [archiveEditTags, setArchiveEditTags] = React.useState('');
   const [compareLeftId, setCompareLeftId] = React.useState('');
   const [compareRightId, setCompareRightId] = React.useState('');
   const [reportComparison, setReportComparison] = React.useState<TransactionFollowUpReportComparison | null>(null);
