@@ -711,6 +711,8 @@ export const ArchivePage: React.FC = () => {
           loadDocumentsFromServer(),
           loadArchivedTransactions(),
           loadTrashRecords(),
+          loadApprovalNotifications(),
+          ...(canApproveVersions ? [loadApprovalCenterItems()] : []),
         ]);
 
         if (!mounted) return;
@@ -738,7 +740,18 @@ export const ArchivePage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [isAdmin]);
+  }, [isAdmin, canApproveVersions]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadApprovalNotifications().catch(() => undefined);
+      if (canApproveVersions) {
+        void loadApprovalCenterItems().catch(() => undefined);
+      }
+    }, 60000);
+
+    return () => window.clearInterval(timer);
+  }, [canApproveVersions]);
 
   const filteredDocuments = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -1486,8 +1499,8 @@ export const ArchivePage: React.FC = () => {
   };
 
   const pendingApprovalCount = useMemo(
-    () => documents.reduce((sum, doc) => sum + Number(doc.pendingVersionCount || 0), 0),
-    [documents],
+    () => approvalItems.filter((item) => getAttachmentVersionStatus(item) === 'draft').length,
+    [approvalItems],
   );
 
   const approvalEmployees = useMemo(
