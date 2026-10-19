@@ -1201,7 +1201,9 @@ export const TransactionFollowUpPage: React.FC = () => {
         .map(normalizeReportTemplate)
         .filter((template): template is FlexibleReportTemplate => Boolean(template))
         .sort((left, right) => {
-          if (left.scope !== right.scope) return left.scope === 'shared' ? -1 : 1;
+          if (left.isDefault !== right.isDefault) return left.isDefault ? -1 : 1;
+          if (left.scope !== right.scope) return left.scope === 'personal' ? -1 : 1;
+          if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
           return right.updatedAt.localeCompare(left.updatedAt);
         }),
     );
@@ -1218,6 +1220,15 @@ export const TransactionFollowUpPage: React.FC = () => {
 
     try {
       setReportTemplateSaving(true);
+      if (
+        scope === 'shared'
+        && reportTemplateAccessMode === 'selected'
+        && !reportTemplateAllowedUserIds.length
+      ) {
+        toast.error('حدد مستخدمًا واحدًا على الأقل للقالب العام المقيّد');
+        return;
+      }
+
       await transactionFollowUpApi.saveReportTemplate({
         name,
         scope,
@@ -1230,10 +1241,19 @@ export const TransactionFollowUpPage: React.FC = () => {
             : null,
         orientation: reportOrientation,
         options: reportTemplateOptionsForApi(flexibleReportOptions),
+        accessMode: scope === 'shared' ? reportTemplateAccessMode : 'all',
+        allowedUserIds:
+          scope === 'shared' && reportTemplateAccessMode === 'selected'
+            ? reportTemplateAllowedUserIds
+            : [],
+        isDefault: reportTemplateDefault,
       });
 
       await refreshReportTemplates();
       setReportTemplateName('');
+      setReportTemplateAccessMode('all');
+      setReportTemplateAllowedUserIds([]);
+      setReportTemplateDefault(false);
       toast.success(
         scope === 'shared'
           ? 'تم حفظ القالب العام للإدارة'
@@ -1269,6 +1289,129 @@ export const TransactionFollowUpPage: React.FC = () => {
     setReportTo(to);
     await loadExecutiveReport(from, to, template.assigneeUserId || '');
     toast.success(`تم تطبيق قالب «${template.name}»`);
+  };
+
+  const updateFlexibleReportTemplateDraft = (
+    templateId: string,
+    patch: Partial<Pick<FlexibleReportTemplate, 'accessMode' | 'allowedUserIds' | 'isDefault'>>,
+  ) => {
+    setReportTemplates((current) =>
+      current.map((template) => {
+        if (patch.isDefault && template.id !== templateId) {
+          const selected = current.find((item) => item.id === templateId);
+          if (
+            selected
+            && template.scope === selected.scope
+            && (
+              selected.scope === 'shared'
+              || template.createdById === selected.createdById
+            )
+          ) {
+            return { ...template, isDefault: false };
+          }
+        }
+        return template.id === templateId ? { ...template, ...patch } : template;
+      }),
+    );
+  };
+
+  const toggleFlexibleReportTemplateAudienceUser = (
+    template: FlexibleReportTemplate,
+    userId: string,
+  ) => {
+    const exists = template.allowedUserIds.includes(userId);
+    updateFlexibleReportTemplateDraft(template.id, {
+      allowedUserIds: exists
+        ? template.allowedUserIds.filter((id) => id !== userId)
+        : [...template.allowedUserIds, userId],
+    });
+  };
+
+  const saveFlexibleReportTemplateGovernance = async (template: FlexibleReportTemplate) => {
+    if (
+      template.scope === 'shared'
+      && template.accessMode === 'selected'
+      && !template.allowedUserIds.length
+    ) {
+      toast.error('حدد مستخدمًا واحدًا على الأقل قبل حفظ تقييد القالب');
+      return;
+    }
+
+    try {
+      setReportTemplateSaving(true);
+      await transactionFollowUpApi.updateReportTemplate(template.id, {
+        ...(template.scope === 'shared'
+          ? {
+              accessMode: template.accessMode,
+              allowedUserIds: template.accessMode === 'selected'
+                ? template.allowedUserIds
+                : [],
+            }
+          : {}),
+        isDefault: template.isDefault,
+      });
+      await refreshReportTemplates();
+      toast.success('تم حفظ إعدادات القالب');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ إعدادات القالب');
+      await refreshReportTemplates().catch(() => undefined);
+    } finally {
+      setReportTemplateSaving(false);
+    }
+  };
+
+  const moveFlexibleReportTemplate = async (
+    template: FlexibleReportTemplate,
+    direction: 'up' | 'down',
+  ) => {
+    const canManageOrder =
+      template.scope === 'personal'
+      || isAdmin
+      || canDelete;
+    if (!canManageOrder) return;
+
+    const sameScope = reportTemplates
+      .filter((item) =>
+        item.scope === template.scope
+        && (
+          template.scope === 'shared'
+          || item.createdById === template.createdById
+        ),
+      )
+      .sort((left, right) => {
+        if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
+        return left.updatedAt.localeCompare(right.updatedAt);
+      });
+
+    const currentIndex = sameScope.findIndex((item) => item.id === template.id);
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= sameScope.length) return;
+
+    const ordered = sameScope.map((item) => item.id);
+    [ordered[currentIndex], ordered[targetIndex]] = [ordered[targetIndex], ordered[currentIndex]];
+
+    try {
+      setReportTemplateSaving(true);
+      await transactionFollowUpApi.reorderReportTemplates(template.scope, ordered);
+      await refreshReportTemplates();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر ترتيب القوالب');
+    } finally {
+      setReportTemplateSaving(false);
+    }
+  };
+
+  const cloneFlexibleReportTemplateToPersonal = async (template: FlexibleReportTemplate) => {
+    try {
+      setReportTemplateSaving(true);
+      const clone = await transactionFollowUpApi.cloneReportTemplate(template.id);
+      await refreshReportTemplates();
+      toast.success(`تم إنشاء قالب شخصي «${clone.name}» ويمكن تعديله دون التأثير على الأصل`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر نسخ القالب');
+    } finally {
+      setReportTemplateSaving(false);
+    }
   };
 
   const deleteFlexibleReportTemplate = async (template: FlexibleReportTemplate) => {
