@@ -3602,7 +3602,7 @@ ${styleAssets}
                     record={record}
                     canEdit={recordCanEdit}
                     canDelete={canDelete}
-                    canReopen={canReopen}
+                    canReopen={canReopen && !record.archivedAt}
                     canTransfer={
                       canTransfer &&
                       !['completed', 'closed'].includes(record.status) &&
