@@ -186,7 +186,7 @@ export const openArchivedTransactionVisualPdf = async (input: {
   transactionId: string;
   html: string;
   attachments: TransactionFollowUpAttachment[];
-  fileName: string;
+  popup: Window;
 }) => {
   const report = await renderHtmlToPdf(input.html);
   let appended = 0;
@@ -216,15 +216,14 @@ export const openArchivedTransactionVisualPdf = async (input: {
   }
 
   const bytes = await report.save();
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const arrayBuffer = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+  const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
-  const popup = window.open(url, '_blank', 'noopener,noreferrer');
 
-  if (!popup) {
-    URL.revokeObjectURL(url);
-    throw new Error('تعذر فتح التقرير. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى.');
-  }
-
+  input.popup.location.replace(url);
   window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
 
   return {
