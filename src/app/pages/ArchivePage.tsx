@@ -2958,7 +2958,20 @@ export const ArchivePage: React.FC = () => {
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={closeVersionGovernanceDialog}>رجوع</AlertDialogCancel>
+            <AlertDialogCancel onClick={closeVersionGovernanceDialog} disabled={versionGovernanceSaving}>رجوع</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={versionGovernanceSaving}
+              onClick={(event) => {
+                event.preventDefault();
+                if (versionGovernanceAction === 'approve') {
+                  void approveVersionDraft();
+                } else {
+                  void cancelVersionDraft();
+                }
+              }}
+            >
+              {versionGovernanceSaving ? 'جاري التنفيذ...' : versionGovernanceAction === 'approve' ? 'اعتماد الإصدار' : 'إلغاء المسودة'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
