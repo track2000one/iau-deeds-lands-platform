@@ -1123,6 +1123,50 @@ export type TransactionFollowUpReportComparison = {
   >;
 };
 
+export type TransactionFollowUpReportTemplateOptions = {
+  title: string;
+  categories: Array<'completed' | 'overdue' | 'waiting_response' | 'needs_follow_up'>;
+  search: string;
+  priority: TransactionFollowUpPriority | '';
+  organizationalUnit: TransactionFollowUpOrganizationalUnit | '';
+  sortBy:
+    | 'transactionDate'
+    | 'transactionNumber'
+    | 'priority'
+    | 'currentAssigneeName'
+    | 'dueDate'
+    | 'category';
+  sortDirection: 'asc' | 'desc';
+  visibleColumns: Array<
+    | 'transactionNumber'
+    | 'transactionDate'
+    | 'subject'
+    | 'transactionType'
+    | 'organizationalUnit'
+    | 'currentAssigneeName'
+    | 'category'
+    | 'priority'
+    | 'dueDate'
+    | 'requiredAction'
+  >;
+};
+
+export type TransactionFollowUpReportTemplate = {
+  id: string;
+  name: string;
+  scope: 'personal' | 'shared';
+  reportMode: 'weekly' | 'monthly' | 'custom';
+  customFrom?: string | null;
+  customTo?: string | null;
+  assigneeUserId?: string | null;
+  orientation: 'portrait' | 'landscape';
+  options: TransactionFollowUpReportTemplateOptions;
+  createdById: string;
+  createdByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TransactionFollowUpReportSchedule = {
   id: string;
   name: string;
@@ -1529,6 +1573,50 @@ export const transactionFollowUpApi = {
       `/api/transaction-follow-up/reports/backup-runs/${id}/restore-test`,
       { method: 'POST' },
     ),
+
+  reportTemplates: () =>
+    apiJson<TransactionFollowUpReportTemplate[]>('/api/transaction-follow-up/reports/templates'),
+
+  saveReportTemplate: (input: {
+    name: string;
+    scope: 'personal' | 'shared';
+    reportMode: 'weekly' | 'monthly' | 'custom';
+    customFrom?: string | null;
+    customTo?: string | null;
+    assigneeUserId?: string | null;
+    orientation: 'portrait' | 'landscape';
+    options: TransactionFollowUpReportTemplateOptions;
+  }) =>
+    apiJson<TransactionFollowUpReportTemplate>('/api/transaction-follow-up/reports/templates', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  updateReportTemplate: (
+    id: string,
+    input: Partial<{
+      name: string;
+      scope: 'personal' | 'shared';
+      reportMode: 'weekly' | 'monthly' | 'custom';
+      customFrom: string | null;
+      customTo: string | null;
+      assigneeUserId: string | null;
+      orientation: 'portrait' | 'landscape';
+      options: TransactionFollowUpReportTemplateOptions;
+    }>,
+  ) =>
+    apiJson<TransactionFollowUpReportTemplate>(
+      `/api/transaction-follow-up/reports/templates/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      },
+    ),
+
+  deleteReportTemplate: (id: string) =>
+    apiJson<void>(`/api/transaction-follow-up/reports/templates/${id}`, {
+      method: 'DELETE',
+    }),
 
   reportSchedules: () =>
     apiJson<TransactionFollowUpReportSchedule[]>('/api/transaction-follow-up/reports/schedules'),
