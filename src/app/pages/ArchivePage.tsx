@@ -3477,6 +3477,58 @@ export const ArchivePage: React.FC = () => {
                 disabled={versionSaving}
               />
             </div>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+              <Label htmlFor="archive-version-approval-route">توجيه طلب الاعتماد *</Label>
+              <NativeSelect
+                id="archive-version-approval-route"
+                value={versionApprovalRoute}
+                onChange={(event) => {
+                  const value = event.target.value === 'specific' ? 'specific' : 'pool';
+                  setVersionApprovalRoute(value);
+                  if (value === 'pool') setVersionApproverId('');
+                }}
+                disabled={versionSaving || versionApproversLoading}
+                className="mt-2"
+              >
+                <option value="pool">مجموعة معتمدي الأرشيف — أول معتمد مخول يمكنه المراجعة</option>
+                <option value="specific">معتمد محدد — توجيه الطلب إلى مستخدم بعينه</option>
+              </NativeSelect>
+
+              {versionApprovalRoute === 'specific' && (
+                <div className="mt-3 space-y-2">
+                  <Label htmlFor="archive-version-approver">المعتمد المحدد *</Label>
+                  <NativeSelect
+                    id="archive-version-approver"
+                    value={versionApproverId}
+                    onChange={(event) => setVersionApproverId(event.target.value)}
+                    disabled={versionSaving || versionApproversLoading}
+                  >
+                    <option value="">
+                      {versionApproversLoading ? 'جاري تحميل المعتمدين...' : 'اختر المعتمد'}
+                    </option>
+                    {versionApprovers.map((approver) => (
+                      <option key={approver.id} value={approver.id}>
+                        {approver.name}{approver.role === 'admin' ? ' — مسؤول النظام' : ''}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+              )}
+
+              <p className="mt-2 text-xs leading-6 text-amber-900">
+                لا يظهر المستخدم الحالي ضمن قائمة المعتمدين تطبيقًا لمبدأ فصل المُعد عن المُعتمد.
+                {versionApprovalRoute === 'specific'
+                  ? ' لن يتمكن من اعتماد الطلب إلا المعتمد المحدد.'
+                  : ' سيتم إشعار جميع المستخدمين المخولين باعتماد الأرشيف.'}
+              </p>
+
+              {!versionApproversLoading && versionApprovers.length === 0 ? (
+                <p className="mt-2 text-xs font-bold text-red-700">
+                  لا يوجد معتمد آخر متاح حاليًا. امنح مستخدمًا آخر صلاحية «اعتماد الأرشيف» أولًا.
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <AlertDialogFooter>
@@ -3494,7 +3546,13 @@ export const ArchivePage: React.FC = () => {
                 event.preventDefault();
                 void saveAttachmentVersion();
               }}
-              disabled={versionSaving || !versionFile}
+              disabled={
+                versionSaving ||
+                versionApproversLoading ||
+                !versionFile ||
+                versionApprovers.length === 0 ||
+                (versionApprovalRoute === 'specific' && !versionApproverId)
+              }
               className="bg-[#1F4E78] text-white hover:bg-[#173A59]"
             >
               {versionSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <History className="ml-2 h-4 w-4" />}
