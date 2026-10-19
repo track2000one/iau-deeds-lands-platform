@@ -58,8 +58,36 @@ import {
   type TransactionFollowUpOrganizationalUnit,
 } from '../api/transactionFollowUp';
 
+type ArchiveAttachment = {
+  id: string;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  driveUrl: string;
+  driveFileId: string;
+  version?: number;
+  isCurrent?: boolean;
+  addedBy?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type ArchiveActivity = {
+  id: string;
+  action: string;
+  description?: string | null;
+  actorName?: string | null;
+  createdAt: string;
+};
+
 type ArchiveDocument = {
   id: string;
+  archiveNumber?: string;
+  attachmentCount?: number;
+  totalFileSize?: number;
+  attachments?: ArchiveAttachment[];
+  activities?: ArchiveActivity[];
   title: string;
   category: string;
   documentNumber: string;
@@ -207,6 +235,7 @@ const getArchiveConfidentialityClassName = (value: ArchiveDocument['confidential
 };
 
 const getArchiveReference = (doc: ArchiveDocument) =>
+  doc.archiveNumber ||
   `ARC-${String(doc.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || '00000000'}`;
 
 const getArchiveMissingMetadata = (doc: ArchiveDocument) => {
@@ -216,7 +245,7 @@ const getArchiveMissingMetadata = (doc: ArchiveDocument) => {
   if (!String(doc.issuingAuthority || '').trim()) missing.push('الجهة / المصدر');
   if (!String(doc.tags || '').trim()) missing.push('الكلمات المفتاحية');
   if (!String(doc.description || '').trim()) missing.push('الوصف');
-  if (!String(doc.driveUrl || '').trim()) missing.push('رابط الملف');
+  if (!(doc.attachments?.length || String(doc.driveUrl || '').trim())) missing.push('الملفات المرفقة');
   return missing;
 };
 
@@ -316,7 +345,7 @@ export const ArchivePage: React.FC = () => {
   };
 
   const loadDocumentsFromServer = async () => {
-    const remote = await archiveRequest<ArchiveDocument[]>();
+    const remote = await archiveRequest<ArchiveDocument[]>('/records');
     setDocuments(Array.isArray(remote) ? remote : []);
     return Array.isArray(remote) ? remote : [];
   };
@@ -365,9 +394,27 @@ export const ArchivePage: React.FC = () => {
         continue;
       }
 
-      await archiveRequest<ArchiveDocument>('', {
+      await archiveRequest<ArchiveDocument>('/records', {
         method: 'POST',
-        body: JSON.stringify(legacy),
+        body: JSON.stringify({
+          title: legacy.title,
+          category: legacy.category,
+          documentNumber: legacy.documentNumber,
+          documentDate: legacy.documentDate,
+          documentDateType: legacy.documentDateType,
+          issuingAuthority: legacy.issuingAuthority,
+          confidentiality: legacy.confidentiality,
+          tags: legacy.tags,
+          description: legacy.description,
+          attachments: [{
+            fileName: legacy.fileName,
+            originalName: legacy.originalName,
+            mimeType: legacy.mimeType,
+            fileSize: legacy.fileSize,
+            driveUrl: legacy.driveUrl,
+            driveFileId: legacy.driveFileId,
+          }],
+        }),
       });
 
       existingKeys.add(key);
@@ -685,7 +732,7 @@ export const ArchivePage: React.FC = () => {
     if (!documentToDelete) return;
 
     try {
-      await archiveRequest<void>(`/${documentToDelete.id}`, {
+      await archiveRequest<void>(`/records/${documentToDelete.id}`, {
         method: 'DELETE',
       });
 
@@ -693,7 +740,7 @@ export const ArchivePage: React.FC = () => {
         current.filter((doc) => doc.id !== documentToDelete.id)
       );
 
-      toast.success('تم حذف الملف من الأرشفة');
+      toast.success('تم نقل السجل الأرشيفي إلى المحذوفات');
       setDeleteDialogOpen(false);
       setDocumentToDelete(null);
 
@@ -704,17 +751,17 @@ export const ArchivePage: React.FC = () => {
     } catch (error) {
       console.error('Archive delete error:', error);
       toast.error(
-        error instanceof Error ? error.message : 'فشل في حذف ملف الأرشفة'
+        error instanceof Error ? error.message : 'فشل في حذف السجل الأرشيفي'
       );
     }
   };
   const validateForm = () => {
     if (!form.title.trim()) {
-      toast.error('عنوان الملف مطلوب');
+      toast.error('عنوان السجل الأرشيفي مطلوب');
       return false;
     }
     if (!form.category.trim()) {
-      toast.error('تصنيف الملف مطلوب');
+      toast.error('تصنيف السجل الأرشيفي مطلوب');
       return false;
     }
     if (formMode === 'add' && form.files.length === 0) {
