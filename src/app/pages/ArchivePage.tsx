@@ -1276,6 +1276,14 @@ export const ArchivePage: React.FC = () => {
       toast.error('لا يمكنك اعتماد إصدار قمت برفعه بنفسك. يجب أن يعتمد الإصدار مستخدم آخر مخول.');
       return;
     }
+    if (!isOwnVersionDraft(attachment) && !canCurrentUserReviewVersion(attachment)) {
+      toast.error(
+        attachment.approvalRoute === 'specific'
+          ? `طلب الاعتماد موجه إلى ${attachment.assignedApproverName || 'معتمد آخر'}`
+          : 'طلب الاعتماد غير مسند إلى حسابك',
+      );
+      return;
+    }
     setVersionGovernanceAttachment(attachment);
     setVersionGovernanceAction(action);
     setVersionGovernanceRecordId(recordId || selectedDocument?.id || '');
