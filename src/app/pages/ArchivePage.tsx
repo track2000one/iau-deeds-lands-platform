@@ -2054,6 +2054,10 @@ export const ArchivePage: React.FC = () => {
               <InfoItem label="الكلمات المفتاحية" value={selectedDocument.tags || '-'} />
               <InfoItem label="عدد الملفات" value={(selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1).toLocaleString('ar-SA')} />
               <InfoItem label="إجمالي الحجم" value={formatFileSize(selectedDocument.totalFileSize ?? selectedDocument.fileSize)} />
+              <InfoItem
+                label="إجمالي الإصدارات"
+                value={(selectedDocument.attachmentVersionCount || selectedDocument.attachments?.length || selectedDocument.attachmentCount || 1).toLocaleString('ar-SA')}
+              />
               <InfoItem label="تاريخ الأرشفة" value={formatDate(selectedDocument.createdAt)} />
               <InfoItem label="آخر تعديل" value={formatDate(selectedDocument.updatedAt)} />
             </div>
