@@ -4737,6 +4737,9 @@ ${styleAssets}
                               {archive.retentionPolicy !== 'none' && (
                                 <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
                                   {archiveRetentionLabels[archive.retentionPolicy]}
+                                  {archiveRetentionExpiry(archive)
+                                    ? ` · حتى ${formatDate(archiveRetentionExpiry(archive)?.toISOString())}`
+                                    : ''}
                                 </Badge>
                               )}
                               {archive.templateName ? (
@@ -4755,8 +4758,11 @@ ${styleAssets}
                               {formatDate(archive.periodFrom)} — {formatDate(archive.periodTo)}
                               {' · '}
                               تم الحفظ {formatDateTime(archive.createdAt)}
+                              {archive.generatedByName ? <> · بواسطة: {archive.generatedByName}</> : null}
                               {archive.updatedByName ? <> · آخر تعديل: {archive.updatedByName}</> : null}
-                              {archive.finalizedAt ? <> · اعتماد نهائي: {formatDateTime(archive.finalizedAt)}</> : null}
+                              {archive.finalizedAt
+                                ? <> · اعتماد نهائي: {archive.finalizedByName || 'مستخدم إشرافي'} في {formatDateTime(archive.finalizedAt)}</>
+                                : null}
                             </p>
 
                             {archive.notes && (
