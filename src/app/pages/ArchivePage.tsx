@@ -100,6 +100,18 @@ type ArchiveApprover = {
   role: 'admin' | 'employee';
 };
 
+type ArchiveApprovalNotification = {
+  id: string;
+  recipientUserId: string;
+  recordId: string;
+  attachmentId: string;
+  type: string;
+  title: string;
+  message?: string | null;
+  readAt?: string | null;
+  createdAt: string;
+};
+
 type ArchiveApprovalItem = ArchiveAttachment & {
   record: {
     id: string;
@@ -522,6 +534,9 @@ export const ArchivePage: React.FC = () => {
   const [approvalDateTo, setApprovalDateTo] = useState('');
   const [approvalSort, setApprovalSort] = useState<'newest' | 'oldest'>('newest');
 
+  const [approvalNotifications, setApprovalNotifications] = useState<ArchiveApprovalNotification[]>([]);
+  const [approvalUnreadCount, setApprovalUnreadCount] = useState(0);
+
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<ArchiveFormState>(emptyForm);
   const [selectedDocument, setSelectedDocument] = useState<ArchiveDocument | null>(null);
@@ -583,6 +598,27 @@ export const ArchivePage: React.FC = () => {
     const items = Array.isArray(result?.items) ? result.items : [];
     setApprovalItems(items);
     return items;
+  };
+
+  const loadApprovalNotifications = async () => {
+    const result = await archiveRequest<{
+      items: ArchiveApprovalNotification[];
+      unreadCount: number;
+    }>('/records/version-approval-notifications');
+    const items = Array.isArray(result?.items) ? result.items : [];
+    setApprovalNotifications(items);
+    setApprovalUnreadCount(Number(result?.unreadCount || 0));
+    return items;
+  };
+
+  const markApprovalNotificationsRead = async () => {
+    await archiveRequest<void>('/records/version-approval-notifications/read-all', {
+      method: 'PATCH',
+    });
+    setApprovalUnreadCount(0);
+    setApprovalNotifications((current) =>
+      current.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })),
+    );
   };
 
   const loadArchivedTransactions = async () => {
