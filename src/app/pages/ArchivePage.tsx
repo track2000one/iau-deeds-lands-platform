@@ -1090,15 +1090,30 @@ export const ArchivePage: React.FC = () => {
     return body as UploadResponse;
   };
 
-  const openAttachmentVersionDialog = (attachment: ArchiveAttachment) => {
+  const openAttachmentVersionDialog = async (attachment: ArchiveAttachment) => {
     if (!canEdit) {
       toast.error('لا تملك صلاحية إضافة إصدار جديد');
       return;
     }
+
     setVersionSourceAttachment(attachment);
     setVersionFile(null);
     setVersionNote('');
+    setVersionApprovalRoute('pool');
+    setVersionApproverId('');
     setVersionDialogOpen(true);
+
+    try {
+      setVersionApproversLoading(true);
+      const approvers = await loadVersionApprovers();
+      if (!approvers.length) {
+        toast.error('لا يوجد معتمد آخر مخول حاليًا. أضف صلاحية «اعتماد الأرشيف» لمستخدم آخر قبل إرسال إصدار جديد.');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل قائمة معتمدي الأرشيف');
+    } finally {
+      setVersionApproversLoading(false);
+    }
   };
 
   const closeAttachmentVersionDialog = () => {
@@ -1107,6 +1122,8 @@ export const ArchivePage: React.FC = () => {
     setVersionSourceAttachment(null);
     setVersionFile(null);
     setVersionNote('');
+    setVersionApprovalRoute('pool');
+    setVersionApproverId('');
   };
 
   const saveAttachmentVersion = async () => {
@@ -1116,6 +1133,14 @@ export const ArchivePage: React.FC = () => {
     }
     if (!canEdit) {
       toast.error('لا تملك صلاحية إضافة إصدار جديد');
+      return;
+    }
+    if (!versionApprovers.length) {
+      toast.error('لا يوجد معتمد آخر متاح لإرسال طلب الاعتماد إليه');
+      return;
+    }
+    if (versionApprovalRoute === 'specific' && !versionApproverId) {
+      toast.error('اختر المعتمد المحدد قبل حفظ مسودة الإصدار');
       return;
     }
 
@@ -1134,6 +1159,8 @@ export const ArchivePage: React.FC = () => {
             driveUrl: uploaded.driveUrl,
             driveFileId: uploaded.driveFileId,
             versionNote: versionNote.trim(),
+            approvalRoute: versionApprovalRoute,
+            approverUserId: versionApprovalRoute === 'specific' ? versionApproverId : null,
           }),
         },
       );
@@ -1142,13 +1169,19 @@ export const ArchivePage: React.FC = () => {
         current.map((doc) => (doc.id === updated.id ? updated : doc)),
       );
       setSelectedDocument(updated);
+      const approverName =
+        versionApprovalRoute === 'specific'
+          ? versionApprovers.find((item) => item.id === versionApproverId)?.name || 'المعتمد المحدد'
+          : 'مجموعة معتمدي الأرشيف';
       toast.success(
-        `تم حفظ مسودة الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} وبانتظار الاعتماد`,
+        `تم حفظ مسودة الإصدار ${Math.max(2, Number(versionSourceAttachment.version || 1) + 1)} وإرسالها للاعتماد إلى ${approverName}`,
       );
       setVersionDialogOpen(false);
       setVersionSourceAttachment(null);
       setVersionFile(null);
       setVersionNote('');
+      setVersionApprovalRoute('pool');
+      setVersionApproverId('');
     } catch (error) {
       console.error('Archive attachment version error:', error);
       toast.error(error instanceof Error ? error.message : 'تعذر حفظ الإصدار الجديد');
