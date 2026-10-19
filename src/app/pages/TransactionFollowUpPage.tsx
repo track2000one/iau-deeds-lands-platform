@@ -4714,6 +4714,31 @@ ${styleAssets}
                                       : 'تقرير مخصص')}
                               </b>
                               <Badge variant="outline">{archive.source === 'scheduled' ? 'آلي' : 'يدوي'}</Badge>
+                              <Badge
+                                variant="outline"
+                                className={archive.governanceStatus === 'final'
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                  : 'border-amber-300 bg-amber-50 text-amber-800'}
+                              >
+                                {archive.governanceStatus === 'final' ? 'نهائي' : 'مسودة'}
+                              </Badge>
+                              {archive.isPinned && (
+                                <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                                  <Star className="ml-1 h-3 w-3 fill-current" />
+                                  مثبت
+                                </Badge>
+                              )}
+                              {archive.isDeletionProtected && (
+                                <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800">
+                                  <ShieldCheck className="ml-1 h-3 w-3" />
+                                  محمي من الحذف
+                                </Badge>
+                              )}
+                              {archive.retentionPolicy !== 'none' && (
+                                <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
+                                  {archiveRetentionLabels[archive.retentionPolicy]}
+                                </Badge>
+                              )}
                               {archive.templateName ? (
                                 <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">
                                   القالب: {archive.templateName}
@@ -4730,6 +4755,8 @@ ${styleAssets}
                               {formatDate(archive.periodFrom)} — {formatDate(archive.periodTo)}
                               {' · '}
                               تم الحفظ {formatDateTime(archive.createdAt)}
+                              {archive.updatedByName ? <> · آخر تعديل: {archive.updatedByName}</> : null}
+                              {archive.finalizedAt ? <> · اعتماد نهائي: {formatDateTime(archive.finalizedAt)}</> : null}
                             </p>
 
                             {archive.notes && (
