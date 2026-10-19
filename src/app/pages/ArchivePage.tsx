@@ -2154,6 +2154,70 @@ export const ArchivePage: React.FC = () => {
               </CardContent>
             </Card>
 
+            {getAttachmentVersionGroups(selectedDocument).some((group) => group.versions.length > 1) && (
+              <Card className="border-slate-200">
+                <CardHeader className="border-b border-slate-100 bg-slate-50/70">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <History className="h-4 w-4 text-[#1F4E78]" />
+                    سجل إصدارات الملفات
+                  </CardTitle>
+                  <CardDescription>
+                    يحتفظ النظام بجميع النسخ السابقة ويحدد الإصدار الحالي لكل ملف.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 p-4">
+                  {getAttachmentVersionGroups(selectedDocument)
+                    .filter((group) => group.versions.length > 1)
+                    .map((group) => (
+                      <div key={group.groupId} className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="font-black text-slate-800">
+                          {group.current.originalName || group.current.fileName}
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {group.versions.map((version) => (
+                            <div
+                              key={version.id}
+                              className={version.isCurrent
+                                ? "flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 sm:flex-row sm:items-center sm:justify-between"
+                                : "flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"}
+                            >
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <b className="text-sm text-slate-800">V{version.version || 1}</b>
+                                  <Badge
+                                    variant="outline"
+                                    className={version.isCurrent
+                                      ? "border-emerald-200 bg-white text-emerald-800"
+                                      : "border-slate-300 bg-white text-slate-600"}
+                                  >
+                                    {version.isCurrent ? 'الحالي' : 'سابق'}
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {formatDateTime(version.createdAt)} · {formatFileSize(version.fileSize)}
+                                </p>
+                                {version.versionNote ? (
+                                  <p className="mt-1 text-xs leading-5 text-slate-700">{version.versionNote}</p>
+                                ) : null}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(version.driveUrl, '_blank', 'noopener,noreferrer')}
+                              >
+                                <Eye className="ml-2 h-4 w-4" />
+                                عرض الإصدار
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="border-slate-200">
               <CardHeader className="border-b border-slate-100 bg-slate-50/70">
                 <CardTitle className="flex items-center gap-2 text-base">
