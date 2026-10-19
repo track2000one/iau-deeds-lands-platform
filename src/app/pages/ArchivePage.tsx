@@ -2071,7 +2071,7 @@ export const ArchivePage: React.FC = () => {
                   الملفات المرفقة ({selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1})
                 </CardTitle>
                 <CardDescription>
-                  يمكن إضافة ملفات جديدة في أي وقت من خلال «تحديث السجل وإضافة ملفات».
+                  يمكن إضافة ملفات جديدة للسجل، أو رفع إصدار أحدث لملف قائم مع الاحتفاظ بجميع نسخه السابقة.
                 </CardDescription>
               </CardHeader>
 
