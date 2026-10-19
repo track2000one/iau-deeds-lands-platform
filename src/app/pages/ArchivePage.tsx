@@ -2336,12 +2336,12 @@ export const ArchivePage: React.FC = () => {
                                 ) : null}
                                 {version.approvedAt ? (
                                   <p className="mt-1 text-xs text-emerald-700">
-                                    معتمد · {formatDateTime(version.approvedAt)}
+                                    اعتمد بواسطة {version.approvedByName || 'مستخدم'} · {formatDateTime(version.approvedAt)}
                                   </p>
                                 ) : null}
                                 {version.cancelledAt ? (
                                   <p className="mt-1 text-xs text-red-700">
-                                    ملغى · {formatDateTime(version.cancelledAt)}
+                                    ألغي بواسطة {version.cancelledByName || 'مستخدم'} · {formatDateTime(version.cancelledAt)}
                                   </p>
                                 ) : null}
                               </div>
