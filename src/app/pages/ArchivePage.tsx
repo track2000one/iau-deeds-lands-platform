@@ -58,8 +58,36 @@ import {
   type TransactionFollowUpOrganizationalUnit,
 } from '../api/transactionFollowUp';
 
+type ArchiveAttachment = {
+  id: string;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  driveUrl: string;
+  driveFileId: string;
+  version?: number;
+  isCurrent?: boolean;
+  addedBy?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type ArchiveActivity = {
+  id: string;
+  action: string;
+  description?: string | null;
+  actorName?: string | null;
+  createdAt: string;
+};
+
 type ArchiveDocument = {
   id: string;
+  archiveNumber?: string;
+  attachmentCount?: number;
+  totalFileSize?: number;
+  attachments?: ArchiveAttachment[];
+  activities?: ArchiveActivity[];
   title: string;
   category: string;
   documentNumber: string;
@@ -207,6 +235,7 @@ const getArchiveConfidentialityClassName = (value: ArchiveDocument['confidential
 };
 
 const getArchiveReference = (doc: ArchiveDocument) =>
+  doc.archiveNumber ||
   `ARC-${String(doc.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || '00000000'}`;
 
 const getArchiveMissingMetadata = (doc: ArchiveDocument) => {
@@ -216,7 +245,7 @@ const getArchiveMissingMetadata = (doc: ArchiveDocument) => {
   if (!String(doc.issuingAuthority || '').trim()) missing.push('الجهة / المصدر');
   if (!String(doc.tags || '').trim()) missing.push('الكلمات المفتاحية');
   if (!String(doc.description || '').trim()) missing.push('الوصف');
-  if (!String(doc.driveUrl || '').trim()) missing.push('رابط الملف');
+  if (!(doc.attachments?.length || String(doc.driveUrl || '').trim())) missing.push('الملفات المرفقة');
   return missing;
 };
 
@@ -316,7 +345,7 @@ export const ArchivePage: React.FC = () => {
   };
 
   const loadDocumentsFromServer = async () => {
-    const remote = await archiveRequest<ArchiveDocument[]>();
+    const remote = await archiveRequest<ArchiveDocument[]>('/records');
     setDocuments(Array.isArray(remote) ? remote : []);
     return Array.isArray(remote) ? remote : [];
   };
@@ -365,9 +394,27 @@ export const ArchivePage: React.FC = () => {
         continue;
       }
 
-      await archiveRequest<ArchiveDocument>('', {
+      await archiveRequest<ArchiveDocument>('/records', {
         method: 'POST',
-        body: JSON.stringify(legacy),
+        body: JSON.stringify({
+          title: legacy.title,
+          category: legacy.category,
+          documentNumber: legacy.documentNumber,
+          documentDate: legacy.documentDate,
+          documentDateType: legacy.documentDateType,
+          issuingAuthority: legacy.issuingAuthority,
+          confidentiality: legacy.confidentiality,
+          tags: legacy.tags,
+          description: legacy.description,
+          attachments: [{
+            fileName: legacy.fileName,
+            originalName: legacy.originalName,
+            mimeType: legacy.mimeType,
+            fileSize: legacy.fileSize,
+            driveUrl: legacy.driveUrl,
+            driveFileId: legacy.driveFileId,
+          }],
+        }),
       });
 
       existingKeys.add(key);
@@ -427,7 +474,19 @@ export const ArchivePage: React.FC = () => {
     return documents.filter((doc) => {
       const matchesSearch =
         !query ||
-        [doc.title, doc.category, doc.documentNumber, doc.documentDate, doc.issuingAuthority, doc.tags, doc.description, doc.originalName, doc.mimeType]
+        [
+          doc.title,
+          doc.archiveNumber,
+          doc.category,
+          doc.documentNumber,
+          doc.documentDate,
+          doc.issuingAuthority,
+          doc.tags,
+          doc.description,
+          doc.originalName,
+          doc.mimeType,
+          ...(doc.attachments || []).flatMap((item) => [item.originalName, item.mimeType]),
+        ]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(query));
 
@@ -459,7 +518,14 @@ export const ArchivePage: React.FC = () => {
     );
   }, [archivedTransactions, searchQuery]);
 
-  const totalSize = useMemo(() => documents.reduce((sum, doc) => sum + Number(doc.fileSize || 0), 0), [documents]);
+  const totalSize = useMemo(
+    () => documents.reduce((sum, doc) => sum + Number(doc.totalFileSize ?? doc.fileSize ?? 0), 0),
+    [documents],
+  );
+  const totalArchiveAttachments = useMemo(
+    () => documents.reduce((sum, doc) => sum + Number(doc.attachmentCount || doc.attachments?.length || 1), 0),
+    [documents],
+  );
   const availableCategories = useMemo(() => Array.from(new Set([...categories, ...documents.map((doc) => doc.category).filter(Boolean)])), [documents]);
   const archiveQuality = useMemo(() => {
     const numberCounts = new Map<string, number>();
@@ -685,7 +751,7 @@ export const ArchivePage: React.FC = () => {
     if (!documentToDelete) return;
 
     try {
-      await archiveRequest<void>(`/${documentToDelete.id}`, {
+      await archiveRequest<void>(`/records/${documentToDelete.id}`, {
         method: 'DELETE',
       });
 
@@ -693,7 +759,7 @@ export const ArchivePage: React.FC = () => {
         current.filter((doc) => doc.id !== documentToDelete.id)
       );
 
-      toast.success('تم حذف الملف من الأرشفة');
+      toast.success('تم نقل السجل الأرشيفي إلى المحذوفات');
       setDeleteDialogOpen(false);
       setDocumentToDelete(null);
 
@@ -704,17 +770,17 @@ export const ArchivePage: React.FC = () => {
     } catch (error) {
       console.error('Archive delete error:', error);
       toast.error(
-        error instanceof Error ? error.message : 'فشل في حذف ملف الأرشفة'
+        error instanceof Error ? error.message : 'فشل في حذف السجل الأرشيفي'
       );
     }
   };
   const validateForm = () => {
     if (!form.title.trim()) {
-      toast.error('عنوان الملف مطلوب');
+      toast.error('عنوان السجل الأرشيفي مطلوب');
       return false;
     }
     if (!form.category.trim()) {
-      toast.error('تصنيف الملف مطلوب');
+      toast.error('تصنيف السجل الأرشيفي مطلوب');
       return false;
     }
     if (formMode === 'add' && form.files.length === 0) {
@@ -759,103 +825,78 @@ export const ArchivePage: React.FC = () => {
     setIsSaving(true);
 
     try {
-      if (formMode === 'add') {
-        const savedDocuments: ArchiveDocument[] = [];
+      const metadataPayload = {
+        title: form.title.trim(),
+        category: form.category.trim(),
+        documentNumber: form.documentNumber.trim(),
+        documentDate: form.documentDate || '',
+        documentDateType: form.documentDateType,
+        issuingAuthority: form.issuingAuthority.trim(),
+        confidentiality: form.confidentiality,
+        tags: form.tags.trim(),
+        description: form.description.trim(),
+      };
 
+      const uploadSelectedFiles = async () => {
+        const attachments = [];
         for (const file of form.files) {
           const uploaded = await uploadFileToGoogleDrive(file);
-
-          const baseTitle = form.title.trim();
-          const title =
-            form.files.length === 1
-              ? baseTitle
-              : `${baseTitle} - ${file.name.replace(/\.[^/.]+$/, '')}`;
-
-          const payload = {
-            title,
-            category: form.category.trim(),
-            documentNumber: form.documentNumber.trim(),
-            documentDate: form.documentDate || '',
-            documentDateType: form.documentDateType,
-            issuingAuthority: form.issuingAuthority.trim(),
-            confidentiality: form.confidentiality,
-            tags: form.tags.trim(),
-            description: form.description.trim(),
+          attachments.push({
             fileName: uploaded.fileName || file.name,
             originalName: file.name,
-            mimeType:
-              uploaded.mimeType ||
-              file.type ||
-              'application/octet-stream',
+            mimeType: uploaded.mimeType || file.type || 'application/octet-stream',
             fileSize: file.size,
             driveUrl: uploaded.driveUrl,
             driveFileId: uploaded.driveFileId,
-          };
-
-          const saved = await archiveRequest<ArchiveDocument>('', {
-            method: 'POST',
-            body: JSON.stringify(payload),
           });
-
-          savedDocuments.push(saved);
         }
+        return attachments;
+      };
 
-        setDocuments((current) => [...savedDocuments, ...current]);
+      if (formMode === 'add') {
+        const attachments = await uploadSelectedFiles();
+        const saved = await archiveRequest<ArchiveDocument>('/records', {
+          method: 'POST',
+          body: JSON.stringify({
+            ...metadataPayload,
+            attachments,
+          }),
+        });
 
+        setDocuments((current) => [saved, ...current]);
         toast.success(
-          savedDocuments.length === 1
-            ? 'تمت أرشفة الملف بنجاح'
-            : `تمت أرشفة ${savedDocuments.length} ملفات بنجاح`
+          attachments.length === 1
+            ? 'تم إنشاء السجل الأرشيفي وإضافة الملف بنجاح'
+            : `تم إنشاء سجل أرشيفي واحد وإضافة ${attachments.length} ملفات داخله`,
         );
       } else if (selectedDocument) {
-        let updatedFileData: Partial<ArchiveDocument> = {};
-
-        if (form.files.length > 0) {
-          const file = form.files[0];
-          const uploaded = await uploadFileToGoogleDrive(file);
-
-          updatedFileData = {
-            fileName: uploaded.fileName || file.name,
-            originalName: file.name,
-            mimeType:
-              uploaded.mimeType ||
-              file.type ||
-              'application/octet-stream',
-            fileSize: file.size,
-            driveUrl: uploaded.driveUrl,
-            driveFileId: uploaded.driveFileId,
-          };
-        }
-
-        const payload = {
-          ...selectedDocument,
-          title: form.title.trim(),
-          category: form.category.trim(),
-          documentNumber: form.documentNumber.trim(),
-          documentDate: form.documentDate || '',
-          documentDateType: form.documentDateType,
-          issuingAuthority: form.issuingAuthority.trim(),
-          confidentiality: form.confidentiality,
-          tags: form.tags.trim(),
-          description: form.description.trim(),
-          ...updatedFileData,
-        };
-
-        const updated = await archiveRequest<ArchiveDocument>(
-          `/${selectedDocument.id}`,
+        let updated = await archiveRequest<ArchiveDocument>(
+          `/records/${selectedDocument.id}`,
           {
             method: 'PUT',
-            body: JSON.stringify(payload),
-          }
+            body: JSON.stringify(metadataPayload),
+          },
         );
+
+        if (form.files.length > 0) {
+          const attachments = await uploadSelectedFiles();
+          updated = await archiveRequest<ArchiveDocument>(
+            `/records/${selectedDocument.id}/attachments`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ attachments }),
+            },
+          );
+        }
 
         setDocuments((current) =>
-          current.map((doc) =>
-            doc.id === selectedDocument.id ? updated : doc
-          )
+          current.map((doc) => (doc.id === selectedDocument.id ? updated : doc)),
         );
-
-        toast.success('تم تحديث بيانات الملف');
+        toast.success(
+          form.files.length > 0
+            ? `تم تحديث السجل وإضافة ${form.files.length} ملفات جديدة`
+            : 'تم تحديث بيانات السجل الأرشيفي',
+        );
       }
 
       setFormOpen(false);
@@ -908,6 +949,10 @@ export const ArchivePage: React.FC = () => {
   };
 
   const openFile = (doc: ArchiveDocument) => {
+    if ((doc.attachmentCount || doc.attachments?.length || 1) > 1) {
+      openDetails(doc);
+      return;
+    }
     window.open(doc.driveUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -974,20 +1019,30 @@ export const ArchivePage: React.FC = () => {
           {canAdd && (
             <Button onClick={openAddForm} className="w-full lg:w-auto">
               <Plus className="ml-2 h-4 w-4" />
-              إضافة ملف للأرشفة
+              إنشاء سجل أرشيفي
             </Button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <Card>
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">السجلات الأرشيفية</p>
+              <p className="text-2xl font-bold">{documents.length}</p>
+            </div>
+            <Archive className="h-9 w-9 text-primary" />
+          </CardContent>
+        </Card>
+
         <Card>
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">إجمالي الملفات</p>
-              <p className="text-2xl font-bold">{documents.length}</p>
+              <p className="text-2xl font-bold">{totalArchiveAttachments.toLocaleString('ar-SA')}</p>
             </div>
-            <Archive className="h-9 w-9 text-primary" />
+            <Paperclip className="h-9 w-9 text-primary" />
           </CardContent>
         </Card>
 
@@ -1309,8 +1364,8 @@ export const ArchivePage: React.FC = () => {
         <div id="archive-form" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
           <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl md:text-2xl font-bold">{formMode === 'add' ? 'إضافة ملف للأرشفة' : 'تعديل بيانات الملف'}</h2>
-              <p className="text-sm text-muted-foreground mt-1">أضف عنوانًا وتصنيفًا وبيانات وصفية، ثم ارفع الملف إلى Google Drive.</p>
+              <h2 className="text-xl md:text-2xl font-bold">{formMode === 'add' ? 'إنشاء سجل أرشيفي' : 'تحديث السجل وإضافة ملفات'}</h2>
+              <p className="text-sm text-muted-foreground mt-1">أنشئ سجلًا واحدًا للموضوع، ثم أرفق داخله ملفًا واحدًا أو عدة ملفات. ويمكن إضافة ملفات جديدة لاحقًا دون إنشاء سجل جديد.</p>
             </div>
 
             <Button
@@ -1432,7 +1487,7 @@ export const ArchivePage: React.FC = () => {
               <CardContent className="space-y-4">
                 <div className="rounded-xl border border-dashed p-6 text-center bg-muted/20">
                   <Upload className="h-12 w-12 mx-auto mb-3 text-primary" />
-                  <p className="font-semibold mb-1">{form.files.length > 0 ? `تم اختيار ${form.files.length} ملف` : formMode === 'edit' ? 'اختيار ملفات جديدة اختياري' : 'اختر ملفًا أو أكثر للأرشفة'}</p>
+                  <p className="font-semibold mb-1">{form.files.length > 0 ? `تم اختيار ${form.files.length} ملف` : formMode === 'edit' ? 'إضافة ملفات جديدة إلى السجل (اختياري)' : 'اختر ملفًا أو أكثر داخل السجل الأرشيفي'}</p>
                   <p className="text-sm text-muted-foreground mb-4">
                     {form.files.length > 0
                       ? `إجمالي الحجم: ${formatFileSize(form.files.reduce((sum, file) => sum + file.size, 0))}`
@@ -1489,8 +1544,12 @@ export const ArchivePage: React.FC = () => {
 
                 {formMode === 'edit' && selectedDocument && (
                   <div className="rounded-lg border p-3 bg-muted/20">
-                    <p className="text-sm font-medium">الملف الحالي</p>
-                    <p className="text-sm text-muted-foreground mt-1">{selectedDocument.originalName} — {formatFileSize(selectedDocument.fileSize)}</p>
+                    <p className="text-sm font-medium">الملفات الموجودة حاليًا</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {(selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1).toLocaleString('ar-SA')} ملف
+                      {' — '}
+                      {formatFileSize(selectedDocument.totalFileSize ?? selectedDocument.fileSize)}
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -1523,8 +1582,8 @@ export const ArchivePage: React.FC = () => {
         <div id="archive-details" className="rounded-xl border bg-card p-4 md:p-6 shadow-sm">
           <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl md:text-2xl font-bold">تفاصيل ملف الأرشفة</h2>
-              <p className="text-sm text-muted-foreground mt-1">عرض بيانات الملف والإجراءات المتاحة.</p>
+              <h2 className="text-xl md:text-2xl font-bold">تفاصيل السجل الأرشيفي</h2>
+              <p className="text-sm text-muted-foreground mt-1">عرض البيانات الوصفية وجميع الملفات والتحديثات التابعة للسجل.</p>
             </div>
 
             <Button variant="outline" onClick={() => { setDetailsOpen(false); setSelectedDocument(null); }} className="w-full md:w-auto">
@@ -1537,7 +1596,9 @@ export const ArchivePage: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
                 <h3 className="text-xl font-bold">{selectedDocument.title}</h3>
-                <p className="text-muted-foreground">{selectedDocument.originalName}</p>
+                <p className="text-muted-foreground">
+                  {getArchiveReference(selectedDocument)} · {(selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1).toLocaleString('ar-SA')} ملف
+                </p>
               </div>
 
               <Badge variant={getConfidentialityVariant(selectedDocument.confidentiality) as any}>
@@ -1556,9 +1617,8 @@ export const ArchivePage: React.FC = () => {
               <InfoItem label="نوع التاريخ" value={selectedDocument.documentDateType === 'hijri' ? 'هجري' : 'ميلادي'} />
               <InfoItem label="الجهة / المصدر" value={selectedDocument.issuingAuthority || '-'} />
               <InfoItem label="الكلمات المفتاحية" value={selectedDocument.tags || '-'} />
-              <InfoItem label="اسم الملف" value={selectedDocument.originalName} />
-              <InfoItem label="نوع الملف" value={selectedDocument.mimeType || '-'} />
-              <InfoItem label="الحجم" value={formatFileSize(selectedDocument.fileSize)} />
+              <InfoItem label="عدد الملفات" value={(selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1).toLocaleString('ar-SA')} />
+              <InfoItem label="إجمالي الحجم" value={formatFileSize(selectedDocument.totalFileSize ?? selectedDocument.fileSize)} />
               <InfoItem label="تاريخ الأرشفة" value={formatDate(selectedDocument.createdAt)} />
               <InfoItem label="آخر تعديل" value={formatDate(selectedDocument.updatedAt)} />
             </div>
@@ -1568,33 +1628,65 @@ export const ArchivePage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  الملف المؤرشف
+                  <Paperclip className="h-4 w-4" />
+                  الملفات المرفقة ({selectedDocument.attachmentCount || selectedDocument.attachments?.length || 1})
                 </CardTitle>
+                <CardDescription>
+                  يمكن إضافة ملفات جديدة في أي وقت من خلال «تحديث السجل وإضافة ملفات».
+                </CardDescription>
               </CardHeader>
 
-              <CardContent className="space-y-4">
-                <AttachmentPreviewCard
-                  attachment={selectedDocument}
-                />
-
-                <div className="rounded-lg border p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{selectedDocument.originalName}</p>
-                    <p className="text-sm text-muted-foreground">{selectedDocument.mimeType || 'نوع غير معروف'} — {formatFileSize(selectedDocument.fileSize)}</p>
+              <CardContent className="space-y-3">
+                {(selectedDocument.attachments?.length
+                  ? selectedDocument.attachments
+                  : [{
+                      id: selectedDocument.id,
+                      fileName: selectedDocument.fileName,
+                      originalName: selectedDocument.originalName,
+                      mimeType: selectedDocument.mimeType,
+                      fileSize: selectedDocument.fileSize,
+                      driveUrl: selectedDocument.driveUrl,
+                      driveFileId: selectedDocument.driveFileId,
+                    }]
+                ).map((attachment) => (
+                  <div
+                    key={attachment.id || attachment.driveFileId || attachment.driveUrl}
+                    className="rounded-xl border border-slate-200 bg-white p-4"
+                  >
+                    <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-semibold">{attachment.originalName || attachment.fileName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {attachment.mimeType || 'نوع غير معروف'} — {formatFileSize(attachment.fileSize)}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => window.open(attachment.driveUrl, '_blank', 'noopener,noreferrer')}
+                        >
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                          فتح
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = attachment.driveUrl;
+                            link.target = '_blank';
+                            link.rel = 'noreferrer';
+                            link.download = attachment.originalName || attachment.fileName;
+                            link.click();
+                          }}
+                        >
+                          <Download className="ml-2 h-4 w-4" />
+                          تنزيل
+                        </Button>
+                      </div>
+                    </div>
+                    <AttachmentPreviewCard attachment={attachment as any} />
                   </div>
-
-                  <div className="flex flex-col md:flex-row gap-2">
-                    <Button variant="outline" onClick={() => openFile(selectedDocument)}>
-                      <ExternalLink className="ml-2 h-4 w-4" />
-                      فتح
-                    </Button>
-                    <Button variant="outline" onClick={() => downloadFile(selectedDocument)}>
-                      <Download className="ml-2 h-4 w-4" />
-                      تنزيل
-                    </Button>
-                  </div>
-                </div>
+                ))}
               </CardContent>
             </Card>
 
@@ -1603,7 +1695,7 @@ export const ArchivePage: React.FC = () => {
                 {canEdit && (
                   <Button variant="outline" onClick={() => openEditForm(selectedDocument)}>
                     <Edit className="ml-2 h-4 w-4" />
-                    تعديل البيانات
+                    تحديث السجل وإضافة ملفات
                   </Button>
                 )}
                 {canDelete && (
@@ -1661,10 +1753,10 @@ export const ArchivePage: React.FC = () => {
           <div>
             <h2 className="flex items-center gap-2 text-lg font-black text-slate-800 sm:text-xl">
               <Archive className="h-5 w-5 text-sky-700" />
-              ملفات الأرشفة ({filteredDocuments.length})
+              السجلات الأرشيفية ({filteredDocuments.length})
             </h2>
             <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              اختر طريقة العرض المناسبة: بطاقات مرئية أو جدول تفصيلي مضغوط.
+              كل بطاقة تمثل سجلًا أرشيفيًا واحدًا، ويمكن أن يحتوي السجل على عدة ملفات ومرفقات.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1693,7 +1785,7 @@ export const ArchivePage: React.FC = () => {
               </Button>
             </div>
             <Badge variant="outline" className="w-fit border-slate-300 bg-white/90 px-3 py-1 font-bold text-slate-700 shadow-sm">
-              {filteredDocuments.length} ملف
+              {filteredDocuments.length} سجل · {totalArchiveAttachments.toLocaleString('ar-SA')} ملف
             </Badge>
           </div>
         </div>
@@ -1769,12 +1861,12 @@ export const ArchivePage: React.FC = () => {
                           <p className="mt-1 line-clamp-2 font-bold text-slate-700">{doc.issuingAuthority || '-'}</p>
                         </div>
                         <div>
-                          <p className="text-[11px] font-medium text-slate-400">نوع الملف</p>
-                          <p className="mt-1 font-black text-slate-700">{getArchiveFileTypeLabel(doc)}</p>
+                          <p className="text-[11px] font-medium text-slate-400">عدد الملفات</p>
+                          <p className="mt-1 font-black text-slate-700">{(doc.attachmentCount || doc.attachments?.length || 1).toLocaleString('ar-SA')} ملف</p>
                         </div>
                         <div>
-                          <p className="text-[11px] font-medium text-slate-400">الحجم</p>
-                          <p className="mt-1 font-black text-slate-700">{formatFileSize(doc.fileSize)}</p>
+                          <p className="text-[11px] font-medium text-slate-400">إجمالي الحجم</p>
+                          <p className="mt-1 font-black text-slate-700">{formatFileSize(doc.totalFileSize ?? doc.fileSize)}</p>
                         </div>
                       </div>
                     </div>
@@ -1863,8 +1955,8 @@ export const ArchivePage: React.FC = () => {
                       <th className="px-4 py-3 font-black">تاريخ المستند</th>
                       <th className="px-4 py-3 font-black">الجهة / المصدر</th>
                       <th className="px-4 py-3 font-black">السرية</th>
-                      <th className="px-4 py-3 font-black">النوع</th>
-                      <th className="px-4 py-3 font-black">الحجم</th>
+                      <th className="px-4 py-3 font-black">الملفات</th>
+                      <th className="px-4 py-3 font-black">إجمالي الحجم</th>
                       <th className="px-4 py-3 text-center font-black">الإجراءات</th>
                     </tr>
                   </thead>
@@ -1899,8 +1991,8 @@ export const ArchivePage: React.FC = () => {
                             {getConfidentialityLabel(doc.confidentiality)}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 align-top font-black text-slate-700">{getArchiveFileTypeLabel(doc)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 align-top font-semibold text-slate-700">{formatFileSize(doc.fileSize)}</td>
+                        <td className="px-4 py-3 align-top font-black text-slate-700">{(doc.attachmentCount || doc.attachments?.length || 1).toLocaleString('ar-SA')}</td>
+                        <td className="whitespace-nowrap px-4 py-3 align-top font-semibold text-slate-700">{formatFileSize(doc.totalFileSize ?? doc.fileSize)}</td>
                         <td className="px-4 py-3 align-top">
                           <div className="flex min-w-max items-center justify-center gap-1.5">
                             <Button type="button" variant="outline" size="sm" onClick={() => openDetails(doc)} title="عرض التفاصيل" className="h-8 px-2.5">
@@ -1930,7 +2022,7 @@ export const ArchivePage: React.FC = () => {
                 </table>
               </div>
               <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-2 text-xs text-slate-500">
-                يعرض الجدول {filteredDocuments.length} ملفًا. استخدم البحث والتصفية لتقليل النتائج، ويمكن التمرير أفقيًا على الشاشات الصغيرة.
+                يعرض الجدول {filteredDocuments.length} سجلًا أرشيفيًا و{totalArchiveAttachments.toLocaleString('ar-SA')} ملفًا مرفقًا. استخدم البحث والتصفية لتقليل النتائج، ويمكن التمرير أفقيًا على الشاشات الصغيرة.
               </div>
             </div>
           )}
@@ -1942,9 +2034,27 @@ export const ArchivePage: React.FC = () => {
         onOpenChange={setExcelImportOpen}
         existingDocuments={documents}
         createArchiveDocument={(payload: ArchiveExcelImportPayload) =>
-          archiveRequest<ArchiveDocument>('', {
+          archiveRequest<ArchiveDocument>('/records', {
             method: 'POST',
-            body: JSON.stringify(payload),
+            body: JSON.stringify({
+              title: payload.title,
+              category: payload.category,
+              documentNumber: payload.documentNumber,
+              documentDate: payload.documentDate,
+              documentDateType: payload.documentDateType,
+              issuingAuthority: payload.issuingAuthority,
+              confidentiality: payload.confidentiality,
+              tags: payload.tags,
+              description: payload.description,
+              attachments: [{
+                fileName: payload.fileName,
+                originalName: payload.originalName,
+                mimeType: payload.mimeType,
+                fileSize: payload.fileSize,
+                driveUrl: payload.driveUrl,
+                driveFileId: payload.driveFileId,
+              }],
+            }),
           })
         }
         onImported={async () => {
@@ -1957,9 +2067,9 @@ export const ArchivePage: React.FC = () => {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>حذف ملف من الأرشفة</AlertDialogTitle>
+            <AlertDialogTitle>حذف سجل أرشيفي</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم حذف بيانات الملف من الأرشفة داخل المنصة. لن يتم حذف الملف من Google Drive تلقائيًا.
+              سيتم نقل السجل الأرشيفي إلى المحذوفات داخل المنصة، مع بقاء الملفات الأصلية في Google Drive. يمكن إضافة الاستعادة والحذف النهائي ضمن إدارة المحذوفات لاحقًا.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
