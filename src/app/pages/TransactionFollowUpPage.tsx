@@ -4794,6 +4794,15 @@ ${styleAssets}
                               size="sm"
                               variant="outline"
                               disabled={reportArchiveLoading || reportExporting}
+                              onClick={() => void printArchivedReport(archive.id)}
+                            >
+                              <Printer className="ml-1 h-4 w-4" />
+                              طباعة
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={reportArchiveLoading || reportExporting}
                               onClick={() => void exportArchivedReportPdf(archive.id)}
                             >
                               <FileDown className="ml-1 h-4 w-4" />
@@ -4812,20 +4821,51 @@ ${styleAssets}
                             <Button
                               size="sm"
                               variant="outline"
+                              disabled={archive.governanceStatus === 'final' && !canDelete}
                               onClick={() => startArchiveMetadataEdit(archive)}
                             >
                               <Pencil className="ml-1 h-4 w-4" />
                               بيانات
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void toggleArchiveActivity(archive.id)}
+                            >
+                              <History className="ml-1 h-4 w-4" />
+                              السجل
+                            </Button>
                             {canDelete && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-red-200 text-red-700"
-                                onClick={() => void deleteArchivedReport(archive.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className={archive.isPinned ? 'border-amber-300 bg-amber-50 text-amber-800' : ''}
+                                  disabled={reportArchiveLoading}
+                                  onClick={() => void toggleArchivePinned(archive)}
+                                >
+                                  <Star className={`ml-1 h-4 w-4 ${archive.isPinned ? 'fill-current' : ''}`} />
+                                  {archive.isPinned ? 'إلغاء التثبيت' : 'تثبيت'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => startArchiveGovernanceEdit(archive)}
+                                >
+                                  <ShieldCheck className="ml-1 h-4 w-4" />
+                                  حوكمة
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-red-200 text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                  disabled={Boolean(archiveDeleteBlockReason(archive))}
+                                  title={archiveDeleteBlockReason(archive) || 'حذف التقرير المؤرشف'}
+                                  onClick={() => void deleteArchivedReport(archive.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </>
                             )}
                           </div>
                         </div>
