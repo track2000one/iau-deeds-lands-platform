@@ -2073,7 +2073,7 @@ export const ArchivePage: React.FC = () => {
 
               <CardContent className="space-y-3">
                 {(selectedDocument.attachments?.length
-                  ? selectedDocument.attachments
+                  ? selectedDocument.attachments.filter((item) => item.isCurrent !== false)
                   : [{
                       id: selectedDocument.id,
                       fileName: selectedDocument.fileName,
@@ -2094,6 +2094,21 @@ export const ArchivePage: React.FC = () => {
                         <p className="text-sm text-muted-foreground">
                           {attachment.mimeType || 'نوع غير معروف'} — {formatFileSize(attachment.fileSize)}
                         </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">
+                            الإصدار الحالي V{attachment.version || 1}
+                          </Badge>
+                          {(() => {
+                            const group = getAttachmentVersionGroups(selectedDocument).find(
+                              (item) => item.current.id === attachment.id,
+                            );
+                            return group && group.versions.length > 1 ? (
+                              <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
+                                {group.versions.length.toLocaleString('ar-SA')} إصدارات
+                              </Badge>
+                            ) : null;
+                          })()}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <Button
