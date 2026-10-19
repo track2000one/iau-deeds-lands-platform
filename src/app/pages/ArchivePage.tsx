@@ -55,6 +55,7 @@ import { authenticatedFetch } from '../../lib/http';
 import { usePermissions } from '../../context/PermissionsContext';
 import { AttachmentPreviewCard } from '../components/AttachmentPreview';
 import { ArchiveReportsDialog } from '../components/ArchiveReportsDialog';
+import { ArchivedTransactionsReportsDialog } from '../components/ArchivedTransactionsReportsDialog';
 import { ArchiveExcelImportDialog, type ArchiveExcelImportPayload } from '../components/ArchiveExcelImportDialog';
 import {
   transactionFollowUpApi,
@@ -512,6 +513,7 @@ export const ArchivePage: React.FC = () => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
+  const [archivedTransactionReportsOpen, setArchivedTransactionReportsOpen] = useState(false);
   const [excelImportOpen, setExcelImportOpen] = useState(false);
 
   const [trashOpen, setTrashOpen] = useState(false);
@@ -642,9 +644,23 @@ export const ArchivePage: React.FC = () => {
   };
 
   const loadArchivedTransactions = async () => {
-    const result = await transactionFollowUpApi.archived({ page: 1, pageSize: 500 });
-    setArchivedTransactions(result.items || []);
-    return result.items || [];
+    const all: TransactionFollowUpRecord[] = [];
+    let page = 1;
+    let totalPages = 1;
+
+    do {
+      const result = await transactionFollowUpApi.archived({
+        page,
+        pageSize: 500,
+        includeAttachments: true,
+      });
+      all.push(...(result.items || []));
+      totalPages = Math.max(1, Number(result.totalPages || 1));
+      page += 1;
+    } while (page <= totalPages);
+
+    setArchivedTransactions(all);
+    return all;
   };
 
   const migrateLegacyDocuments = async (remoteDocuments: ArchiveDocument[]) => {
