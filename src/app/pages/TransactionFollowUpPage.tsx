@@ -1508,7 +1508,7 @@ export const TransactionFollowUpPage: React.FC = () => {
 <title>${title}</title>
 ${styleAssets}
 <style>
-  @page { size: A4 portrait; margin: 12mm; }
+  @page { size: A4 ${reportOrientation}; margin: 10mm; }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: Arial, Tahoma, sans-serif; color: #17202a; background: #fff; }
   .report-sheet { width: 100% !important; max-width: none !important; padding: 0 !important; box-shadow: none !important; border: 0 !important; }
@@ -1545,10 +1545,11 @@ ${styleAssets}
         logging: false,
       });
 
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const landscape = reportOrientation === 'landscape';
+      const pdf = new jsPDF({ orientation: reportOrientation, unit: 'mm', format: 'a4' });
       const margin = 8;
-      const pageWidth = 210;
-      const pageHeight = 297;
+      const pageWidth = landscape ? 297 : 210;
+      const pageHeight = landscape ? 210 : 297;
       const printableWidth = pageWidth - margin * 2;
       const printableHeight = pageHeight - margin * 2;
       const pxPerMm = canvas.width / printableWidth;
@@ -1592,7 +1593,7 @@ ${styleAssets}
       }
 
       pdf.save(`تقرير-متابعة-المعاملات-${reportFrom}-إلى-${reportTo}.pdf`);
-      toast.success('تم إنشاء ملف PDF للتقرير التنفيذي');
+      toast.success('تم إنشاء ملف PDF للتقرير المرن');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر إنشاء ملف PDF');
     } finally {
