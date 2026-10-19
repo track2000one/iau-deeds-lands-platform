@@ -49,6 +49,7 @@ const ACTIONS: Array<{
   { key: 'canCreateUser', ar: 'إضافة مستخدم جديد', en: 'Create User' },
   { key: 'canCreateCycle', ar: 'إنشاء دورة جديدة', en: 'Create Cycle' },
   { key: 'canApproveCycle', ar: 'اعتماد دورة', en: 'Approve Cycle' },
+  { key: 'canApproveArchive', ar: 'اعتماد الأرشيف', en: 'Approve Archive' },
 ];
 
 export const PermissionMatrix: React.FC<{
@@ -104,6 +105,7 @@ export const PermissionMatrix: React.FC<{
         canCreateUser: false,
         canCreateCycle: false,
         canApproveCycle: false,
+        canApproveArchive: false,
       };
     }
 
@@ -132,7 +134,7 @@ export const PermissionMatrix: React.FC<{
               {ui('صفحات المخاطر الأربع (سجل المخاطر التشغيلية، لوحة المخاطر التنفيذية، طلبات قبول المخاطر، شهية المخاطر وإعدادات KRI) تكون للمسؤول افتراضيًا، ولا تظهر للمستخدم العادي إلا إذا منح المسؤول صلاحية «عرض» للصفحة المطلوبة.', 'The four risk pages are administrator-only by default and are shown to an ordinary user only when an administrator grants View permission for the required risk page.')}
             </p>
             <p className="mt-1 text-xs font-semibold text-violet-700">
-              {ui('الأرشفة: «عرض» لفتح الملفات والمعاملات المؤرشفة، «إضافة» لترحيل المعاملة المغلقة إلى الأرشفة وإضافة الملفات، «تعديل» لاستعادة المعاملة إلى نظام المتابعة أو تعديل بيانات الأرشفة، «حذف» للحذف النهائي من المنصة، و«طباعة» لطباعة بيانات المعاملات وتقارير الأرشفة.', 'Archive: View opens archived files and transactions; Add archives closed transactions and adds files; Edit restores transactions to follow-up or edits archive metadata; Delete permanently removes archive records from the platform; Print enables archived transaction printing and archive reports.')}
+              {ui('الأرشفة: «عرض» لفتح الملفات والمعاملات المؤرشفة، «إضافة» لترحيل المعاملة المغلقة وإضافة الملفات، «تعديل» لتحديث بيانات الأرشفة ورفع الإصدارات الجديدة، «اعتماد الأرشيف» لمراجعة واعتماد أو إلغاء مسودات الإصدارات، «حذف» للحذف، و«طباعة» للتقارير. فصل الاعتماد عن التعديل يمنع المستخدم الذي يرفع النسخة من اعتمادها إلا إذا مُنح صلاحية الاعتماد صراحة.', 'Archive: View opens archived files and transactions; Add archives closed transactions and adds files; Edit updates archive metadata and uploads new versions; Approve Archive reviews, approves, or cancels version drafts; Delete removes records; Print enables reports. Approval is separated from editing so uploaders cannot approve their own versions unless explicitly granted approval permission.')}
             </p>
             <p className="mt-2 text-xs font-medium text-primary">
               {ui('يمكن تمرير الجدول بعجلة الفأرة أو بسحب شريط التمرير الواضح على طرف الجدول، كما يمكن استخدام زري أعلى وأسفل للانتقال السريع.', 'Scroll with the mouse wheel or drag the visible scrollbar at the edge of the table. You can also use the Top and Bottom buttons for quick navigation.')}
@@ -187,6 +189,7 @@ export const PermissionMatrix: React.FC<{
 
                 {ACTIONS.map((action) => {
                   const isCyclePermission = action.key === 'canCreateCycle' || action.key === 'canApproveCycle';
+                  const isArchiveApprovalPermission = action.key === 'canApproveArchive';
                   const riskViewOnlyModules: ModuleName[] = [
                     'transaction_risk_register',
                     'transaction_risk_executive',
@@ -204,7 +207,9 @@ export const PermissionMatrix: React.FC<{
                         ? moduleName === 'transaction_follow_up'
                         : isCyclePermission
                           ? ['assets', 'accounting_transformation'].includes(moduleName)
-                          : true;
+                          : isArchiveApprovalPermission
+                            ? moduleName === 'archive'
+                            : true;
                   return (
                     <td key={action.key} className="p-3 text-center">
                       {supported ? (
