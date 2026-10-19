@@ -3777,10 +3777,7 @@ ${styleAssets}
           dir="rtl"
         >
           <DialogHeader className="rounded-xl border border-slate-200 border-r-4 border-r-[#1F4E78] !bg-white p-4 text-right shadow-sm" style={{ backgroundColor: '#FFFFFF' }}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <DialogTitle className="!text-slate-950" style={{ color: '#0F172A' }}>التقرير المرن لمتابعة المعاملات</DialogTitle>
-              <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-600">واجهة تجريبية</Badge>
-            </div>
+            <DialogTitle className="!text-slate-950" style={{ color: '#0F172A' }}>التقرير المرن لمتابعة المعاملات</DialogTitle>
             <DialogDescription className="!text-slate-700">
               تقرير احترافي قابل للتصفية والفرز والاستبعاد واختيار الأعمدة واتجاه الطباعة، ويعرض فقط: المنجزة، المتأخرة القائمة، بانتظار رد، وتحتاج متابعة.
             </DialogDescription>
