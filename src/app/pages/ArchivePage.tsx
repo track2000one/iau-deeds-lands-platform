@@ -806,103 +806,78 @@ export const ArchivePage: React.FC = () => {
     setIsSaving(true);
 
     try {
-      if (formMode === 'add') {
-        const savedDocuments: ArchiveDocument[] = [];
+      const metadataPayload = {
+        title: form.title.trim(),
+        category: form.category.trim(),
+        documentNumber: form.documentNumber.trim(),
+        documentDate: form.documentDate || '',
+        documentDateType: form.documentDateType,
+        issuingAuthority: form.issuingAuthority.trim(),
+        confidentiality: form.confidentiality,
+        tags: form.tags.trim(),
+        description: form.description.trim(),
+      };
 
+      const uploadSelectedFiles = async () => {
+        const attachments = [];
         for (const file of form.files) {
           const uploaded = await uploadFileToGoogleDrive(file);
-
-          const baseTitle = form.title.trim();
-          const title =
-            form.files.length === 1
-              ? baseTitle
-              : `${baseTitle} - ${file.name.replace(/\.[^/.]+$/, '')}`;
-
-          const payload = {
-            title,
-            category: form.category.trim(),
-            documentNumber: form.documentNumber.trim(),
-            documentDate: form.documentDate || '',
-            documentDateType: form.documentDateType,
-            issuingAuthority: form.issuingAuthority.trim(),
-            confidentiality: form.confidentiality,
-            tags: form.tags.trim(),
-            description: form.description.trim(),
+          attachments.push({
             fileName: uploaded.fileName || file.name,
             originalName: file.name,
-            mimeType:
-              uploaded.mimeType ||
-              file.type ||
-              'application/octet-stream',
+            mimeType: uploaded.mimeType || file.type || 'application/octet-stream',
             fileSize: file.size,
             driveUrl: uploaded.driveUrl,
             driveFileId: uploaded.driveFileId,
-          };
-
-          const saved = await archiveRequest<ArchiveDocument>('', {
-            method: 'POST',
-            body: JSON.stringify(payload),
           });
-
-          savedDocuments.push(saved);
         }
+        return attachments;
+      };
 
-        setDocuments((current) => [...savedDocuments, ...current]);
+      if (formMode === 'add') {
+        const attachments = await uploadSelectedFiles();
+        const saved = await archiveRequest<ArchiveDocument>('/records', {
+          method: 'POST',
+          body: JSON.stringify({
+            ...metadataPayload,
+            attachments,
+          }),
+        });
 
+        setDocuments((current) => [saved, ...current]);
         toast.success(
-          savedDocuments.length === 1
-            ? 'تمت أرشفة الملف بنجاح'
-            : `تمت أرشفة ${savedDocuments.length} ملفات بنجاح`
+          attachments.length === 1
+            ? 'تم إنشاء السجل الأرشيفي وإضافة الملف بنجاح'
+            : `تم إنشاء سجل أرشيفي واحد وإضافة ${attachments.length} ملفات داخله`,
         );
       } else if (selectedDocument) {
-        let updatedFileData: Partial<ArchiveDocument> = {};
-
-        if (form.files.length > 0) {
-          const file = form.files[0];
-          const uploaded = await uploadFileToGoogleDrive(file);
-
-          updatedFileData = {
-            fileName: uploaded.fileName || file.name,
-            originalName: file.name,
-            mimeType:
-              uploaded.mimeType ||
-              file.type ||
-              'application/octet-stream',
-            fileSize: file.size,
-            driveUrl: uploaded.driveUrl,
-            driveFileId: uploaded.driveFileId,
-          };
-        }
-
-        const payload = {
-          ...selectedDocument,
-          title: form.title.trim(),
-          category: form.category.trim(),
-          documentNumber: form.documentNumber.trim(),
-          documentDate: form.documentDate || '',
-          documentDateType: form.documentDateType,
-          issuingAuthority: form.issuingAuthority.trim(),
-          confidentiality: form.confidentiality,
-          tags: form.tags.trim(),
-          description: form.description.trim(),
-          ...updatedFileData,
-        };
-
-        const updated = await archiveRequest<ArchiveDocument>(
-          `/${selectedDocument.id}`,
+        let updated = await archiveRequest<ArchiveDocument>(
+          `/records/${selectedDocument.id}`,
           {
             method: 'PUT',
-            body: JSON.stringify(payload),
-          }
+            body: JSON.stringify(metadataPayload),
+          },
         );
+
+        if (form.files.length > 0) {
+          const attachments = await uploadSelectedFiles();
+          updated = await archiveRequest<ArchiveDocument>(
+            `/records/${selectedDocument.id}/attachments`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ attachments }),
+            },
+          );
+        }
 
         setDocuments((current) =>
-          current.map((doc) =>
-            doc.id === selectedDocument.id ? updated : doc
-          )
+          current.map((doc) => (doc.id === selectedDocument.id ? updated : doc)),
         );
-
-        toast.success('تم تحديث بيانات الملف');
+        toast.success(
+          form.files.length > 0
+            ? `تم تحديث السجل وإضافة ${form.files.length} ملفات جديدة`
+            : 'تم تحديث بيانات السجل الأرشيفي',
+        );
       }
 
       setFormOpen(false);
