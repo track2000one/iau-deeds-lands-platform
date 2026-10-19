@@ -4645,7 +4645,7 @@ ${styleAssets}
                           </div>
                         )}
                       </div>
-                    )))
+                    ))
                   )}
 
                   <div className="flex items-center justify-between border-t pt-3">
