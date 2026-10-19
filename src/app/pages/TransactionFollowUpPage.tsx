@@ -3772,17 +3772,21 @@ ${styleAssets}
 
       <Dialog open={reportOpen} onOpenChange={(open) => !reportExporting && setReportOpen(open)}>
         <DialogContent
-          className="max-h-[94dvh] overflow-y-auto overscroll-contain border-slate-300 bg-slate-50 text-slate-950 shadow-2xl [scrollbar-gutter:stable] [&_input]:!bg-white [&_input]:!text-slate-900 [&_label]:!text-slate-800 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
+          className="max-h-[94dvh] overflow-y-auto overscroll-contain !border-slate-200 !bg-[#F8FAFC] !text-slate-950 shadow-2xl [color-scheme:light] [scrollbar-gutter:stable] [&_button]:transition-colors [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:placeholder:!text-slate-400 [&_label]:!text-slate-700 [&_select]:!border-slate-300 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!border-slate-300 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
+          style={{ backgroundColor: '#F8FAFC', color: '#0F172A', colorScheme: 'light' }}
           dir="rtl"
         >
-          <DialogHeader className="rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm">
-            <DialogTitle className="text-slate-950">التقرير المرن لمتابعة المعاملات</DialogTitle>
+          <DialogHeader className="rounded-xl border border-slate-200 !bg-white p-4 text-right shadow-sm" style={{ backgroundColor: '#FFFFFF' }}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <DialogTitle className="text-slate-950">التقرير المرن لمتابعة المعاملات</DialogTitle>
+              <Badge variant="outline" className="border-slate-300 bg-slate-100 text-slate-700">واجهة تجريبية</Badge>
+            </div>
             <DialogDescription className="text-slate-600">
               تقرير احترافي قابل للتصفية والفرز والاستبعاد واختيار الأعمدة واتجاه الطباعة، ويعرض فقط: المنجزة، المتأخرة القائمة، بانتظار رد، وتحتاج متابعة.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="sticky top-0 z-20 -mx-1 flex flex-wrap gap-2 border-b border-slate-300 bg-slate-50/95 px-1 py-3 backdrop-blur">
+          <div className="sticky top-0 z-20 -mx-1 flex flex-wrap gap-2 border-b border-slate-200 !bg-[#F8FAFC] px-1 py-3" style={{ backgroundColor: '#F8FAFC' }}>
             <Button
               type="button"
               variant={reportSection === 'preview' ? 'default' : 'outline'}
@@ -3826,7 +3830,7 @@ ${styleAssets}
 
           {reportSection === 'preview' && (
             <>
-              <div className="grid gap-3 rounded-2xl border border-slate-300 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8">
+              <div className="grid gap-3 rounded-2xl border border-slate-200 !bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8" style={{ backgroundColor: '#FFFFFF' }}>
                 <Field label="نوع التقرير">
                   <NativeSelect
                     value={reportMode}
@@ -3927,7 +3931,7 @@ ${styleAssets}
                   </Button>
                   <Button
                     type="button"
-                    className="flex-[1.4] bg-slate-800 text-white hover:bg-slate-900"
+                    className="flex-[1.4] bg-slate-800 text-white hover:bg-slate-700"
                     disabled={reportLoading || reportExporting}
                     onClick={() => void exportFullFollowUpBackup()}
                   >
@@ -3939,7 +3943,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="grid gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6">
+              <div className="grid gap-3 rounded-2xl border border-slate-200 !bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6" style={{ backgroundColor: '#FFFFFF' }}>
                 <div className="xl:col-span-2">
                   <Field label="اسم النسخة المؤرشفة">
                     <Input
@@ -3967,12 +3971,12 @@ ${styleAssets}
                     />
                   </Field>
                 </div>
-                <div className="md:col-span-2 xl:col-span-6 text-[11px] leading-5 text-amber-900/75">
+                <div className="md:col-span-2 xl:col-span-6 text-[11px] leading-5 text-slate-500">
                   هذه البيانات اختيارية وتستخدم لاحقًا في البحث والتصفية داخل أرشيف التقارير.
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-2xl border border-sky-300 bg-white p-4 shadow-sm">
+              <div className="space-y-4 rounded-2xl border border-slate-200 !bg-white p-4 shadow-sm" style={{ backgroundColor: '#FFFFFF' }}>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h3 className="font-black text-slate-900">إعداد التقرير المرن</h3>
@@ -3986,11 +3990,11 @@ ${styleAssets}
                   </Button>
                 </div>
 
-                <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-3">
+                <div className="rounded-2xl border border-slate-200 !bg-slate-50 p-3" style={{ backgroundColor: '#F8FAFC' }}>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-black text-violet-950">قوالب التقرير المحفوظة</p>
-                      <p className="mt-1 text-[11px] leading-5 text-violet-800/75">
+                      <p className="text-xs font-black text-slate-900">قوالب التقرير المحفوظة</p>
+                      <p className="mt-1 text-[11px] leading-5 text-slate-600">
                         القوالب محفوظة في قاعدة البيانات وتظهر من أي جهاز. ويمكن للمستخدم الإشرافي إنشاء قالب عام للجميع أو تقييده لمستخدمين محددين.
                       </p>
                     </div>
@@ -4026,7 +4030,7 @@ ${styleAssets}
                       )}
                       <Button
                         type="button"
-                        className="shrink-0"
+                        className="shrink-0 bg-slate-800 text-white hover:bg-slate-700"
                         disabled={reportTemplateSaving}
                         onClick={() => void saveFlexibleReportTemplate()}
                       >
@@ -4038,7 +4042,7 @@ ${styleAssets}
                     </div>
                   </div>
 
-                  <div className="mt-3 grid gap-3 rounded-xl border border-violet-100 bg-white/80 p-3 md:grid-cols-2">
+                  <div className="mt-3 grid gap-3 rounded-xl border border-slate-200 !bg-white p-3 md:grid-cols-2" style={{ backgroundColor: '#FFFFFF' }}>
                     <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700">
                       <span className="inline-flex items-center gap-2">
                         <Star className="h-4 w-4 text-amber-500" />
@@ -4071,7 +4075,7 @@ ${styleAssets}
                   {(isAdmin || canDelete)
                     && reportTemplateScope === 'shared'
                     && reportTemplateAccessMode === 'selected' && (
-                      <div className="mt-3 rounded-xl border border-violet-100 bg-white p-3">
+                      <div className="mt-3 rounded-xl border border-slate-200 !bg-white p-3" style={{ backgroundColor: '#FFFFFF' }}>
                         <p className="mb-2 text-[11px] font-black text-slate-700">المستخدمون المسموح لهم باستخدام القالب</p>
                         <div className="grid max-h-36 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
                           {assignees.map((user) => {
@@ -4106,7 +4110,7 @@ ${styleAssets}
                       {reportTemplates.map((template) => (
                         <div
                           key={template.id}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-violet-200 bg-white px-3 py-2.5 shadow-sm"
+                          className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 !bg-white px-3 py-2.5 shadow-sm"
                         >
                           <div className="min-w-0">
                             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -4228,7 +4232,7 @@ ${styleAssets}
                       ))}
                     </div>
                   ) : (
-                    <div className="mt-3 rounded-xl border border-dashed border-violet-200 bg-white/70 px-3 py-4 text-center text-[11px] text-violet-800/70">
+                    <div className="mt-3 rounded-xl border border-dashed border-slate-300 !bg-white px-3 py-4 text-center text-[11px] text-slate-500">
                       لا توجد قوالب محفوظة بعد. جهّز التقرير بالشكل المطلوب ثم اكتب اسم القالب واضغط «حفظ كقالب».
                     </div>
                   )}
