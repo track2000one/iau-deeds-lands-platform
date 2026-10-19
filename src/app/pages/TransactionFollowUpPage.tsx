@@ -3551,9 +3551,14 @@ ${styleAssets}
                       {(isAdmin || canDelete) && (
                         <NativeSelect
                           value={reportTemplateScope}
-                          onChange={(event) =>
-                            setReportTemplateScope(event.target.value as 'personal' | 'shared')
-                          }
+                          onChange={(event) => {
+                            const scope = event.target.value as 'personal' | 'shared';
+                            setReportTemplateScope(scope);
+                            if (scope === 'personal') {
+                              setReportTemplateAccessMode('all');
+                              setReportTemplateAllowedUserIds([]);
+                            }
+                          }}
                           className="bg-white sm:w-[170px]"
                         >
                           <option value="personal">قالب شخصي</option>
@@ -3573,6 +3578,69 @@ ${styleAssets}
                       </Button>
                     </div>
                   </div>
+
+                  <div className="mt-3 grid gap-3 rounded-xl border border-violet-100 bg-white/80 p-3 md:grid-cols-2">
+                    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700">
+                      <span className="inline-flex items-center gap-2">
+                        <Star className="h-4 w-4 text-amber-500" />
+                        جعل القالب الجديد افتراضيًا
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={reportTemplateDefault}
+                        onChange={(event) => setReportTemplateDefault(event.target.checked)}
+                        className="h-4 w-4 accent-amber-600"
+                      />
+                    </label>
+
+                    {(isAdmin || canDelete) && reportTemplateScope === 'shared' && (
+                      <Field label="من يحق له استخدام القالب العام؟">
+                        <NativeSelect
+                          value={reportTemplateAccessMode}
+                          onChange={(event) =>
+                            setReportTemplateAccessMode(event.target.value as 'all' | 'selected')
+                          }
+                          className="bg-white"
+                        >
+                          <option value="all">جميع مستخدمي نظام المتابعة</option>
+                          <option value="selected">مستخدمون محددون فقط</option>
+                        </NativeSelect>
+                      </Field>
+                    )}
+                  </div>
+
+                  {(isAdmin || canDelete)
+                    && reportTemplateScope === 'shared'
+                    && reportTemplateAccessMode === 'selected' && (
+                      <div className="mt-3 rounded-xl border border-violet-100 bg-white p-3">
+                        <p className="mb-2 text-[11px] font-black text-slate-700">المستخدمون المسموح لهم باستخدام القالب</p>
+                        <div className="grid max-h-36 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+                          {assignees.map((user) => {
+                            const checked = reportTemplateAllowedUserIds.includes(user.id);
+                            return (
+                              <label
+                                key={user.id}
+                                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-[11px] font-bold ${checked ? 'border-violet-300 bg-violet-50 text-violet-900' : 'border-slate-200 bg-white text-slate-600'}`}
+                              >
+                                <span className="truncate">{user.username}</span>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() =>
+                                    setReportTemplateAllowedUserIds((current) =>
+                                      checked
+                                        ? current.filter((id) => id !== user.id)
+                                        : [...current, user.id],
+                                    )
+                                  }
+                                  className="h-4 w-4 accent-violet-700"
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                   {reportTemplates.length > 0 ? (
                     <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
