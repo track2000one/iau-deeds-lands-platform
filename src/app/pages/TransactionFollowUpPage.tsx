@@ -962,6 +962,8 @@ export const TransactionFollowUpPage: React.FC = () => {
     setReportFrom(range.from);
     setReportTo(range.to);
     setReportAssigneeId('');
+    setFlexibleReportOptions(createDefaultFlexibleReportOptions());
+    setReportOrientation('landscape');
     setReportSection('preview');
     setReportOpen(true);
     await Promise.all([
@@ -978,6 +980,47 @@ export const TransactionFollowUpPage: React.FC = () => {
     setReportFrom(range.from);
     setReportTo(range.to);
     await loadExecutiveReport(range.from, range.to, reportAssigneeId);
+  };
+
+  const toggleFlexibleReportCategory = (category: FlexibleReportOptions['categories'][number]) => {
+    setFlexibleReportOptions((current) => {
+      const exists = current.categories.includes(category);
+      const categories = exists
+        ? current.categories.filter((item) => item !== category)
+        : [...current.categories, category];
+      if (!categories.length) {
+        toast.warning('يجب إبقاء فئة واحدة على الأقل في التقرير');
+        return current;
+      }
+      return { ...current, categories };
+    });
+  };
+
+  const toggleFlexibleReportColumn = (column: FlexibleReportOptions['visibleColumns'][number]) => {
+    setFlexibleReportOptions((current) => {
+      const exists = current.visibleColumns.includes(column);
+      const visibleColumns = exists
+        ? current.visibleColumns.filter((item) => item !== column)
+        : [...current.visibleColumns, column];
+      if (!visibleColumns.length) {
+        toast.warning('يجب إبقاء عمود واحد على الأقل في التقرير');
+        return current;
+      }
+      return { ...current, visibleColumns };
+    });
+  };
+
+  const excludeFlexibleReportRow = (id: string) => {
+    setFlexibleReportOptions((current) =>
+      current.excludedIds.includes(id)
+        ? current
+        : { ...current, excludedIds: [...current.excludedIds, id] },
+    );
+  };
+
+  const resetFlexibleReport = () => {
+    setFlexibleReportOptions(createDefaultFlexibleReportOptions());
+    setReportOrientation('landscape');
   };
 
   const buildFollowUpWorkbook = async (backup: TransactionFollowUpBackupData) => {
