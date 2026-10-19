@@ -2011,6 +2011,59 @@ export const ArchivePage: React.FC = () => {
               </CardContent>
             </Card>
 
+            <Card className="border-slate-200">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/70">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <History className="h-4 w-4 text-slate-700" />
+                  سجل النشاط الزمني
+                </CardTitle>
+                <CardDescription>
+                  سجل تدقيق يوضح ما تم على السجل الأرشيفي ومن قام بالإجراء وتاريخه.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4">
+                {selectedDocument.activities?.length ? (
+                  <div className="relative space-y-0">
+                    {selectedDocument.activities.map((activity, index) => (
+                      <div key={activity.id} className="relative flex gap-4 pb-5 last:pb-0">
+                        {index < (selectedDocument.activities?.length || 0) - 1 && (
+                          <div className="absolute right-[15px] top-8 h-[calc(100%-1rem)] w-px bg-slate-200" />
+                        )}
+                        <div className="relative z-10 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm">
+                          <Clock3 className="h-4 w-4 text-slate-600" />
+                        </div>
+                        <div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <Badge
+                              variant="outline"
+                              className={`w-fit font-bold ${getArchiveActivityClassName(activity.action)}`}
+                            >
+                              {getArchiveActivityLabel(activity.action)}
+                            </Badge>
+                            <span className="text-xs font-medium text-slate-500">
+                              {formatDateTime(activity.createdAt)}
+                            </span>
+                          </div>
+                          {activity.description ? (
+                            <p className="mt-2 text-sm leading-6 text-slate-700">
+                              {activity.description}
+                            </p>
+                          ) : null}
+                          <p className="mt-2 text-xs text-slate-500">
+                            بواسطة: <b className="text-slate-700">{activity.actorName || 'النظام'}</b>
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-muted-foreground">
+                    لا توجد أحداث مسجلة لهذا السجل حتى الآن.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {(canEdit || canDelete) && (
               <div className="flex flex-col md:flex-row justify-end gap-2">
                 {canEdit && (
