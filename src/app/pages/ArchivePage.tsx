@@ -2334,6 +2334,16 @@ export const ArchivePage: React.FC = () => {
                                 {version.versionNote ? (
                                   <p className="mt-1 text-xs leading-5 text-slate-700">{version.versionNote}</p>
                                 ) : null}
+                                {version.approvedAt ? (
+                                  <p className="mt-1 text-xs text-emerald-700">
+                                    معتمد · {formatDateTime(version.approvedAt)}
+                                  </p>
+                                ) : null}
+                                {version.cancelledAt ? (
+                                  <p className="mt-1 text-xs text-red-700">
+                                    ملغى · {formatDateTime(version.cancelledAt)}
+                                  </p>
+                                ) : null}
                               </div>
                               <Button
                                 type="button"
