@@ -2753,8 +2753,8 @@ ${styleAssets}
   };
 
   const archiveTransaction = async (record: TransactionFollowUpRecord) => {
-    if (record.status !== 'closed') {
-      toast.error('لا يمكن أرشفة المعاملة إلا بعد اعتماد إنجازها وإقفالها');
+    if (!['completed', 'closed'].includes(record.status)) {
+      toast.error('يمكن إنشاء نسخة أرشيفية للمعاملة المنجزة أو المغلقة فقط');
       return;
     }
 
@@ -2765,7 +2765,7 @@ ${styleAssets}
     if (entered == null) return;
 
     if (!window.confirm(
-      'سيتم ترحيل المعاملة من قوائم المتابعة النشطة إلى قسم «الأرشفة»، مع الاحتفاظ بكامل سجل الإجراءات والمرفقات. هل تريد المتابعة؟',
+      'سيتم إنشاء نسخة للمعاملة في قسم «الأرشفة» مع كامل سجلها ومرفقاتها، وستبقى المعاملة الأصلية ظاهرة في نظام المتابعة بحالتها الحالية. هل تريد المتابعة؟',
     )) {
       return;
     }
@@ -2773,12 +2773,14 @@ ${styleAssets}
     try {
       setSaving(true);
       await transactionFollowUpApi.archive(record.id, entered.trim() || null);
-      toast.success('تم ترحيل المعاملة إلى قسم الأرشفة');
-      if (selected?.id === record.id) setSelected(null);
+      toast.success('تم إنشاء نسخة في الأرشفة مع بقاء المعاملة في نظام المتابعة');
       await load();
+      if (selected?.id === record.id) {
+        await openDetails(record.id);
+      }
       window.dispatchEvent(new CustomEvent('iau-notifications-changed'));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر ترحيل المعاملة إلى الأرشفة');
+      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء النسخة الأرشيفية');
     } finally {
       setSaving(false);
     }
@@ -5657,17 +5659,17 @@ ${styleAssets}
                 </Card>
               ) : null}
 
-              {canArchive && selected.status === 'closed' && !selected.archivedAt && (
+              {canArchive && ['completed', 'closed'].includes(selected.status) && !selected.archivedAt && (
                 <Card className="border-emerald-200 bg-emerald-50/50">
                   <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="flex items-center gap-2 text-sm font-black text-emerald-950">
                         <Archive className="h-4 w-4" />
-                        ترحيل اختياري إلى الأرشفة
+                        إنشاء نسخة في الأرشفة
                       </p>
                       <p className="mt-1 text-xs leading-6 text-emerald-900/80">
-                        المعاملة مغلقة ويمكن ترحيلها إلى قسم «الأرشفة» عند الحاجة. لن يتم حذف سجلها أو مرفقاتها،
-                        وستختفي فقط من قوائم المتابعة النشطة.
+                        المعاملة {selected.status === 'closed' ? 'مغلقة' : 'منجزة'} ويمكن نسخها إلى قسم «الأرشفة».
+                        ستبقى المعاملة الأصلية ظاهرة في نظام المتابعة، وتظهر نسخة منها في الأرشفة مع سجل الإجراءات والمرفقات.
                       </p>
                     </div>
                     <Button
@@ -5676,13 +5678,33 @@ ${styleAssets}
                       onClick={() => void archiveTransaction(selected)}
                     >
                       <Archive className="ml-2 h-4 w-4" />
-                      ترحيل إلى الأرشفة
+                      نسخ إلى الأرشفة
                     </Button>
                   </CardContent>
                 </Card>
               )}
 
-              {canReopen && ['completed', 'closed'].includes(selected.status) && (
+              {selected.archivedAt && (
+                <Card className="border-sky-200 bg-sky-50/50">
+                  <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="flex items-center gap-2 text-sm font-black text-sky-950">
+                        <Archive className="h-4 w-4" />
+                        توجد نسخة محفوظة في الأرشفة
+                      </p>
+                      <p className="mt-1 text-xs leading-6 text-sky-900/80">
+                        بقيت هذه المعاملة في نظام المتابعة بحالتها {selected.status === 'closed' ? 'المغلقة' : selected.status === 'completed' ? 'المنجزة' : 'الحالية'}،
+                        وتم إنشاء نسخة أرشيفية بتاريخ {formatDateTime(selected.archivedAt)}.
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="w-fit border-sky-300 bg-white font-bold text-sky-800">
+                      موجودة في المتابعة والأرشفة
+                    </Badge>
+                  </CardContent>
+                </Card>
+              )}
+
+              {canReopen && ['completed', 'closed'].includes(selected.status) && !selected.archivedAt && (
                 <Card className="border-amber-200 bg-amber-50/50">
                   <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
