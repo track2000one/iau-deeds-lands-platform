@@ -1132,6 +1132,45 @@ export const TransactionFollowUpPage: React.FC = () => {
   };
 
   const openExecutiveReport = async () => {
+    const defaultTemplate =
+      reportTemplates.find((template) => template.scope === 'personal' && template.isDefault)
+      || reportTemplates.find((template) => template.scope === 'shared' && template.isDefault);
+
+    setReportSection('preview');
+    setReportOpen(true);
+
+    if (defaultTemplate) {
+      const nextOptions = cloneFlexibleReportOptions(defaultTemplate.options);
+      nextOptions.excludedIds = [];
+      setFlexibleReportOptions(nextOptions);
+      setReportOrientation(defaultTemplate.orientation);
+      setReportMode(defaultTemplate.reportMode);
+      setReportAssigneeId(defaultTemplate.assigneeUserId || '');
+
+      let from = reportFrom;
+      let to = reportTo;
+      if (
+        defaultTemplate.reportMode === 'weekly'
+        || defaultTemplate.reportMode === 'monthly'
+      ) {
+        const range = reportRange(defaultTemplate.reportMode);
+        from = range.from;
+        to = range.to;
+      } else {
+        from = defaultTemplate.customFrom || reportFrom;
+        to = defaultTemplate.customTo || reportTo;
+      }
+
+      setReportFrom(from);
+      setReportTo(to);
+      await Promise.all([
+        loadExecutiveReport(from, to, defaultTemplate.assigneeUserId || ''),
+        loadReportArchives(1),
+        loadReportSchedules(),
+      ]);
+      return;
+    }
+
     const range = reportRange('monthly');
     setReportMode('monthly');
     setReportFrom(range.from);
@@ -1139,8 +1178,6 @@ export const TransactionFollowUpPage: React.FC = () => {
     setReportAssigneeId('');
     setFlexibleReportOptions(createDefaultFlexibleReportOptions());
     setReportOrientation('landscape');
-    setReportSection('preview');
-    setReportOpen(true);
     await Promise.all([
       loadExecutiveReport(range.from, range.to, ''),
       loadReportArchives(1),
