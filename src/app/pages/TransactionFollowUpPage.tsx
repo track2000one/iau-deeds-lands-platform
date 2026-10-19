@@ -4190,6 +4190,11 @@ ${styleAssets}
                               {archive.reportType === 'weekly' ? 'تقرير أسبوعي' : archive.reportType === 'monthly' ? 'تقرير شهري' : 'تقرير مخصص'}
                             </b>
                             <Badge variant="outline">{archive.source === 'scheduled' ? 'آلي' : 'يدوي'}</Badge>
+                            {archive.templateName && (
+                              <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">
+                                القالب: {archive.templateName}
+                              </Badge>
+                            )}
                             {archive.assigneeName && <Badge variant="outline">{archive.assigneeName}</Badge>}
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
@@ -4385,7 +4390,7 @@ ${styleAssets}
                     <div className="py-12 text-center text-sm text-muted-foreground">جارٍ تحميل الجدولات...</div>
                   ) : reportSchedules.length === 0 ? (
                     <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
-                      لا توجد جدولات تقارير حتى الآن.
+                      لا توجد جدولات تقارير حتى الآن. أنشئ قالب تقرير مرن أولًا ثم اربطه بجدولة أسبوعية أو شهرية.
                     </div>
                   ) : (
                     reportSchedules.map((schedule) => (
