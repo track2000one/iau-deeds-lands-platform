@@ -336,6 +336,10 @@ type FlexibleReportTemplate = {
   id: string;
   name: string;
   scope: 'personal' | 'shared';
+  accessMode: 'all' | 'selected';
+  allowedUserIds: string[];
+  isDefault: boolean;
+  sortOrder: number;
   createdById?: string | null;
   createdByName?: string | null;
   createdAt: string;
@@ -392,6 +396,12 @@ const normalizeReportTemplate = (value: unknown): FlexibleReportTemplate | null 
     id: String(raw.id),
     name: String(raw.name),
     scope: raw.scope === 'shared' ? 'shared' : 'personal',
+    accessMode: raw.accessMode === 'selected' ? 'selected' : 'all',
+    allowedUserIds: Array.isArray(raw.allowedUserIds)
+      ? raw.allowedUserIds.map((value) => String(value))
+      : [],
+    isDefault: Boolean(raw.isDefault),
+    sortOrder: Number.isFinite(Number(raw.sortOrder)) ? Number(raw.sortOrder) : 0,
     createdById: raw.createdById || null,
     createdByName: raw.createdByName || null,
     createdAt: String(raw.createdAt || new Date().toISOString()),
@@ -513,6 +523,9 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [reportTemplates, setReportTemplates] = React.useState<FlexibleReportTemplate[]>([]);
   const [reportTemplateName, setReportTemplateName] = React.useState('');
   const [reportTemplateScope, setReportTemplateScope] = React.useState<'personal' | 'shared'>('personal');
+  const [reportTemplateAccessMode, setReportTemplateAccessMode] = React.useState<'all' | 'selected'>('all');
+  const [reportTemplateAllowedUserIds, setReportTemplateAllowedUserIds] = React.useState<string[]>([]);
+  const [reportTemplateDefault, setReportTemplateDefault] = React.useState(false);
   const [reportTemplateSaving, setReportTemplateSaving] = React.useState(false);
   const [reportData, setReportData] = React.useState<TransactionFollowUpExecutiveReport | null>(null);
   const [reportSection, setReportSection] = React.useState<'preview' | 'archive' | 'schedule'>('preview');
