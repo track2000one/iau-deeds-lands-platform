@@ -3772,27 +3772,27 @@ ${styleAssets}
 
       <Dialog open={reportOpen} onOpenChange={(open) => !reportExporting && setReportOpen(open)}>
         <DialogContent
-          className="max-h-[94dvh] overflow-y-auto overscroll-contain !border-slate-200 !bg-[#F8FAFC] !text-slate-950 shadow-2xl [color-scheme:light] [scrollbar-gutter:stable] [&_button]:transition-colors [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:placeholder:!text-slate-600 [&_label]:!text-slate-800 [&_select]:!border-slate-300 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!border-slate-300 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
-          style={{ backgroundColor: '#F8FAFC', color: '#0F172A', colorScheme: 'light' }}
+          className="max-h-[94dvh] overflow-y-auto overscroll-contain !border-slate-200 !bg-[#F5F7FA] !text-slate-950 shadow-2xl [color-scheme:light] [scrollbar-gutter:stable] [&_button]:transition-colors [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:placeholder:!text-slate-500 [&_label]:!text-slate-800 [&_select]:!border-slate-300 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!border-slate-300 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
+          style={{ backgroundColor: '#F5F7FA', color: '#172033', colorScheme: 'light' }}
           dir="rtl"
         >
-          <DialogHeader className="rounded-xl border border-blue-200 !bg-blue-50 p-4 text-right shadow-sm" style={{ backgroundColor: '#EFF6FF' }}>
+          <DialogHeader className="rounded-xl border border-slate-200 border-r-4 border-r-[#1F4E78] !bg-white p-4 text-right shadow-sm" style={{ backgroundColor: '#FFFFFF' }}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <DialogTitle className="!text-slate-950" style={{ color: '#0F172A' }}>التقرير المرن لمتابعة المعاملات</DialogTitle>
-              <Badge variant="outline" className="border-blue-200 bg-white text-blue-800">واجهة تجريبية</Badge>
+              <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-600">واجهة تجريبية</Badge>
             </div>
             <DialogDescription className="!text-slate-700">
               تقرير احترافي قابل للتصفية والفرز والاستبعاد واختيار الأعمدة واتجاه الطباعة، ويعرض فقط: المنجزة، المتأخرة القائمة، بانتظار رد، وتحتاج متابعة.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="sticky top-0 z-20 -mx-1 flex flex-wrap gap-2 border-b border-slate-200 !bg-[#F8FAFC] px-1 py-3" style={{ backgroundColor: '#F8FAFC' }}>
+          <div className="sticky top-0 z-20 -mx-1 flex flex-wrap gap-2 border-b border-slate-200 !bg-[#F5F7FA] px-1 py-3" style={{ backgroundColor: '#F5F7FA' }}>
             <Button
               type="button"
               variant={reportSection === 'preview' ? 'default' : 'outline'}
               className={reportSection === 'preview'
-                ? 'bg-slate-900 text-white hover:bg-slate-800'
-                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'}
+                ? 'bg-[#1F4E78] text-white hover:bg-[#173A59]'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}
               onClick={() => setReportSection('preview')}
             >
               <FileText className="ml-2 h-4 w-4" />
@@ -3802,8 +3802,8 @@ ${styleAssets}
               type="button"
               variant={reportSection === 'archive' ? 'default' : 'outline'}
               className={reportSection === 'archive'
-                ? 'bg-slate-900 text-white hover:bg-slate-800'
-                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'}
+                ? 'bg-[#1F4E78] text-white hover:bg-[#173A59]'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}
               onClick={() => {
                 setReportSection('archive');
                 void loadReportArchives(reportArchivePage);
@@ -3816,8 +3816,8 @@ ${styleAssets}
               type="button"
               variant={reportSection === 'schedule' ? 'default' : 'outline'}
               className={reportSection === 'schedule'
-                ? 'bg-slate-900 text-white hover:bg-slate-800'
-                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'}
+                ? 'bg-[#1F4E78] text-white hover:bg-[#173A59]'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}
               onClick={() => {
                 setReportSection('schedule');
                 void loadReportSchedules();
@@ -3830,7 +3830,7 @@ ${styleAssets}
 
           {reportSection === 'preview' && (
             <>
-              <div className="grid gap-3 rounded-2xl border border-cyan-200 !bg-cyan-50 p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8" style={{ backgroundColor: '#ECFEFF' }}>
+              <div className="grid gap-3 rounded-2xl border border-[#D6E3EF] !bg-[#F7FAFD] p-4 shadow-sm md:grid-cols-2 xl:grid-cols-8" style={{ backgroundColor: '#F7FAFD' }}>
                 <Field label="نوع التقرير">
                   <NativeSelect
                     value={reportMode}
@@ -3931,7 +3931,7 @@ ${styleAssets}
                   </Button>
                   <Button
                     type="button"
-                    className="flex-[1.4] bg-slate-800 text-white hover:bg-slate-700"
+                    className="flex-[1.4] bg-[#1F4E78] text-white hover:bg-[#173A59]"
                     disabled={reportLoading || reportExporting}
                     onClick={() => void exportFullFollowUpBackup()}
                   >
@@ -3943,7 +3943,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="grid gap-3 rounded-2xl border border-amber-300 !bg-amber-50 p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6" style={{ backgroundColor: '#FFFBEB' }}>
+              <div className="grid gap-3 rounded-2xl border border-[#E6D8B9] !bg-[#FFFCF5] p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6" style={{ backgroundColor: '#FFFCF5' }}>
                 <div className="xl:col-span-2">
                   <Field label="اسم النسخة المؤرشفة">
                     <Input
@@ -3976,7 +3976,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-2xl border border-orange-200 !bg-orange-50 p-4 shadow-sm" style={{ backgroundColor: '#FFF7ED' }}>
+              <div className="space-y-4 rounded-2xl border border-[#D7E0E7] !bg-white p-4 shadow-sm" style={{ backgroundColor: '#FFFFFF' }}>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h3 className="font-black !text-slate-950" style={{ color: '#0F172A' }}>إعداد التقرير المرن</h3>
@@ -3990,7 +3990,7 @@ ${styleAssets}
                   </Button>
                 </div>
 
-                <div className="rounded-2xl border border-violet-200 !bg-violet-50 p-3" style={{ backgroundColor: '#F5F3FF' }}>
+                <div className="rounded-2xl border border-[#D9DDE8] !bg-[#F8F9FC] p-3" style={{ backgroundColor: '#F8F9FC' }}>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-black !text-slate-950">قوالب التقرير المحفوظة</p>
@@ -4030,7 +4030,7 @@ ${styleAssets}
                       )}
                       <Button
                         type="button"
-                        className="shrink-0 bg-slate-800 text-white hover:bg-slate-700"
+                        className="shrink-0 bg-[#1F4E78] text-white hover:bg-[#173A59]"
                         disabled={reportTemplateSaving}
                         onClick={() => void saveFlexibleReportTemplate()}
                       >
@@ -4083,7 +4083,7 @@ ${styleAssets}
                             return (
                               <label
                                 key={user.id}
-                                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-[11px] font-bold ${checked ? 'border-violet-300 bg-violet-50 text-violet-900' : 'border-slate-200 bg-white text-slate-600'}`}
+                                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-[11px] font-bold ${checked ? 'border-[#B9C9D8] bg-[#EEF4F8] text-[#24425A]' : 'border-slate-200 bg-white text-slate-600'}`}
                               >
                                 <span className="truncate">{user.username}</span>
                                 <input
@@ -4096,7 +4096,7 @@ ${styleAssets}
                                         : [...current, user.id],
                                     )
                                   }
-                                  className="h-4 w-4 accent-violet-700"
+                                  className="h-4 w-4 accent-[#1F4E78]"
                                 />
                               </label>
                             );
@@ -4118,7 +4118,7 @@ ${styleAssets}
                               <Badge
                                 variant="outline"
                                 className={template.scope === 'shared'
-                                  ? 'border-violet-300 bg-violet-50 text-violet-800'
+                                  ? 'border-[#C9D6E2] bg-[#F4F7FA] text-[#2F4F67]'
                                   : 'border-slate-200 bg-slate-50 text-slate-600'}
                               >
                                 {template.scope === 'shared' ? 'عام للإدارة' : 'شخصي'}
@@ -4350,7 +4350,7 @@ ${styleAssets}
                   )}
                 </div>
 
-                <div className="grid gap-3 rounded-2xl border border-sky-200 !bg-sky-50 p-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]" style={{ backgroundColor: '#F0F9FF' }}>
+                <div className="grid gap-3 rounded-2xl border border-[#D6E3EF] !bg-[#F7FAFD] p-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]" style={{ backgroundColor: '#F7FAFD' }}>
                   <Field label="عنوان التقرير">
                     <Input
                       value={flexibleReportOptions.title}
@@ -4404,7 +4404,7 @@ ${styleAssets}
                   </Field>
                 </div>
 
-                <div className="rounded-2xl border border-emerald-200 !bg-emerald-50 p-3" style={{ backgroundColor: '#ECFDF5' }}>
+                <div className="rounded-2xl border border-[#D5E3DB] !bg-[#F7FAF8] p-3" style={{ backgroundColor: '#F7FAF8' }}>
                   <p className="mb-2 text-xs font-black text-slate-700">الفئات الظاهرة في التقرير</p>
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {FLEXIBLE_REPORT_CATEGORIES.map((category) => {
@@ -4427,7 +4427,7 @@ ${styleAssets}
                   </div>
                 </div>
 
-                <div className="grid gap-3 rounded-2xl border border-indigo-200 !bg-indigo-50 p-3 md:grid-cols-3 xl:grid-cols-5" style={{ backgroundColor: '#EEF2FF' }}>
+                <div className="grid gap-3 rounded-2xl border border-[#DCE2E8] !bg-[#F8FAFC] p-3 md:grid-cols-3 xl:grid-cols-5" style={{ backgroundColor: '#F8FAFC' }}>
                   <Field label="الفرز حسب">
                     <NativeSelect
                       value={flexibleReportOptions.sortBy}
@@ -4490,7 +4490,7 @@ ${styleAssets}
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-rose-200 !bg-rose-50 p-3" style={{ backgroundColor: '#FFF1F2' }}>
+                <div className="rounded-2xl border border-[#D6E3EF] !bg-[#F7FAFD] p-3" style={{ backgroundColor: '#F7FAFD' }}>
                   <p className="mb-2 text-xs font-black text-slate-700">الأعمدة الظاهرة</p>
                   <div className="flex flex-wrap gap-2">
                     {FLEXIBLE_REPORT_COLUMNS.map((column) => {
@@ -4514,7 +4514,7 @@ ${styleAssets}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-lime-200 !bg-lime-50 px-4 py-3 text-xs leading-6 text-lime-950" style={{ backgroundColor: '#F7FEE7' }}>
+              <div className="rounded-2xl border border-[#D6E3EF] !bg-[#F7FAFD] px-4 py-3 text-xs leading-6 text-slate-700" style={{ backgroundColor: '#F7FAFD' }}>
                 <b>Excel المرن:</b> يصدر نفس نتيجة المعاينة الحالية حرفيًا من حيث الفئات، التصفية، الفرز، الأعمدة والاستبعادات،
                 مع تنسيق احترافي ومرشح تلقائي وتجهيز للطباعة. أما «نسخة احتياطية كاملة» فتبقى منفصلة، وتنشئ ZIP يحتوي على
                 جميع بيانات نظام المتابعة وملف Excel خام وJSON ونسخ فعلية من الصور والمرفقات وأدلة التوجيهات.
@@ -4759,7 +4759,7 @@ ${styleAssets}
                                 </Badge>
                               )}
                               {archive.templateName ? (
-                                <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">
+                                <Badge variant="outline" className="border-[#C9D6E2] bg-[#F4F7FA] text-[#2F4F67]">
                                   القالب: {archive.templateName}
                                 </Badge>
                               ) : archive.templateSnapshot ? (
@@ -5246,7 +5246,7 @@ ${styleAssets}
                               {schedule.isActive ? 'نشطة' : 'متوقفة'}
                             </Badge>
                             {schedule.templateName ? (
-                              <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-800">
+                              <Badge variant="outline" className="border-[#C9D6E2] bg-[#F4F7FA] text-[#2F4F67]">
                                 القالب: {schedule.templateName}
                               </Badge>
                             ) : (
