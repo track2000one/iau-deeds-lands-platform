@@ -1128,7 +1128,6 @@ export const TransactionFollowUpPage: React.FC = () => {
       loadExecutiveReport(range.from, range.to, ''),
       loadReportArchives(1),
       loadReportSchedules(),
-      refreshReportTemplates().catch(() => undefined),
     ]);
   };
 
