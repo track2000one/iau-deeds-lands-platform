@@ -2347,6 +2347,17 @@ export const ArchivePage: React.FC = () => {
                                   اعتماد
                                 </Button>
                               ) : null}
+                              {canApproveVersions && getAttachmentVersionStatus(version) === 'draft' ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openVersionGovernanceDialog(version, 'cancel')}
+                                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                                >
+                                  إلغاء المسودة
+                                </Button>
+                              ) : null}
                             </div>
                           ))}
                         </div>
