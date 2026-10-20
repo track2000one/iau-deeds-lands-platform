@@ -13,7 +13,7 @@ const renderHtmlToPdf = async (html: string) => {
   host.style.position = 'fixed';
   host.style.left = '-12000px';
   host.style.top = '0';
-  host.style.width = '1120px';
+  host.style.width = '900px';
   host.style.background = '#ffffff';
   host.style.zIndex = '-1';
   host.innerHTML = html;
@@ -27,7 +27,7 @@ const renderHtmlToPdf = async (html: string) => {
       backgroundColor: '#ffffff',
       useCORS: true,
       logging: false,
-      windowWidth: 1120,
+      windowWidth: 900,
     });
 
     const pdf = await PDFDocument.create();
