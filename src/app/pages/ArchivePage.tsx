@@ -1000,52 +1000,52 @@ export const ArchivePage: React.FC = () => {
 
       const attachmentsCount = detailed.attachments?.length || 0;
       const html = `
-        <div dir="rtl" style="font-family:Arial,'Segoe UI',Tahoma,sans-serif;color:#0f172a;background:#fff;padding:24px;line-height:1.7">
+        <div dir="rtl" style="font-family:Arial,'Segoe UI',Tahoma,sans-serif;color:#0f172a;background:#fff;padding:22px;font-size:15px;line-height:1.8">
           <div style="border:1px solid #cbd5e1;border-radius:14px;background:#f8fafc;padding:16px;margin-bottom:14px">
-            <div style="font-size:12px;color:#0f766e;font-weight:700">جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الأصول والأملاك والأوقاف الجامعية</div>
-            <div style="font-size:27px;font-weight:900;color:#123047;margin-top:5px">بيانات المعاملة المؤرشفة</div>
-            <div style="font-size:12px;color:#64748b;margin-top:4px">نظام المتابعة — قسم الأرشفة · تاريخ إعداد التقرير: ${escapePrintHtml(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</div>
+            <div style="font-size:14px;color:#0f766e;font-weight:800">جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الأصول والأملاك والأوقاف الجامعية</div>
+            <div style="font-size:31px;font-weight:900;color:#123047;margin-top:6px;line-height:1.35">بيانات المعاملة المؤرشفة</div>
+            <div style="font-size:14px;color:#475569;margin-top:5px">نظام المتابعة — قسم الأرشفة · تاريخ إعداد التقرير: ${escapePrintHtml(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px">
-              <div style="border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px;text-align:center">رقم المعاملة<div style="font-size:18px;font-weight:900;color:#0369a1">${escapePrintHtml(detailed.transactionNumber)}</div></div>
-              <div style="border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px;text-align:center">الحالة<div style="font-size:18px;font-weight:900;color:#0369a1">${detailed.status === 'completed' ? 'منجزة' : detailed.status === 'closed' ? 'مغلقة' : escapePrintHtml(detailed.status)}</div></div>
-              <div style="border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px;text-align:center">المرفقات<div style="font-size:18px;font-weight:900;color:#0369a1">${attachmentsCount}</div></div>
+              <div style="border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px;text-align:center">رقم المعاملة<div style="font-size:22px;font-weight:900;color:#0369a1;line-height:1.4">${escapePrintHtml(detailed.transactionNumber)}</div></div>
+              <div style="border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px;text-align:center">الحالة<div style="font-size:22px;font-weight:900;color:#0369a1;line-height:1.4">${detailed.status === 'completed' ? 'منجزة' : detailed.status === 'closed' ? 'مغلقة' : escapePrintHtml(detailed.status)}</div></div>
+              <div style="border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px;text-align:center">المرفقات<div style="font-size:22px;font-weight:900;color:#0369a1;line-height:1.4">${attachmentsCount}</div></div>
             </div>
           </div>
 
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <table style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.7">
             <tbody>
               ${rows.map(([label, value]) => `
                 <tr>
-                  <th style="width:190px;border:1px solid #cbd5e1;background:#eef3f8;padding:8px;text-align:right;font-weight:800">${escapePrintHtml(label)}</th>
-                  <td style="border:1px solid #cbd5e1;padding:8px;text-align:right;vertical-align:top">${escapePrintHtml(value)}</td>
+                  <th style="width:200px;border:1px solid #cbd5e1;background:#eef3f8;padding:10px;text-align:right;font-weight:900;font-size:14px">${escapePrintHtml(label)}</th>
+                  <td style="border:1px solid #cbd5e1;padding:10px;text-align:right;vertical-align:top;font-size:14px">${escapePrintHtml(value)}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
 
-          <div style="font-size:18px;font-weight:900;color:#123047;border-right:4px solid #0f766e;padding-right:8px;margin:20px 0 8px">سجل الإجراءات والتحويلات</div>
+          <div style="font-size:21px;font-weight:900;color:#123047;border-right:5px solid #0f766e;padding-right:10px;margin:22px 0 10px;line-height:1.5">سجل الإجراءات والتحويلات</div>
           ${eventRows
-            ? `<table style="width:100%;border-collapse:collapse;font-size:11px">
+            ? `<table style="width:100%;border-collapse:collapse;font-size:13px;line-height:1.65">
                 <thead>
                   <tr>
-                    <th style="border:1px solid #94a3b8;background:#123047;color:#fff;padding:7px">التاريخ</th>
-                    <th style="border:1px solid #94a3b8;background:#123047;color:#fff;padding:7px">الإجراء</th>
-                    <th style="border:1px solid #94a3b8;background:#123047;color:#fff;padding:7px">بواسطة</th>
-                    <th style="border:1px solid #94a3b8;background:#123047;color:#fff;padding:7px">الملاحظة</th>
+                    <th style="border:1px solid #94a3b8;background:#123047;color:#fff;padding:9px;font-size:13px;font-weight:900">التاريخ</th>
+                    <th style="border:1px solid #94a3b8;background:#123047;color:#fff;padding:9px;font-size:13px;font-weight:900">الإجراء</th>
+                    <th style="border:1px solid #94a3b8;background:#123047;color:#fff;padding:9px;font-size:13px;font-weight:900">بواسطة</th>
+                    <th style="border:1px solid #94a3b8;background:#123047;color:#fff;padding:9px;font-size:13px;font-weight:900">الملاحظة</th>
                   </tr>
                 </thead>
                 <tbody>${eventRows}</tbody>
               </table>`
             : '<div style="border:1px dashed #cbd5e1;border-radius:8px;padding:14px;color:#64748b;text-align:center">لا توجد أحداث مسجلة.</div>'}
 
-          <div style="font-size:18px;font-weight:900;color:#123047;border-right:4px solid #0f766e;padding-right:8px;margin:20px 0 8px">مرفقات المعاملة</div>
+          <div style="font-size:21px;font-weight:900;color:#123047;border-right:5px solid #0f766e;padding-right:10px;margin:22px 0 10px;line-height:1.5">مرفقات المعاملة</div>
           ${attachmentsCount
-            ? `<div style="border:1px solid #bae6fd;border-radius:12px;background:#f0f9ff;padding:13px;color:#075985;font-size:12px">
+            ? `<div style="border:1px solid #bae6fd;border-radius:12px;background:#f0f9ff;padding:15px;color:#075985;font-size:14px;line-height:1.8">
                 سيتم عرض المرفقات التالية كصفحات فعلية داخل نفس ملف التقرير بعد هذه الصفحة؛ الصور ستظهر كاملة، وملفات PDF ستُضم جميع صفحاتها.
               </div>`
             : '<div style="border:1px dashed #cbd5e1;border-radius:8px;padding:14px;color:#64748b;text-align:center">لا توجد مرفقات مرتبطة بهذه المعاملة.</div>'}
 
-          <div style="margin-top:18px;padding-top:8px;border-top:1px solid #e2e8f0;color:#64748b;font-size:10px">
+          <div style="margin-top:20px;padding-top:10px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px">
             تم إنشاء التقرير من منصة إدارة الأصول والأملاك والأوقاف الجامعية.
           </div>
         </div>
