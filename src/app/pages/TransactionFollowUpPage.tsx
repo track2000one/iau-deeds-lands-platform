@@ -3548,19 +3548,20 @@ ${styleAssets}
       )}
 
       {activeWorkspace === 'directives' && (
-        <Card className="rounded-[24px] border-slate-200 bg-white shadow-sm">
-          <CardHeader className="border-b pb-4">
+        <Card className="followup-directives-section rounded-[24px] border-slate-200 bg-white shadow-sm">
+          <CardHeader className="followup-directives-section__header border-b pb-4">
             <CardTitle className="text-base">التوجيهات والاعتمادات</CardTitle>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">
               إدارة التوجيهات الإدارية وطلبات الاعتماد ومؤشرات تنفيذها من مكان واحد.
             </p>
           </CardHeader>
-          <CardContent className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+          <CardContent className="followup-directives-section__content grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
             <ToolCard
               icon={<Gavel className="h-5 w-5" />}
               title="لوحة التوجيهات"
               description="عرض التوجيهات المفتوحة وحالتها ومسؤولي التنفيذ."
               onClick={() => setDirectivesDashboardOpen(true)}
+              tone="directive"
             />
             {(isAdmin || canDelete) && (
               <ToolCard
@@ -3569,6 +3570,7 @@ ${styleAssets}
                 description="طلبات بانتظار مراجعة واعتماد المدير."
                 onClick={() => setApprovalCenterOpen(true)}
                 emphasis
+                tone="approval"
               />
             )}
             {(isAdmin || canDelete) && (
@@ -3577,6 +3579,7 @@ ${styleAssets}
                 title="سجل الاعتمادات"
                 description="القرارات السابقة وتاريخ المراجعات."
                 onClick={() => setApprovalHistoryOpen(true)}
+                tone="history"
               />
             )}
             {(isAdmin || canDelete) && (
@@ -3585,6 +3588,7 @@ ${styleAssets}
                 title="KPI التوجيهات"
                 description="قياس الالتزام والتنفيذ والتأخير للتوجيهات."
                 onClick={() => setDirectiveKpiOpen(true)}
+                tone="kpi"
               />
             )}
           </CardContent>
@@ -6276,24 +6280,27 @@ const ToolCard = ({
   description,
   onClick,
   emphasis = false,
+  tone = 'default',
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   onClick: () => void;
   emphasis?: boolean;
+  tone?: 'default' | 'directive' | 'approval' | 'history' | 'kpi';
 }) => (
   <button
     type="button"
+    data-tone={tone}
     onClick={onClick}
-    className={'group rounded-2xl border p-4 text-right transition hover:-translate-y-0.5 hover:shadow-md ' + (
+    className={'followup-tool-card group rounded-2xl border p-4 text-right transition hover:-translate-y-0.5 hover:shadow-md ' + (
       emphasis
         ? 'border-violet-200 bg-violet-50/60'
         : 'border-slate-200 bg-white hover:border-primary/30'
     )}
   >
     <div className="flex items-start gap-3">
-      <span className={'grid h-10 w-10 shrink-0 place-items-center rounded-xl ' + (
+      <span className={'followup-tool-card__icon grid h-10 w-10 shrink-0 place-items-center rounded-xl ' + (
         emphasis
           ? 'bg-violet-100 text-violet-800'
           : 'bg-slate-100 text-slate-700 group-hover:bg-primary/10 group-hover:text-primary'
@@ -6301,8 +6308,8 @@ const ToolCard = ({
         {icon}
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-black text-slate-900">{title}</span>
-        <span className="mt-1 block text-[11px] leading-5 text-slate-500">{description}</span>
+        <span className="followup-tool-card__title block text-sm font-black text-slate-900">{title}</span>
+        <span className="followup-tool-card__description mt-1 block text-[11px] leading-5 text-slate-500">{description}</span>
       </span>
     </div>
   </button>
