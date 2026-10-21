@@ -3463,3 +3463,64 @@ label[data-app-required-label="true"]::after {
     color: #475569 !important;
   }
 }
+
+
+/* ===== Transaction Follow-up: Workspace Tabs Contrast v6 ===== */
+@media screen {
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-nav {
+    background: #526879 !important;
+    border-top-color: rgba(255,255,255,.12) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-tab {
+    border-color: transparent !important;
+    background: transparent !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-tab .followup-workspace-tab__title {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-tab .followup-workspace-tab__hint {
+    color: rgba(255,255,255,.78) !important;
+    opacity: 1 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-tab .followup-workspace-tab__icon {
+    color: #ffffff !important;
+    background: rgba(255,255,255,.14) !important;
+    border: 1px solid rgba(255,255,255,.10) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-tab:hover {
+    border-color: rgba(255,255,255,.24) !important;
+    background: rgba(255,255,255,.08) !important;
+    color: #ffffff !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-tab[data-active="true"] {
+    border-color: #c8d4df !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    box-shadow:
+      0 5px 14px rgba(15,23,42,.12),
+      inset 0 -3px 0 #1f4e78 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-tab[data-active="true"] .followup-workspace-tab__title {
+    color: #111827 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-tab[data-active="true"] .followup-workspace-tab__hint {
+    color: #475569 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-tab[data-active="true"] .followup-workspace-tab__icon {
+    color: #111827 !important;
+    background: #eef2f6 !important;
+    border-color: #d7e0e8 !important;
+  }
+}
