@@ -5465,39 +5465,130 @@ ${styleAssets}
           }
         }}
       >
-        <DialogContent className="followup-transaction-dialog max-h-[94dvh] overflow-y-auto sm:max-w-5xl" dir="rtl">
+        <DialogContent className="followup-transaction-dialog max-h-[94dvh] overflow-y-auto bg-[#F5F7FA] sm:max-w-6xl" dir="rtl">
           {detailLoading && !selected ? (
             <div className="py-16 text-center"><RefreshCw className="mx-auto h-6 w-6 animate-spin" /></div>
           ) : selected ? (
             <>
-              <DialogHeader className="text-right">
-                <DialogTitle className="flex flex-wrap items-center gap-2">
-                  <span>معاملة {selected.transactionNumber}</span>
-                  <Badge variant="outline" className={indicatorClass[selected.indicatorSeverity]}>{selected.indicatorLabel}</Badge>
-                </DialogTitle>
-                <DialogDescription>{selected.trackingNumber} — {selected.subject}</DialogDescription>
-              </DialogHeader>
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div
+                  className={
+                    'h-1.5 w-full ' +
+                    (selected.indicatorSeverity === 'danger'
+                      ? 'bg-red-500'
+                      : selected.indicatorSeverity === 'warning'
+                        ? 'bg-amber-500'
+                        : selected.status === 'completed' || selected.status === 'closed'
+                          ? 'bg-emerald-500'
+                          : 'bg-[#1F4E78]')
+                  }
+                />
+                <div className="p-5 sm:p-6">
+                  <DialogHeader className="text-right">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className="bg-[#1F4E78] text-white hover:bg-[#1F4E78]">
+                            رقم المعاملة {selected.transactionNumber}
+                          </Badge>
+                          <Badge variant="outline" className={indicatorClass[selected.indicatorSeverity]}>
+                            {selected.indicatorLabel}
+                          </Badge>
+                          <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
+                            {statusLabels[selected.status]}
+                          </Badge>
+                          {selected.archivedAt && (
+                            <Badge variant="outline" className="border-emerald-300 bg-emerald-50 font-bold text-emerald-800">
+                              مؤرشفة
+                            </Badge>
+                          )}
+                        </div>
+                        <DialogTitle className="mt-3 text-xl font-black leading-8 text-slate-950 sm:text-2xl">
+                          {selected.subject}
+                        </DialogTitle>
+                        <DialogDescription className="mt-1 text-sm leading-6 text-slate-500">
+                          {selected.trackingNumber} · {selected.sourceEntity || 'جهة غير محددة'}
+                        </DialogDescription>
+                      </div>
 
-              <div className="grid gap-3 md:grid-cols-4">
-                <Info label="تاريخ المعاملة" value={formatTransactionDate(selected)} />
-                <Info label="النوع" value={typeLabels[selected.transactionType]} />
-                <Info label="الإدارة / الوحدة" value={selected.organizationalUnit ? organizationalUnitLabels[selected.organizationalUnit] : 'غير محددة للمعاملات السابقة'} />
-                <Info label="الأولوية" value={priorityLabels[selected.priority]} />
-                <Info label="الحالة" value={statusLabels[selected.status]} />
-                <Info label="الجهة" value={selected.sourceEntity || '—'} />
-                <Info label="الموظف الحالي" value={selected.currentAssigneeName || 'غير مسندة'} />
-                <Info label="الاستحقاق" value={formatDate(selected.dueDate)} />
-                <Info label="دون إجراء" value={`${selected.daysWithoutAction || 0} يوم`} />
+                      <div className="grid min-w-[280px] gap-2 sm:grid-cols-2 lg:w-[360px]">
+                        <div className="rounded-2xl border border-slate-200 bg-[#F7FAFD] p-3">
+                          <p className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                            <UserRound className="h-3.5 w-3.5" />
+                            الموظف الحالي
+                          </p>
+                          <p className="mt-1 truncate text-sm font-black text-slate-900">
+                            {selected.currentAssigneeName || 'غير مسندة'}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-[#F7FAFD] p-3">
+                          <p className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                            <CalendarClock className="h-3.5 w-3.5" />
+                            الاستحقاق
+                          </p>
+                          <p className="mt-1 text-sm font-black text-slate-900">
+                            {formatDate(selected.dueDate)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </DialogHeader>
+
+                  <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
+                      <p className="text-[11px] font-bold text-slate-500">تاريخ المعاملة</p>
+                      <p className="mt-1 text-sm font-black text-slate-900">{formatTransactionDate(selected)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
+                      <p className="text-[11px] font-bold text-slate-500">الإدارة / الوحدة</p>
+                      <p className="mt-1 text-sm font-black leading-6 text-slate-900">
+                        {selected.organizationalUnit ? organizationalUnitLabels[selected.organizationalUnit] : 'غير محددة للمعاملات السابقة'}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
+                      <p className="text-[11px] font-bold text-slate-500">النوع / الأولوية</p>
+                      <p className="mt-1 text-sm font-black text-slate-900">
+                        {typeLabels[selected.transactionType]} · {priorityLabels[selected.priority]}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
+                      <p className="text-[11px] font-bold text-slate-500">المدة دون إجراء</p>
+                      <p className={
+                        'mt-1 text-sm font-black ' +
+                        ((selected.daysWithoutAction || 0) >= 7 ? 'text-red-700' : 'text-slate-900')
+                      }>
+                        {(selected.daysWithoutAction || 0).toLocaleString('ar-SA')} يوم
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-2">
-                <Card className="border-sky-200">
-                  <CardHeader><CardTitle className="text-base">الإجراء المطلوب حاليًا</CardTitle></CardHeader>
-                  <CardContent className="text-sm leading-7">{selected.requiredAction || 'لم يحدد إجراء قادم.'}</CardContent>
+              <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                <Card className="overflow-hidden border-[#BFD4E6] bg-white shadow-sm">
+                  <CardHeader className="border-b border-[#D6E3EF] bg-[#F7FAFD] pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base font-black text-[#173A59]">
+                      <ClipboardCheck className="h-4 w-4" />
+                      الإجراء المطلوب حاليًا
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="rounded-2xl border-r-4 border-r-[#1F4E78] bg-slate-50/80 p-4 text-sm font-semibold leading-8 text-slate-800">
+                      {selected.requiredAction || 'لم يحدد إجراء قادم.'}
+                    </div>
+                  </CardContent>
                 </Card>
-                <Card className="border-slate-200">
-                  <CardHeader><CardTitle className="text-base">ملاحظات المعاملة</CardTitle></CardHeader>
-                  <CardContent className="text-sm leading-7">{selected.notes || 'لا توجد ملاحظات.'}</CardContent>
+
+                <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
+                  <CardHeader className="border-b border-slate-200 bg-slate-50/80 pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base font-black text-slate-800">
+                      <FileText className="h-4 w-4" />
+                      ملاحظات المعاملة
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 text-sm leading-8 text-slate-700">
+                    {selected.notes || 'لا توجد ملاحظات.'}
+                  </CardContent>
                 </Card>
               </div>
 
