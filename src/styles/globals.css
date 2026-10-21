@@ -3620,3 +3620,166 @@ label[data-app-required-label="true"]::after {
     transform: translateY(-5px);
   }
 }
+
+
+/* ===== Transaction Follow-up: Cursor Glow v8 ===== */
+@media screen and (hover: hover) and (pointer: fine) {
+  body.follow-up-theme-active .follow-up-page-theme :is(
+    .followup-hero,
+    .followup-unit-card,
+    .followup-kpi-card,
+    .followup-filterbar,
+    .followup-recent-panel,
+    .followup-shortcut-card,
+    .followup-operational-card,
+    .followup-work-bucket-card,
+    .followup-executive-card,
+    .followup-priority-panel,
+    .followup-load-panel,
+    .followup-directives-section,
+    .followup-tool-card,
+    .followup-transaction-card
+  ) {
+    --followup-glow-rgb: 47, 120, 159;
+    position: relative;
+    isolation: isolate;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme :is(
+    .followup-hero,
+    .followup-unit-card,
+    .followup-kpi-card,
+    .followup-filterbar,
+    .followup-recent-panel,
+    .followup-shortcut-card,
+    .followup-operational-card,
+    .followup-work-bucket-card,
+    .followup-executive-card,
+    .followup-priority-panel,
+    .followup-load-panel,
+    .followup-directives-section,
+    .followup-tool-card,
+    .followup-transaction-card
+  )::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background:
+      radial-gradient(
+        circle 190px at var(--followup-glow-x, 50%) var(--followup-glow-y, 50%),
+        rgba(var(--followup-glow-rgb), .16) 0%,
+        rgba(var(--followup-glow-rgb), .09) 32%,
+        rgba(var(--followup-glow-rgb), .035) 52%,
+        transparent 72%
+      );
+    transition: opacity 150ms ease;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme :is(
+    .followup-hero,
+    .followup-unit-card,
+    .followup-kpi-card,
+    .followup-filterbar,
+    .followup-recent-panel,
+    .followup-shortcut-card,
+    .followup-operational-card,
+    .followup-work-bucket-card,
+    .followup-executive-card,
+    .followup-priority-panel,
+    .followup-load-panel,
+    .followup-directives-section,
+    .followup-tool-card,
+    .followup-transaction-card
+  )[data-followup-glow="active"]::after {
+    opacity: 1;
+  }
+
+  /* Section-aware glow colors. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-operational-card,
+  body.follow-up-theme-active .follow-up-page-theme .followup-priority-panel,
+  body.follow-up-theme-active .follow-up-page-theme .followup-work-bucket-card[data-bucket="in_progress"],
+  body.follow-up-theme-active .follow-up-page-theme .followup-work-bucket-card[data-bucket="completed_today"] {
+    --followup-glow-rgb: 16, 185, 129;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-executive-card,
+  body.follow-up-theme-active .follow-up-page-theme .followup-work-bucket-card[data-bucket="urgent_today"],
+  body.follow-up-theme-active .follow-up-page-theme .followup-work-bucket-card[data-bucket="due_3_days"] {
+    --followup-glow-rgb: 245, 158, 11;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section,
+  body.follow-up-theme-active .follow-up-page-theme .followup-tool-card[data-tone="approval"],
+  body.follow-up-theme-active .follow-up-page-theme .followup-work-bucket-card[data-bucket="awaiting_review"],
+  body.follow-up-theme-active .follow-up-page-theme .followup-work-bucket-card[data-bucket="extension_requests"] {
+    --followup-glow-rgb: 124, 58, 237;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-load-panel {
+    --followup-glow-rgb: 99, 102, 241;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--red,
+  body.follow-up-theme-active .follow-up-page-theme .followup-work-bucket-card[data-bucket="overdue"] {
+    --followup-glow-rgb: 220, 38, 38;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--green {
+    --followup-glow-rgb: 22, 163, 74;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--amber {
+    --followup-glow-rgb: 181, 129, 5;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--orange {
+    --followup-glow-rgb: 217, 119, 6;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--blue,
+  body.follow-up-theme-active .follow-up-page-theme .followup-unit-card--blue,
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-panel,
+  body.follow-up-theme-active .follow-up-page-theme .followup-filterbar {
+    --followup-glow-rgb: 37, 99, 235;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-unit-card--teal,
+  body.follow-up-theme-active .follow-up-page-theme .followup-shortcut-card--cyan {
+    --followup-glow-rgb: 13, 148, 136;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-shortcut-card--violet {
+    --followup-glow-rgb: 109, 40, 217;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-shortcut-card--amber,
+  body.follow-up-theme-active .follow-up-page-theme .followup-tool-card[data-tone="kpi"] {
+    --followup-glow-rgb: 202, 138, 4;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-tool-card[data-tone="history"] {
+    --followup-glow-rgb: 47, 125, 104;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-tool-card[data-tone="directive"] {
+    --followup-glow-rgb: 31, 107, 148;
+  }
+
+  /* The glow must never interfere with interaction or readability. */
+  body.follow-up-theme-active .follow-up-page-theme [data-followup-glow="active"] {
+    box-shadow:
+      0 12px 26px rgba(15, 23, 42, .10),
+      0 0 0 1px rgba(var(--followup-glow-rgb), .06),
+      inset 0 1px 0 rgba(255,255,255,.72) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.follow-up-theme-active .follow-up-page-theme [data-followup-glow]::after {
+    transition: none !important;
+  }
+}
