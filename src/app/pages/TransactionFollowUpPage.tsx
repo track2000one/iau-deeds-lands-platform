@@ -3051,12 +3051,48 @@ ${styleAssets}
       {activeWorkspace === 'daily' && (
         <div className="space-y-5">
           <div className="followup-kpi-grid">
-            <FollowUpKpiCard title="مفتوحة" value={dashboard.open} icon={<Inbox className="h-6 w-6" />} tone="slate" />
-            <FollowUpKpiCard title="تحتاج إجراء" value={dashboard.needsAction} icon={<AlertTriangle className="h-6 w-6" />} tone="orange" />
-            <FollowUpKpiCard title="متأخرة" value={dashboard.overdue} icon={<Clock3 className="h-6 w-6" />} tone="red" />
-            <FollowUpKpiCard title="بانتظار جهة" value={dashboard.waiting} icon={<FileClock className="h-6 w-6" />} tone="blue" />
-            <FollowUpKpiCard title="غير مسندة" value={dashboard.unassigned} icon={<UserRound className="h-6 w-6" />} tone="amber" />
-            <FollowUpKpiCard title="منجزة / مغلقة" value={dashboard.completed} icon={<CheckCircle2 className="h-6 w-6" />} tone="green" />
+            <FollowUpKpiCard
+              title="مفتوحة"
+              value={dashboard.open}
+              criterion="لم تُنجز أو تُغلق بعد"
+              icon={<Inbox className="h-6 w-6" />}
+              tone="slate"
+            />
+            <FollowUpKpiCard
+              title="تحتاج إجراء"
+              value={dashboard.needsAction}
+              criterion="تحتاج تحديثًا أو إجراءً من المسؤول"
+              icon={<AlertTriangle className="h-6 w-6" />}
+              tone="orange"
+            />
+            <FollowUpKpiCard
+              title="متأخرة"
+              value={dashboard.overdue}
+              criterion="تجاوزت تاريخ الاستحقاق"
+              icon={<Clock3 className="h-6 w-6" />}
+              tone="red"
+            />
+            <FollowUpKpiCard
+              title="بانتظار جهة"
+              value={dashboard.waiting}
+              criterion="معلّقة على رد أو إفادة خارجية"
+              icon={<FileClock className="h-6 w-6" />}
+              tone="blue"
+            />
+            <FollowUpKpiCard
+              title="غير مسندة"
+              value={dashboard.unassigned}
+              criterion="لا يوجد موظف مسؤول حاليًا"
+              icon={<UserRound className="h-6 w-6" />}
+              tone="amber"
+            />
+            <FollowUpKpiCard
+              title="منجزة / مغلقة"
+              value={dashboard.completed}
+              criterion="تم إنهاء دورة المتابعة"
+              icon={<CheckCircle2 className="h-6 w-6" />}
+              tone="green"
+            />
           </div>
 
           <section className="followup-filterbar">
@@ -6152,22 +6188,26 @@ const FollowUpUnitCard = ({
 const FollowUpKpiCard = ({
   title,
   value,
+  criterion,
   icon,
   tone,
 }: {
   title: string;
   value: number;
+  criterion: string;
   icon: React.ReactNode;
   tone: 'slate' | 'orange' | 'red' | 'blue' | 'amber' | 'green';
 }) => (
   <div className={`followup-kpi-card followup-kpi-card--${tone}`}>
     <span className="followup-kpi-card__icon">{icon}</span>
     <span className="min-w-0 flex-1">
-      <span className="block text-sm font-black">{title}</span>
-      <span className="mt-1 block text-3xl font-black leading-none">{value.toLocaleString('ar-SA')}</span>
-      <span className="mt-2 block text-[11px] opacity-70">معاملة</span>
+      <span className="followup-kpi-card__title">{title}</span>
+      <span className="followup-kpi-card__value">{value.toLocaleString('ar-SA')}</span>
+      <span className="followup-kpi-card__criterion">
+        <b>المعيار:</b> {criterion}
+      </span>
     </span>
-    <span className="followup-kpi-card__spark" aria-hidden="true" />
+    <span className="followup-kpi-card__unit">معاملة</span>
   </div>
 );
 
