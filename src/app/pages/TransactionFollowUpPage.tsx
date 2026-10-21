@@ -512,6 +512,13 @@ export const TransactionFollowUpPage: React.FC = () => {
   const canPrint = isAdmin || hasPermission('transaction_follow_up', 'canPrint');
   const canArchive = isAdmin || hasPermission('archive', 'canAdd');
 
+  React.useEffect(() => {
+    document.body.classList.add('follow-up-theme-active');
+    return () => {
+      document.body.classList.remove('follow-up-theme-active');
+    };
+  }, []);
+
   const [dashboard, setDashboard] = React.useState<TransactionFollowUpDashboard>(EMPTY_DASHBOARD);
   const [executiveInbox, setExecutiveInbox] = React.useState<TransactionFollowUpExecutiveInbox>(EMPTY_EXECUTIVE_INBOX);
   const [analytics, setAnalytics] = React.useState<TransactionFollowUpAnalytics>(EMPTY_ANALYTICS);
