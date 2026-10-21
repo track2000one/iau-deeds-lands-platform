@@ -75,6 +75,8 @@ export type MosqueBuilding = {
   unavailableReason?: string | null;
   approvedAlternative?: string | null;
   notes?: string | null;
+  createdBy?: string | null;
+  createdByName?: string | null;
   createdAt?: string;
   updatedAt?: string;
   sites?: Array<{
