@@ -78,12 +78,12 @@ export const TransactionExecutiveInbox: React.FC<Props> = ({
 
     <CardContent className="space-y-4 p-4 sm:p-5">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-        <InboxMetric title="تحتاج تدخل" value={data.counters.attention} danger={data.counters.attention > 0} />
-        <InboxMetric title="متأخرة" value={data.counters.overdue} danger={data.counters.overdue > 0} />
-        <InboxMetric title="مستحقة اليوم" value={data.counters.dueToday} warning={data.counters.dueToday > 0} />
-        <InboxMetric title="غير مسندة" value={data.counters.unassigned} warning={data.counters.unassigned > 0} />
-        <InboxMetric title="دون إجراء" value={data.counters.inactive} warning={data.counters.inactive > 0} />
-        <InboxMetric title="عاجلة" value={data.counters.urgent} danger={data.counters.urgent > 0} />
+        <InboxMetric title="تحتاج تدخل" hint="أولوية متابعة اليوم" value={data.counters.attention} danger={data.counters.attention > 0} />
+        <InboxMetric title="متأخرة" hint="تجاوزت الاستحقاق" value={data.counters.overdue} danger={data.counters.overdue > 0} />
+        <InboxMetric title="مستحقة اليوم" hint="موعدها خلال اليوم" value={data.counters.dueToday} warning={data.counters.dueToday > 0} />
+        <InboxMetric title="غير مسندة" hint="بدون موظف مسؤول" value={data.counters.unassigned} warning={data.counters.unassigned > 0} />
+        <InboxMetric title="دون إجراء" hint="لم تسجل حركة حديثة" value={data.counters.inactive} warning={data.counters.inactive > 0} />
+        <InboxMetric title="عاجلة" hint="أولوية عاجلة" value={data.counters.urgent} danger={data.counters.urgent > 0} />
       </div>
 
       <div className={`grid gap-4 ${supervisor ? 'xl:grid-cols-[1.65fr_.75fr]' : ''}`}>
@@ -206,28 +206,31 @@ export const TransactionExecutiveInbox: React.FC<Props> = ({
 
 const InboxMetric = ({
   title,
+  hint,
   value,
   danger = false,
   warning = false,
 }: {
   title: string;
+  hint: string;
   value: number;
   danger?: boolean;
   warning?: boolean;
 }) => (
   <div
-    className={`rounded-xl border px-3 py-2.5 text-center ${
+    className={`followup-inbox-metric rounded-xl border px-3 py-3 text-center ${
       danger
-        ? 'border-red-200 bg-red-50'
+        ? 'followup-inbox-metric--danger border-red-200 bg-red-50'
         : warning
-          ? 'border-amber-200 bg-amber-50'
+          ? 'followup-inbox-metric--warning border-amber-200 bg-amber-50'
           : 'border-slate-200 bg-white'
     }`}
   >
-    <p className="text-sm font-semibold text-muted-foreground">{title}</p>
-    <p className={`mt-1 text-2xl font-black ${danger ? 'text-red-700' : warning ? 'text-amber-800' : 'text-slate-900'}`}>
+    <p className="followup-inbox-metric__title">{title}</p>
+    <p className={`followup-inbox-metric__value ${danger ? 'text-red-700' : warning ? 'text-amber-800' : 'text-slate-900'}`}>
       {value.toLocaleString('ar-SA')}
     </p>
+    <p className="followup-inbox-metric__hint">{hint}</p>
   </div>
 );
 
