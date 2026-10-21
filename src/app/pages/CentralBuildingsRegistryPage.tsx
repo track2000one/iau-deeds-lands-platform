@@ -974,23 +974,9 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                     </div>
                                   </div>
 
-                                  <div className="flex gap-1">
-                                    {canEdit && !pendingEnvelope && (
-                                      <Button size="icon" variant="outline" onClick={() => openEdit(building)} title="تعديل البيانات الأساسية">
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                    {canDelete && (
-                                      <Button
-                                        size="icon"
-                                        variant="outline"
-                                        disabled={references > 0}
-                                        onClick={() => setDeleteTarget(building)}
-                                        title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : 'حذف المبنى'}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    )}
+                                  <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground" title="يحتفظ النظام ببيانات منشئ السجل">
+                                    <UserRound className="h-3.5 w-3.5" />
+                                    <span className="max-w-[100px] truncate">{building.createdByName || (building.createdBy ? 'مستخدم سابق' : 'سجل قديم')}</span>
                                   </div>
                                 </div>
 
@@ -1018,6 +1004,32 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                     الإحداثيات: {building.latitude ?? '—'} ، {building.longitude ?? '—'}
                                   </div>
                                 )}
+                                <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
+                                  <Button size="sm" variant="outline" className="gap-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setViewTarget(building)}>
+                                    <Eye className="h-4 w-4" /> عرض
+                                  </Button>
+                                  {canEditBuilding(building) && !pendingEnvelope && (
+                                    <Button size="sm" variant="outline" className="gap-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => openEdit(building)}>
+                                      <Pencil className="h-4 w-4" /> تعديل
+                                    </Button>
+                                  )}
+                                  {canPrint && (
+                                    <Button size="sm" variant="outline" className="gap-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => printBuilding(building)}>
+                                      <Printer className="h-4 w-4" /> طباعة
+                                    </Button>
+                                  )}
+                                  {canDeleteBuilding(building) && (
+                                    <Button size="sm" variant="outline" disabled={references > 0}
+                                      className="gap-1.5 border-red-300 text-red-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-red-50 hover:shadow-md"
+                                      onClick={() => setDeleteTarget(building)}
+                                      title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : 'حذف المبنى'}>
+                                      <Trash2 className="h-4 w-4" /> حذف
+                                    </Button>
+                                  )}
+                                  {!ownsBuilding(building) && (
+                                    <span className="inline-flex items-center text-xs text-muted-foreground">التعديل والحذف متاحان للمنشئ فقط</span>
+                                  )}
+                                </div>
                               </article>
                             );
                           })}
