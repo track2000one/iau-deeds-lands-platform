@@ -597,12 +597,14 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
               <button
                 key={bucket}
                 type="button"
+                data-active={active ? 'true' : 'false'}
+                data-bucket={bucket}
                 onClick={() => {
                   userChangedBucket.current = true;
                   setSelectedBucket(bucket);
                 }}
                 className={
-                  'relative min-h-[82px] transform-gpu rounded-[18px] border px-3 py-3 text-right ' +
+                  'followup-work-bucket-card relative min-h-[82px] transform-gpu rounded-[18px] border px-3 py-3 text-right ' +
                   'transition-all duration-200 ease-out ' +
                   'shadow-[0_10px_20px_-12px_rgba(15,23,42,0.55),0_5px_10px_-6px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.92)] ' +
                   'hover:-translate-y-1 hover:shadow-[0_18px_30px_-14px_rgba(15,23,42,0.58),0_8px_14px_-8px_rgba(15,23,42,0.32),inset_0_1px_0_rgba(255,255,255,0.96)] ' +
