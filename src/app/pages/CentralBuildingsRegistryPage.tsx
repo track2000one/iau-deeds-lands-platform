@@ -9,16 +9,19 @@ import {
   ChevronUp,
   Crosshair,
   Database,
+  Eye,
   Landmark,
   Link2,
   MapPin,
   MapPinned,
   Pencil,
+  Printer,
   Plus,
   RefreshCw,
   Search,
   ShieldCheck,
   Trash2,
+  UserRound,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
@@ -158,6 +161,22 @@ const parseCoordinate = (value: string): number | null => {
 const isValidLatitude = (value: number) => value >= -90 && value <= 90;
 const isValidLongitude = (value: number) => value >= -180 && value <= 180;
 
+const buildingDetails = (building: MosqueBuilding): Array<[string, string]> => [
+  ['رقم المبنى', building.buildingNumber],
+  ['اسم المبنى', building.name || '—'],
+  ['الحرم / الموقع الجامعي', building.campusLocation || '—'],
+  ['المدينة', building.city || '—'],
+  ['الحي', building.district || '—'],
+  ['رقم الصك', building.deed?.deedNumber || 'غير مرتبط'],
+  ['الاستخدام الرئيسي', building.primaryUse || '—'],
+  ['نوع المبنى', building.buildingType || '—'],
+  ['عدد الأدوار', building.floorsCount == null ? '—' : String(building.floorsCount)],
+  ['المساحة المبنية', building.builtUpArea == null ? '—' : `${building.builtUpArea.toLocaleString('ar-SA')} م²`],
+  ['الإحداثيات', building.latitude == null || building.longitude == null ? '—' : `${building.latitude} ، ${building.longitude}`],
+  ['أنشأ السجل', building.createdByName || (building.createdBy ? 'مستخدم سابق' : 'سجل قديم غير منسوب')],
+  ['تاريخ الإنشاء', building.createdAt ? new Date(building.createdAt).toLocaleString('ar-SA') : '—'],
+];
+
 const parseOptionalNumber = (value: string): number | null => {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -167,11 +186,17 @@ const parseOptionalNumber = (value: string): number | null => {
 
 export const CentralBuildingsRegistryPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isAdmin, hasPermission } = usePermissions();
+  const { isAdmin, hasPermission, userProfile } = usePermissions();
   const canView = isAdmin || hasPermission('central_buildings', 'canView');
   const canAdd = isAdmin || hasPermission('central_buildings', 'canAdd');
   const canEdit = isAdmin || hasPermission('central_buildings', 'canEdit');
   const canDelete = isAdmin || hasPermission('central_buildings', 'canDelete');
+  const canPrint = isAdmin || hasPermission('central_buildings', 'canPrint');
+  const ownsBuilding = (building: MosqueBuilding) => isAdmin || Boolean(
+    userProfile?.uid && building.createdBy && userProfile.uid === building.createdBy
+  );
+  const canEditBuilding = (building: MosqueBuilding) => canEdit && ownsBuilding(building);
+  const canDeleteBuilding = (building: MosqueBuilding) => canDelete && ownsBuilding(building);
   const canViewAssets = isAdmin || hasPermission('assets', 'canView');
   const canEditAssets = isAdmin || hasPermission('assets', 'canEdit');
   const canViewAccounting =
@@ -198,6 +223,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     useState<MosqueBuilding | null>(null);
   const [form, setForm] = useState<BuildingForm>(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState<MosqueBuilding | null>(null);
+  const [viewTarget, setViewTarget] = useState<MosqueBuilding | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [visibleGroupCounts, setVisibleGroupCounts] = useState<Record<string, number>>({});
 
@@ -383,6 +409,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   };
 
   const openEdit = (building: MosqueBuilding) => {
+    if (!canEditBuilding(building)) {
+      toast.error('لا يمكنك تعديل سجل أنشأه مستخدم آخر');
+      return;
+    }
     setEditingBuilding(building);
     setForm({
       buildingNumber: building.buildingNumber || '',
@@ -469,6 +499,14 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   };
 
   const saveBuilding = async () => {
+    if (editingBuilding && !canEditBuilding(editingBuilding)) {
+      toast.error('لا يمكنك تعديل سجل أنشأه مستخدم آخر');
+      return;
+    }
+    if (!editingBuilding && !canAdd) {
+      toast.error('لا تملك صلاحية إضافة مبنى');
+      return;
+    }
     const buildingNumber = form.buildingNumber.trim();
     const name = form.name.trim();
     if (!buildingNumber || !name) {
@@ -655,6 +693,11 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
+    if (!canDeleteBuilding(deleteTarget)) {
+      toast.error('لا يمكنك حذف سجل أنشأه مستخدم آخر');
+      setDeleteTarget(null);
+      return;
+    }
     const item = usage.get(deleteTarget.id);
     const references =
       (item?.mosqueSites || 0) + (item?.assets || 0) + (item?.accounting || 0) + (item?.inspections || 0);
@@ -676,6 +719,45 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const printBuilding = (building: MosqueBuilding) => {
+    if (!canPrint) {
+      toast.error('لا تملك صلاحية الطباعة');
+      return;
+    }
+    const popup = window.open('', '_blank', 'width=900,height=750');
+    if (!popup) {
+      toast.error('يرجى السماح بالنوافذ المنبثقة لطباعة البطاقة');
+      return;
+    }
+    const page = popup.document;
+    page.title = `بطاقة مبنى - ${building.buildingNumber}`;
+    page.documentElement.lang = 'ar';
+    page.documentElement.dir = 'rtl';
+    page.body.style.cssText = 'direction:rtl;font-family:Tahoma,Arial,sans-serif;color:#132744;padding:34px;line-height:1.8';
+    const heading = page.createElement('h1');
+    heading.textContent = 'جامعة الإمام عبدالرحمن بن فيصل — السجل المركزي للمباني';
+    heading.style.cssText = 'font-size:22px;border-bottom:2px solid #14365a;padding-bottom:12px';
+    page.body.appendChild(heading);
+    const heading2 = page.createElement('h2');
+    heading2.textContent = building.name || building.buildingNumber;
+    page.body.appendChild(heading2);
+    const table = page.createElement('table');
+    table.style.cssText = 'width:100%;border-collapse:collapse;table-layout:fixed';
+    buildingDetails(building).forEach(([label, value]) => {
+      const tr = page.createElement('tr');
+      const th = page.createElement('th');
+      const td = page.createElement('td');
+      th.textContent = label;
+      td.textContent = value;
+      th.style.cssText = 'text-align:right;width:34%;background:#edf2f7;border:1px solid #b6c6d7;padding:9px';
+      td.style.cssText = 'border:1px solid #b6c6d7;padding:9px;overflow-wrap:anywhere';
+      tr.append(th, td);
+      table.appendChild(tr);
+    });
+    page.body.appendChild(table);
+    popup.setTimeout(() => { popup.focus(); popup.print(); }, 250);
   };
 
   if (!canView) {
@@ -709,12 +791,12 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <CentralBuildingsReports buildings={buildings} usage={usage} usageLoading={usageLoading} />
+            {canPrint && <CentralBuildingsReports buildings={buildings} usage={usage} usageLoading={usageLoading} />}
             <Button variant="outline" onClick={() => void loadData()} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               تحديث
             </Button>
-            {canEdit && (canEditAssets || canEditAccounting) && (
+            {isAdmin && canEdit && (canEditAssets || canEditAccounting) && (
               <Button variant="outline" onClick={() => void migrateLegacyLinks()} disabled={migrating || loading}>
                 <Link2 className={`h-4 w-4 ${migrating ? 'animate-pulse' : ''}`} />
                 {migrating ? 'جاري ربط السجلات...' : 'ربط السجلات القديمة'}
@@ -862,7 +944,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                             return (
                               <article
                                 key={building.id}
-                                className="rounded-2xl border bg-background/60 p-4 shadow-sm"
+                                className="group rounded-2xl border bg-background/60 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
                               >
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
