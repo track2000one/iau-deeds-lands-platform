@@ -5592,14 +5592,16 @@ ${styleAssets}
                 </Card>
               </div>
 
-              <Card className="border-sky-200">
-                <CardHeader>
+              <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
+                <CardHeader className="border-b border-slate-200 bg-white pb-3">
                   <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
-                    <span className="flex items-center gap-2">
-                      <Paperclip className="h-4 w-4 text-sky-700" />
+                    <span className="flex items-center gap-2 font-black text-slate-900">
+                      <span className="grid h-8 w-8 place-items-center rounded-xl bg-sky-50 text-sky-700">
+                        <Paperclip className="h-4 w-4" />
+                      </span>
                       مرفقات المعاملة
                     </span>
-                    <Badge variant="outline" className="bg-white">
+                    <Badge variant="outline" className="border-slate-300 bg-slate-50 font-bold text-slate-700">
                       {(selected.attachments?.length || 0).toLocaleString('ar-SA')} مرفق
                     </Badge>
                   </CardTitle>
@@ -5612,7 +5614,7 @@ ${styleAssets}
                   ) : (
                     <div className="grid gap-2 md:grid-cols-2">
                       {selected.attachments.map((attachment) => (
-                        <div key={attachment.id} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border bg-slate-50/70 p-3">
+                        <div key={attachment.id} className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-[#F8FAFC] p-3 transition hover:border-sky-200 hover:bg-sky-50/30">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold">{attachment.title}</p>
                             <p className="mt-1 text-[10px] text-muted-foreground">
@@ -5979,24 +5981,80 @@ ${styleAssets}
                 }}
               />
 
-              <Card>
-                <CardHeader><CardTitle className="text-base">سجل الإجراءات والتحويلات</CardTitle></CardHeader>
-                <CardContent>
+              <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
+                <CardHeader className="border-b border-slate-200 bg-[#F8FAFC] pb-3">
+                  <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
+                    <span className="flex items-center gap-2 font-black text-slate-900">
+                      <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#EAF1F7] text-[#1F4E78]">
+                        <History className="h-4 w-4" />
+                      </span>
+                      سجل الإجراءات والتحويلات
+                    </span>
+                    <Badge variant="outline" className="border-slate-300 bg-white text-slate-700">
+                      {(selected.events?.length || 0).toLocaleString('ar-SA')} حدث
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-5">
                   {!selected.events?.length ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">لا توجد أحداث مسجلة.</div>
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-10 text-center text-sm text-muted-foreground">
+                      لا توجد أحداث مسجلة.
+                    </div>
                   ) : (
-                    <div className="space-y-3">
-                      {selected.events.map((event) => (
-                        <div key={event.id} className="rounded-xl border bg-slate-50/70 p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <b className="text-sm">{event.actionText || 'تحديث المعاملة'}</b>
-                            <span className="text-xs text-muted-foreground">{formatDateTime(event.createdAt)}</span>
+                    <div className="relative mr-3 border-r-2 border-slate-200 pr-7">
+                      {selected.events.map((event, index) => (
+                        <div key={event.id} className={index === selected.events.length - 1 ? 'relative pb-1' : 'relative pb-5'}>
+                          <span
+                            className={
+                              'absolute -right-[37px] top-1 grid h-5 w-5 place-items-center rounded-full border-4 border-white shadow-sm ' +
+                              (index === 0 ? 'bg-[#1F4E78]' : 'bg-slate-400')
+                            }
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                          </span>
+
+                          <div className={
+                            'rounded-2xl border p-4 transition ' +
+                            (index === 0
+                              ? 'border-[#BFD4E6] bg-[#F7FAFD] shadow-sm'
+                              : 'border-slate-200 bg-white')
+                          }>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-sm font-black leading-6 text-slate-900">
+                                    {event.actionText || 'تحديث المعاملة'}
+                                  </p>
+                                  {index === 0 && (
+                                    <Badge variant="outline" className="border-[#BFD4E6] bg-white text-[#1F4E78]">
+                                      آخر إجراء
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                                  <span className="font-semibold text-slate-700">{event.createdByName || '—'}</span>
+                                  <span>·</span>
+                                  <span>{formatDateTime(event.createdAt)}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            {(event.fromAssigneeName || event.toAssigneeName) && (
+                              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
+                                <ArrowLeftRight className="h-3.5 w-3.5 text-[#1F4E78]" />
+                                <span>المسؤول:</span>
+                                <b>{event.fromAssigneeName || '—'}</b>
+                                <span className="text-slate-400">←</span>
+                                <b>{event.toAssigneeName || '—'}</b>
+                              </div>
+                            )}
+
+                            {event.note && (
+                              <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-sm leading-7 text-slate-700">
+                                {event.note}
+                              </p>
+                            )}
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground">بواسطة: {event.createdByName || '—'}</div>
-                          {(event.fromAssigneeName || event.toAssigneeName) && (
-                            <div className="mt-1 text-xs">المسؤول: {event.fromAssigneeName || '—'} ← {event.toAssigneeName || '—'}</div>
-                          )}
-                          {event.note && <p className="mt-2 text-sm leading-6">{event.note}</p>}
                         </div>
                       ))}
                     </div>
@@ -6004,9 +6062,16 @@ ${styleAssets}
                 </CardContent>
               </Card>
 
-              <div className="flex flex-wrap justify-between gap-2 border-t pt-4">
-                {canDelete ? <Button variant="outline" className="border-red-300 text-red-700" onClick={() => void remove(selected)}>حذف المعاملة</Button> : <span />}
-                <Button variant="outline" onClick={() => setSelected(null)}>إغلاق</Button>
+              <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap justify-between gap-2 border-t border-slate-200 bg-white/95 px-1 py-3 backdrop-blur">
+                {canDelete ? (
+                  <Button variant="outline" className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100" onClick={() => void remove(selected)}>
+                    <Trash2 className="ml-2 h-4 w-4" />
+                    حذف المعاملة
+                  </Button>
+                ) : <span />}
+                <Button variant="outline" className="min-w-28 border-slate-300 bg-white font-bold" onClick={() => setSelected(null)}>
+                  إغلاق
+                </Button>
               </div>
             </>
           ) : null}
