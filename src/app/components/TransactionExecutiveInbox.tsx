@@ -87,7 +87,7 @@ export const TransactionExecutiveInbox: React.FC<Props> = ({
       </div>
 
       <div className={`grid gap-4 ${supervisor ? 'xl:grid-cols-[1.65fr_.75fr]' : ''}`}>
-        <section className="min-w-0 rounded-2xl border border-slate-200 bg-white">
+        <section className="followup-priority-panel min-w-0 rounded-2xl border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div>
               <h3 className="text-base font-black text-slate-900">التدخلات ذات الأولوية</h3>
@@ -153,7 +153,7 @@ export const TransactionExecutiveInbox: React.FC<Props> = ({
         </section>
 
         {supervisor && (
-          <section className="rounded-2xl border border-slate-200 bg-white">
+          <section className="followup-load-panel rounded-2xl border border-slate-200 bg-white">
             <div className="border-b px-4 py-3">
               <h3 className="flex items-center gap-2 text-base font-black text-slate-900">
                 <UsersRound className="h-4 w-4" />
@@ -195,7 +195,7 @@ export const TransactionExecutiveInbox: React.FC<Props> = ({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-600">
+      <div className="followup-executive-summary flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-600">
         <span className="inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5 text-red-600" />تحتاج متابعة: <b>{data.counters.needsFollowUp.toLocaleString('ar-SA')}</b></span>
         <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5 text-amber-700" />بانتظار رد دون تحديث: <b>{data.counters.staleWaiting.toLocaleString('ar-SA')}</b></span>
         <span className="inline-flex items-center gap-1"><UserRound className="h-3.5 w-3.5 text-slate-600" />إجمالي المفتوحة: <b>{data.counters.totalOpen.toLocaleString('ar-SA')}</b></span>
