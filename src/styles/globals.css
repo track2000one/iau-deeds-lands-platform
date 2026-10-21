@@ -3098,3 +3098,225 @@ label[data-app-required-label="true"]::after {
     }
   }
 }
+
+
+/* ===== Transaction Follow-up: Section Palette v4 ===== */
+@media screen {
+  /* Keep one readable text system while giving every major section its own visual identity. */
+  body.follow-up-theme-active .follow-up-page-theme {
+    --followup-text: #1f2937;
+    --followup-text-strong: #0f172a;
+    --followup-text-muted: #5b6b7f;
+    color: var(--followup-text) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme h1,
+  body.follow-up-theme-active .follow-up-page-theme h2,
+  body.follow-up-theme-active .follow-up-page-theme h3,
+  body.follow-up-theme-active .follow-up-page-theme [data-slot="card-title"] {
+    color: var(--followup-text-strong) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .text-muted-foreground,
+  body.follow-up-theme-active .follow-up-page-theme .text-slate-400,
+  body.follow-up-theme-active .follow-up-page-theme .text-slate-500,
+  body.follow-up-theme-active .follow-up-page-theme .text-slate-600 {
+    color: var(--followup-text-muted) !important;
+  }
+
+  /* 1. Main header / navigation: cool institutional blue. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-hero {
+    border-color: #cfddea !important;
+    background:
+      linear-gradient(135deg, #f8fbff 0%, #f2f8fd 58%, #eef6fb 100%) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-workspace-nav {
+    border-top-color: #d7e3ec !important;
+    background: #edf4f8 !important;
+  }
+
+  /* 2. Organisational unit cards: separate blue and teal families. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-unit-card--blue {
+    border-color: #bdd4e7 !important;
+    background: #f1f7fc !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-unit-card--teal {
+    border-color: #bfe2d9 !important;
+    background: #f1faf7 !important;
+  }
+
+  /* 3. Main KPI cards: soft semantic backgrounds with dark readable text. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--slate {
+    background: #f7f9fc !important;
+    border-color: #cfd7e1 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--orange {
+    background: #fff5e9 !important;
+    border-color: #f4cda4 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--red {
+    background: #fff1f2 !important;
+    border-color: #f5c2c7 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--blue {
+    background: #eef5ff !important;
+    border-color: #bfd5fb !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--amber {
+    background: #fff9e8 !important;
+    border-color: #ecd79b !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-kpi-card--green {
+    background: #eefaf3 !important;
+    border-color: #b8dec6 !important;
+  }
+
+  /* 4. Search and filters: neutral grey-blue so controls remain the focus. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-filterbar {
+    border-color: #d2dee8 !important;
+    background: #f5f8fb !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-filterbar__search,
+  body.follow-up-theme-active .follow-up-page-theme .followup-filterbar__select {
+    border-color: #cfdbe5 !important;
+    background: #ffffff !important;
+    color: #334155 !important;
+  }
+
+  /* 5. Recent transactions: pale blue report surface. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-panel {
+    border-color: #cddded !important;
+    background: #f7fbff !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-panel__header {
+    border-bottom-color: #d4e2ee !important;
+    background: #eef5fb !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__head-row,
+  body.follow-up-theme-active .follow-up-page-theme .followup-recent-table__head-row th {
+    background: #e7f0f7 !important;
+    color: #334155 !important;
+  }
+
+  /* 6. Quick actions: three visibly different functional surfaces. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-shortcut-card--violet {
+    border-color: #d8ccf4 !important;
+    background: #f6f2ff !important;
+    color: #3f3a75 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-shortcut-card--cyan {
+    border-color: #bce1e8 !important;
+    background: #eefbfc !important;
+    color: #174e59 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-shortcut-card--amber {
+    border-color: #ead49b !important;
+    background: #fff9e9 !important;
+    color: #765312 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-shortcut-card__icon {
+    background: rgba(255,255,255,.78) !important;
+    border-color: rgba(100,116,139,.18) !important;
+  }
+
+  /* 7. Daily operational work center: mint-green family. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-operational-card {
+    border-color: #bcded0 !important;
+    background: #f2fbf7 !important;
+    color: #243b36 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-operational-card > .followup-operational-header {
+    border-bottom-color: #c9e7db !important;
+    background: #e8f7f1 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-operational-card > .followup-operational-content {
+    background: #f8fcfa !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-operational-card .followup-work-selected-summary {
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.45);
+  }
+
+  /* 8. Executive daily inbox: warm sand/orange family. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-executive-card {
+    border-color: #e5ccb0 !important;
+    background: #fff8f1 !important;
+    color: #3d3228 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-executive-card > [data-slot="card-header"] {
+    border-bottom-color: #ead7c1 !important;
+    background: #fff2e5 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-executive-card > [data-slot="card-content"] {
+    background: #fffcf8 !important;
+  }
+
+  /* 9. Priority interventions: light green surface, with red/orange badges preserved inside. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-priority-panel {
+    border-color: #c7dfcf !important;
+    background: #f3faf5 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-priority-panel > div:first-child {
+    border-bottom-color: #d5e8da !important;
+    background: #eaf6ed !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-priority-panel button:hover {
+    background: #edf7f0 !important;
+  }
+
+  /* 10. Employee load: soft lavender to distinguish it from priority interventions. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-load-panel {
+    border-color: #d7d6ef !important;
+    background: #f7f6ff !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-load-panel > div:first-child {
+    border-bottom-color: #e1dff3 !important;
+    background: #f0effc !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-load-panel > div:not(:first-child) {
+    background: #fbfaff !important;
+  }
+
+  /* 11. Executive summary strip: quiet blue-grey reference area. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-executive-summary {
+    border-color: #d3dde7 !important;
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+  }
+
+  /* Preserve semantic content and prevent pale text on pastel sections. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-operational-card p,
+  body.follow-up-theme-active .follow-up-page-theme .followup-executive-card p,
+  body.follow-up-theme-active .follow-up-page-theme .followup-priority-panel p,
+  body.follow-up-theme-active .follow-up-page-theme .followup-load-panel p {
+    text-shadow: none !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-operational-card .text-foreground,
+  body.follow-up-theme-active .follow-up-page-theme .followup-executive-card .text-foreground,
+  body.follow-up-theme-active .follow-up-page-theme .followup-priority-panel .text-foreground,
+  body.follow-up-theme-active .follow-up-page-theme .followup-load-panel .text-foreground {
+    color: #1f2937 !important;
+  }
+}
