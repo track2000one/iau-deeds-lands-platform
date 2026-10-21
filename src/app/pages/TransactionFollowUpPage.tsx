@@ -6143,21 +6143,22 @@ const WorkspaceTab = ({
 }) => (
   <button
     type="button"
+    data-active={active ? 'true' : 'false'}
     onClick={onClick}
-    className={'group flex min-h-[62px] items-center gap-3 rounded-2xl border px-3 py-2.5 text-right transition ' + (
+    className={'followup-workspace-tab group flex min-h-[62px] items-center gap-3 rounded-2xl border px-3 py-2.5 text-right transition ' + (
       active
-        ? 'border-primary/40 bg-white text-primary shadow-sm ring-1 ring-primary/10'
-        : 'border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white'
+        ? 'border-primary/40 bg-white text-slate-950 shadow-sm ring-1 ring-primary/10'
+        : 'border-transparent bg-transparent text-white hover:border-white/25 hover:bg-white/10'
     )}
   >
-    <span className={'grid h-9 w-9 shrink-0 place-items-center rounded-xl ' + (
-      active ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-600 group-hover:bg-slate-50'
+    <span className={'followup-workspace-tab__icon grid h-9 w-9 shrink-0 place-items-center rounded-xl ' + (
+      active ? 'bg-slate-100 text-slate-950' : 'bg-white/15 text-white group-hover:bg-white/20'
     )}>
       {icon}
     </span>
     <span className="min-w-0">
-      <span className="block text-xs font-black sm:text-sm">{title}</span>
-      <span className="mt-0.5 hidden text-[10px] text-slate-400 sm:block">{hint}</span>
+      <span className="followup-workspace-tab__title block text-xs font-black sm:text-sm">{title}</span>
+      <span className="followup-workspace-tab__hint mt-0.5 hidden text-[10px] sm:block">{hint}</span>
     </span>
   </button>
 );
