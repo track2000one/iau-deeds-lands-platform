@@ -3671,9 +3671,9 @@ label[data-app-required-label="true"]::after {
     background:
       radial-gradient(
         circle 190px at var(--followup-glow-x, 50%) var(--followup-glow-y, 50%),
-        rgba(var(--followup-glow-rgb), .16) 0%,
-        rgba(var(--followup-glow-rgb), .09) 32%,
-        rgba(var(--followup-glow-rgb), .035) 52%,
+        rgba(var(--followup-glow-rgb), .14) 0%,
+        rgba(var(--followup-glow-rgb), .075) 32%,
+        rgba(var(--followup-glow-rgb), .03) 52%,
         transparent 72%
       );
     transition: opacity 150ms ease;
