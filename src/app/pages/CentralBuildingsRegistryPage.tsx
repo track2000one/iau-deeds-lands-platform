@@ -1052,6 +1052,29 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      <Dialog open={Boolean(viewTarget)} onOpenChange={(open) => !open && setViewTarget(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" dir="rtl">
+          <DialogHeader className="text-right sm:text-right">
+            <DialogTitle>عرض بيانات المبنى</DialogTitle>
+            <DialogDescription>البيانات الأساسية وبيانات المنشئ كما هي مسجلة في السجل المركزي.</DialogDescription>
+          </DialogHeader>
+          {viewTarget && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {buildingDetails(viewTarget).map(([label, value]) => (
+                <div key={label} className="rounded-xl border bg-muted/20 p-3">
+                  <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+                  <p className="mt-1 break-words text-sm font-bold text-foreground">{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:justify-start">
+            {viewTarget && canPrint && <Button variant="outline" onClick={() => printBuilding(viewTarget)}><Printer className="h-4 w-4" /> طباعة البطاقة</Button>}
+            <Button variant="outline" onClick={() => setViewTarget(null)}>إغلاق</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl" dir="rtl">
           <DialogHeader className="text-right sm:text-right">
