@@ -16,6 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePermissions } from '../../context/PermissionsContext';
 import { mosqueApi, type MosqueBuilding, type MosqueModuleRole } from '../api/mosques';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -255,6 +256,10 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 
 export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, canAdd, canEdit, canDelete, onReload, onPendingTotalChange, context = 'mosque' }) => {
   const isCentral = context === 'central';
+  const { isAdmin, userProfile } = usePermissions();
+  const ownsPendingBuilding = (building: MosqueBuilding) => isAdmin || Boolean(
+    userProfile?.uid && building.createdBy && building.createdBy === userProfile.uid
+  );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importRows, setImportRows] = useState<BuildingImportEnvelope[]>([]);
@@ -319,6 +324,10 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
   );
 
   const openReview = (item: PendingItem) => {
+    if (!canEdit || !ownsPendingBuilding(item.building)) {
+      toast.error('لا يمكنك مراجعة سجل مستورد من مستخدم آخر');
+      return;
+    }
     setReviewItem(item);
     setReviewDraft({ ...item.envelope.draft });
     setReviewMapOpen(false);
@@ -485,6 +494,10 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
 
   const saveCorrections = async () => {
     if (!reviewItem || !reviewDraft) return;
+    if (!canEdit || !ownsPendingBuilding(reviewItem.building)) {
+      toast.error('غير مصرح بتعديل هذه المسودة');
+      return;
+    }
     setSavingReview(true);
     try {
       const envelope: BuildingImportEnvelope = { ...reviewItem.envelope, draft: { ...reviewDraft } };
@@ -508,6 +521,10 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
 
   const approveReview = async () => {
     if (!reviewItem || !reviewDraft) return;
+    if (!canEdit || !ownsPendingBuilding(reviewItem.building)) {
+      toast.error('غير مصرح باعتماد هذه المسودة');
+      return;
+    }
     const blockers = approvalBlockers(reviewDraft);
     if (blockers.length) {
       toast.error(`لا يمكن الاعتماد قبل استكمال: ${blockers.join('، ')}`);
@@ -540,6 +557,10 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
   };
 
   const deletePending = async (item: PendingItem) => {
+    if (!canDelete || !ownsPendingBuilding(item.building)) {
+      toast.error('غير مصرح بحذف مسودة أنشأها مستخدم آخر');
+      return;
+    }
     if (!window.confirm('حذف هذا السجل المعلق نهائيًا؟')) return;
     try {
       await mosqueApi.deleteBuilding(item.building.id);
@@ -626,7 +647,7 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
                 <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800">
                   {pendingOverallTotal.toLocaleString('ar-SA')} معلق
                 </Badge>
-                {role === 'head' && canDelete && pendingOverallTotal > 0 && (
+                {role === 'head' && isAdmin && canDelete && pendingOverallTotal > 0 && (
                   <Button
                     type="button"
                     size="sm"
@@ -735,13 +756,13 @@ export const BuildingExcelImportManager: React.FC<Props> = ({ buildings, role, c
 
                     {role === 'head' && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {canEdit && (
+                        {canEdit && ownsPendingBuilding(item.building) && (
                           <Button size="sm" variant="outline" className={button3d} onClick={() => openReview(item)}>
                             <Pencil className="ml-1 h-4 w-4" />
                             مراجعة وتصحيح
                           </Button>
                         )}
-                        {canDelete && (
+                        {canDelete && ownsPendingBuilding(item.building) && (
                           <Button size="sm" variant="outline" className="border-red-300 text-red-600" onClick={() => deletePending(item)}>
                             <Trash2 className="ml-1 h-4 w-4" />
                             حذف المسودة
