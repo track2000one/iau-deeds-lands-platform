@@ -569,7 +569,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
 
   return (
     <Card className="followup-operational-card overflow-hidden rounded-[24px] border-slate-200 bg-white shadow-sm">
-      <CardHeader className="border-b bg-slate-50/60 px-4 py-4 sm:px-5">
+      <CardHeader className="followup-operational-header border-b bg-slate-50/60 px-4 py-4 sm:px-5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-xl">
@@ -587,7 +587,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4 p-4 sm:p-5">
+      <CardContent className="followup-operational-content space-y-4 p-4 sm:p-5">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {visibleBuckets.map((bucket) => {
             const meta = bucketMeta[bucket];
@@ -626,7 +626,7 @@ export const TransactionDailyWorkCenter: React.FC<Props> = ({
           })}
         </div>
 
-        <div className={'rounded-2xl border px-4 py-3 ' + selectedMeta.className}>
+        <div className={'followup-work-selected-summary rounded-2xl border px-4 py-3 ' + selectedMeta.className}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-lg font-black">{selectedMeta.label}</p>
