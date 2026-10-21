@@ -3320,3 +3320,146 @@ label[data-app-required-label="true"]::after {
     color: #1f2937 !important;
   }
 }
+
+
+/* ===== Transaction Follow-up: Directives Contrast v5 ===== */
+@media screen {
+  /* Dedicated palette for the directives and approvals workspace. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section {
+    border-color: #cfdbe8 !important;
+    background: #f7f9fd !important;
+    color: #1f2937 !important;
+    box-shadow:
+      0 10px 24px rgba(15, 23, 42, .07),
+      inset 0 1px 0 #ffffff !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section__header {
+    border-bottom-color: #d8e2ed !important;
+    background: #eef4fa !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section__header [data-slot="card-title"] {
+    color: #172033 !important;
+    font-size: 18px !important;
+    font-weight: 950 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section__header p {
+    color: #526173 !important;
+    font-size: 12px !important;
+    font-weight: 650 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section__content {
+    background: #f9fbfd !important;
+  }
+
+  /* All directive tools use dark readable typography over distinct pastel surfaces. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card {
+    min-height: 94px;
+    border-width: 1px !important;
+    color: #1f2937 !important;
+    text-shadow: none !important;
+    box-shadow:
+      0 7px 18px rgba(15, 23, 42, .07),
+      inset 0 1px 0 rgba(255,255,255,.92) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card:hover {
+    transform: translateY(-2px) !important;
+    filter: none !important;
+    box-shadow:
+      0 12px 24px rgba(15, 23, 42, .11),
+      inset 0 1px 0 rgba(255,255,255,.96) !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card__title {
+    color: #172033 !important;
+    font-size: 15px !important;
+    font-weight: 950 !important;
+    line-height: 1.45 !important;
+    opacity: 1 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card__description {
+    margin-top: 5px !important;
+    color: #475569 !important;
+    font-size: 12px !important;
+    font-weight: 650 !important;
+    line-height: 1.65 !important;
+    opacity: 1 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card__icon {
+    width: 42px !important;
+    height: 42px !important;
+    border: 1px solid rgba(71, 85, 105, .14) !important;
+    background: rgba(255,255,255,.82) !important;
+    box-shadow: none !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card[data-tone="directive"] {
+    border-color: #b8d2e5 !important;
+    border-inline-start: 4px solid #1f6b94 !important;
+    background: #eef7fc !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card[data-tone="directive"] .followup-tool-card__icon {
+    color: #0f5f87 !important;
+    background: #e1f1f8 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card[data-tone="approval"] {
+    border-color: #d5c8f1 !important;
+    border-inline-start: 4px solid #6d4bc3 !important;
+    background: #f5f1ff !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card[data-tone="approval"] .followup-tool-card__title {
+    color: #3f2d74 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card[data-tone="approval"] .followup-tool-card__description {
+    color: #5f5279 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card[data-tone="approval"] .followup-tool-card__icon {
+    color: #6842c2 !important;
+    background: #ebe5fb !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card[data-tone="history"] {
+    border-color: #c7ddd5 !important;
+    border-inline-start: 4px solid #2f7d68 !important;
+    background: #f0f8f5 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card[data-tone="history"] .followup-tool-card__icon {
+    color: #236c59 !important;
+    background: #e3f2ed !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card[data-tone="kpi"] {
+    border-color: #e7d1a3 !important;
+    border-inline-start: 4px solid #a36a12 !important;
+    background: #fff8e9 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card[data-tone="kpi"] .followup-tool-card__icon {
+    color: #8a590e !important;
+    background: #faedcf !important;
+  }
+
+  /* Avoid inherited muted text making these cards appear disabled. */
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card .text-slate-900,
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card .text-slate-800,
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card .text-slate-700 {
+    color: #172033 !important;
+  }
+
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card .text-slate-500,
+  body.follow-up-theme-active .follow-up-page-theme .followup-directives-section .followup-tool-card .text-muted-foreground {
+    color: #475569 !important;
+  }
+}
