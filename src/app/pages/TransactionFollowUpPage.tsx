@@ -514,8 +514,79 @@ export const TransactionFollowUpPage: React.FC = () => {
 
   React.useEffect(() => {
     document.body.classList.add('follow-up-theme-active');
+
+    const glowSelector = [
+      '.followup-hero',
+      '.followup-unit-card',
+      '.followup-kpi-card',
+      '.followup-filterbar',
+      '.followup-recent-panel',
+      '.followup-shortcut-card',
+      '.followup-operational-card',
+      '.followup-work-bucket-card',
+      '.followup-executive-card',
+      '.followup-priority-panel',
+      '.followup-load-panel',
+      '.followup-directives-section',
+      '.followup-tool-card',
+      '.followup-transaction-card',
+    ].join(',');
+
+    let activeGlowSurface: HTMLElement | null = null;
+
+    const clearGlow = () => {
+      if (activeGlowSurface) {
+        activeGlowSurface.removeAttribute('data-followup-glow');
+        activeGlowSurface = null;
+      }
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') {
+        clearGlow();
+        return;
+      }
+
+      const eventTarget = event.target;
+      if (!(eventTarget instanceof Element)) {
+        clearGlow();
+        return;
+      }
+
+      const page = eventTarget.closest('.follow-up-page-theme');
+      const surface = eventTarget.closest(glowSelector) as HTMLElement | null;
+
+      if (!page || !surface || !page.contains(surface)) {
+        clearGlow();
+        return;
+      }
+
+      if (activeGlowSurface && activeGlowSurface !== surface) {
+        activeGlowSurface.removeAttribute('data-followup-glow');
+      }
+
+      const rect = surface.getBoundingClientRect();
+      surface.style.setProperty('--followup-glow-x', `${event.clientX - rect.left}px`);
+      surface.style.setProperty('--followup-glow-y', `${event.clientY - rect.top}px`);
+      surface.setAttribute('data-followup-glow', 'active');
+      activeGlowSurface = surface;
+    };
+
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (finePointer) {
+      document.addEventListener('pointermove', handlePointerMove, { passive: true });
+      document.documentElement.addEventListener('mouseleave', clearGlow);
+      window.addEventListener('blur', clearGlow);
+    }
+
     return () => {
+      clearGlow();
       document.body.classList.remove('follow-up-theme-active');
+      if (finePointer) {
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.documentElement.removeEventListener('mouseleave', clearGlow);
+        window.removeEventListener('blur', clearGlow);
+      }
     };
   }, []);
 
