@@ -1027,10 +1027,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                     </Button>
                                   )}
                                   {canDeleteBuilding(building) && (
-                                    <Button size="sm" variant="outline" disabled={references > 0}
+                                    <Button size="sm" variant="outline" disabled={references > 0 || Boolean(building.photos?.length)}
                                       className="gap-1.5 border-red-300 text-red-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-red-50 hover:shadow-md"
                                       onClick={() => setDeleteTarget(building)}
-                                      title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : 'حذف المبنى'}>
+                                      title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length ? 'احذف صور المبنى أولًا' : 'حذف المبنى'}>
                                       <Trash2 className="h-4 w-4" /> حذف
                                     </Button>
                                   )}
