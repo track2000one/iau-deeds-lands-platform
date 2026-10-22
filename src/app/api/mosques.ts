@@ -43,6 +43,14 @@ export type MosqueBuildingPendingPage = {
   totalPages: number;
 };
 
+export type CentralBuildingPhoto = {
+  id: string;
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  uploadedAt: string;
+};
+
 export type MosqueBuilding = {
   id: string;
   buildingNumber: string;
@@ -75,6 +83,7 @@ export type MosqueBuilding = {
   unavailableReason?: string | null;
   approvedAlternative?: string | null;
   notes?: string | null;
+  photos?: CentralBuildingPhoto[] | null;
   createdBy?: string | null;
   createdByName?: string | null;
   createdAt?: string;
@@ -1012,6 +1021,28 @@ export const mosqueApi = {
   createBuilding: (input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>('/api/mosques/buildings', { method: 'POST', body: JSON.stringify(input) }),
   updateBuilding: (id: string, input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>(`/api/mosques/buildings/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteBuilding: (id: string) => apiJson<void>(`/api/mosques/buildings/${id}`, { method: 'DELETE' }),
+  uploadBuildingPhotos: async (id: string, files: File[]) => {
+    const data = new FormData();
+    files.forEach((file) => data.append('photos', file));
+    const response = await authenticatedFetch(`/api/mosques/buildings/${encodeURIComponent(id)}/photos`, {
+      method: 'POST', body: data,
+    }, 120_000);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body?.message || 'تعذر رفع صور المبنى');
+    return body as { photos: CentralBuildingPhoto[] };
+  },
+  buildingPhotoBlob: async (id: string, photoId: string) => {
+    const response = await authenticatedFetch(
+      `/api/mosques/buildings/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}/content`,
+    );
+    if (!response.ok) throw new Error('تعذر تحميل صورة المبنى');
+    return response.blob();
+  },
+  deleteBuildingPhoto: (id: string, photoId: string) =>
+    apiJson<{ photos: CentralBuildingPhoto[] }>(
+      `/api/mosques/buildings/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`,
+      { method: 'DELETE' },
+    ),
   deleteAllPendingBuildings: () => apiJson<{ deletedCount: number; skippedCount: number; totalPending: number }>(
     '/api/mosques/buildings/pending-imports/all',
     { method: 'DELETE' },
