@@ -55,6 +55,8 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Textarea } from '../components/ui/textarea';
 import { BuildingExcelImportManager, getPendingBuildingImport, isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { CentralBuildingsReports } from '../components/CentralBuildingsReports';
+import { CentralBuildingPhotos } from '../components/CentralBuildingPhotos';
+import type { CentralBuildingPhoto } from '../api/mosques';
 import {
   Dialog,
   DialogContent,
@@ -224,6 +226,12 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const [form, setForm] = useState<BuildingForm>(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState<MosqueBuilding | null>(null);
   const [viewTarget, setViewTarget] = useState<MosqueBuilding | null>(null);
+  const updateBuildingPhotos = (buildingId: string, photos: CentralBuildingPhoto[]) => {
+    setBuildings((records) => records.map((item) => item.id === buildingId ? { ...item, photos } : item));
+    setEditingBuilding((item) => item?.id === buildingId ? { ...item, photos } : item);
+    setViewTarget((item) => item?.id === buildingId ? { ...item, photos } : item);
+  };
+
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [visibleGroupCounts, setVisibleGroupCounts] = useState<Record<string, number>>({});
 
@@ -1019,10 +1027,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                     </Button>
                                   )}
                                   {canDeleteBuilding(building) && (
-                                    <Button size="sm" variant="outline" disabled={references > 0}
+                                    <Button size="sm" variant="outline" disabled={references > 0 || Boolean(building.photos?.length)}
                                       className="gap-1.5 border-red-300 text-red-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-red-50 hover:shadow-md"
                                       onClick={() => setDeleteTarget(building)}
-                                      title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : 'حذف المبنى'}>
+                                      title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length ? 'احذف صور المبنى أولًا' : 'حذف المبنى'}>
                                       <Trash2 className="h-4 w-4" /> حذف
                                     </Button>
                                   )}
@@ -1067,6 +1075,9 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                 </div>
               ))}
             </div>
+          )}
+          {viewTarget && (
+            <CentralBuildingPhotos key={viewTarget.id} buildingId={viewTarget.id} photos={viewTarget.photos} />
           )}
           <DialogFooter className="gap-2 sm:justify-start">
             {viewTarget && canPrint && <Button variant="outline" onClick={() => printBuilding(viewTarget)}><Printer className="h-4 w-4" /> طباعة البطاقة</Button>}
@@ -1301,6 +1312,17 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               )}
             </div>
           </div>
+
+          <CentralBuildingPhotos
+            key={editingBuilding?.id || 'new-building'}
+            buildingId={editingBuilding?.id}
+            photos={editingBuilding?.photos}
+            editable={Boolean(editingBuilding && canEditBuilding(editingBuilding))}
+            onPhotosChange={(photos) => {
+              if (editingBuilding) updateBuildingPhotos(editingBuilding.id, photos);
+            }}
+            onReload={loadData}
+          />
 
           <DialogFooter className="gap-2 sm:justify-start">
             <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>

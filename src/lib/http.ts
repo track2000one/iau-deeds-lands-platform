@@ -7,7 +7,8 @@ export const getApiBaseUrl = () => API_BASE_URL;
 
 export const authenticatedFetch = async (
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
 ): Promise<Response> => {
   if (!API_BASE_URL) {
     throw new Error('VITE_API_URL غير مفعّل');
@@ -37,7 +38,7 @@ export const authenticatedFetch = async (
 
   const timeout = window.setTimeout(() => {
     controller.abort(new DOMException('Request timeout', 'TimeoutError'));
-  }, DEFAULT_REQUEST_TIMEOUT_MS);
+  }, timeoutMs);
 
   try {
     const response = await fetch(normalizedPath, {
