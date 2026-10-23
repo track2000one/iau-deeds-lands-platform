@@ -6,6 +6,7 @@ import {
   MapPin,
   Plus,
   Save,
+  Search,
   Trash2,
   X,
 } from 'lucide-react';
@@ -50,6 +51,16 @@ const categories = [
 ];
 
 const emptyReferences: SiteInspectionReferences = { deeds: [], buildings: [] };
+
+// Ignore Arabic diacritics and common alef variants while searching building references.
+const normalizeBuildingSearch = (value: string) =>
+  value
+    .normalize('NFKC')
+    .toLocaleLowerCase('ar')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .trim();
 
 const parseReferenceCoordinates = (value: unknown): { latitude: number; longitude: number } | null => {
   if (!value) return null;
@@ -120,6 +131,18 @@ export const SiteInspectionFormPage: React.FC = () => {
   const [references, setReferences] = React.useState<SiteInspectionReferences>(emptyReferences);
   const [referencesLoading, setReferencesLoading] = React.useState(true);
   const [referenceMode, setReferenceMode] = React.useState<'none' | 'deed' | 'building'>('none');
+  const [buildingSearch, setBuildingSearch] = React.useState('');
+
+  const matchingBuildings = React.useMemo(() => {
+    const query = normalizeBuildingSearch(buildingSearch);
+    if (!query) return references.buildings;
+    return references.buildings.filter((building) =>
+      [building.name, building.buildingNumber, building.campusLocation]
+        .some((value) => normalizeBuildingSearch(value || '').includes(query))
+    );
+  }, [buildingSearch, references.buildings]);
+  // Keep the linked building available in the select while another search is typed.
+  const selectedBuilding = references.buildings.find((building) => building.id === form.buildingId);
 
   React.useEffect(() => {
     getSiteInspectionReferences()
@@ -182,6 +205,7 @@ export const SiteInspectionFormPage: React.FC = () => {
 
   const changeReferenceMode = (mode: 'none' | 'deed' | 'building') => {
     setReferenceMode(mode);
+    if (mode !== 'building') setBuildingSearch('');
     setForm((current) => ({
       ...current,
       deedId: mode === 'deed' ? current.deedId : null,
@@ -219,6 +243,7 @@ export const SiteInspectionFormPage: React.FC = () => {
   };
 
   const selectBuildingReference = (buildingId: string) => {
+    setBuildingSearch('');
     const building = references.buildings.find((item) => item.id === buildingId);
     if (!building) {
       setForm((current) => ({ ...current, buildingId: null }));
@@ -418,17 +443,58 @@ export const SiteInspectionFormPage: React.FC = () => {
           )}
 
           {referenceMode === 'building' && (
-            <div className="md:col-span-2">
+            <div className="space-y-3 md:col-span-2">
+              <Field label="بحث باسم المبنى">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <Input
+                    dir="rtl"
+                    value={buildingSearch}
+                    onChange={(event) => setBuildingSearch(event.target.value)}
+                    placeholder="اكتب اسم المبنى أو رقمه..."
+                    aria-label="بحث باسم المبنى"
+                    className="pr-10 pl-10"
+                    disabled={referencesLoading}
+                  />
+                  {buildingSearch && (
+                    <button
+                      type="button"
+                      title="مسح البحث"
+                      aria-label="مسح البحث"
+                      onClick={() => setBuildingSearch('')}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </Field>
               <Field label="اختر المبنى">
-                <NativeSelect value={form.buildingId || ''} onChange={(event) => selectBuildingReference(event.target.value)}>
-                  <option value="">اختر المبنى...</option>
-                  {references.buildings.map((building) => (
+                <NativeSelect
+                  value={form.buildingId || ''}
+                  onChange={(event) => selectBuildingReference(event.target.value)}
+                  disabled={referencesLoading}
+                >
+                  <option value="">{referencesLoading ? 'جارٍ تحميل المباني...' : 'اختر المبنى...'}</option>
+                  {selectedBuilding && buildingSearch.trim() && !matchingBuildings.some((building) => building.id === selectedBuilding.id) && (
+                    <option value={selectedBuilding.id}>
+                      المبنى المرتبط حاليًا: {selectedBuilding.buildingNumber} — {selectedBuilding.name || 'مبنى بدون اسم'}
+                    </option>
+                  )}
+                  {matchingBuildings.map((building) => (
                     <option key={building.id} value={building.id}>
                       {building.buildingNumber} — {building.name || 'مبنى بدون اسم'}{building.campusLocation ? ` — ${building.campusLocation}` : ''}
                     </option>
                   ))}
                 </NativeSelect>
               </Field>
+              {buildingSearch.trim() && (
+                <p role="status" className="text-xs text-slate-600">
+                  {matchingBuildings.length
+                    ? `عدد المباني المطابقة: ${matchingBuildings.length}`
+                    : 'لا توجد مبانٍ مطابقة للبحث. جرّب اسمًا أو رقمًا آخر.'}
+                </p>
+              )}
             </div>
           )}
 
