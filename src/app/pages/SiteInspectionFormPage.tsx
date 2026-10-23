@@ -132,6 +132,7 @@ export const SiteInspectionFormPage: React.FC = () => {
   const [referencesLoading, setReferencesLoading] = React.useState(true);
   const [referenceMode, setReferenceMode] = React.useState<'none' | 'deed' | 'building'>('none');
   const [buildingSearch, setBuildingSearch] = React.useState('');
+  const [activeBuildingSuggestion, setActiveBuildingSuggestion] = React.useState(0);
 
   const matchingBuildings = React.useMemo(() => {
     const query = normalizeBuildingSearch(buildingSearch);
@@ -141,6 +142,7 @@ export const SiteInspectionFormPage: React.FC = () => {
         .some((value) => normalizeBuildingSearch(value || '').includes(query))
     );
   }, [buildingSearch, references.buildings]);
+  const visibleBuildingSuggestions = matchingBuildings.slice(0, 8);
   // Keep the linked building available in the select while another search is typed.
   const selectedBuilding = references.buildings.find((building) => building.id === form.buildingId);
 
@@ -450,9 +452,39 @@ export const SiteInspectionFormPage: React.FC = () => {
                   <Input
                     dir="rtl"
                     value={buildingSearch}
-                    onChange={(event) => setBuildingSearch(event.target.value)}
+                    onChange={(event) => {
+                      setBuildingSearch(event.target.value);
+                      setActiveBuildingSuggestion(0);
+                    }}
+                    onKeyDown={(event) => {
+                      if (!buildingSearch.trim() || !visibleBuildingSuggestions.length) {
+                        if (event.key === 'Escape') setBuildingSearch('');
+                        return;
+                      }
+                      if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        setActiveBuildingSuggestion((index) => Math.min(index + 1, visibleBuildingSuggestions.length - 1));
+                      } else if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        setActiveBuildingSuggestion((index) => Math.max(index - 1, 0));
+                      } else if (event.key === 'Enter') {
+                        event.preventDefault();
+                        const building = visibleBuildingSuggestions[activeBuildingSuggestion];
+                        if (building) selectBuildingReference(building.id);
+                      } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        setBuildingSearch('');
+                      }
+                    }}
                     placeholder="اكتب اسم المبنى أو رقمه..."
                     aria-label="بحث باسم المبنى"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-controls="building-autocomplete-results"
+                    aria-expanded={Boolean(buildingSearch.trim() && visibleBuildingSuggestions.length)}
+                    aria-activedescendant={buildingSearch.trim() && visibleBuildingSuggestions[activeBuildingSuggestion]
+                      ? `building-suggestion-${visibleBuildingSuggestions[activeBuildingSuggestion].id}`
+                      : undefined}
                     className="pr-10 pl-10"
                     disabled={referencesLoading}
                   />
@@ -468,8 +500,48 @@ export const SiteInspectionFormPage: React.FC = () => {
                     </button>
                   )}
                 </div>
+                {buildingSearch.trim() && !referencesLoading && (
+                  <div
+                    id="building-autocomplete-results"
+                    role="listbox"
+                    aria-label="أسماء المباني المطابقة"
+                    className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-sky-200 bg-white p-1 shadow-md"
+                  >
+                    {visibleBuildingSuggestions.length ? (
+                      <>
+                        {visibleBuildingSuggestions.map((building, index) => (
+                          <button
+                            key={building.id}
+                            id={`building-suggestion-${building.id}`}
+                            type="button"
+                            role="option"
+                            aria-selected={activeBuildingSuggestion === index}
+                            onMouseEnter={() => setActiveBuildingSuggestion(index)}
+                            onClick={() => selectBuildingReference(building.id)}
+                            className={`flex w-full flex-col gap-1 rounded-lg px-3 py-2 text-right transition-colors ${
+                              activeBuildingSuggestion === index ? 'bg-sky-100 text-sky-950' : 'text-slate-800 hover:bg-sky-50'
+                            }`}
+                          >
+                            <span className="text-sm font-semibold">{building.name || 'مبنى بدون اسم'}</span>
+                            <span className="text-xs text-slate-600" dir="rtl">
+                              رقم المبنى: {building.buildingNumber}
+                              {building.campusLocation ? ` — ${building.campusLocation}` : ''}
+                            </span>
+                          </button>
+                        ))}
+                        {matchingBuildings.length > visibleBuildingSuggestions.length && (
+                          <div className="border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
+                            تظهر أول {visibleBuildingSuggestions.length} نتائج من أصل {matchingBuildings.length}. أضف حروفًا لتضييق البحث.
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="px-3 py-3 text-sm text-slate-600">لا توجد مبانٍ مطابقة. جرّب اسمًا أو رقمًا آخر.</p>
+                    )}
+                  </div>
+                )}
               </Field>
-              <Field label="اختر المبنى">
+              <Field label="أو اختر المبنى من القائمة">
                 <NativeSelect
                   value={form.buildingId || ''}
                   onChange={(event) => selectBuildingReference(event.target.value)}
@@ -490,9 +562,7 @@ export const SiteInspectionFormPage: React.FC = () => {
               </Field>
               {buildingSearch.trim() && (
                 <p role="status" className="text-xs text-slate-600">
-                  {matchingBuildings.length
-                    ? `عدد المباني المطابقة: ${matchingBuildings.length}`
-                    : 'لا توجد مبانٍ مطابقة للبحث. جرّب اسمًا أو رقمًا آخر.'}
+                  عدد المباني المطابقة: {matchingBuildings.length}
                 </p>
               )}
             </div>
