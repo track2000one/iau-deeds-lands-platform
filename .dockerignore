@@ -1,0 +1,17 @@
+# Allow only the production frontend's source and build inputs.
+# Never copy backend code, local secrets, or repository history into the image.
+**
+!Dockerfile
+!Caddyfile
+!.npmrc
+!package.json
+!package-lock.json
+!index.html
+!vite.config.ts
+!postcss.config.mjs
+!pnpm-workspace.yaml
+!default_shadcn_theme.css
+!src/
+!src/**
+!public/
+!public/**
