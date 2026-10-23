@@ -1550,9 +1550,9 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
 
   const updateTourStatus = async (tour: MosqueFieldTour, status: MosqueFieldTour['status']) => {
     try {
-      const updated = await mosqueApi.updateFieldTour(tour.id, { status, notes: tour.notes || null });
-      setTours((current) => current.map((item) => item.id === tour.id ? { ...item, ...updated } : item));
-      toast.success('تم تحديث حالة الجولة');
+      await mosqueApi.updateFieldTour(tour.id, { status, notes: tour.notes || null });
+      await load();
+      toast.success('تم تحديث حالة الجولة والمؤشرات المرتبطة بها');
     } catch (error) { toast.error(error instanceof Error ? error.message : 'تعذر تحديث الجولة'); }
   };
 
@@ -3024,6 +3024,43 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
               <FieldVisitOverviewMetric label="الجولات الجارية" value={tourStats.inProgress} icon={RefreshCw} />
               <FieldVisitOverviewMetric label="الجولات المجدولة" value={tourStats.scheduled} icon={CalendarDays} />
             </div>
+            <div className="rounded-2xl border border-sky-200 bg-[#f3f8ff] p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-black text-[#0b4a3f]">توزيع حالات الجولات المسجلة</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">
+                    يظهر شريط التوزيع الجولات المجدولة والجارية والمكتملة والمؤجلة كلٌّ حسب حالته الفعلية.
+                    إنشاء الجولة يضيفها إلى المجدولة، ولا يرفع نسبة الإنجاز.
+                  </p>
+                </div>
+                <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-black text-sky-900">
+                  {tourStats.scheduled} مجدولة من {tourStats.eligible} غير ملغاة
+                </span>
+              </div>
+              <div
+                role="img"
+                aria-label={`توزيع الجولات: ${tourStats.scheduled} مجدولة، ${tourStats.inProgress} جارية، ${tourStats.completed} مكتملة، ${tourStats.postponed} مؤجلة، ${tourStats.cancelled} ملغاة`}
+                className="flex h-5 w-full overflow-hidden rounded-full border border-sky-200 bg-slate-100"
+                dir="rtl"
+              >
+                {tourStats.eligible > 0 && (
+                  <>
+                    <div className="h-full bg-sky-500 transition-[width] duration-500" style={{ width: `${100 * tourStats.scheduled / tourStats.eligible}%` }} />
+                    <div className="h-full bg-amber-500 transition-[width] duration-500" style={{ width: `${100 * tourStats.inProgress / tourStats.eligible}%` }} />
+                    <div className="h-full bg-emerald-600 transition-[width] duration-500" style={{ width: `${100 * tourStats.completed / tourStats.eligible}%` }} />
+                    <div className="h-full bg-slate-400 transition-[width] duration-500" style={{ width: `${100 * tourStats.postponed / tourStats.eligible}%` }} />
+                  </>
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-bold">
+                <span className="flex items-center gap-1.5 text-sky-800"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" />مجدولة: {tourStats.scheduled}</span>
+                <span className="flex items-center gap-1.5 text-amber-800"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />جارية: {tourStats.inProgress}</span>
+                <span className="flex items-center gap-1.5 text-emerald-800"><span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />مكتملة: {tourStats.completed}</span>
+                <span className="flex items-center gap-1.5 text-slate-700"><span className="h-2.5 w-2.5 rounded-full bg-slate-400" />مؤجلة: {tourStats.postponed}</span>
+                {tourStats.cancelled > 0 && <span className="text-slate-600">ملغاة (مستبعدة من الشريط): {tourStats.cancelled}</span>}
+              </div>
+              {!tourStats.eligible && <p className="mt-2 text-xs text-slate-600">لا توجد جولات غير ملغاة لعرض توزيعها.</p>}
+            </div>
             <div className="rounded-2xl border border-[#d2e7dd] bg-[#f2faf5] p-4">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -3251,7 +3288,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
     </div> : <div className={`${tourCardsVisible ? 'grid' : 'hidden'} gap-4 md:grid-cols-2 xl:grid-cols-3`}>
       {tours.map((tour) => <Card key={tour.id} className="overflow-hidden">
         <CardHeader className="border-b bg-gradient-to-l from-emerald-50/70 to-white"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{tour.title}</CardTitle><CardDescription className="mt-1">{tour.tourNumber}</CardDescription></div><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{tourStatusLabels[tour.status]}</Badge>{tour.canEdit !== true && <Badge variant="outline" className="border-slate-300 bg-slate-100 text-slate-700"><Eye className="ml-1 h-3 w-3" />عرض فقط</Badge>}</div></div></CardHeader>
-        <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-44 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between gap-3 rounded-lg bg-white px-2 py-2 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) { if (canEdit && full.canEdit === true) openVisit(full); else setViewingVisit(full); } }}><span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{visit.site.name}</b><small className="mt-0.5 block truncate text-[10px] text-slate-500">{visitScopeLabels[visit.visitScope || 'whole_site'] || 'الموقع بالكامل'} — {visit.assignedToName || 'غير مسند'}</small></span><span className="shrink-0 text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && tour.canEdit === true && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).filter(([value]) => value !== 'cancelled' || tour.canCancel === true || tour.status === 'cancelled').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}{canPrint && tour.canEdit === true && <div className="grid gap-2 sm:grid-cols-2"><Button size="sm" className="w-full border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={() => exportTourTreatmentExcel(tour)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button><Button size="sm" variant="outline" className="w-full border-emerald-200 text-emerald-800" onClick={() => void printTourTreatmentReport(tour)}><ImageIcon className="ml-2 h-4 w-4" />تقرير المعالجة المصور قبل / بعد</Button></div>}{canDelete && tour.canDelete === true && <Button size="sm" variant="destructive" className="w-full !border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => setTourAction({ tour, action: 'delete' })}><Trash2 className="ml-2 h-4 w-4 text-white" />حذف الجولة</Button>}{canEdit && tour.canDelete !== true && tour.canCancel === true && tour.status !== 'cancelled' && <Button size="sm" variant="destructive" className="w-full !border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => setTourAction({ tour, action: 'cancel' })}><X className="ml-2 h-4 w-4 text-white" />إلغاء الجولة</Button>}</CardContent>
+        <CardContent className="space-y-3 pt-4 text-sm"><InfoLine label="التاريخ" value={new Date(tour.scheduledDate).toLocaleDateString('ar-SA-u-ca-gregory')} /><InfoLine label="الفريق" value={(tour.teamMembers || []).join('، ')} /><InfoLine label="النطاق" value={tour.scope || '-'} /><FieldTourVisitExecution tour={tour} /><div className="rounded-xl border bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><span className="font-bold">المواقع المجدولة</span><Badge>{tour.visits?.length || 0}</Badge></div><div className="max-h-44 space-y-1 overflow-y-auto">{tour.visits?.map((visit) => <button key={visit.id} type="button" className="flex w-full items-center justify-between gap-3 rounded-lg bg-white px-2 py-2 text-right hover:bg-sky-50" onClick={() => { const full = visits.find((item) => item.id === visit.id); if (full) { if (canEdit && full.canEdit === true) openVisit(full); else setViewingVisit(full); } }}><span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{visit.site.name}</b><small className="mt-0.5 block truncate text-[10px] text-slate-500">{visitScopeLabels[visit.visitScope || 'whole_site'] || 'الموقع بالكامل'} — {visit.assignedToName || 'غير مسند'}</small></span><span className="shrink-0 text-xs text-slate-500">{visitStatusLabels[visit.workflowStatus]}</span></button>)}</div></div>{canEdit && tour.canEdit === true && <NativeSelect value={tour.status} onChange={(event) => void updateTourStatus(tour, event.target.value as MosqueFieldTour['status'])}>{Object.entries(tourStatusLabels).filter(([value]) => value !== 'cancelled' || tour.canCancel === true || tour.status === 'cancelled').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>}{canPrint && tour.canEdit === true && <div className="grid gap-2 sm:grid-cols-2"><Button size="sm" className="w-full border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={() => exportTourTreatmentExcel(tour)}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button><Button size="sm" variant="outline" className="w-full border-emerald-200 text-emerald-800" onClick={() => void printTourTreatmentReport(tour)}><ImageIcon className="ml-2 h-4 w-4" />تقرير المعالجة المصور قبل / بعد</Button></div>}{canDelete && tour.canDelete === true && <Button size="sm" variant="destructive" className="w-full !border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => setTourAction({ tour, action: 'delete' })}><Trash2 className="ml-2 h-4 w-4 text-white" />حذف الجولة</Button>}{canEdit && tour.canDelete !== true && tour.canCancel === true && tour.status !== 'cancelled' && <Button size="sm" variant="destructive" className="w-full !border-red-700 !bg-red-600 !text-white hover:!bg-red-700 hover:!text-white" onClick={() => setTourAction({ tour, action: 'cancel' })}><X className="ml-2 h-4 w-4 text-white" />إلغاء الجولة</Button>}</CardContent>
       </Card>)}
       {!tours.length && <Empty message="لم يتم إنشاء جولات ميدانية بعد" />}
     </div>}
@@ -3929,6 +3966,42 @@ const FieldVisitVisualProgress = ({ label, value, tone, emptyMessage }: FieldVis
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+const FieldTourVisitExecution = ({ tour }: { tour: MosqueFieldTour }) => {
+  const allVisits = tour.visits || [];
+  const total = allVisits.length;
+  const executed = allVisits.filter((visit) => ['completed', 'follow_up', 'closed'].includes(visit.workflowStatus)).length;
+  const ratio = total ? Math.round((executed / total) * 100) : 0;
+  const isSuspended = ['cancelled', 'postponed'].includes(tour.status);
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="font-bold text-amber-950">تنفيذ زيارات الجولة</span>
+        <span className="rounded-full bg-white px-2 py-1 text-xs font-black text-amber-900">{executed} من {total} · {ratio}%</span>
+      </div>
+      <div
+        role="progressbar"
+        aria-label={`نسبة الزيارات المنفذة في الجولة ${tour.tourNumber}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={ratio}
+        className="h-3 w-full overflow-hidden rounded-full border border-amber-200 bg-white"
+        dir="rtl"
+      >
+        <div className="h-full rounded-full bg-amber-500 transition-[width] duration-500" style={{ width: `${ratio}%` }} />
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-600">
+        {isSuspended
+          ? 'الجولة مؤجلة أو ملغاة؛ النسبة المعروضة توثق الزيارات التي نُفذت قبل توقفها.'
+          : total === 0
+            ? 'لا توجد زيارات مسندة إلى هذه الجولة.'
+            : executed === 0
+              ? 'الزيارات مجدولة ولم تُسجل أي زيارة منفذة بعد.'
+              : 'يشمل التنفيذ الزيارات المكتملة والمغلقة والتي تحتاج متابعة، ولا يعني إغلاق جميع الملاحظات.'}
+      </p>
     </div>
   );
 };
