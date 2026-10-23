@@ -1215,10 +1215,13 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       progressPercent: eligible.length ? Math.round((completed / eligible.length) * 100) : 0,
     };
   }, [tours]);
+  // A completed, closed or follow-up visit was physically performed;
+  // planned and in-progress visits do not count as executed yet.
   const executedVisits = React.useMemo(
     () => visits.filter((visit) => ['completed', 'follow_up', 'closed'].includes(visit.workflowStatus)).length,
     [visits],
   );
+  const visitExecutionPercent = visits.length ? Math.round((executedVisits / visits.length) * 100) : 0;
 
   const filteredVisits = React.useMemo(() => {
     const fromTime = dateFromFilter ? new Date(`${dateFromFilter}T00:00:00`).getTime() : null;
@@ -3071,7 +3074,30 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                 tone="sites"
                 emptyMessage="لم تُسجل تغطية مكتملة لأي موقع بعد"
               />
-              <p className="mt-2 text-xs font-semibold text-slate-600">الزيارات المنفذة أو المحالة للمتابعة: {executedVisits} من أصل {summary.visits} زيارة مسجلة.</p>
+            </div>
+            <div className="rounded-2xl border border-[#e6d5b4] bg-[#fffbf1] p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-black text-[#0b4a3f]">نسبة تنفيذ الزيارات</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">
+                    نسبة الزيارات المكتملة أو المغلقة أو المحالة للمتابعة من جميع الزيارات المسجلة.
+                    الزيارة المجدولة أو الجارية لا تُحتسب منفذة حتى تحديث حالتها.
+                  </p>
+                </div>
+                <span className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-black text-amber-900">
+                  {executedVisits} من {visits.length} · {visitExecutionPercent}%
+                </span>
+              </div>
+              <FieldVisitVisualProgress
+                label="نسبة تنفيذ الزيارات الميدانية"
+                value={visitExecutionPercent}
+                tone="visits"
+                emptyMessage={visits.length ? 'لم تُنفذ أي زيارة حتى الآن' : 'لم تُسجل زيارات حتى الآن'}
+              />
+              <p className="mt-2 text-xs font-semibold text-slate-600">
+                {visits.length - executedVisits} زيارة مجدولة أو جارية من أصل {visits.length} زيارة مسجلة.
+                يشمل المنفذ الزيارات التي تحتاج متابعة لاحقة ولا يعني اكتمال معالجة ملاحظاتها.
+              </p>
             </div>
           </div>
 
@@ -3830,7 +3856,7 @@ const VisitAttachmentField: React.FC<{
 type FieldVisitVisualProgressProps = {
   label: string;
   value: number;
-  tone: 'tours' | 'sites';
+  tone: 'tours' | 'sites' | 'visits';
   emptyMessage: string;
 };
 
@@ -3839,10 +3865,14 @@ const FieldVisitVisualProgress = ({ label, value, tone, emptyMessage }: FieldVis
   const percent = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
   const isZero = percent === 0;
   const isComplete = percent === 100;
-  const stroke = tone === 'tours' ? '#087f64' : '#0369a1';
-  const track = tone === 'tours' ? '#d7e9df' : '#d7eaf8';
-  const barFill = tone === 'tours' ? 'bg-gradient-to-l from-emerald-700 to-teal-400' : 'bg-gradient-to-l from-sky-700 to-cyan-400';
-  const labelTone = tone === 'tours' ? 'text-emerald-950' : 'text-sky-950';
+  const stroke = tone === 'tours' ? '#087f64' : tone === 'sites' ? '#0369a1' : '#b45309';
+  const track = tone === 'tours' ? '#d7e9df' : tone === 'sites' ? '#d7eaf8' : '#f8e5be';
+  const barFill = tone === 'tours'
+    ? 'bg-gradient-to-l from-emerald-700 to-teal-400'
+    : tone === 'sites'
+      ? 'bg-gradient-to-l from-sky-700 to-cyan-400'
+      : 'bg-gradient-to-l from-amber-700 to-amber-400';
+  const labelTone = tone === 'tours' ? 'text-emerald-950' : tone === 'sites' ? 'text-sky-950' : 'text-amber-950';
   const radius = 33;
   const circumference = 2 * Math.PI * radius;
   const state = isZero ? emptyMessage : isComplete ? 'مكتمل بنسبة 100%' : 'التنفيذ جارٍ';
@@ -3873,7 +3903,7 @@ const FieldVisitVisualProgress = ({ label, value, tone, emptyMessage }: FieldVis
         <div className="w-full min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className={`text-sm font-black ${labelTone}`}>{label}</span>
-            <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${isZero ? 'border-slate-300 bg-slate-100 text-slate-700' : tone === 'tours' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-sky-200 bg-sky-50 text-sky-900'}`}>
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${isZero ? 'border-slate-300 bg-slate-100 text-slate-700' : tone === 'tours' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : tone === 'sites' ? 'border-sky-200 bg-sky-50 text-sky-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
               {state}
             </span>
           </div>
