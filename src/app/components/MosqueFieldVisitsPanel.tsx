@@ -3029,7 +3029,12 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                 </div>
                 <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-900">{tourStats.completed} من {tourStats.eligible} · {tourStats.progressPercent}%</span>
               </div>
-              <Progress value={tourStats.progressPercent} className="h-3" />
+              <FieldVisitVisualProgress
+                label="نسبة إنجاز الجولات الميدانية"
+                value={tourStats.progressPercent}
+                tone="tours"
+                emptyMessage="لم تكتمل أي جولة حتى الآن"
+              />
               {(tourStats.postponed > 0 || tourStats.cancelled > 0) && (
                 <p className="mt-2 text-xs text-slate-600">
                   {tourStats.postponed > 0 ? `الجولات المؤجلة: ${tourStats.postponed}` : ''}
@@ -3060,7 +3065,12 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                 </div>
                 <span className="rounded-full border border-[#d6b46a]/45 bg-white px-3 py-1 text-xs font-black text-[#8a6a1f]">{summary.visitedSites} من {summary.totalSites} · {summary.coveragePercent}%</span>
               </div>
-              <Progress value={summary.coveragePercent} className="h-3" />
+              <FieldVisitVisualProgress
+                label="نسبة تغطية مواقع المساجد والمصليات"
+                value={summary.coveragePercent}
+                tone="sites"
+                emptyMessage="لم تُسجل تغطية مكتملة لأي موقع بعد"
+              />
               <p className="mt-2 text-xs font-semibold text-slate-600">الزيارات المنفذة أو المحالة للمتابعة: {executedVisits} من أصل {summary.visits} زيارة مسجلة.</p>
             </div>
           </div>
@@ -3817,6 +3827,82 @@ const VisitAttachmentField: React.FC<{
   </div>
   <VisitAttachmentGallery label="المرفقات المضافة" attachments={attachments} onRemove={onRemove} onDescriptionChange={onDescriptionChange} />
 </div>;
+type FieldVisitVisualProgressProps = {
+  label: string;
+  value: number;
+  tone: 'tours' | 'sites';
+  emptyMessage: string;
+};
+
+/** Keep 0% visible as a real value, without drawing a misleading filled bar. */
+const FieldVisitVisualProgress = ({ label, value, tone, emptyMessage }: FieldVisitVisualProgressProps) => {
+  const percent = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+  const isZero = percent === 0;
+  const isComplete = percent === 100;
+  const stroke = tone === 'tours' ? '#087f64' : '#0369a1';
+  const track = tone === 'tours' ? '#d7e9df' : '#d7eaf8';
+  const barFill = tone === 'tours' ? 'bg-gradient-to-l from-emerald-700 to-teal-400' : 'bg-gradient-to-l from-sky-700 to-cyan-400';
+  const labelTone = tone === 'tours' ? 'text-emerald-950' : 'text-sky-950';
+  const radius = 33;
+  const circumference = 2 * Math.PI * radius;
+  const state = isZero ? emptyMessage : isComplete ? 'مكتمل بنسبة 100%' : 'التنفيذ جارٍ';
+
+  return (
+    <div className="rounded-xl border border-slate-200/80 bg-white p-3 sm:p-4">
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+        <div className="relative h-[104px] w-[104px] shrink-0" role="img" aria-label={`${label}: ${percent}%`}>
+          <svg aria-hidden="true" viewBox="0 0 100 100" className="h-full w-full" fill="none">
+            <circle cx="50" cy="50" r={radius} stroke={track} strokeWidth="10" />
+            {percent > 0 && (
+              <circle
+                cx="50" cy="50" r={radius}
+                stroke={stroke}
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * (1 - percent / 100)}
+                transform="rotate(-90 50 50)"
+              />
+            )}
+          </svg>
+          <div className={`absolute inset-0 flex flex-col items-center justify-center ${labelTone}`}>
+            <span className="text-2xl font-black tabular-nums">{percent}%</span>
+            <span className="text-[10px] font-bold">{isZero ? 'لم يبدأ' : isComplete ? 'مكتمل' : 'إنجاز'}</span>
+          </div>
+        </div>
+        <div className="w-full min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className={`text-sm font-black ${labelTone}`}>{label}</span>
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${isZero ? 'border-slate-300 bg-slate-100 text-slate-700' : tone === 'tours' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-sky-200 bg-sky-50 text-sky-900'}`}>
+              {state}
+            </span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label={label}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent}
+            aria-valuetext={`${percent}% — ${state}`}
+            className="relative h-5 overflow-hidden rounded-full border border-slate-300 bg-slate-100"
+            dir="rtl"
+          >
+            <div className={`absolute inset-y-0 right-0 rounded-full transition-[width] duration-500 ${barFill}`} style={{ width: `${percent}%` }} />
+            <div className="pointer-events-none absolute inset-0 flex justify-between">
+              {[0, 25, 50, 75, 100].map((mark) => (
+                <span key={mark} className="h-full w-px bg-slate-400/40" aria-hidden="true" />
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-between text-[10px] font-semibold text-slate-600" dir="rtl">
+            <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FieldVisitOverviewMetric = ({ label, value, icon: Icon }: { label: string; value: number; icon: React.ElementType }) => (
   <div className="flex min-h-[94px] items-center justify-between gap-3 rounded-2xl border border-[#e2d4b4] bg-white p-3 shadow-[0_5px_14px_rgba(6,60,51,0.05)]">
     <div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-[#0b4a3f]">{value}</p></div>
