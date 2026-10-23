@@ -1,0 +1,28 @@
+name: Frontend Docker image validation
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'Caddyfile'
+      - '.dockerignore'
+      - '.github/workflows/frontend-docker-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build frontend container
+        run: |
+          docker build --progress=plain \
+            --build-arg VITE_API_URL=https://example.invalid \
+            -t iau-deeds-frontend:verify .
+      - name: Verify image contents
+        run: |
+          docker run --rm --entrypoint /bin/sh iau-deeds-frontend:verify \
+            -c 'test -s /srv/index.html && test -f /etc/caddy/Caddyfile'
