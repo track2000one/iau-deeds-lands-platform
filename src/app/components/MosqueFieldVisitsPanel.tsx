@@ -1199,6 +1199,27 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
 
   React.useEffect(() => { void load(); }, [load]);
 
+  // Tour completion and site coverage measure two different aspects of the field program.
+  // Exclude cancelled tours from the completion denominator, but retain them in the audit total.
+  const tourStats = React.useMemo(() => {
+    const eligible = tours.filter((tour) => tour.status !== 'cancelled');
+    const completed = eligible.filter((tour) => tour.status === 'completed').length;
+    return {
+      total: tours.length,
+      eligible: eligible.length,
+      completed,
+      inProgress: eligible.filter((tour) => tour.status === 'in_progress').length,
+      scheduled: eligible.filter((tour) => tour.status === 'scheduled').length,
+      postponed: eligible.filter((tour) => tour.status === 'postponed').length,
+      cancelled: tours.length - eligible.length,
+      progressPercent: eligible.length ? Math.round((completed / eligible.length) * 100) : 0,
+    };
+  }, [tours]);
+  const executedVisits = React.useMemo(
+    () => visits.filter((visit) => ['completed', 'follow_up', 'closed'].includes(visit.workflowStatus)).length,
+    [visits],
+  );
+
   const filteredVisits = React.useMemo(() => {
     const fromTime = dateFromFilter ? new Date(`${dateFromFilter}T00:00:00`).getTime() : null;
     const toTime = dateToFilter ? new Date(`${dateToFilter}T23:59:59.999`).getTime() : null;
@@ -2982,25 +3003,66 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
               <CardDescription className="mt-2 max-w-3xl leading-6">لوحة تشغيل موحدة لمتابعة التغطية الميدانية، الزيارات المنفذة، الملاحظات المفتوحة، والصور قبل المعالجة وبعدها.</CardDescription>
             </div>
             <div className="rounded-2xl border border-[#d6b46a]/45 bg-[#0b4a3f] px-4 py-3 text-center text-white">
-              <div className="text-[11px] font-bold text-[#efd18a]">نسبة التغطية</div>
-              <div className="mt-1 text-3xl font-black">{summary.coveragePercent}%</div>
+              <div className="text-[11px] font-bold text-[#efd18a]">نسبة إنجاز الجولات</div>
+              <div className="mt-1 text-3xl font-black">{tourStats.progressPercent}%</div>
+              <div className="mt-1 text-[10px] font-semibold text-[#e8e2cb]">{tourStats.completed} جولة مكتملة من {tourStats.eligible} غير ملغاة</div>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-5 p-4 sm:p-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <FieldVisitOverviewMetric label="إجمالي المواقع" value={summary.totalSites} icon={MapPin} />
-            <FieldVisitOverviewMetric label="تمت زيارتها" value={summary.visitedSites} icon={CheckCircle2} />
-            <FieldVisitOverviewMetric label="المتبقية" value={summary.remainingSites} icon={CalendarDays} />
-            <FieldVisitOverviewMetric label="إجمالي الزيارات" value={summary.visits} icon={ClipboardList} />
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 font-black text-[#0b4a3f]"><Route className="h-4 w-4" />إحصائيات الجولات الميدانية</h3>
+              <span className="text-xs font-semibold text-slate-600">البيانات حسب حالات الجولات المسجلة</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <FieldVisitOverviewMetric label="إجمالي الجولات" value={tourStats.total} icon={Route} />
+              <FieldVisitOverviewMetric label="الجولات المكتملة" value={tourStats.completed} icon={CheckCircle2} />
+              <FieldVisitOverviewMetric label="الجولات الجارية" value={tourStats.inProgress} icon={RefreshCw} />
+              <FieldVisitOverviewMetric label="الجولات المجدولة" value={tourStats.scheduled} icon={CalendarDays} />
+            </div>
+            <div className="rounded-2xl border border-[#d2e7dd] bg-[#f2faf5] p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-black text-[#0b4a3f]">تقدم تنفيذ الجولات</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">نسبة الجولات المكتملة إلى الجولات غير الملغاة. لا تُحسب الجولات المجدولة أو الجارية أو المؤجلة ضمن الإنجاز.</p>
+                </div>
+                <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-900">{tourStats.completed} من {tourStats.eligible} · {tourStats.progressPercent}%</span>
+              </div>
+              <Progress value={tourStats.progressPercent} className="h-3" />
+              {(tourStats.postponed > 0 || tourStats.cancelled > 0) && (
+                <p className="mt-2 text-xs text-slate-600">
+                  {tourStats.postponed > 0 ? `الجولات المؤجلة: ${tourStats.postponed}` : ''}
+                  {tourStats.postponed > 0 && tourStats.cancelled > 0 ? ' · ' : ''}
+                  {tourStats.cancelled > 0 ? `الجولات الملغاة: ${tourStats.cancelled} (مستبعدة من نسبة الإنجاز)` : ''}
+                </p>
+              )}
+              {!tourStats.eligible && <p className="mt-2 text-xs text-slate-500">لم تُسجل جولات قابلة للتنفيذ حتى الآن.</p>}
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-[#e2d4b4] bg-[#fbf8f1] p-4">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div><p className="font-black text-[#0b4a3f]">تقدم البرنامج الميداني</p><p className="mt-1 text-xs text-slate-500">تتحدث النسبة تلقائيًا وفق المواقع التي تم تنفيذ زيارات عليها.</p></div>
-              <span className="rounded-full border border-[#d6b46a]/45 bg-white px-3 py-1 text-xs font-black text-[#8a6a1f]">{summary.visitedSites} من {summary.totalSites}</span>
+          <div className="space-y-3 border-t border-[#e8ddc3] pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 font-black text-[#0b4a3f]"><MapPin className="h-4 w-4" />تغطية المواقع والزيارات</h3>
+              <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-black text-sky-900">نسبة تغطية المواقع: {summary.coveragePercent}%</span>
             </div>
-            <Progress value={summary.coveragePercent} className="h-3" />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <FieldVisitOverviewMetric label="إجمالي المواقع" value={summary.totalSites} icon={MapPin} />
+              <FieldVisitOverviewMetric label="مواقع تمت زيارتها" value={summary.visitedSites} icon={CheckCircle2} />
+              <FieldVisitOverviewMetric label="مواقع لم تُغطَّ بعد" value={summary.remainingSites} icon={CalendarDays} />
+              <FieldVisitOverviewMetric label="الزيارات المسجلة (كل الحالات)" value={summary.visits} icon={ClipboardList} />
+            </div>
+            <div className="rounded-2xl border border-[#e2d4b4] bg-[#fbf8f1] p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-black text-[#0b4a3f]">نسبة تغطية المواقع</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">يُحتسب الموقع مغطّى عند وجود زيارة مكتملة أو تحتاج متابعة أو مغلقة؛ الزيارات المجدولة والجارية لا تُعد تغطية مكتملة.</p>
+                </div>
+                <span className="rounded-full border border-[#d6b46a]/45 bg-white px-3 py-1 text-xs font-black text-[#8a6a1f]">{summary.visitedSites} من {summary.totalSites} · {summary.coveragePercent}%</span>
+              </div>
+              <Progress value={summary.coveragePercent} className="h-3" />
+              <p className="mt-2 text-xs font-semibold text-slate-600">الزيارات المنفذة أو المحالة للمتابعة: {executedVisits} من أصل {summary.visits} زيارة مسجلة.</p>
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
