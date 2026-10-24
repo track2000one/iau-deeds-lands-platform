@@ -125,11 +125,11 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
     }
   };
 
-  const fieldLabel = 'mb-1 block text-xs font-bold text-slate-700';
+  const fieldLabel = 'mb-1.5 block text-sm font-bold text-slate-800';
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !preparing) onClose(); }}>
-      <DialogContent dir="rtl" className="max-h-[92vh] w-[min(960px,calc(100vw-2rem))] max-w-[960px] overflow-y-auto p-5 sm:p-6">
+      <DialogContent dir="rtl" className="max-h-[92vh] !w-[min(960px,calc(100vw-2rem))] !max-w-[960px] overflow-y-auto p-5 sm:p-6">
         <DialogHeader className="text-right">
           <DialogTitle className="flex items-center gap-2 text-lg font-black text-emerald-950">
             <Printer className="h-5 w-5" /> إعداد التقرير الجدولي
@@ -225,8 +225,9 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
             </div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {inspectionPrintColumns.map((column) => (
-                <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-sm">
-                  <Checkbox checked={columns.includes(column.key)}
+                <label key={column.key} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:border-emerald-300 hover:bg-emerald-50/30">
+                  <Checkbox className="size-5 border-2 border-slate-400 data-[state=checked]:border-emerald-700 data-[state=checked]:bg-emerald-700"
+                    checked={columns.includes(column.key)}
                     onCheckedChange={(value) => toggleColumn(column.key, value === true)} />
                   <span>{column.label}</span>
                 </label>
@@ -235,7 +236,7 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
           </section>
 
           <label className="flex cursor-pointer flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3">
-            <Checkbox checked={includePhotos} onCheckedChange={(value) => setIncludePhotos(value === true)} />
+            <Checkbox className="size-5 border-2 border-amber-500 data-[state=checked]:border-amber-700 data-[state=checked]:bg-amber-700" checked={includePhotos} onCheckedChange={(value) => setIncludePhotos(value === true)} />
             <ImageIcon className="h-5 w-5 text-amber-800" />
             <span className="font-bold text-amber-950">إدراج الصور في التقرير</span>
             <span className="text-xs text-slate-600">
@@ -248,7 +249,7 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
           </p>
         </div>
 
-        <DialogFooter className="flex-row-reverse items-center justify-between gap-3 border-t pt-4">
+        <DialogFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white pt-4">
           <div className="text-sm font-black text-emerald-950">
             المعاينات المطابقة: <span className="text-lg">{matches.length}</span>
           </div>

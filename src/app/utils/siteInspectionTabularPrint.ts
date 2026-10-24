@@ -17,7 +17,7 @@ export const inspectionPrintColumns: { key: InspectionPrintColumn; label: string
   { key: 'city', label: 'المدينة' },
   { key: 'district', label: 'الحي' },
   { key: 'overallStatus', label: 'الحالة العامة' },
-  { key: 'workflowStatus', label: 'حالة المعاملة' },
+  { key: 'workflowStatus', label: 'حالة المعاينة' },
   { key: 'priority', label: 'الأولوية' },
   { key: 'observations', label: 'الملاحظات' },
   { key: 'recommendedAction', label: 'الإجراء المقترح' },
@@ -119,31 +119,34 @@ const valueFor = (record: SiteInspection, key: InspectionPrintColumn): string =>
 };
 
 const style = [
-  '@page { size: A4 landscape; margin: 12mm; }',
+  '@page { size: A4 landscape; margin: 10mm; }',
   '* { box-sizing: border-box; }',
   'html, body { direction: rtl; margin: 0; padding: 0; }',
-  'body { background: #eef3f4; color: #203044; font: 12px/1.7 Tahoma,Arial,sans-serif; print-color-adjust: exact; -webkit-print-color-adjust: exact; }',
-  'main { max-width: 1280px; margin: 16px auto; background: #fff; padding: 18px; }',
-  '.header { border: 1px solid #bbd3ce; border-right: 5px solid #0b5749; padding: 15px; background: #f3f9f6; margin-bottom: 16px; }',
-  '.university { font-size: 17px; font-weight: bold; color: #0b4a3f; }',
+  'body { background: #eef3f4; color: #203044; font: 14px/1.65 Tahoma,Arial,sans-serif; print-color-adjust: exact; -webkit-print-color-adjust: exact; }',
+  'main { max-width: 1280px; margin: 14px auto; background: #fff; padding: 18px; }',
+  '.header { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px 20px; border: 1px solid #bbd3ce; border-right: 5px solid #0b5749; padding: 12px 15px; background: #f3f9f6; margin-bottom: 13px; }',
+  '.header-main { min-width: 0; }',
+  '.header > .subtitle { grid-column: 1 / -1; font-size: 11px; }',
+  '.university { font-size: 18px; font-weight: bold; color: #0b4a3f; }',
   '.subtitle { color: #5f6f7c; }',
-  'h1 { margin: 12px 0 6px; color: #0b4a3f; font-size: 21px; }',
+  'h1 { margin: 6px 0 2px; color: #0b4a3f; font-size: 21px; }',
   'h2 { color: #0b4a3f; font-size: 16px; margin: 20px 0 8px; }',
-  '.meta { display: flex; flex-wrap: wrap; gap: 12px; color: #45566b; font-weight: bold; }',
+  '.meta { display: grid; justify-items: start; gap: 4px; color: #45566b; font-size: 12px; font-weight: bold; }',
   'table { width: 100%; border-collapse: collapse; table-layout: auto; }',
   'thead { display: table-header-group; }',
   'tr { break-inside: avoid; page-break-inside: avoid; }',
-  'th, td { border: 1px solid #c9d5d9; text-align: right; vertical-align: top; padding: 7px 8px; overflow-wrap: anywhere; white-space: pre-wrap; }',
-  'th { color: #fff; background: #0b5749; font-size: 11px; white-space: normal; }',
+  'th, td { border: 1px solid #c9d5d9; text-align: right; vertical-align: top; padding: 9px 10px; overflow-wrap: anywhere; white-space: pre-wrap; font-size: 13px; }',
+  'th { color: #fff; background: #0b5749; font-size: 12.5px; font-weight: 800; white-space: normal; }',
   'tbody tr:nth-child(even) td { background: #f3f8f7; }',
   '.count { white-space: nowrap; }',
-  '.photo { max-width: 160px; max-height: 115px; object-fit: contain; display: block; }',
+  '.photo { max-width: 210px; max-height: 150px; object-fit: contain; display: block; margin: auto; }',
   '.unavailable { color: #a43c2b; font-weight: bold; }',
   '.toolbar { max-width: 1280px; margin: 12px auto 0; padding: 12px; display: flex; gap: 14px; justify-content: space-between; align-items: center; background: #fff; border: 1px solid #c9d5d9; }',
   '.toolbar button { background: #0b5749; color: #fff; border: 0; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }',
   '.note { margin: 15px 0; color: #64748b; }',
   '.footer { border-top: 1px solid #bbc9cc; margin-top: 20px; padding-top: 8px; font-size: 10px; color: #64748b; }',
-  '@media print { body { background: #fff; } main { margin: 0; padding: 0; max-width: none; } .toolbar { display: none; } .header { margin-bottom: 12px; } }',
+  '@media (max-width: 670px) { .header { grid-template-columns: 1fr; } .meta { grid-template-columns: repeat(2,minmax(0,1fr)); } }',
+  '@media print { body { background: #fff; font-size: 12px; } main { margin: 0; padding: 0; max-width: none; } .toolbar { display: none; } .header { margin-bottom: 10px; padding: 9px 12px; } th,td { padding: 7px 6px; font-size: 11.5px; } th { font-size: 11.5px; } .photo { max-width: 200px; max-height: 145px; } }',
 ].join('\n');
 
 const renderReport = (records: SiteInspection[], options: SiteInspectionTablePrintOptions, photos: PhotoRow[]): string => {
@@ -173,9 +176,9 @@ const renderReport = (records: SiteInspection[], options: SiteInspectionTablePri
     '</title><style>' + style + '</style></head><body>' +
     '<div class="toolbar"><strong>معاينة التقرير الجدولي — تأكد من الصور قبل الطباعة' + escapeHtml(photoNotice) +
     '</strong><button type="button" onclick="window.print()">طباعة / حفظ PDF</button></div>' +
-    '<main><header class="header"><div class="university">جامعة الإمام عبدالرحمن بن فيصل</div>' +
+    '<main><header class="header"><div class="header-main"><div class="university">جامعة الإمام عبدالرحمن بن فيصل</div>' +
     '<div class="subtitle">منصة إدارة الصكوك والأراضي — تقارير المعاينات الميدانية</div><h1>' +
-    escapeHtml(options.title) + '</h1><div class="meta"><span>عدد المعاينات: ' + records.length +
+    escapeHtml(options.title) + '</h1></div><div class="meta"><span>عدد المعاينات: ' + records.length +
     '</span><span>التاريخ: ' + escapeHtml(new Date().toLocaleDateString('ar-SA-u-ca-gregory')) +
     '</span><span>التوثيق المصوّر: ' + (options.includePhotos ? 'مضمّن' : 'مستبعد') + '</span></div>' +
     (options.criteria ? '<p class="subtitle">معايير التقرير: ' + escapeHtml(options.criteria) + '</p>' : '') +
