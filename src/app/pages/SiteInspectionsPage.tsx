@@ -5,6 +5,7 @@ import {
   Eye,
   MapPin,
   Plus,
+  Printer,
   Search,
   Trash2,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
+import { SiteInspectionPrintDialog } from '../components/SiteInspectionPrintDialog';
 
 const statusLabels: Record<string, string> = {
   new: 'جديدة',
@@ -44,9 +46,11 @@ export const SiteInspectionsPage: React.FC = () => {
   const [items, setItems] = React.useState<SiteInspection[]>([]);
   const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(true);
+  const [printTarget, setPrintTarget] = React.useState<SiteInspection | 'all' | null>(null);
 
   const canAdd = isAdmin || hasPermission('site_inspections', 'canAdd');
   const canDelete = isAdmin || hasPermission('site_inspections', 'canDelete');
+  const canPrint = isAdmin || hasPermission('site_inspections', 'canPrint');
 
   const load = React.useCallback(async () => {
     try {
@@ -103,12 +107,21 @@ export const SiteInspectionsPage: React.FC = () => {
           </p>
         </div>
 
-        {canAdd && (
-          <Button onClick={() => navigate('/site-inspections/new')}>
-            <Plus className="ml-2 h-4 w-4" />
-            إضافة معاينة جديدة
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {canPrint && (
+            <Button variant="outline" onClick={() => setPrintTarget('all')} disabled={loading || !items.length}
+              className="border-emerald-700 text-emerald-900">
+              <Printer className="ml-2 h-4 w-4" />
+              تقرير شامل / طباعة
+            </Button>
+          )}
+          {canAdd && (
+            <Button onClick={() => navigate('/site-inspections/new')}>
+              <Plus className="ml-2 h-4 w-4" />
+              إضافة معاينة جديدة
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -193,6 +206,12 @@ export const SiteInspectionsPage: React.FC = () => {
                     <Eye className="ml-2 h-4 w-4" />
                     عرض
                   </Button>
+                  {canPrint && (
+                    <Button variant="outline" onClick={() => setPrintTarget(item)}>
+                      <Printer className="ml-2 h-4 w-4" />
+                      طباعة
+                    </Button>
+                  )}
                   {canDelete && (
                     <Button variant="destructive" className="platform-record-danger" onClick={() => remove(item)}>
                       <Trash2 className="ml-2 h-4 w-4" />
@@ -204,6 +223,14 @@ export const SiteInspectionsPage: React.FC = () => {
             </Card>
           ))}
         </div>
+      )}
+      {printTarget !== null && (
+        <SiteInspectionPrintDialog
+          records={items}
+          target={printTarget === 'all' ? undefined : printTarget}
+          initialSearch={printTarget === 'all' ? search : ''}
+          onClose={() => setPrintTarget(null)}
+        />
       )}
     </div>
   );
