@@ -1,4 +1,5 @@
 import type { MosqueFieldVisit, MosqueFieldVisitItem } from '../api/mosques';
+import { isCarpetChecklistItem } from './carpetVisitStatus';
 
 export type MosqueNeedPreset = 'carpet' | 'air' | 'lighting' | 'cleaning' | 'quran' | 'custom' | 'all';
 export type MosqueNeedStatus = 'open' | 'resolved' | 'all';
@@ -79,10 +80,19 @@ const completedActionPattern = /(?:تم|تمت|جرى|انتهى من)\s+(?:تو
 
 const matchesPreset = (item: MosqueFieldVisitItem, preset: MosqueNeedPreset, query: string): boolean => {
   const descriptor = normalize([item.category, item.title, item.note, item.resolutionNote].join(' '));
-  if (preset === 'carpet') return isExplicitCarpetNeed([item.note, item.resolutionNote].join(' '))
-    || (isExplicitCarpetNeed(item.title) && item.status === 'needs_action');
+  if (preset === 'carpet') {
+    // The structured selection takes precedence over any older free-text note.
+    // It is stored in details and survives saving/reopening without a schema migration.
+    if (isCarpetChecklistItem(item) && item.details?.carpetAssessment === 'replace') return true;
+    if (isCarpetChecklistItem(item) && item.details?.carpetAssessment === 'clean') return false;
+    return isExplicitCarpetNeed([item.note, item.resolutionNote].join(' '))
+      || (isExplicitCarpetNeed(item.title) && item.status === 'needs_action');
+  }
   if (preset === 'custom') return Boolean(normalize(query)) && descriptor.includes(normalize(query));
   if (preset === 'all') return true;
+  // Changing the carpet is a supply/replacement need, not a cleaning service.
+  if (preset === 'cleaning' && isCarpetChecklistItem(item)
+    && item.details?.carpetAssessment === 'replace') return false;
   return needCategoryPatterns[preset].test(descriptor);
 };
 
