@@ -1,3 +1,4 @@
+import { reportPreparerName } from '../utils/reportAttribution';
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -814,10 +815,12 @@ export const MosqueDataCompletenessCenter: React.FC<MosqueDataCompletenessCenter
       ['التقرير', 'تقرير الأداء الشهري لمهام استكمال بيانات المساجد والمصليات'],
       ['الشهر', analytics.month],
       ['تاريخ الاستخراج', new Date().toLocaleString('ar-SA')],
+      ['أُعدّ بواسطة', reportPreparerName()],
       ['معيار KPI', analytics.kpiStandard.code],
       ['التقييم العام', kpiStatusLabel[analytics.unitKpi.status]],
       ['درجة KPI', analytics.unitKpi.score == null ? 'لا تتوفر بيانات كافية' : analytics.unitKpi.score + '/100'],
       [],
+      ['أُعدّ بواسطة', reportPreparerName()],
       ['المؤشر', 'القيمة'],
       ['مهام أنشئت خلال الشهر', analytics.summary.created],
       ['مهام أنجزت خلال الشهر', analytics.summary.completed],
