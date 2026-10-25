@@ -1,3 +1,4 @@
+import { reportPreparerName } from '../utils/reportAttribution';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
@@ -751,6 +752,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     const heading2 = page.createElement('h2');
     heading2.textContent = building.name || building.buildingNumber;
     page.body.appendChild(heading2);
+    const author = page.createElement('p');
+    author.textContent = 'أُعدّ بواسطة: ' + reportPreparerName();
+    author.style.cssText = 'color:#334155;font-size:13px;margin:0 0 14px';
+    page.body.appendChild(author);
     const table = page.createElement('table');
     table.style.cssText = 'width:100%;border-collapse:collapse;table-layout:fixed';
     buildingDetails(building).forEach(([label, value]) => {
