@@ -1020,6 +1020,19 @@ const followUpProgramReportColumns: ProgramReportColumnKey[] = [
   'visit_number', 'site', 'visit_scope', 'date', 'priority', 'open_items', 'women_open_items', 'urgent_items', 'overdue_items', 'workflow',
 ];
 
+const defaultFieldProgramReportTitle = 'تقرير البرنامج الميداني للمساجد والمصليات';
+const mosqueNeedReportTitles: Record<MosqueNeedPreset, string> = {
+  carpet: 'تقرير حصر احتياجات الفرش والسجاد بالمساجد والمصليات',
+  air: 'تقرير حصر احتياجات التكييف والتهوية بالمساجد والمصليات',
+  lighting: 'تقرير حصر احتياجات الإنارة والكهرباء بالمساجد والمصليات',
+  cleaning: 'تقرير حصر احتياجات النظافة بالمساجد والمصليات',
+  quran: 'تقرير حصر احتياجات المصاحف وتجهيزاتها بالمساجد والمصليات',
+  custom: 'تقرير حصر الاحتياجات الميدانية المخصصة بالمساجد والمصليات',
+  all: 'التقرير الشامل لحصر احتياجات المساجد والمصليات',
+};
+const isAutomaticMosqueReportTitle = (title: string) =>
+  title === defaultFieldProgramReportTitle || Object.values(mosqueNeedReportTitles).includes(title);
+
 type VisitReportColumnKey =
   | 'category'
   | 'title'
@@ -1170,7 +1183,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [visitPrintColumns, setVisitPrintColumns] = React.useState<VisitReportColumnKey[]>([...defaultVisitReportColumns]);
   const [preparingPrint, setPreparingPrint] = React.useState(false);
   const [programPrintDialog, setProgramPrintDialog] = React.useState(false);
-  const [programReportTitle, setProgramReportTitle] = React.useState('تقرير البرنامج الميداني للمساجد والمصليات');
+  const [programReportTitle, setProgramReportTitle] = React.useState(defaultFieldProgramReportTitle);
   const [programReportMode, setProgramReportMode] = React.useState<'visits' | 'needs'>('visits');
   const [programNeedPreset, setProgramNeedPreset] = React.useState<MosqueNeedPreset>('carpet');
   const [programNeedQuery, setProgramNeedQuery] = React.useState('');
@@ -3381,22 +3394,30 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                 setProgramNeedStatus('open');
                 setProgramNeedSiteType('');
                 setProgramNeedQuery('');
-                setProgramReportTitle('المساجد والمصليات التي تحتاج إلى فرش أو سجاد');
-              }}>تقرير سريع: احتياجات الفرش</Button>
+                setProgramReportTitle(mosqueNeedReportTitles.carpet);
+              }}>حصر احتياجات الفرش والسجاد</Button>
             </div>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              <button type="button" aria-pressed={programReportMode === 'visits'} onClick={() => setProgramReportMode('visits')}
+              <button type="button" aria-pressed={programReportMode === 'visits'} onClick={() => {
+                setProgramReportMode('visits');
+                setProgramReportTitle((current) =>
+                  isAutomaticMosqueReportTitle(current) ? defaultFieldProgramReportTitle : current);
+              }}
                 className={`rounded-lg border px-3 py-2 text-right text-sm font-bold ${programReportMode === 'visits' ? 'border-sky-600 bg-sky-50 text-sky-900' : 'border-slate-300 bg-white text-slate-600'}`}>
                 <ClipboardList className="ml-2 inline h-4 w-4" />تقرير الزيارات المعتاد
               </button>
-              <button type="button" aria-pressed={programReportMode === 'needs'} onClick={() => setProgramReportMode('needs')}
+              <button type="button" aria-pressed={programReportMode === 'needs'} onClick={() => {
+                setProgramReportMode('needs');
+                setProgramReportTitle((current) =>
+                  isAutomaticMosqueReportTitle(current) ? mosqueNeedReportTitles[programNeedPreset] : current);
+              }}
                 className={`rounded-lg border px-3 py-2 text-right text-sm font-bold ${programReportMode === 'needs' ? 'border-emerald-600 bg-emerald-100 text-emerald-950' : 'border-slate-300 bg-white text-slate-600'}`}>
                 <Search className="ml-2 inline h-4 w-4" />تقرير الاحتياجات حسب المواقع
               </button>
             </div>
           </div>
           <Field label="عنوان التقرير / اسم الجدول">
-            <Input value={programReportTitle} onChange={(event) => setProgramReportTitle(event.target.value)} placeholder="مثال: المساجد والمصليات التي تحتاج إلى فرش" autoFocus />
+            <Input value={programReportTitle} onChange={(event) => setProgramReportTitle(event.target.value)} placeholder="مثال: تقرير حصر احتياجات الفرش والسجاد بالمساجد والمصليات" autoFocus />
           </Field>
           {programReportMode === 'needs' && (
             <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
@@ -3406,7 +3427,12 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <Field label="نوع الاحتياج">
-                  <NativeSelect value={programNeedPreset} onChange={(event) => setProgramNeedPreset(event.target.value as MosqueNeedPreset)}>
+                  <NativeSelect value={programNeedPreset} onChange={(event) => {
+                    const nextPreset = event.target.value as MosqueNeedPreset;
+                    setProgramNeedPreset(nextPreset);
+                    setProgramReportTitle((current) =>
+                      isAutomaticMosqueReportTitle(current) ? mosqueNeedReportTitles[nextPreset] : current);
+                  }}>
                     {mosqueNeedPresets.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
                   </NativeSelect>
                 </Field>
