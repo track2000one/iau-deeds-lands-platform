@@ -61,6 +61,14 @@ import { Progress } from './ui/progress';
 import { Textarea } from './ui/textarea';
 import { appendExcelReportSheet, excelReportDateStamp, writeProfessionalExcel } from '../utils/excelReport';
 import {
+  buildMosqueNeedSummaries,
+  mosqueNeedPresets,
+  openMosqueNeedReport,
+  type MosqueNeedPreset,
+  type MosqueNeedStatus,
+  type MosqueNeedSort,
+} from '../utils/mosqueProgramNeedsReport';
+import {
   clearFieldVisitDraft,
   compressFieldVisitImage,
   deletePendingFieldVisitMedia,
@@ -1163,6 +1171,12 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [preparingPrint, setPreparingPrint] = React.useState(false);
   const [programPrintDialog, setProgramPrintDialog] = React.useState(false);
   const [programReportTitle, setProgramReportTitle] = React.useState('تقرير البرنامج الميداني للمساجد والمصليات');
+  const [programReportMode, setProgramReportMode] = React.useState<'visits' | 'needs'>('visits');
+  const [programNeedPreset, setProgramNeedPreset] = React.useState<MosqueNeedPreset>('carpet');
+  const [programNeedQuery, setProgramNeedQuery] = React.useState('');
+  const [programNeedStatus, setProgramNeedStatus] = React.useState<MosqueNeedStatus>('open');
+  const [programNeedSiteType, setProgramNeedSiteType] = React.useState('');
+  const [programNeedSort, setProgramNeedSort] = React.useState<MosqueNeedSort>('priority');
   const [programPrintColumns, setProgramPrintColumns] = React.useState<ProgramReportColumnKey[]>([...defaultProgramReportColumns]);
   const [visitForm, setVisitForm] = React.useState<VisitForm>(() => emptyVisit([], currentUsername));
   const [uploadingKey, setUploadingKey] = React.useState('');
@@ -1272,6 +1286,17 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     });
   }, [visits, search, siteFilter, statusFilter, visitTypeFilter, visitScopeFilter, overallFilter, priorityFilter, issueFilter, dateFromFilter, dateToFilter, sortBy, sortDirection]);
 
+  const programNeedSummaries = React.useMemo(
+    () => buildMosqueNeedSummaries(filteredVisits, {
+      preset: programNeedPreset,
+      query: programNeedQuery,
+      state: programNeedStatus,
+      siteType: programNeedSiteType,
+      sort: programNeedSort,
+    }),
+    [filteredVisits, programNeedPreset, programNeedQuery, programNeedStatus, programNeedSiteType, programNeedSort],
+  );
+  const programNeedFindings = programNeedSummaries.reduce((total, row) => total + row.evidence.length, 0);
   const activeFilterCount = [search, siteFilter, statusFilter, visitTypeFilter, visitScopeFilter, overallFilter, priorityFilter, issueFilter, dateFromFilter, dateToFilter]
     .filter((value) => Boolean(String(value || '').trim())).length;
 
@@ -2660,6 +2685,37 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
   };
 
   const exportProgramExcel = async () => {
+    if (programReportMode === 'needs') {
+      if (!programNeedSummaries.length) return toast.info('لا توجد مواقع لديها احتياجات مطابقة لمعايير التقرير');
+      const workbook = XLSX.utils.book_new();
+      const exportTitle = programReportTitle.trim() || 'تقرير احتياجات المساجد والمصليات';
+      appendExcelReportSheet(workbook, 'ملخص الاحتياجات', [{
+        'عنوان التقرير': exportTitle,
+        'نوع الاحتياج': mosqueNeedPresets.find((preset) => preset.value === programNeedPreset)?.label || '-',
+        'حالة الاحتياج': programNeedStatus === 'open' ? 'احتياج قائم' : programNeedStatus === 'resolved' ? 'تمت المعالجة' : 'جميع الحالات',
+        'عدد المواقع': programNeedSummaries.length,
+        'عدد الاحتياجات': programNeedFindings,
+        'تاريخ التصدير': new Date().toLocaleString('ar-SA-u-ca-gregory'),
+      }]);
+      appendExcelReportSheet(workbook, 'المواقع التي تحتاج معالجة', programNeedSummaries.map((row, index) => ({
+        'م': index + 1,
+        'المسجد / المصلى': row.siteName,
+        'نوع الموقع': row.siteType === 'jami' ? 'جامع' : row.siteType === 'mosque' ? 'مسجد' : 'مصلى',
+        'الاحتياج': row.evidence.map((entry) => entry.itemTitle).join('؛ '),
+        'الملاحظات الميدانية': row.evidence.map((entry) => entry.note).join('؛ '),
+        'عدد الاحتياجات': row.evidence.length,
+        'الأولوية': priorityLabels[row.priority] || row.priority,
+        'رقم أحدث زيارة': row.latestVisit,
+        'تاريخ الزيارة': new Date(row.latestDate).toLocaleDateString('ar-SA-u-ca-gregory'),
+      })));
+      await writeProfessionalExcel(workbook, `mosque-needs-${excelReportDateStamp()}.xlsx`, {
+        title: exportTitle,
+        subtitle: `المواقع: ${programNeedSummaries.length} — البنود: ${programNeedFindings}`,
+        orientation: 'landscape',
+      });
+      toast.success('تم تصدير تقرير الاحتياجات حسب المواقع بصيغة Excel');
+      return;
+    }
     if (!filteredVisits.length) return toast.info('لا توجد زيارات مطابقة لمعايير التقرير');
     const openCount = (visit: MosqueFieldVisit) => visit.items.filter((item) => item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
     const urgentCount = (visit: MosqueFieldVisit) => visit.items.filter((item) => item.priority === 'urgent' && item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
@@ -2914,6 +2970,22 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
 
   const printProgramReport = () => {
     const reportTitle = programReportTitle.trim() || 'تقرير البرنامج الميداني للمساجد والمصليات';
+    if (programReportMode === 'needs') {
+      if (!programNeedSummaries.length) {
+        return toast.info('لم تُعثر على احتياجات مدوّنة تطابق التصفية الحالية. تحقّق من بنود الفحص والملاحظات.');
+      }
+      const criteria = [
+        mosqueNeedPresets.find((preset) => preset.value === programNeedPreset)?.label || '-',
+        programNeedPreset === 'custom' ? programNeedQuery.trim() : '',
+        programNeedStatus === 'open' ? 'الاحتياجات القائمة' : programNeedStatus === 'resolved' ? 'المعالجة' : 'كل الحالات',
+        programNeedSiteType === 'mosque' ? 'المساجد فقط' : programNeedSiteType === 'jami' ? 'الجوامع فقط' : programNeedSiteType === 'prayer_room' ? 'المصليات فقط' : 'جميع أنواع المواقع',
+      ].filter(Boolean).join(' — ');
+      if (!openMosqueNeedReport(programNeedSummaries, reportTitle, criteria)) {
+        return toast.error('تعذر فتح التقرير. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.');
+      }
+      setProgramPrintDialog(false);
+      return;
+    }
     const openCount = (visit: MosqueFieldVisit) => visit.items.filter((item) => item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
     const urgentCount = (visit: MosqueFieldVisit) => visit.items.filter((item) => item.priority === 'urgent' && item.status === 'needs_action' && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
     const overdueCount = (visit: MosqueFieldVisit) => visit.items.filter((item) => item.status === 'needs_action' && item.dueDate && new Date(item.dueDate).getTime() < Date.now() && !['resolved', 'closed'].includes(item.resolutionStatus)).length;
@@ -3300,11 +3372,81 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
           <DialogDescription>حدد عنوان التقرير ومعايير الفرز والتصفية والأعمدة التي تريد ظهورها في الجدول قبل الانتقال إلى الطباعة. يتم تحديث عدد النتائج مباشرة.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <b className="text-sm text-emerald-950">نوع التقرير</b>
+              <Button type="button" size="sm" variant="outline" className="border-emerald-300 text-emerald-900" onClick={() => {
+                setProgramReportMode('needs');
+                setProgramNeedPreset('carpet');
+                setProgramNeedStatus('open');
+                setProgramNeedSiteType('');
+                setProgramNeedQuery('');
+                setProgramReportTitle('المساجد والمصليات التي تحتاج إلى فرش أو سجاد');
+              }}>تقرير سريع: احتياجات الفرش</Button>
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <button type="button" aria-pressed={programReportMode === 'visits'} onClick={() => setProgramReportMode('visits')}
+                className={`rounded-lg border px-3 py-2 text-right text-sm font-bold ${programReportMode === 'visits' ? 'border-sky-600 bg-sky-50 text-sky-900' : 'border-slate-300 bg-white text-slate-600'}`}>
+                <ClipboardList className="ml-2 inline h-4 w-4" />تقرير الزيارات المعتاد
+              </button>
+              <button type="button" aria-pressed={programReportMode === 'needs'} onClick={() => setProgramReportMode('needs')}
+                className={`rounded-lg border px-3 py-2 text-right text-sm font-bold ${programReportMode === 'needs' ? 'border-emerald-600 bg-emerald-100 text-emerald-950' : 'border-slate-300 bg-white text-slate-600'}`}>
+                <Search className="ml-2 inline h-4 w-4" />تقرير الاحتياجات حسب المواقع
+              </button>
+            </div>
+          </div>
           <Field label="عنوان التقرير / اسم الجدول">
-            <Input value={programReportTitle} onChange={(event) => setProgramReportTitle(event.target.value)} placeholder="مثال: جدول الزيارات الميدانية لمساجد الحرم الشرقي" autoFocus />
+            <Input value={programReportTitle} onChange={(event) => setProgramReportTitle(event.target.value)} placeholder="مثال: المساجد والمصليات التي تحتاج إلى فرش" autoFocus />
           </Field>
+          {programReportMode === 'needs' && (
+            <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <b className="text-sm text-amber-950">تصفية الاحتياجات المدونة ميدانيًا</b>
+                <Badge variant="outline" className="border-amber-300 bg-white text-amber-900">{programNeedSummaries.length} موقع · {programNeedFindings} احتياج</Badge>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="نوع الاحتياج">
+                  <NativeSelect value={programNeedPreset} onChange={(event) => setProgramNeedPreset(event.target.value as MosqueNeedPreset)}>
+                    {mosqueNeedPresets.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
+                  </NativeSelect>
+                </Field>
+                <Field label="حالة الاحتياج">
+                  <NativeSelect value={programNeedStatus} onChange={(event) => setProgramNeedStatus(event.target.value as MosqueNeedStatus)}>
+                    <option value="open">احتياجات قائمة / لم تُغلق</option>
+                    <option value="resolved">تمت معالجتها</option>
+                    <option value="all">جميع الحالات المسجلة</option>
+                  </NativeSelect>
+                </Field>
+                <Field label="نوع الموقع">
+                  <NativeSelect value={programNeedSiteType} onChange={(event) => setProgramNeedSiteType(event.target.value)}>
+                    <option value="">جميع المساجد والمصليات</option>
+                    <option value="jami">الجوامع</option>
+                    <option value="mosque">المساجد</option>
+                    <option value="prayer_room">المصليات</option>
+                  </NativeSelect>
+                </Field>
+                <Field label="ترتيب تقرير الاحتياجات">
+                  <NativeSelect value={programNeedSort} onChange={(event) => setProgramNeedSort(event.target.value as MosqueNeedSort)}>
+                    <option value="priority">الأولوية الأعلى أولًا</option>
+                    <option value="site">اسم الموقع</option>
+                    <option value="date">أحدث زيارة أولًا</option>
+                  </NativeSelect>
+                </Field>
+                {programNeedPreset === 'custom' && <div className="sm:col-span-2">
+                  <Field label="الكلمة أو عبارة الاحتياج">
+                    <Input value={programNeedQuery} onChange={(event) => setProgramNeedQuery(event.target.value)} placeholder="مثال: دورات المياه، تسرب، سماعات..." />
+                  </Field>
+                </div>}
+              </div>
+              <p className="text-xs leading-6 text-amber-950">
+                يعرض التقرير موقعًا واحدًا لكل مسجد أو مصلى، مع تفاصيل الاحتياجات المرتبطة بأحدث التقييمات المسجلة.
+                في قالب الفرش لا يُعتبر بند «نظافة السجاد والأرضيات» وحده إثباتًا للحاجة إلى فرش جديد؛ يلزم وجود طلب توريد أو تغيير أو استبدال مذكور في الملاحظات أو التوصيات.
+              </p>
+              {!programNeedSummaries.length && <p role="status" className="rounded-lg border border-amber-300 bg-white p-2 text-xs font-semibold text-amber-900">لم تُسجل احتياجات مطابقة للشروط الحالية. يمكنك تغيير النوع أو حالة الاحتياج أو التحقق من تدوين الملاحظة في الزيارات.</p>}
+            </section>
+          )}
           <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
-            <div className="mb-3 flex items-center justify-between"><b className="text-sm text-slate-800">الفرز والتصفية</b><Badge variant="outline">{filteredVisits.length} زيارة</Badge></div>
+            <div className="mb-3 flex items-center justify-between"><b className="text-sm text-slate-800">الفرز والتصفية {programReportMode === 'needs' ? 'الإضافية' : ''}</b><Badge variant="outline">{filteredVisits.length} زيارة في نطاق البحث</Badge></div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <NativeSelect value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)}><option value="">جميع المواقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect>
               <NativeSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">جميع حالات الزيارة</option>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect>
@@ -3320,7 +3462,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
             </div>
             <div className="mt-3 flex items-center justify-between gap-2 border-t border-sky-100 pt-3"><span className="text-xs text-slate-600">{activeFilterCount ? 'تم تطبيق ' + activeFilterCount + ' معيار تصفية.' : 'سيتم تضمين جميع الزيارات.'}</span><Button type="button" size="sm" variant="outline" onClick={resetVisitFilters}>إعادة ضبط</Button></div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          {programReportMode === 'visits' && <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               <div><b className="text-sm text-slate-800">الأعمدة الظاهرة في جدول الطباعة</b><p className="mt-1 text-[11px] text-slate-500">اختر الأعمدة التي يحتاجها التقرير فقط. عمود التسلسل «م» يظهر تلقائيًا، وترتيب الأعمدة يبقى بالترتيب القياسي.</p></div>
               <Badge variant="outline">{programPrintColumns.length} عمود مختار</Badge>
@@ -3337,9 +3479,9 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                 return <button key={column.key} type="button" aria-pressed={selected} className={`flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-right text-xs font-semibold transition ${selected ? 'border-sky-300 bg-sky-50 text-sky-800 shadow-sm' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'}`} onClick={() => setProgramPrintColumns((current) => current.includes(column.key) ? (current.length === 1 ? current : current.filter((key) => key !== column.key)) : [...current, column.key])}><span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] ${selected ? 'border-sky-500 bg-sky-600 text-white' : 'border-slate-300 bg-white text-transparent'}`}>✓</span><span>{column.label}</span></button>;
               })}
             </div>
-          </div>
+          </div>}
         </div>
-        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setProgramPrintDialog(false)}>إلغاء</Button><Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={exportProgramExcel} disabled={!filteredVisits.length}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />Excel + الصور</Button><Button onClick={printProgramReport} disabled={!filteredVisits.length}><Printer className="ml-2 h-4 w-4" />متابعة إلى الطباعة</Button></DialogFooter>
+        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setProgramPrintDialog(false)}>إلغاء</Button><Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={exportProgramExcel} disabled={programReportMode === 'needs' ? !programNeedSummaries.length : !filteredVisits.length}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />{programReportMode === 'needs' ? 'Excel للاحتياجات' : 'Excel + الصور'}</Button><Button onClick={printProgramReport} disabled={programReportMode === 'needs' ? !programNeedSummaries.length : !filteredVisits.length}><Printer className="ml-2 h-4 w-4" />متابعة إلى الطباعة</Button></DialogFooter>
       </DialogContent>
     </Dialog>
 
