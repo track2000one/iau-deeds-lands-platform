@@ -1,3 +1,4 @@
+import { reportPreparerHtml } from './reportAttribution';
 import type { InspectionAttachment, SiteInspection } from '../../types/siteInspection';
 import { authenticatedFetch } from '../../lib/http';
 
@@ -173,7 +174,7 @@ const renderReport = (records: SiteInspection[], options: SiteInspectionTablePri
   const unavailable = photos.filter((photo) => !photo.image).length;
   const photoNotice = unavailable ? ' — عدد الصور التي تعذر تحميلها: ' + unavailable : '';
   return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><title>' + escapeHtml(options.title) +
-    '</title><style>' + style + '</style></head><body>' +
+    '</title><style>' + style + '</style></head><body>' + reportPreparerHtml() +
     '<div class="toolbar"><strong>معاينة التقرير الجدولي — تأكد من الصور قبل الطباعة' + escapeHtml(photoNotice) +
     '</strong><button type="button" onclick="window.print()">طباعة / حفظ PDF</button></div>' +
     '<main><header class="header"><div class="header-main"><div class="university">جامعة الإمام عبدالرحمن بن فيصل</div>' +
