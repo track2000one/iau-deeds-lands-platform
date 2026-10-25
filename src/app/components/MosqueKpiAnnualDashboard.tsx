@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { reportPreparerName } from '../utils/reportAttribution';
 import { toast } from 'sonner';
 import {
   Award,
@@ -320,6 +321,7 @@ export const MosqueKpiAnnualDashboard: React.FC = () => {
 
     const executive = [
       ['التقرير', 'التقرير السنوي التنفيذي لمؤشرات أداء استكمال بيانات المساجد والمصليات'],
+      ['أُعدّ بواسطة', reportPreparerName()],
       ['السنة', selectedYear],
       ['عدد الأشهر الرسمية', annualSummary.officialMonths],
       ['متوسط KPI السنوي', annualSummary.avgScore == null ? 'غير مقاس' : annualSummary.avgScore + '/100'],
