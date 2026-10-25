@@ -11,7 +11,7 @@ export const mosqueNeedPresets: { value: MosqueNeedPreset; label: string }[] = [
   { value: 'cleaning', label: 'النظافة' },
   { value: 'quran', label: 'المصاحف والتجهيزات المرتبطة بها' },
   { value: 'custom', label: 'بحث بكلمة أو احتياج مخصص' },
-  { value: 'all', label: 'جميع بنود الاحتياج' },
+  { value: 'all', label: 'جميع أنواع الاحتياج' },
 ];
 
 export type MosqueNeedEvidence = {
@@ -65,17 +65,35 @@ const matchesState = (item: MosqueFieldVisitItem, state: MosqueNeedStatus) =>
   (item.status === 'needs_action' || item.status === 'not_available')
   && (state === 'all' || (state === 'open' ? !isResolved(item) : isResolved(item)));
 
+// The same definitions power every category in the dropdown, including items written
+// in free-text notes. A category name alone does not turn a good item into an unmet need.
+const needCategoryPatterns: Record<Exclude<MosqueNeedPreset, 'carpet' | 'custom' | 'all'>, RegExp> = {
+  air: /(?:تكييف|تهويه|مكيف|تبريد|مراوح)/,
+  lighting: /(?:اناره|كهرباء|اضاءه|مصابيح|لمبات|اسلاك)/,
+  cleaning: /(?:نظافه|تنظيف|اتساخ|غسيل|اوساخ|مخلفات)/,
+  quran: /(?:مصاحف|مصحف|قران|رفوف المصاحف|حوامل المصاحف)/,
+};
+const actionOrNeedPattern = /(?:يحتاج|تحتاج|نحتاج|بحاجه|حاجه الي|مطلوب|يتطلب|يلزم|ضروره|نقص|ناقص|غير متوفر|غير صالح|لا يوجد|لا يعمل|لا تعمل|معطل|عطل|خلل|تالف|متهالك|ضعيف|انقطاع|توفير|تامين|شراء|توريد|تغيير|استبدال|صيانه|اصلاح|تجديد|تركيب|تزويد|سحب|ازاله|معالجه)/;
+const completedActionPattern = /(?:تم|تمت|جرى|انتهى من)\s+(?:توفير|تامين|شراء|توريد|تغيير|استبدال|صيانه|اصلاح|تجديد|تركيب|تزويد|سحب|ازاله|تنظيف|غسيل|معالجه)/;
+
 const matchesPreset = (item: MosqueFieldVisitItem, preset: MosqueNeedPreset, query: string): boolean => {
   const descriptor = normalize([item.category, item.title, item.note, item.resolutionNote].join(' '));
-  const noteText = normalize([item.note, item.resolutionNote, item.title].join(' '));
   if (preset === 'carpet') return isExplicitCarpetNeed([item.note, item.resolutionNote].join(' '))
     || (isExplicitCarpetNeed(item.title) && item.status === 'needs_action');
   if (preset === 'custom') return Boolean(normalize(query)) && descriptor.includes(normalize(query));
-  if (preset === 'air') return /(?:تكييف|تهويه|مكيف|تبريد)/.test(descriptor);
-  if (preset === 'lighting') return /(?:اناره|كهرباء|اضاءه|مصابيح)/.test(descriptor);
-  if (preset === 'cleaning') return /(?:نظافه|تنظيف|اتساخ|غسيل)/.test(descriptor);
-  if (preset === 'quran') return /(?:مصاحف|مصحف|قران|رفوف المصاحف|حوامل المصاحف)/.test(descriptor);
-  return preset === 'all' || Boolean(noteText);
+  if (preset === 'all') return true;
+  return needCategoryPatterns[preset].test(descriptor);
+};
+
+// General visit recommendations are not checklist findings. Include a recommendation
+// only when it explicitly describes an outstanding need in the chosen category.
+const matchesVisitRecommendation = (note: unknown, preset: MosqueNeedPreset, query: string): boolean => {
+  const text = normalize(note);
+  if (!text || completedActionPattern.test(text) || !actionOrNeedPattern.test(text)) return false;
+  if (preset === 'carpet') return isExplicitCarpetNeed(text);
+  if (preset === 'custom') return Boolean(normalize(query)) && text.includes(normalize(query));
+  if (preset === 'all') return true;
+  return needCategoryPatterns[preset].test(text);
 };
 
 const visitDateMillis = (visit: MosqueFieldVisit) => {
@@ -131,22 +149,27 @@ export const buildMosqueNeedSummaries = (
     });
   }
 
-  // A field team may write "يحتاج الموقع إلى فرش" in the visit's free-text
-  // recommendation, without creating a matching checklist item.
-  if (options.preset === 'carpet' && options.state !== 'resolved') {
+  // A site may have a documented supply/repair need in the visit's written
+  // recommendation instead of a checklist item. Apply this equally to every
+  // need category, without confusing a completed action with an open request.
+  // Resolved-only reports rely on explicitly resolved checklist records.
+  if (options.state !== 'resolved') {
     for (const visit of latestTextBySection.values()) {
-      const recordedNotes = [visit.recommendations, visit.generalNotes].filter((value) => isExplicitCarpetNeed(value));
+      const recordedNotes = [visit.recommendations, visit.generalNotes]
+        .filter((value) => matchesVisitRecommendation(value, options.preset, options.query));
       if (!recordedNotes.length) continue;
       const alreadyIncluded = evidence.some((item) =>
         item.siteId === visit.siteId && item.visitScope === (visit.visitScope || 'whole_site')
-        && visitDateMillis(visit) <= new Date(item.visitDate).getTime()
+        && item.visitNumber === visit.visitNumber
+        && recordedNotes.some((note) => normalize(item.note).includes(normalize(note)))
       );
       if (alreadyIncluded) continue;
       evidence.push({
         siteId: visit.siteId, siteName: visit.site.name, siteType: visit.site.siteType,
         visitNumber: visit.visitNumber, visitDate: visit.visitDate,
         visitScope: visit.visitScope || 'whole_site',
-        itemTitle: 'احتياج فرش وارد في ملاحظات الزيارة',
+        itemTitle: options.preset === 'all' ? 'احتياج وارد في ملاحظات الزيارة'
+          : mosqueNeedPresets.find((preset) => preset.value === options.preset)?.label || 'احتياج ميداني',
         category: 'توصية ميدانية',
         note: recordedNotes.join('؛ '),
         priority: visit.priority || 'normal',
@@ -204,7 +227,7 @@ export const createMosqueNeedReportHtml = (
 ): string => {
   const body = rows.map((row, idx) => {
     const detail = row.evidence.map((item) =>
-      '<div class="finding"><b>' + escapeHtml(item.itemTitle) + '</b>: ' + escapeHtml(item.note) +
+      '<div class="finding"><b>' + escapeHtml(item.category) + ' — ' + escapeHtml(item.itemTitle) + '</b>: ' + escapeHtml(item.note) +
       '<small>النطاق: ' + escapeHtml(item.visitScope === 'women_section' ? 'مصلى النساء' : item.visitScope === 'men_section' ? 'قسم الرجال' : 'الموقع بالكامل') +
       ' — حالة المعالجة: ' + escapeHtml(labels[item.resolutionStatus] || item.resolutionStatus) + '</small></div>'
     ).join('');
