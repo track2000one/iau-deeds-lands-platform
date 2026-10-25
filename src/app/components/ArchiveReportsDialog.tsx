@@ -1,3 +1,5 @@
+import { reportPreparerName } from '../utils/reportAttribution';
+import { withReportPreparer } from '../utils/reportAttribution';
 import React, { useMemo, useState } from 'react';
 import ExcelJS from 'exceljs';
 import {
@@ -356,10 +358,10 @@ export const ArchiveReportsDialog: React.FC<ArchiveReportsDialogProps> = ({ docu
     }
 
     const rows = filtered.map((doc) => `<tr>${activeColumns.map((column) => `<td>${escapeHtml(valueForColumn(doc, column.key))}</td>`).join('')}</tr>`).join('');
-    popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(reportTitle)}</title><style>
+    popup.document.write(withReportPreparer(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(reportTitle)}</title><style>
       @page{size:${paperSize} ${orientation};margin:10mm}*{box-sizing:border-box}body{font-family:Arial,Tahoma,sans-serif;color:#172033;margin:0;font-size:${compact ? '10px' : '11px'}}
       .head{border:1px solid #cbd5e1;border-radius:12px;padding:14px;margin-bottom:10px;background:#f8fafc}.uni{font-size:11px;color:#0f766e;font-weight:700}.title{font-size:22px;font-weight:800;color:#123047;margin:5px 0}.meta{color:#64748b;line-height:1.8}.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:10px 0}.metric{border:1px solid #cbd5e1;border-radius:8px;padding:7px;text-align:center;background:#fff}.metric b{display:block;font-size:16px;color:#0369a1}.filters{background:#e0f2fe;border:1px solid #bae6fd;padding:7px 10px;border-radius:8px;margin:8px 0;line-height:1.7}table{width:100%;border-collapse:collapse;table-layout:auto}th{background:#123047;color:white;font-weight:700;padding:${compact ? '6px' : '8px'};border:1px solid #94a3b8}td{padding:${compact ? '5px' : '7px'};border:1px solid #cbd5e1;vertical-align:top;word-break:break-word}tbody tr:nth-child(even){background:#f8fafc}.footer{margin-top:10px;color:#64748b;font-size:9px;text-align:left}@media print{.no-print{display:none!important}.head{break-inside:avoid}tr{break-inside:avoid}}
-    </style></head><body><div class="head"><div class="uni">جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الأصول والأملاك والأوقاف الجامعية</div><div class="title">${escapeHtml(reportTitle)}</div><div class="meta">تاريخ الاستخراج: ${escapeHtml(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</div><div class="filters"><b>معايير التقرير:</b> ${escapeHtml(filterSummary())}</div><div class="metrics"><div class="metric">النتائج<b>${metrics.count}</b></div><div class="metric">الحجم<b>${escapeHtml(formatFileSize(metrics.bytes))}</b></div><div class="metric">سري<b>${metrics.confidential}</b></div><div class="metric">بيانات ناقصة<b>${metrics.incomplete}</b></div><div class="metric">أرقام مكررة<b>${metrics.duplicated}</b></div></div></div><table><thead><tr>${activeColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table><div class="footer">تقرير مولد من الأرشفة الإلكترونية — ${metrics.count} سجل</div><script>window.onload=()=>setTimeout(()=>window.print(),250);<\/script></body></html>`);
+    </style></head><body><div class="head"><div class="uni">جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الأصول والأملاك والأوقاف الجامعية</div><div class="title">${escapeHtml(reportTitle)}</div><div class="meta">تاريخ الاستخراج: ${escapeHtml(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</div><div class="filters"><b>معايير التقرير:</b> ${escapeHtml(filterSummary())}</div><div class="metrics"><div class="metric">النتائج<b>${metrics.count}</b></div><div class="metric">الحجم<b>${escapeHtml(formatFileSize(metrics.bytes))}</b></div><div class="metric">سري<b>${metrics.confidential}</b></div><div class="metric">بيانات ناقصة<b>${metrics.incomplete}</b></div><div class="metric">أرقام مكررة<b>${metrics.duplicated}</b></div></div></div><table><thead><tr>${activeColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table><div class="footer">تقرير مولد من الأرشفة الإلكترونية — ${metrics.count} سجل</div><script>window.onload=()=>setTimeout(()=>window.print(),250);<\/script></body></html>`));
     popup.document.close();
   };
 
@@ -389,6 +391,7 @@ export const ArchiveReportsDialog: React.FC<ArchiveReportsDialogProps> = ({ docu
       summary.getRow(1).height = 34;
       const summaryRows: Array<[string, string | number]> = [
         ['تاريخ الاستخراج', new Date().toLocaleString('ar-SA-u-ca-gregory')],
+        ['أُعدّ بواسطة', reportPreparerName()],
         ['معايير التقرير', filterSummary()],
         ['عدد النتائج', metrics.count],
         ['إجمالي الحجم', formatFileSize(metrics.bytes)],

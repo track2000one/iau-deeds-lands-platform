@@ -1,3 +1,5 @@
+import { reportPreparerName } from '../utils/reportAttribution';
+import { withReportPreparer } from '../utils/reportAttribution';
 import React, { useMemo, useState } from 'react';
 import ExcelJS from 'exceljs';
 import {
@@ -434,7 +436,7 @@ export const ArchivedTransactionsReportsDialog: React.FC<Props> = ({
       )
       .join('');
 
-    popup.document.write(`<!doctype html>
+    popup.document.write(withReportPreparer(`<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8" />
@@ -484,7 +486,7 @@ ${attachmentAppendixHtml()}
 <div class="footer">تقرير مرن للمعاملات المؤرشفة — ${filtered.length} معاملة — ${attachmentCount} مرفق</div>
 <script>window.onload=()=>setTimeout(()=>window.print(),250);<\/script>
 </body>
-</html>`);
+</html>`));
     popup.document.close();
   };
 
@@ -517,6 +519,7 @@ ${attachmentAppendixHtml()}
 
       const summaryRows: Array<[string, string | number]> = [
         ['تاريخ الاستخراج', new Date().toLocaleString('ar-SA-u-ca-gregory')],
+        ['أُعدّ بواسطة', reportPreparerName()],
         ['معايير التقرير', filterSummary()],
         ['عدد المعاملات', filtered.length],
         ['المعاملات ذات المرفقات', withAttachments],

@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { apiJson } from '../lib/http';
 import { authStorage } from '../lib/authStorage';
+import { setActiveReportPreparer } from '../app/utils/reportAttribution';
 import type {
   UserPermissions,
   UserProfile,
@@ -103,6 +104,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Keep printed and exported reports attributed to the logged-in account.
+  // Never take this value from record owner fields or editable report forms.
+  useEffect(() => {
+    setActiveReportPreparer(userProfile?.username || null);
+    return () => setActiveReportPreparer(null);
+  }, [userProfile?.username]);
 
   const currentUser = useMemo<CurrentUser | null>(() => {
     if (!userProfile) return null;

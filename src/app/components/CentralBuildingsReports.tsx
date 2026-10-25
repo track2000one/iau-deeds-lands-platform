@@ -1,3 +1,4 @@
+import { withReportPreparer, reportPreparerName } from '../utils/reportAttribution';
 import React, { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { BarChart3, Download, Printer, Search, SlidersHorizontal } from 'lucide-react';
@@ -142,6 +143,14 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
     const worksheet = XLSX.utils.json_to_sheet(rows, { header: chosen.map((column) => column.label) });
     worksheet['!cols'] = chosen.map((column) => ({ wch: column.width }));
     const workbook = XLSX.utils.book_new();
+    const infoSheet = XLSX.utils.aoa_to_sheet([
+      ['معلومات التقرير', 'القيمة'],
+      ['أُعدّ بواسطة', reportPreparerName()],
+      ['تاريخ الاستخراج', new Date().toLocaleString('ar-SA-u-ca-gregory')],
+      ['عدد النتائج', filtered.length],
+    ]);
+    infoSheet['!cols'] = [{ wch: 28 }, { wch: 46 }];
+    XLSX.utils.book_append_sheet(workbook, infoSheet, 'معلومات التقرير');
     XLSX.utils.book_append_sheet(workbook, worksheet, 'تقرير المباني');
     XLSX.writeFile(workbook, `تقرير-السجل-المركزي-للمباني-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
@@ -151,7 +160,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
     const popup = window.open('', '_blank', 'noopener,noreferrer,width=1400,height=900');
     if (!popup) return;
     const rows = filtered.map((building) => `<tr>${chosen.map((column) => `<td>${escapeHtml(cellValue(building, column.key))}</td>`).join('')}</tr>`).join('');
-    popup.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير السجل المركزي للمباني</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:24px;color:#172033}h1{font-size:22px;margin:0 0 8px}.meta{color:#667085;font-size:12px;margin-bottom:18px}.stats{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}.stat{border:1px solid #d7dee8;border-radius:10px;padding:8px 12px;font-size:12px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #d8dee8;padding:7px;text-align:right}th{background:#eef5f7;font-weight:700}@media print{body{padding:0}.no-print{display:none}table{font-size:9px}}</style></head><body><div class="no-print" style="margin-bottom:12px"><button onclick="window.print()">طباعة / حفظ PDF</button></div><h1>تقرير السجل المركزي للمباني</h1><div class="meta">تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</div><div class="stats"><span class="stat">النتائج: ${summary.total}</span><span class="stat">المعتمد: ${summary.approved}</span><span class="stat">المعلق: ${summary.pending}</span><span class="stat">بإحداثيات: ${summary.coordinates}</span></div><table><thead><tr>${chosen.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></body></html>`);
+    popup.document.write(withReportPreparer(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير السجل المركزي للمباني</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:24px;color:#172033}h1{font-size:22px;margin:0 0 8px}.meta{color:#667085;font-size:12px;margin-bottom:18px}.stats{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}.stat{border:1px solid #d7dee8;border-radius:10px;padding:8px 12px;font-size:12px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #d8dee8;padding:7px;text-align:right}th{background:#eef5f7;font-weight:700}@media print{body{padding:0}.no-print{display:none}table{font-size:9px}}</style></head><body><div class="no-print" style="margin-bottom:12px"><button onclick="window.print()">طباعة / حفظ PDF</button></div><h1>تقرير السجل المركزي للمباني</h1><div class="meta">تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</div><div class="stats"><span class="stat">النتائج: ${summary.total}</span><span class="stat">المعتمد: ${summary.approved}</span><span class="stat">المعلق: ${summary.pending}</span><span class="stat">بإحداثيات: ${summary.coordinates}</span></div><table><thead><tr>${chosen.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></body></html>`));
     popup.document.close();
     popup.focus();
   };
