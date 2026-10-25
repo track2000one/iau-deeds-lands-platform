@@ -1,3 +1,4 @@
+import { reportPreparerName } from '../utils/reportAttribution';
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
@@ -2360,7 +2361,7 @@ export const TransactionFollowUpPage: React.FC = () => {
 
       sheet.mergeCells(`A4:${lastColumnLetter}4`);
       sheet.getCell('A4').value =
-        `الفترة: ${formatDate(exportData.period.from)} إلى ${formatDate(exportData.period.to)} · الموظف: ${assigneeLabel}`;
+        `الفترة: ${formatDate(exportData.period.from)} إلى ${formatDate(exportData.period.to)} · الموظف: ${assigneeLabel} · أُعدّ بواسطة: ${reportPreparerName()}`;
       sheet.getCell('A4').font = { size: 9, color: { argb: 'FF64748B' } };
       sheet.getCell('A4').alignment = { horizontal: 'center', vertical: 'middle' };
 
