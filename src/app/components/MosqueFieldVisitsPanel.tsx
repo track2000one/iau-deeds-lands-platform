@@ -1040,6 +1040,16 @@ const mosqueNeedReportTitles: Record<MosqueNeedPreset, string> = {
   custom: 'تقرير حصر الاحتياجات الميدانية المخصصة بالمساجد والمصليات',
   all: 'التقرير الشامل لحصر احتياجات المساجد والمصليات',
 };
+// Keep the quick-report action synchronized with the current need selection.
+const mosqueNeedActionLabels: Record<MosqueNeedPreset, string> = {
+  carpet: 'حصر احتياجات الفرش والسجاد',
+  air: 'حصر احتياجات التكييف والتهوية',
+  lighting: 'حصر احتياجات الإنارة والكهرباء',
+  cleaning: 'حصر احتياجات النظافة',
+  quran: 'حصر احتياجات المصاحف وتجهيزاتها',
+  custom: 'إعداد تقرير احتياج مخصص',
+  all: 'حصر جميع أنواع الاحتياج',
+};
 const isAutomaticMosqueReportTitle = (title: string) =>
   title === defaultFieldProgramReportTitle || Object.values(mosqueNeedReportTitles).includes(title);
 
@@ -3403,14 +3413,21 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <b className="text-sm text-emerald-950">نوع التقرير</b>
-              <Button type="button" size="sm" variant="outline" className="border-emerald-300 text-emerald-900" onClick={() => {
-                setProgramReportMode('needs');
-                setProgramNeedPreset('carpet');
-                setProgramNeedStatus('open');
-                setProgramNeedSiteType('');
-                setProgramNeedQuery('');
-                setProgramReportTitle(mosqueNeedReportTitles.carpet);
-              }}>حصر احتياجات الفرش والسجاد</Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="max-w-full border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-100"
+                title={mosqueNeedActionLabels[programNeedPreset]}
+                onClick={() => {
+                  setProgramReportMode('needs');
+                  setProgramReportTitle((current) =>
+                    isAutomaticMosqueReportTitle(current) ? mosqueNeedReportTitles[programNeedPreset] : current);
+                }}
+              >
+                <FileText className="ml-2 h-4 w-4 shrink-0" />
+                <span className="whitespace-normal text-right">{mosqueNeedActionLabels[programNeedPreset]}</span>
+              </Button>
             </div>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               <button type="button" aria-pressed={programReportMode === 'visits'} onClick={() => {
@@ -3427,7 +3444,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                   isAutomaticMosqueReportTitle(current) ? mosqueNeedReportTitles[programNeedPreset] : current);
               }}
                 className={`rounded-lg border px-3 py-2 text-right text-sm font-bold ${programReportMode === 'needs' ? 'border-emerald-600 bg-emerald-100 text-emerald-950' : 'border-slate-300 bg-white text-slate-600'}`}>
-                <Search className="ml-2 inline h-4 w-4" />تقرير الاحتياجات حسب المواقع
+                <Search className="ml-2 inline h-4 w-4" />تقرير حسب الاحتياج
               </button>
             </div>
           </div>
