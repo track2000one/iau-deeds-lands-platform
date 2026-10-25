@@ -6,7 +6,7 @@ export type MosqueNeedStatus = 'open' | 'resolved' | 'all';
 export type MosqueNeedSort = 'site' | 'priority' | 'date';
 
 export const mosqueNeedPresets: { value: MosqueNeedPreset; label: string }[] = [
-  { value: 'carpet', label: 'احتياج فرش أو سجاد جديد' },
+  { value: 'carpet', label: 'تغيير الفرش والسجاد أو توفيره' },
   { value: 'air', label: 'التكييف والتهوية' },
   { value: 'lighting', label: 'الإنارة والكهرباء' },
   { value: 'cleaning', label: 'النظافة' },
@@ -28,6 +28,7 @@ export type MosqueNeedEvidence = {
   priority: string;
   resolutionStatus: string;
   responsibleEntity: string;
+  visitWorkflowStatus: MosqueFieldVisit['workflowStatus'];
 };
 
 export type MosqueNeedSummary = {
@@ -122,20 +123,35 @@ export const buildMosqueNeedSummaries = (
     sort: MosqueNeedSort;
   },
 ): MosqueNeedSummary[] => {
-  // Newer field assessments replace earlier assessments of the same checklist item
-  // within the same site/section. Planned/unverified visits must not wipe out findings.
+  // Scheduled visits can contain actual saved checklist observations even if the
+  // overall visit status was never advanced. Include those observations as
+  // "pending verification", but do not treat the visit as completed.
+  // A blank scheduled visit must not overwrite earlier verified observations.
   const latestItems = new Map<string, { visit: MosqueFieldVisit; item: MosqueFieldVisitItem }>();
   const latestTextBySection = new Map<string, MosqueFieldVisit>();
   const ordered = [...visits]
-    .filter((visit) => visit.workflowStatus !== 'planned')
     .filter((visit) => !options.siteType || visit.site.siteType === options.siteType)
     .sort((a, b) => visitDateMillis(a) - visitDateMillis(b) || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   for (const visit of ordered) {
     const section = visit.visitScope || 'whole_site';
-    latestTextBySection.set(visit.siteId + '|' + section, visit);
+    const scheduled = visit.workflowStatus === 'planned';
+    const hasWrittenRecommendations = [visit.recommendations, visit.generalNotes]
+      .some((value) => matchesVisitRecommendation(value, options.preset, options.query));
+    if (!scheduled || hasWrittenRecommendations) {
+      latestTextBySection.set(visit.siteId + '|' + section, visit);
+    }
     for (const item of visit.items || []) {
       if (item.status === 'not_checked') continue;
+      if (scheduled) {
+        // Only positively recorded needs from a scheduled visit are evidence.
+        // Their status remains unverified in the resulting report.
+        const hasEvidence = (['needs_action', 'not_available'].includes(item.status))
+          && (Boolean(String(item.note || '').trim())
+            || Boolean(String(item.resolutionNote || '').trim())
+            || (isCarpetChecklistItem(item) && item.details?.carpetAssessment === 'replace'));
+        if (!hasEvidence) continue;
+      }
       latestItems.set([visit.siteId, section, item.category, item.title].join('|'), { visit, item });
     }
   }
@@ -157,6 +173,7 @@ export const buildMosqueNeedSummaries = (
       priority: item.priority || 'normal',
       resolutionStatus: item.resolutionStatus || 'new',
       responsibleEntity: String(item.responsibleEntity || '-'),
+      visitWorkflowStatus: visit.workflowStatus,
     });
   }
 
@@ -186,6 +203,7 @@ export const buildMosqueNeedSummaries = (
         priority: visit.priority || 'normal',
         resolutionStatus: 'new',
         responsibleEntity: '-',
+        visitWorkflowStatus: visit.workflowStatus,
       });
     }
   }
@@ -240,7 +258,9 @@ export const createMosqueNeedReportHtml = (
     const detail = row.evidence.map((item) =>
       '<div class="finding"><b>' + escapeHtml(item.category) + ' — ' + escapeHtml(item.itemTitle) + '</b>: ' + escapeHtml(item.note) +
       '<small>النطاق: ' + escapeHtml(item.visitScope === 'women_section' ? 'مصلى النساء' : item.visitScope === 'men_section' ? 'قسم الرجال' : 'الموقع بالكامل') +
-      ' — حالة المعالجة: ' + escapeHtml(labels[item.resolutionStatus] || item.resolutionStatus) + '</small></div>'
+      ' — حالة المعالجة: ' + escapeHtml(labels[item.resolutionStatus] || item.resolutionStatus) +
+      ' — توثيق الزيارة: ' + escapeHtml(item.visitWorkflowStatus === 'planned' ? 'زيارة مجدولة / قيد التحقق الميداني' : 'زيارة بدأت أو نُفذت') +
+      '</small></div>'
     ).join('');
     return '<tr><td>' + (idx + 1) + '</td><td class="name">' + escapeHtml(row.siteName) +
       '</td><td>' + escapeHtml(labels[row.siteType] || row.siteType) +
@@ -251,6 +271,7 @@ export const createMosqueNeedReportHtml = (
   }).join('');
   const total = rows.reduce((sum, row) => sum + row.evidence.length, 0);
   const urgent = rows.filter((row) => row.priority === 'urgent').length;
+  const pendingVerification = rows.filter((row) => row.evidence.some((item) => item.visitWorkflowStatus === 'planned')).length;
   return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>' +
     escapeHtml(title) + '</title><style>' +
     '@page{size:A4 landscape;margin:11mm}*{box-sizing:border-box;print-color-adjust:exact;-webkit-print-color-adjust:exact}' +
@@ -271,10 +292,11 @@ export const createMosqueNeedReportHtml = (
     escapeHtml(new Date().toLocaleDateString('ar-SA-u-ca-gregory')) + '</p></header>' +
     '<section class="stats"><div class="stat">المواقع المطابقة<b>' + rows.length +
     '</b></div><div class="stat">الاحتياجات المرصودة<b>' + total +
-    '</b></div><div class="stat">مواقع بأولوية عاجلة<b>' + urgent + '</b></div></section>' +
+    '</b></div><div class="stat">مواقع بأولوية عاجلة<b>' + urgent +
+    '</b></div><div class="stat">تحتاج تحققًا ميدانيًا<b>' + pendingVerification + '</b></div></section>' +
     '<table><thead><tr><th>م</th><th>المسجد / المصلى</th><th>النوع</th><th>الاحتياج والملاحظة</th><th>عدد البنود</th><th>الأولوية</th><th>رقم أحدث زيارة</th><th>تاريخ الزيارة</th></tr></thead>' +
     '<tbody>' + (body || '<tr><td colspan="8">لا توجد مواقع مطابقة للمعايير المحددة.</td></tr>') +
-    '</tbody></table><p class="footer">يعتمد التقرير على الملاحظات والاحتياجات المدونة في الزيارات، وليس على مجرد وجود بند فحص ضمن النموذج. يتطلب التحقق الميداني قبل اعتماد الاحتياجات للشراء أو التنفيذ.</p></body></html>';
+    '</tbody></table><p class="footer">يعتمد التقرير على الاحتياجات المحفوظة فعليًا في الزيارات. الملاحظات المدونة داخل زيارة مجدولة تُعرض بوصفها قيد التحقق الميداني، ولا تعني إنجاز الزيارة أو اعتماد طلب شراء. يتطلب التحقق قبل اعتماد التنفيذ.</p></body></html>';
 };
 
 export const openMosqueNeedReport = (rows: MosqueNeedSummary[], title: string, criteria: string): boolean => {
