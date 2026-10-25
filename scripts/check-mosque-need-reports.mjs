@@ -11,6 +11,14 @@ const source = result.outputFiles[0].text;
 const { buildMosqueNeedSummaries, mosqueNeedPresets } = await import(
   'data:text/javascript;base64,' + Buffer.from(source).toString('base64')
 );
+const statusBundle = await build({
+  entryPoints: ['src/app/utils/carpetVisitStatus.ts'],
+  bundle: true, platform: 'node', format: 'esm',
+  write: false, logLevel: 'silent',
+});
+const { carpetStatusSelectionPatch, selectedCarpetItemStatus, CARPET_REPLACEMENT_NOTE } = await import(
+  'data:text/javascript;base64,' + Buffer.from(statusBundle.outputFiles[0].text).toString('base64')
+);
 
 let testCount = 0;
 const defaults = { preset: 'all', query: '', state: 'open', siteType: '', sort: 'priority' };
@@ -43,6 +51,41 @@ check('Quran and shelving', [visit('6', [item('رفوف المصاحف', 'تحت
 check('Custom query', [visit('7', [item('تسرب المياه', 'يلزم إصلاح تسرب المياه')])], 'custom', 1, { query: 'تسرب' });
 check('Custom query excludes unrelated', [visit('7', [item('تسرب المياه', 'يلزم إصلاح تسرب المياه')])], 'custom', 0, { query: 'مصاحف' });
 check('All needs includes checklist findings', [visit('8', [item('النظافة', 'تحتاج تنظيف')])], 'all', 1);
+
+// A specific "needs changing" selection is saved as a normal, backend-valid
+// needs_action item with a structured carpet replacement flag.
+const carpetInspection = item('نظافة السجاد والأرضيات', '', { category: 'النظافة', details: {} });
+const replacementPatch = carpetStatusSelectionPatch(carpetInspection, 'needs_replacement');
+assert.equal(replacementPatch.status, 'needs_action');
+assert.equal(replacementPatch.details.carpetAssessment, 'replace');
+assert.equal(replacementPatch.note, CARPET_REPLACEMENT_NOTE);
+testCount += 3;
+const savedReplacement = { ...carpetInspection, ...replacementPatch };
+assert.equal(selectedCarpetItemStatus(savedReplacement), 'needs_replacement');
+testCount++;
+check('Replacement option feeds carpeting needs report',
+  [visit('carpet-choice', [savedReplacement])], 'carpet', 1);
+check('Replacement option does not incorrectly appear in cleaning service report',
+  [visit('carpet-choice', [savedReplacement])], 'cleaning', 0);
+check('Resolved replacement not reported among open needs',
+  [visit('carpet-fixed', [{ ...savedReplacement, resolutionStatus: 'closed' }])], 'carpet', 0);
+check('Resolved replacement is available in completed needs report',
+  [visit('carpet-fixed', [{ ...savedReplacement, resolutionStatus: 'closed' }])], 'carpet', 1, { state: 'resolved' });
+
+const cleaningPatch = carpetStatusSelectionPatch(savedReplacement, 'needs_action');
+const savedCleaning = { ...savedReplacement, ...cleaningPatch };
+assert.equal(cleaningPatch.details.carpetAssessment, 'clean');
+assert.equal(selectedCarpetItemStatus(savedCleaning), 'needs_action');
+assert.equal(cleaningPatch.note, '');
+testCount += 3;
+check('Choosing cleaning removes the previous replacement need',
+  [visit('carpet-clean', [{ ...savedCleaning, note: 'تحتاج السجادة للتنظيف' }])], 'carpet', 0);
+check('Choosing cleaning is included in cleaning report',
+  [visit('carpet-clean', [{ ...savedCleaning, note: 'تحتاج السجادة للتنظيف' }])], 'cleaning', 1);
+check('Existing legacy free-text carpet request remains supported',
+  [visit('legacy-carpet', [item('نظافة السجاد والأرضيات', 'السجاد يحتاج إلى تغيير')])], 'carpet', 1);
+check('Untouched carpet-good entry not listed as a need',
+  [visit('carpet-good', [item('نظافة السجاد والأرضيات', '', { status: 'good' })])], 'carpet', 0);
 
 // A general/recommendations-only need must be found for EVERY report type.
 const noteCases = [
