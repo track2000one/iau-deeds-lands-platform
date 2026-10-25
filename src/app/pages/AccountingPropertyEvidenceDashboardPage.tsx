@@ -1,3 +1,4 @@
+import { withReportPreparer } from '../utils/reportAttribution';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
@@ -361,12 +362,12 @@ export const AccountingPropertyEvidenceDashboardPage: React.FC = () => {
         <td>${escapeHtml(`${task.historyCount} حدث — ${task.latestHistory?.summary || 'لا يوجد سجل محفوظ'}`)}</td>
       </tr>`).join('');
     const generatedAt = new Date().toLocaleString('ar-SA');
-    popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير متابعة مستندات الإثبات</title><style>
+    popup.document.write(withReportPreparer(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير متابعة مستندات الإثبات</title><style>
       @page{size:A4 landscape;margin:12mm} body{font-family:Arial,Tahoma,sans-serif;color:#111827;margin:0} h1{font-size:22px;margin:0 0 6px} .meta{font-size:11px;color:#475569;margin-bottom:14px}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 16px}.box{border:1px solid #cbd5e1;border-radius:8px;padding:8px;text-align:center}.box b{display:block;font-size:18px;margin-top:4px}table{width:100%;border-collapse:collapse;font-size:10px}th,td{border:1px solid #cbd5e1;padding:6px;vertical-align:top}th{background:#f1f5f9}.due_soon{background:#fffbeb}.overdue{background:#fef2f2}.critical{background:#fee2e2;font-weight:700}.legend{font-size:10px;margin-top:10px;color:#475569}@media print{button{display:none}}
     </style></head><body><h1>تقرير متابعة مستندات الإثبات</h1><div class="meta">جامعة الإمام عبدالرحمن بن فيصل — لجنة متابعة متطلبات التحول المحاسبي<br>تاريخ إعداد التقرير: ${escapeHtml(generatedAt)} — معيار الحالة الحرجة: ${EVIDENCE_ESCALATION_CONFIG.criticalAfterDays} يومًا بعد الاستحقاق</div>
     <div class="summary"><div class="box">المهام المفتوحة<b>${totalOpenTasks}</b></div><div class="box">المتأخرة<b>${totalOverdueTasks}</b></div><div class="box">الحرجة<b>${totalCriticalTasks}</b></div><div class="box">أولوية عالية<b>${totalHighPriorityOpen}</b></div></div>
     <table><thead><tr><th>العقار</th><th>المستند</th><th>حالة المستند</th><th>التصعيد</th><th>المسؤول</th><th>الأولوية</th><th>الاستحقاق</th><th>مدة التأخير</th><th>حالة المتابعة</th><th>آخر إجراء</th><th>السجل الزمني</th></tr></thead><tbody>${rowsHtml}</tbody></table>
-    <div class="legend">قريب الاستحقاق: خلال ${EVIDENCE_ESCALATION_CONFIG.dueSoonDays} أيام — متأخر: بعد تاريخ الاستحقاق — حرج: بعد ${EVIDENCE_ESCALATION_CONFIG.criticalAfterDays} يومًا من التأخير.</div></body></html>`);
+    <div class="legend">قريب الاستحقاق: خلال ${EVIDENCE_ESCALATION_CONFIG.dueSoonDays} أيام — متأخر: بعد تاريخ الاستحقاق — حرج: بعد ${EVIDENCE_ESCALATION_CONFIG.criticalAfterDays} يومًا من التأخير.</div></body></html>`));
     popup.document.close();
     popup.focus();
     window.setTimeout(() => popup.print(), 250);
