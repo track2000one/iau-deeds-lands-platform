@@ -105,8 +105,28 @@ check('Do not report completed supply as open need',
   [visit('done', [], { recommendations: 'تم تركيب مصابيح جديدة' })], 'lighting', 0);
 check('Normal operational note is not an unmet need',
   [visit('normal', [], { generalNotes: 'تم فحص النظافة والحالة جيدة' })], 'cleaning', 0);
-check('Planned visits are not verified findings',
-  [visit('planned', [item('إنارة المسجد', 'يحتاج تركيب إنارة')], { workflowStatus: 'planned' })], 'lighting', 0);
+check('Explicitly saved need in a planned visit is reported pending verification',
+  [visit('planned', [item('إنارة المسجد', 'يحتاج تركيب إنارة')], { workflowStatus: 'planned' })], 'lighting', 1);
+const plannedFinding = buildMosqueNeedSummaries(
+  [visit('planned', [item('إنارة المسجد', 'يحتاج تركيب إنارة')], { workflowStatus: 'planned' })],
+  { ...defaults, preset: 'lighting' }
+);
+assert.equal(plannedFinding[0].evidence[0].visitWorkflowStatus, 'planned');
+testCount++;
+check('Blank checklist in scheduled visit is not proof of a need',
+  [visit('blank', [item('إنارة المسجد', '', { status: 'not_checked' })], { workflowStatus: 'planned' })], 'lighting', 0);
+check('Unremarkable good status in scheduled visit is not a need',
+  [visit('good', [item('إنارة المسجد', '', { status: 'good' })], { workflowStatus: 'planned' })], 'lighting', 0);
+check('Structured carpet replacement in scheduled visit is a provisional need',
+  [visit('scheduled-carpet', [{
+    ...item('نظافة السجاد والأرضيات', 'الفرش يحتاج إلى تغيير'),
+    details: { carpetAssessment: 'replace' },
+  }], { workflowStatus: 'planned' })], 'carpet', 1);
+check('Scheduled visit with only the cleaning option does not show a carpet purchase',
+  [visit('scheduled-clean', [{
+    ...item('نظافة السجاد والأرضيات', 'السجاد يحتاج تنظيف'),
+    details: { carpetAssessment: 'clean' },
+  }], { workflowStatus: 'planned' })], 'carpet', 0);
 check('Resolved items are absent from open reports',
   [visit('resolved', [item('التكييف', 'يحتاج إصلاح', { resolutionStatus: 'closed' })])], 'air', 0);
 check('Resolved items appear in resolved reports',
