@@ -1,3 +1,4 @@
+import { reportPreparerHtml } from './reportAttribution';
 import type { MosqueFieldVisit, MosqueFieldVisitItem } from '../api/mosques';
 import { isCarpetChecklistItem } from './carpetVisitStatus';
 
@@ -286,7 +287,7 @@ export const createMosqueNeedReportHtml = (
     'th{background:#0b5749;color:white;font-size:11px}.name{font-weight:bold}.finding+.finding{margin-top:6px;border-top:1px dashed #cbd5e1;padding-top:5px}' +
     '.finding small{display:block;color:#64748b}.footer{margin-top:12px;font-size:10px;color:#64748b}' +
     '@media print{body{margin:0}.toolbar{display:none}}' +
-    '</style></head><body><div class="toolbar"><b>معاينة تقرير الاحتياجات — راجع النتائج قبل الطباعة</b><button onclick="window.print()">طباعة / حفظ PDF</button></div>' +
+    '</style></head><body>' + reportPreparerHtml() + '<div class="toolbar"><b>معاينة تقرير الاحتياجات — راجع النتائج قبل الطباعة</b><button onclick="window.print()">طباعة / حفظ PDF</button></div>' +
     '<header class="head"><strong>جامعة الإمام عبدالرحمن بن فيصل — وحدة العناية بالمساجد والمصليات</strong><h1>' +
     escapeHtml(title) + '</h1><p>معايير التقرير: ' + escapeHtml(criteria) + '</p><p>تاريخ الإعداد: ' +
     escapeHtml(new Date().toLocaleDateString('ar-SA-u-ca-gregory')) + '</p></header>' +
