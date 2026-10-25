@@ -44,6 +44,7 @@ const normalize = (text: unknown): string => String(text || '').normalize('NFKC'
   .replace(/[\u064b-\u065f\u0670\u0640]/g, '')
   .replace(/[أإآ]/g, 'ا')
   .replace(/ى/g, 'ي')
+  .replace(/ة/g, 'ه')
   .replace(/\s+/g, ' ')
   .trim();
 
