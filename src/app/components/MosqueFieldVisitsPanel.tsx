@@ -515,7 +515,7 @@ const getItemStatusOptions = (item: MosqueFieldVisitItem): ItemStatusOption[] =>
   const profile = itemStatusProfileByTitle[item.title] || 'condition';
   const baseOptions = itemStatusProfiles[profile];
   const options = isCarpetChecklistItem(item)
-    ? [...baseOptions.slice(0, 2), { value: CARPET_REPLACEMENT_VALUE, label: 'يحتاج إلى تغيير' }, ...baseOptions.slice(2)]
+    ? [...baseOptions.slice(0, 2), { value: CARPET_REPLACEMENT_VALUE, label: 'يحتاج الفرش إلى تغيير' }, ...baseOptions.slice(2)]
     : baseOptions;
   if (options.some((option) => option.value === item.status)) return options;
 
