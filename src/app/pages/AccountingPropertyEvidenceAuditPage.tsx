@@ -1,3 +1,4 @@
+import { reportPreparerName } from '../utils/reportAttribution';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
@@ -492,6 +493,7 @@ export const AccountingPropertyEvidenceAuditPage: React.FC = () => {
               <Badge variant="outline" className={mirrorConnected ? 'border-emerald-200/30 bg-emerald-200/10 text-emerald-50' : 'border-amber-200/30 bg-amber-200/10 text-amber-50'}>{mirrorConnected ? 'متصل بنسخة AuditLog على الخادم' : 'التحقق من الخادم غير متاح'}</Badge>
             </div>
             <h1 className="text-2xl font-black sm:text-3xl">السجل الرقابي المركزي لمستندات الإثبات</h1>
+            <p className="mt-2 text-sm font-semibold text-slate-200">أُعدّ بواسطة: {reportPreparerName()}</p>
             <p className="mt-3 max-w-5xl text-sm leading-7 text-slate-300">يعرض جميع أحداث متابعة مستندات الإثبات المسجلة داخل الحالات الأربع لمؤشرات السيطرة، ويجمع هوية المنفذ والتوقيت ونوع الإجراء والتغيرات وحالة التصعيد الحالية في شاشة رقابية واحدة.</p>
           </div>
           <div className="audit-no-print flex flex-wrap gap-2 lg:justify-end">
