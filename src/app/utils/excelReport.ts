@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
+import { reportPreparerName } from './reportAttribution';
 
 export type ExcelReportRow = Record<string, unknown>;
 export type ExcelMetric = { label: string; value: string | number; tone?: 'blue' | 'green' | 'amber' | 'red' | 'slate' };
@@ -203,7 +204,7 @@ export const writeProfessionalExcel = async (
 
     ws.mergeCells(3, 1, 3, columnCount);
     const metaCell = ws.getCell(3, 1);
-    metaCell.value = [options.subtitle, `تاريخ الاستخراج: ${generatedAt}`].filter(Boolean).join(' | ');
+    metaCell.value = [options.subtitle, `تاريخ الاستخراج: ${generatedAt}`, `أُعدّ بواسطة: ${reportPreparerName()}`].filter(Boolean).join(' | ');
     metaCell.font = { name: 'Arial', size: 9, color: { argb: palette.muted } };
     metaCell.fill = fill(palette.slateSoft);
     metaCell.alignment = { horizontal: 'right', vertical: 'middle', wrapText: true };
