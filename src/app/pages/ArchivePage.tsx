@@ -1,3 +1,4 @@
+import { reportPreparerHtml } from '../utils/reportAttribution';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
@@ -1005,6 +1006,7 @@ export const ArchivePage: React.FC = () => {
             <div style="font-size:14px;color:#0f766e;font-weight:800">جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الأصول والأملاك والأوقاف الجامعية</div>
             <div style="font-size:31px;font-weight:900;color:#123047;margin-top:6px;line-height:1.35">بيانات المعاملة المؤرشفة</div>
             <div style="font-size:14px;color:#475569;margin-top:5px">نظام المتابعة — قسم الأرشفة · تاريخ إعداد التقرير: ${escapePrintHtml(new Date().toLocaleString('ar-SA-u-ca-gregory'))}</div>
+            <div style="font-size:14px;color:#334155;margin-top:5px">${reportPreparerHtml()}</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px">
               <div style="border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px;text-align:center">رقم المعاملة<div style="font-size:22px;font-weight:900;color:#0369a1;line-height:1.4">${escapePrintHtml(detailed.transactionNumber)}</div></div>
               <div style="border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px;text-align:center">الحالة<div style="font-size:22px;font-weight:900;color:#0369a1;line-height:1.4">${detailed.status === 'completed' ? 'منجزة' : detailed.status === 'closed' ? 'مغلقة' : escapePrintHtml(detailed.status)}</div></div>
