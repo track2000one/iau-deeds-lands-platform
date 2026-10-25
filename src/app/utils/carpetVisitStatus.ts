@@ -2,7 +2,8 @@ import type { MosqueFieldVisitItem } from '../api/mosques';
 
 export const CARPET_CHECKLIST_TITLE = 'نظافة السجاد والأرضيات';
 export const CARPET_REPLACEMENT_VALUE = 'needs_replacement';
-export const CARPET_REPLACEMENT_NOTE = 'يحتاج إلى تغيير الفرش والسجاد';
+export const CARPET_REPLACEMENT_NOTE = 'يحتاج الفرش إلى تغيير';
+const legacyReplacementNotes = ['يحتاج إلى تغيير الفرش والسجاد', CARPET_REPLACEMENT_NOTE];
 
 export const isCarpetChecklistItem = (item: Pick<MosqueFieldVisitItem, 'title'>): boolean =>
   item.title === CARPET_CHECKLIST_TITLE;
@@ -38,6 +39,6 @@ export const carpetStatusSelectionPatch = (
   return {
     status: selected as MosqueFieldVisitItem['status'],
     details,
-    note: item.note === CARPET_REPLACEMENT_NOTE ? '' : item.note,
+    note: legacyReplacementNotes.includes(String(item.note || '').trim()) ? '' : item.note,
   };
 };
