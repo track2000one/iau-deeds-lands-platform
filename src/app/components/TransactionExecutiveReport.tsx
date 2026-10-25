@@ -1,4 +1,5 @@
 import React from 'react';
+import { reportPreparerName } from '../utils/reportAttribution';
 import type {
   TransactionFollowUpExecutiveReport,
   TransactionFollowUpPriority,
@@ -526,6 +527,7 @@ export const TransactionExecutiveReport = React.forwardRef<HTMLDivElement, Props
           </p>
           <p className="mt-1 text-[10px] text-slate-600">
             تاريخ إعداد التقرير: {formatDateTime(report.generatedAt)}
+            {' · '}أُعدّ بواسطة: {reportPreparerName()}
           </p>
           <p className="mt-2 text-[10px] font-bold text-slate-700">
             الفئات المعروضة: {options.categories.map((category) => categoryLabels[category]).join('، ') || 'لا توجد فئات محددة'}
