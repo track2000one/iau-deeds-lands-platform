@@ -1200,6 +1200,8 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [programNeedStatus, setProgramNeedStatus] = React.useState<MosqueNeedStatus>('open');
   const [programNeedSiteType, setProgramNeedSiteType] = React.useState('');
   const [programNeedSort, setProgramNeedSort] = React.useState<MosqueNeedSort>('priority');
+  // Needs reports start with all accessible visits; table filters are opt-in.
+  const [programNeedUseCurrentFilters, setProgramNeedUseCurrentFilters] = React.useState(false);
   const [programPrintColumns, setProgramPrintColumns] = React.useState<ProgramReportColumnKey[]>([...defaultProgramReportColumns]);
   const [visitForm, setVisitForm] = React.useState<VisitForm>(() => emptyVisit([], currentUsername));
   const [uploadingKey, setUploadingKey] = React.useState('');
@@ -1310,16 +1312,18 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   }, [visits, search, siteFilter, statusFilter, visitTypeFilter, visitScopeFilter, overallFilter, priorityFilter, issueFilter, dateFromFilter, dateToFilter, sortBy, sortDirection]);
 
   const programNeedSummaries = React.useMemo(
-    () => buildMosqueNeedSummaries(filteredVisits, {
+    () => buildMosqueNeedSummaries(programNeedUseCurrentFilters ? filteredVisits : visits, {
       preset: programNeedPreset,
       query: programNeedQuery,
       state: programNeedStatus,
       siteType: programNeedSiteType,
       sort: programNeedSort,
     }),
-    [filteredVisits, programNeedPreset, programNeedQuery, programNeedStatus, programNeedSiteType, programNeedSort],
+    [visits, filteredVisits, programNeedUseCurrentFilters, programNeedPreset, programNeedQuery, programNeedStatus, programNeedSiteType, programNeedSort],
   );
   const programNeedFindings = programNeedSummaries.reduce((total, row) => total + row.evidence.length, 0);
+  const programNeedPendingSites = programNeedSummaries.filter((row) =>
+    row.evidence.some((finding) => finding.visitWorkflowStatus === 'planned')).length;
   const activeFilterCount = [search, siteFilter, statusFilter, visitTypeFilter, visitScopeFilter, overallFilter, priorityFilter, issueFilter, dateFromFilter, dateToFilter]
     .filter((value) => Boolean(String(value || '').trim())).length;
 
@@ -2727,6 +2731,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
         'الاحتياج': row.evidence.map((entry) => entry.itemTitle).join('؛ '),
         'الملاحظات الميدانية': row.evidence.map((entry) => entry.note).join('؛ '),
         'عدد الاحتياجات': row.evidence.length,
+        'حالة التوثيق': row.evidence.some((entry) => entry.visitWorkflowStatus === 'planned') ? 'تتضمن ملاحظة قيد التحقق' : 'موثقة بزيارة بدأت أو نُفذت',
         'الأولوية': priorityLabels[row.priority] || row.priority,
         'رقم أحدث زيارة': row.latestVisit,
         'تاريخ الزيارة': new Date(row.latestDate).toLocaleDateString('ar-SA-u-ca-gregory'),
@@ -2994,14 +2999,14 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
   const printProgramReport = () => {
     const reportTitle = programReportTitle.trim() || 'تقرير البرنامج الميداني للمساجد والمصليات';
     if (programReportMode === 'needs') {
-      if (!programNeedSummaries.length) {
-        return toast.info('لم تُعثر على احتياجات مدوّنة تطابق التصفية الحالية. تحقّق من بنود الفحص والملاحظات.');
-      }
+      // An empty result is also a valid report: offer a printable zero-findings record.
+      // A stored assessment in a scheduled visit is marked as awaiting verification.
       const criteria = [
         mosqueNeedPresets.find((preset) => preset.value === programNeedPreset)?.label || '-',
         programNeedPreset === 'custom' ? programNeedQuery.trim() : '',
         programNeedStatus === 'open' ? 'الاحتياجات القائمة' : programNeedStatus === 'resolved' ? 'المعالجة' : 'كل الحالات',
         programNeedSiteType === 'mosque' ? 'المساجد فقط' : programNeedSiteType === 'jami' ? 'الجوامع فقط' : programNeedSiteType === 'prayer_room' ? 'المصليات فقط' : 'جميع أنواع المواقع',
+        programNeedUseCurrentFilters ? 'تصفية قائمة الزيارات مفعلة' : 'جميع الزيارات المسجلة',
       ].filter(Boolean).join(' — ');
       if (!openMosqueNeedReport(programNeedSummaries, reportTitle, criteria)) {
         return toast.error('تعذر فتح التقرير. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.');
@@ -3433,7 +3438,10 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
             <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <b className="text-sm text-amber-950">تصفية الاحتياجات المدونة ميدانيًا</b>
-                <Badge variant="outline" className="border-amber-300 bg-white text-amber-900">{programNeedSummaries.length} موقع · {programNeedFindings} احتياج</Badge>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="border-amber-300 bg-white text-amber-900">{programNeedSummaries.length} موقع · {programNeedFindings} احتياج</Badge>
+                  {programNeedPendingSites > 0 && <Badge variant="outline" className="border-sky-300 bg-sky-50 text-sky-900">{programNeedPendingSites} موقع قيد التحقق</Badge>}
+                </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <Field label="نوع الاحتياج">
@@ -3474,14 +3482,24 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
                   </Field>
                 </div>}
               </div>
+              <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-amber-200 bg-white p-3 text-sm font-semibold text-slate-800">
+                <input
+                  type="checkbox"
+                  className="h-5 w-5 shrink-0 accent-emerald-700"
+                  checked={programNeedUseCurrentFilters}
+                  onChange={(event) => setProgramNeedUseCurrentFilters(event.target.checked)}
+                />
+                تطبيق تصفية قائمة الزيارات الحالية ({filteredVisits.length} من {visits.length} زيارة)
+              </label>
               <p className="text-xs leading-6 text-amber-950">
-                يعرض التقرير موقعًا واحدًا لكل مسجد أو مصلى، مع تفاصيل الاحتياجات المرتبطة بأحدث التقييمات المسجلة.
-                يظهر احتياج الفرش إذا اختيرت نتيجة «يحتاج إلى تغيير» لبند «نظافة السجاد والأرضيات»، أو دُوّن طلب واضح لتوفير الفرش أو استبداله في الملاحظات. لا تُعد النظافة وحدها سببًا للاستبدال.
+                افتراضيًا يشمل التقرير جميع الزيارات المسجلة ({visits.length}) وليس فقط الزيارات الظاهرة بالقائمة.
+                يظهر احتياج الفرش عند اختيار «يحتاج الفرش إلى تغيير» أو تدوين طلب توفير أو استبدال واضح.
+                والاحتياج المحفوظ في زيارة مجدولة يظهر بعلامة «قيد التحقق الميداني» ولا يُحسب زيارة منجزة.
               </p>
-              {!programNeedSummaries.length && <p role="status" className="rounded-lg border border-amber-300 bg-white p-2 text-xs font-semibold text-amber-900">لم تُسجل احتياجات مطابقة للشروط الحالية. يمكنك تغيير النوع أو حالة الاحتياج أو التحقق من تدوين الملاحظة في الزيارات.</p>}
+              {!programNeedSummaries.length && <p role="status" className="rounded-lg border border-amber-300 bg-white p-2 text-xs font-semibold text-amber-900">لا توجد احتياجات محفوظة مطابقة للمعايير. يمكنك طباعة تقرير بصفر نتائج، أو حفظ اختيار الاحتياج في الزيارة أولًا ثم تحديث التقرير.</p>}
             </section>
           )}
-          <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+          {(programReportMode === 'visits' || programNeedUseCurrentFilters) && <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
             <div className="mb-3 flex items-center justify-between"><b className="text-sm text-slate-800">الفرز والتصفية {programReportMode === 'needs' ? 'الإضافية' : ''}</b><Badge variant="outline">{filteredVisits.length} زيارة في نطاق البحث</Badge></div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <NativeSelect value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)}><option value="">جميع المواقع</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</NativeSelect>
@@ -3497,7 +3515,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
               <Field label="اتجاه الفرز"><NativeSelect value={sortDirection} onChange={(event) => setSortDirection(event.target.value as 'asc' | 'desc')}><option value="desc">تنازلي / الأحدث أولًا</option><option value="asc">تصاعدي / الأقدم أولًا</option></NativeSelect></Field>
             </div>
             <div className="mt-3 flex items-center justify-between gap-2 border-t border-sky-100 pt-3"><span className="text-xs text-slate-600">{activeFilterCount ? 'تم تطبيق ' + activeFilterCount + ' معيار تصفية.' : 'سيتم تضمين جميع الزيارات.'}</span><Button type="button" size="sm" variant="outline" onClick={resetVisitFilters}>إعادة ضبط</Button></div>
-          </div>
+          </div>}
           {programReportMode === 'visits' && <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               <div><b className="text-sm text-slate-800">الأعمدة الظاهرة في جدول الطباعة</b><p className="mt-1 text-[11px] text-slate-500">اختر الأعمدة التي يحتاجها التقرير فقط. عمود التسلسل «م» يظهر تلقائيًا، وترتيب الأعمدة يبقى بالترتيب القياسي.</p></div>
@@ -3517,7 +3535,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
             </div>
           </div>}
         </div>
-        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setProgramPrintDialog(false)}>إلغاء</Button><Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={exportProgramExcel} disabled={programReportMode === 'needs' ? !programNeedSummaries.length : !filteredVisits.length}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />{programReportMode === 'needs' ? 'Excel للاحتياجات' : 'Excel + الصور'}</Button><Button onClick={printProgramReport} disabled={programReportMode === 'needs' ? !programNeedSummaries.length : !filteredVisits.length}><Printer className="ml-2 h-4 w-4" />متابعة إلى الطباعة</Button></DialogFooter>
+        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setProgramPrintDialog(false)}>إلغاء</Button><Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={exportProgramExcel} disabled={programReportMode === 'needs' ? !programNeedSummaries.length : !filteredVisits.length}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />{programReportMode === 'needs' ? 'Excel للاحتياجات' : 'Excel + الصور'}</Button><Button onClick={printProgramReport} disabled={programReportMode === 'visits' && !filteredVisits.length}><Printer className="ml-2 h-4 w-4" />متابعة إلى الطباعة</Button></DialogFooter>
       </DialogContent>
     </Dialog>
 
