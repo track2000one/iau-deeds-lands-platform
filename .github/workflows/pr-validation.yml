@@ -18,5 +18,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Verify mosque needs reports (all types)
+        run: node scripts/check-mosque-need-reports.mjs
       - name: Build frontend
         run: npm run build
