@@ -125,6 +125,7 @@ export function VacantLandsPage() {
   const verifiedArea = verified.reduce((total, x) => total + areaNumber(x.verifiedVacantArea), 0);
   const tentativeArea = items.reduce((total, x) => total + areaNumber(x.approximateArea), 0);
   const unreviewedCount = items.filter((x) => x.status === 'DRAFT' || x.status === 'UNDER_REVIEW').length;
+  const filteredVerifiedArea = shown.filter((x) => x.status === 'VERIFIED_VACANT').reduce((n, x) => n + areaNumber(x.verifiedVacantArea), 0);
   const findStatus = (value: Status) => statusOptions.find((s) => s.value === value) || statusOptions[0];
 
   const patch = (key: keyof FormState, value: string) => setForm((previous) => ({ ...previous, [key]: value }));
@@ -169,8 +170,8 @@ export function VacantLandsPage() {
       toast.error('تحقق من الصك والبيانات والمساحات، بحيث لا تتجاوز المساحة المعتمدة مساحة الموقع');
       return;
     }
-    if (form.status === 'VERIFIED_VACANT' && (official == null || !isAdmin)) {
-      toast.error('اعتماد الشغور يتطلب صلاحية مسؤول وإدخال المساحة المؤكدة');
+    if (form.status === 'VERIFIED_VACANT' && (official == null || !isAdmin || !form.inspectionDate)) {
+      toast.error('اعتماد الشغور يتطلب صلاحية مسؤول ومساحة مؤكدة وتاريخ معاينة');
       return;
     }
     const body = {
@@ -331,7 +332,7 @@ export function VacantLandsPage() {
           <thead><tr>{['الرمز','الموقع','النطاق','رقم الصك','المساحة التقديرية م²','الشاغرة المعتمدة م²','الحالة','آخر مُحدّث'].map((h) => <th key={h} className="border border-black p-2 text-right">{h}</th>)}</tr></thead>
           <tbody>{shown.map((x) => <tr key={x.id}><td className="border border-black p-2">{x.code}</td><td className="border border-black p-2">{x.name}</td><td className="border border-black p-2">{x.campus}</td><td className="border border-black p-2">{x.deed?.deedNumber || '—'}</td><td className="border border-black p-2">{areaFmt(x.approximateArea)}</td><td className="border border-black p-2">{x.status === 'VERIFIED_VACANT' ? areaFmt(x.verifiedVacantArea) : '—'}</td><td className="border border-black p-2">{findStatus(x.status).label}</td><td className="border border-black p-2">{x.updatedByName || '—'}</td></tr>)}</tbody>
         </table>
-        <p className="mt-4 text-sm">إجمالي الشاغر المعتمد في كامل السجل: {areaFmt(verifiedArea)} م²</p>
+        <p className="mt-4 text-sm">مجموع المساحة الشاغرة المعتمدة للمواقع المفلترة: {areaFmt(filteredVerifiedArea)} م²</p>
       </div>}
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -343,7 +344,7 @@ export function VacantLandsPage() {
               <Field title="اسم الموقع *"><Input required value={form.name} onChange={(e) => patch('name', e.target.value)} placeholder="الموقع رقم 03" /></Field>
               <Field title="الحرم أو النطاق العقاري *"><Input required value={form.campus} onChange={(e) => patch('campus', e.target.value)} /></Field>
               <Field title="حالة الإشغال">
-                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.status} onChange={(e) => patch('status', e.target.value)}>
+                <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={form.status} onChange={(e) => setForm((old) => ({ ...old, status: e.target.value as Status, verifiedVacantArea: e.target.value === 'VERIFIED_VACANT' ? old.verifiedVacantArea : '' }))}>
                   {statusOptions.filter((s) => isAdmin || s.value !== 'VERIFIED_VACANT').map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </Field>
@@ -360,7 +361,7 @@ export function VacantLandsPage() {
                 </Field>
               </div>
               <Field title="المساحة التقديرية للموقع (م²) *"><Input required type="number" min="0.01" step="0.01" value={form.approximateArea} onChange={(e) => patch('approximateArea', e.target.value)} /></Field>
-              <Field title="المساحة الشاغرة المؤكدة (م²)"><Input type="number" min="0" step="0.01" value={form.verifiedVacantArea} onChange={(e) => patch('verifiedVacantArea', e.target.value)} placeholder="تُملأ بعد التحقق" /></Field>
+              <Field title="المساحة الشاغرة المؤكدة (م²)"><Input type="number" min="0" step="0.01" disabled={!isAdmin || form.status !== 'VERIFIED_VACANT'} value={form.verifiedVacantArea} onChange={(e) => patch('verifiedVacantArea', e.target.value)} placeholder="تُملأ بعد التحقق" /></Field>
               <Field title="خط العرض"><Input type="number" min="-90" max="90" step="any" value={form.latitude} onChange={(e) => patch('latitude', e.target.value)} placeholder="26.39" /></Field>
               <Field title="خط الطول"><Input type="number" min="-180" max="180" step="any" value={form.longitude} onChange={(e) => patch('longitude', e.target.value)} placeholder="50.20" /></Field>
               <Field title="تاريخ المعاينة"><Input type="date" value={form.inspectionDate} onChange={(e) => patch('inspectionDate', e.target.value)} /></Field>
