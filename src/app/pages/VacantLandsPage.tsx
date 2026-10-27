@@ -31,6 +31,7 @@ type VacantLand = {
   inspectionDate?: string | null;
   inspectionNote?: string | null;
   notes?: string | null;
+  createdById?: string | null;
   createdByName?: string | null;
   updatedByName?: string | null;
   verifiedByName?: string | null;
@@ -72,7 +73,7 @@ const Field = ({ title, children }: { title: string; children: React.ReactNode }
 
 export function VacantLandsPage() {
   const { isAdmin, hasPermission } = usePermissions();
-  const { username } = useAuth();
+  const { username, currentUser } = useAuth();
   const [items, setItems] = useState<VacantLand[]>([]);
   const [deeds, setDeeds] = useState<DeedOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -313,8 +314,8 @@ export function VacantLandsPage() {
                   {x.locationDescription && <p className="mt-3 line-clamp-2 text-sm">{x.locationDescription}</p>}
                   <p className="mt-3 text-xs text-muted-foreground">أُنشئ بواسطة: {x.createdByName || 'غير محدد'} · آخر تعديل: {x.updatedByName || 'غير محدد'}</p>
                   <div className="mt-4 flex gap-2">
-                    {canEdit && (isAdmin || x.status !== 'VERIFIED_VACANT') && <Button size="sm" variant="outline" onClick={() => openEdit(x)}><Pencil className="ml-1 h-4 w-4" />تحرير</Button>}
-                    {canDelete && (isAdmin || x.status !== 'VERIFIED_VACANT') && <Button size="sm" variant="outline" onClick={() => void remove(x)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button>}
+                    {canEdit && (isAdmin || (x.createdById === currentUser?.uid && x.status !== 'VERIFIED_VACANT')) && <Button size="sm" variant="outline" onClick={() => openEdit(x)}><Pencil className="ml-1 h-4 w-4" />تحرير</Button>}
+                    {canDelete && (isAdmin || (x.createdById === currentUser?.uid && x.status !== 'VERIFIED_VACANT')) && <Button size="sm" variant="outline" onClick={() => void remove(x)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button>}
                   </div>
                 </article>
               );
