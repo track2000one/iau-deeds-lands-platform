@@ -36,6 +36,7 @@ const ArchivePage = lazy(() => import('./pages/ArchivePage').then((m) => ({ defa
 const AppearanceSettingsPage = lazy(() => import('./pages/AppearanceSettingsPage').then((m) => ({ default: m.AppearanceSettingsPage })));
 const CentralBuildingsRegistryPage = lazy(() => import('./pages/CentralBuildingsRegistryPage').then((m) => ({ default: m.CentralBuildingsRegistryPage })));
 const SiteInspectionsPage = lazy(() => import('./pages/SiteInspectionsPage').then((m) => ({ default: m.SiteInspectionsPage })));
+const VacantLandsPage = lazy(() => import('./pages/VacantLandsPage').then((m) => ({ default: m.VacantLandsPage })));
 const InvestmentsPage = lazy(() => import('./pages/InvestmentsPage').then((m) => ({ default: m.InvestmentsPage })));
 const InvestmentAreaDetailsPage = lazy(() => import('./pages/InvestmentAreaDetailsPage').then((m) => ({ default: m.InvestmentAreaDetailsPage })));
 const InvestmentAreaFormPage = lazy(() => import('./pages/InvestmentAreaFormPage').then((m) => ({ default: m.InvestmentAreaFormPage })));
@@ -99,6 +100,7 @@ const CORE_HOME_MODULES = [
 
 const SCOPED_LANDING_ROUTES = [
   ['investments', '/investments'],
+  ['vacant_lands', '/lands/vacant'],
   ['assets', '/assets'],
   ['accounting_transformation', '/accounting-transformation'],
   ['mosques', '/mosques'],
@@ -141,6 +143,9 @@ const HomeLandingPage = () => {
 
 const page = (element: ReactNode) => <Suspense fallback={<LoadingPage />}>{element}</Suspense>;
 const adminOnly = (element: ReactNode) => <RequireAdmin>{page(element)}</RequireAdmin>;
+const vacantLandsPermission = (element: ReactNode) => (
+  <PermissionGuard module="vacant_lands" action="canView">{page(element)}</PermissionGuard>
+);
 const investmentPermission = (element: ReactNode, action: 'canView' | 'canAdd' | 'canEdit' | 'canDelete' | 'canPrint') => (
   <PermissionGuard module="investments" action={action}>{page(element)}</PermissionGuard>
 );
@@ -174,6 +179,7 @@ export const router = createHashRouter([
         ],
       },
       { path: 'maps/:deedId?', element: page(<MapsPage />) },
+      { path: 'lands/vacant', element: vacantLandsPermission(<VacantLandsPage />) },
       {
         path: 'assets',
         children: [
