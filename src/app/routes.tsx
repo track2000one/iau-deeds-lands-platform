@@ -37,6 +37,8 @@ const AppearanceSettingsPage = lazy(() => import('./pages/AppearanceSettingsPage
 const CentralBuildingsRegistryPage = lazy(() => import('./pages/CentralBuildingsRegistryPage').then((m) => ({ default: m.CentralBuildingsRegistryPage })));
 const SiteInspectionsPage = lazy(() => import('./pages/SiteInspectionsPage').then((m) => ({ default: m.SiteInspectionsPage })));
 const VacantLandsPage = lazy(() => import('./pages/VacantLandsPage').then((m) => ({ default: m.VacantLandsPage })));
+const VacantLandsMapPage = lazy(() => import('./pages/VacantLandsMapPage').then((m) => ({ default: m.VacantLandsMapPage })));
+
 const InvestmentsPage = lazy(() => import('./pages/InvestmentsPage').then((m) => ({ default: m.InvestmentsPage })));
 const InvestmentAreaDetailsPage = lazy(() => import('./pages/InvestmentAreaDetailsPage').then((m) => ({ default: m.InvestmentAreaDetailsPage })));
 const InvestmentAreaFormPage = lazy(() => import('./pages/InvestmentAreaFormPage').then((m) => ({ default: m.InvestmentAreaFormPage })));
@@ -180,6 +182,7 @@ export const router = createHashRouter([
       },
       { path: 'maps/:deedId?', element: page(<MapsPage />) },
       { path: 'lands/vacant', element: vacantLandsPermission(<VacantLandsPage />) },
+      { path: 'lands/vacant/map', element: vacantLandsPermission(<VacantLandsMapPage />) },
       {
         path: 'assets',
         children: [
