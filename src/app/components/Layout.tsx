@@ -84,6 +84,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const scopedLandingRoutes = [
     ['investments', '/investments'],
+    ['vacant_lands', '/lands/vacant'],
     ['assets', '/assets'],
     ['accounting_transformation', '/accounting-transformation'],
     ['mosques', '/mosques'],
@@ -142,6 +143,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'all-deeds', path: '/deeds', icon: FileText, label: t('nav.allDeeds'), module: 'deeds', action: 'canView' },
     { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: t('nav.allocatedLands'), module: 'allocated_lands', action: 'canView' },
     { id: 'delivered-lands', path: '/lands/delivered', icon: MapPin, label: t('nav.deliveredLands'), module: 'delivered_lands', action: 'canView' },
+    { id: 'vacant-lands', path: '/lands/vacant', icon: LandPlot, label: ui('الأراضي الشاغرة', 'Vacant Lands'), module: 'vacant_lands', action: 'canView' },
     { id: 'investments', path: '/investments', icon: LandPlot, label: ui('المساحات والفرص الاستثمارية', 'Investment Areas & Opportunities'), module: 'investments', action: 'canView' },
     { id: 'site-inspections', path: '/site-inspections', icon: ClipboardCheck, label: ui('معاينة أرض أو موقع', 'Land or Site Inspection'), module: 'site_inspections', action: 'canView' },
     { id: 'leased-lands-out', path: '/lands/leased-out', icon: MapPin, label: t('nav.leasedLandsOut'), module: 'leased_lands_out', action: 'canView' },
@@ -175,6 +177,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (path.startsWith('/deeds')) return 'all-deeds';
     if (path.startsWith('/lands/allocated')) return 'allocated-lands';
     if (path.startsWith('/lands/delivered')) return 'delivered-lands';
+    if (path.startsWith('/lands/vacant')) return 'vacant-lands';
     if (path.startsWith('/investments')) return 'investments';
     if (path.startsWith('/site-inspections')) return 'site-inspections';
     if (path.startsWith('/lands/leased-out')) return 'leased-lands-out';

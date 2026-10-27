@@ -1,0 +1,31 @@
+name: Vacant Lands Frontend Build
+
+on:
+  push:
+    branches:
+      - feat/vacant-lands-registry-20261027
+  pull_request:
+    paths:
+      - 'src/app/pages/VacantLandsPage.tsx'
+      - 'src/app/routes.tsx'
+      - 'src/app/components/Layout.tsx'
+      - 'src/types/permissions.ts'
+      - '.github/workflows/vacant-lands-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build React and Vite
+        run: npm run build
