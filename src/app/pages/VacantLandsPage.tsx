@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FileDown, FileText, LandPlot, Pencil, Plus, Search, Trash2, CheckCircle2, MapPin, Ruler, Map as MapIcon } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { InvestmentPolygonEditor } from '../components/InvestmentPolygonEditor';
+import { VacantLandRelationsDialog } from '../components/VacantLandRelationsDialog';
 import { getPolygonMetrics, type InvestmentPolygonFeature } from '../../features/investments/geometry';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -94,6 +95,7 @@ export function VacantLandsPage() {
   const [campus, setCampus] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [deedQuery, setDeedQuery] = useState('');
+  const [relationItem, setRelationItem] = useState<VacantLand | null>(null);
   const [error, setError] = useState('');
 
   const canAdd = isAdmin || hasPermission('vacant_lands', 'canAdd');
@@ -261,6 +263,7 @@ export function VacantLandsPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => navigate('/lands/vacant/map')}><MapIcon className="ml-2 h-4 w-4" />الخريطة التفاعلية</Button>
+              {canAdd && <Button variant="outline" onClick={() => navigate('/lands/vacant/import')}><FileDown className="ml-2 h-4 w-4" />استيراد المواقع وربط الصكوك</Button>
               {canPrint && <Button variant="outline" onClick={exportExcel}><FileDown className="ml-2 h-4 w-4" />تصدير Excel</Button>}
               {canPrint && <Button variant="outline" onClick={() => window.print()}><FileText className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
               {canAdd && <Button onClick={openNew}><Plus className="ml-2 h-4 w-4" />إضافة موقع</Button>}
@@ -332,6 +335,7 @@ export function VacantLandsPage() {
                   <p className="mt-3 text-xs text-muted-foreground">أُنشئ بواسطة: {x.createdByName || 'غير محدد'} · آخر تعديل: {x.updatedByName || 'غير محدد'}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={() => navigate('/lands/vacant/map?selected=' + encodeURIComponent(x.id))}><MapIcon className="ml-1 h-4 w-4" />الخريطة</Button>
+                    <Button size="sm" variant="outline" onClick={() => setRelationItem(x)}>روابط الصك والمباني والاستثمار</Button>
                     {canEdit && (isAdmin || (x.createdById === currentUser?.uid && x.status !== 'VERIFIED_VACANT')) && <Button size="sm" variant="outline" onClick={() => openEdit(x)}><Pencil className="ml-1 h-4 w-4" />تحرير</Button>}
                     {canDelete && (isAdmin || (x.createdById === currentUser?.uid && x.status !== 'VERIFIED_VACANT')) && <Button size="sm" variant="outline" onClick={() => void remove(x)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button>}
                   </div>
@@ -354,6 +358,14 @@ export function VacantLandsPage() {
         <p className="mt-4 text-sm">مجموع المساحة الشاغرة المعتمدة للمواقع المفلترة: {areaFmt(filteredVerifiedArea)} م²</p>
       </div>}
 
+      {relationItem && (
+        <VacantLandRelationsDialog
+          open={Boolean(relationItem)}
+          deedId={relationItem.deedId}
+          code={relationItem.code}
+          onOpenChange={(value) => { if (!value) setRelationItem(null); }}
+        />
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[92vh] w-[96vw] max-w-5xl overflow-y-auto" dir="rtl">
           <DialogHeader><DialogTitle className="text-xl">{editing ? 'تعديل موقع شاغر' : 'إضافة موقع إلى الحصر المبدئي'}</DialogTitle></DialogHeader>
