@@ -110,7 +110,10 @@ export function VacantLandsPage() {
       const response = await apiJson<VacantLand[]>('/api/vacant-lands');
       setItems(response);
     } catch (reason) {
-      const msg = reason instanceof Error ? reason.message : 'تعذر تحميل بيانات الأراضي';
+      const raw = reason instanceof Error ? reason.message : 'تعذر تحميل بيانات الأراضي';
+      const msg = /VacantLand.*(does not exist|P2021)|VACANT_LAND_SCHEMA_PENDING|سجل الأراضي الشاغرة بانتظار تهيئة/i.test(raw)
+        ? 'سجل الأراضي الشاغرة بانتظار إنشاء جدوله في قاعدة البيانات بواسطة مسؤول النظام. لم تتأثر سجلات الصكوك أو المباني.'
+        : raw;
       setError(msg);
       toast.error(msg);
     } finally { setLoading(false); }
@@ -263,10 +266,10 @@ export function VacantLandsPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => navigate('/lands/vacant/map')}><MapIcon className="ml-2 h-4 w-4" />الخريطة التفاعلية</Button>
-              {canAdd && <Button variant="outline" onClick={() => navigate('/lands/vacant/import')}><FileDown className="ml-2 h-4 w-4" />استيراد المواقع وربط الصكوك</Button>}
-              {canPrint && <Button variant="outline" onClick={exportExcel}><FileDown className="ml-2 h-4 w-4" />تصدير Excel</Button>}
-              {canPrint && <Button variant="outline" onClick={() => window.print()}><FileText className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
-              {canAdd && <Button onClick={openNew}><Plus className="ml-2 h-4 w-4" />إضافة موقع</Button>}
+              {canAdd && <Button variant="outline" disabled={loading || Boolean(error)} onClick={() => navigate('/lands/vacant/import')}><FileDown className="ml-2 h-4 w-4" />استيراد المواقع وربط الصكوك</Button>}
+              {canPrint && <Button variant="outline" disabled={loading || Boolean(error)} onClick={exportExcel}><FileDown className="ml-2 h-4 w-4" />تصدير Excel</Button>}
+              {canPrint && <Button variant="outline" disabled={loading || Boolean(error)} onClick={() => window.print()}><FileText className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
+              {canAdd && <Button disabled={loading || Boolean(error)} onClick={openNew}><Plus className="ml-2 h-4 w-4" />إضافة موقع</Button>}
             </div>
           </div>
           <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm">
@@ -276,10 +279,10 @@ export function VacantLandsPage() {
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
-            { label: 'إجمالي المواقع', value: String(items.length), icon: MapPin },
-            { label: 'قيد التحقق', value: String(unreviewedCount), icon: Search },
-            { label: 'مواقع شاغرة معتمدة', value: String(verified.length), icon: CheckCircle2 },
-            { label: 'مساحة شاغرة معتمدة (م²)', value: areaFmt(verifiedArea), icon: Ruler },
+            { label: 'إجمالي المواقع', value: loading || error ? '—' : String(items.length), icon: MapPin },
+            { label: 'قيد التحقق', value: loading || error ? '—' : String(unreviewedCount), icon: Search },
+            { label: 'مواقع شاغرة معتمدة', value: loading || error ? '—' : String(verified.length), icon: CheckCircle2 },
+            { label: 'مساحة شاغرة معتمدة (م²)', value: loading || error ? '—' : areaFmt(verifiedArea), icon: Ruler },
           ].map((metric) => (
             <div key={metric.label} className="rounded-2xl border border-primary/20 bg-card/85 p-4 shadow-md transition-all hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl">
               <metric.icon className="mb-3 h-5 w-5 text-primary" />
@@ -305,12 +308,17 @@ export function VacantLandsPage() {
             </select>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            المعروض: {shown.length} موقع · مجموع المساحات التقديرية المسجلة: {areaFmt(tentativeArea)} م² (غير معتمد)
+            {loading || error ? 'بيانات الحصر غير متاحة حاليًا، لذا لا تُعرض أرقام غير مؤكدة.' : <>المعروض: {shown.length} موقع · مجموع المساحات التقديرية المسجلة: {areaFmt(tentativeArea)} م² (غير معتمد)</>}
           </p>
         </div>
 
         {loading ? <p className="py-10 text-center">جارٍ تحميل سجل الأراضي...</p> :
-          error ? <p role="alert" className="rounded-xl border border-destructive/50 p-4">{error} <Button variant="outline" onClick={() => void load()}>إعادة المحاولة</Button></p> :
+          error ? <div role="alert" className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-5">
+            <h2 className="mb-2 text-lg font-bold">تعذر تحميل سجل الأراضي الشاغرة</h2>
+            <p className="mb-3 text-sm">{error}</p>
+            <p className="mb-4 text-xs text-muted-foreground">هذه الحالة لا تعني أن إجمالي المواقع صفر. يُرجى معالجة تهيئة قاعدة البيانات قبل بدء الإدخال.</p>
+            <Button variant="outline" onClick={() => void load()}>إعادة المحاولة</Button>
+          </div> :
           shown.length === 0 ? <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">لا توجد مواقع مطابقة. يمكنك إضافة أول موقع بعد التحقق من الصك.</div> :
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {shown.map((x) => {
