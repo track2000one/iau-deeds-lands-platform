@@ -24,6 +24,7 @@ import {
   downloadKml,
   downloadKmz,
   parseGeometryFile,
+  parseGeometryCollectionFile,
 } from '../../features/investments/geometryFiles';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -53,6 +54,8 @@ type InvestmentPolygonEditorProps = {
   helperText?: string;
   showAreaComparisons?: boolean;
   readOnly?: boolean;
+  strictSinglePolygon?: boolean;
+  onImportFile?: (fileName: string) => void;
   onGeometryChange: (
     geoJson: InvestmentPolygonFeature | null,
     metrics: {
@@ -177,6 +180,8 @@ export const InvestmentPolygonEditor: React.FC<
   helperText = 'فعّل وضع الرسم ثم انقر على زوايا الأرض بالترتيب. يمكن سحب كل نقطة لتعديلها، أو حذفها من قائمة النقاط.',
   showAreaComparisons = true,
   readOnly = false,
+  strictSinglePolygon = false,
+  onImportFile,
   onGeometryChange,
 }) => {
   const [points, setPoints] = React.useState<PolygonCoordinate[]>(() =>
@@ -243,10 +248,15 @@ export const InvestmentPolygonEditor: React.FC<
 
     try {
       setImportingFile(true);
-      const feature = await parseGeometryFile(file);
+      const items = strictSinglePolygon ? await parseGeometryCollectionFile(file) : null;
+      if (items && items.length !== 1) {
+        throw new Error('يحتوي الملف على أكثر من مضلع. اختر ملفًا بمضلع واحد لهذا الموقع، ولا تُسند حدود المواقع الأخرى إليه.');
+      }
+      const feature = items ? items[0].feature : await parseGeometryFile(file);
       const importedPoints = extractOuterRing(feature);
 
       publish(importedPoints);
+      onImportFile?.(file.name);
       setDrawing(false);
       toast.success(
         `تم استيراد حدود Polygon من ${file.name} بعدد ${importedPoints.length} نقاط.`
