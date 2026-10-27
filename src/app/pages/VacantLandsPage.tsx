@@ -263,7 +263,7 @@ export function VacantLandsPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => navigate('/lands/vacant/map')}><MapIcon className="ml-2 h-4 w-4" />الخريطة التفاعلية</Button>
-              {canAdd && <Button variant="outline" onClick={() => navigate('/lands/vacant/import')}><FileDown className="ml-2 h-4 w-4" />استيراد المواقع وربط الصكوك</Button>
+              {canAdd && <Button variant="outline" onClick={() => navigate('/lands/vacant/import')}><FileDown className="ml-2 h-4 w-4" />استيراد المواقع وربط الصكوك</Button>}
               {canPrint && <Button variant="outline" onClick={exportExcel}><FileDown className="ml-2 h-4 w-4" />تصدير Excel</Button>}
               {canPrint && <Button variant="outline" onClick={() => window.print()}><FileText className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
               {canAdd && <Button onClick={openNew}><Plus className="ml-2 h-4 w-4" />إضافة موقع</Button>}
