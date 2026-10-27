@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FileDown, FileText, LandPlot, Pencil, Plus, Search, Trash2, CheckCircle2, MapPin, Ruler } from 'lucide-react';
+import { FileDown, FileText, LandPlot, Pencil, Plus, Search, Trash2, CheckCircle2, MapPin, Ruler, Map as MapIcon } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { InvestmentPolygonEditor } from '../components/InvestmentPolygonEditor';
+import { getPolygonMetrics, type InvestmentPolygonFeature } from '../../features/investments/geometry';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { apiJson } from '../../lib/http';
@@ -26,6 +29,9 @@ type VacantLand = {
   status: Status;
   currentUse?: string | null;
   allocationPurpose?: string | null;
+  geometryGeoJson?: InvestmentPolygonFeature | null;
+  geometrySourceName?: string | null;
+  geometryUpdatedByName?: string | null;
   latitude?: string | number | null;
   longitude?: string | number | null;
   inspectionDate?: string | null;
@@ -43,12 +49,14 @@ type FormState = {
   locationDescription: string; approximateArea: string; verifiedVacantArea: string;
   status: Status; currentUse: string; allocationPurpose: string;
   latitude: string; longitude: string; inspectionDate: string; inspectionNote: string; notes: string;
+  geometryGeoJson: InvestmentPolygonFeature | null; geometrySourceName: string;
 };
 const emptyForm: FormState = {
   code: '', name: '', campus: 'الحرم الجامعي الشرقي', deedId: '',
   locationDescription: '', approximateArea: '', verifiedVacantArea: '',
   status: 'DRAFT', currentUse: '', allocationPurpose: '',
   latitude: '', longitude: '', inspectionDate: '', inspectionNote: '', notes: '',
+  geometryGeoJson: null, geometrySourceName: '',
 };
 const statusOptions: { value: Status; label: string; tone: string }[] = [
   { value: 'DRAFT', label: 'شاغرة مبدئيًا – غير معتمدة', tone: 'border-slate-500/40 bg-slate-500/10 text-foreground' },
@@ -72,6 +80,7 @@ const Field = ({ title, children }: { title: string; children: React.ReactNode }
 );
 
 export function VacantLandsPage() {
+  const navigate = useNavigate();
   const { isAdmin, hasPermission } = usePermissions();
   const { username, currentUser } = useAuth();
   const [items, setItems] = useState<VacantLand[]>([]);
@@ -156,6 +165,8 @@ export function VacantLandsPage() {
       inspectionDate: day(x.inspectionDate),
       inspectionNote: x.inspectionNote || '',
       notes: x.notes || '',
+      geometryGeoJson: x.geometryGeoJson || null,
+      geometrySourceName: x.geometrySourceName || '',
     });
     setDeedQuery(x.deed?.deedNumber || '');
     setDeeds(x.deed ? [x.deed] : []);
@@ -191,6 +202,8 @@ export function VacantLandsPage() {
       inspectionDate: form.inspectionDate ? new Date(form.inspectionDate + 'T12:00:00Z').toISOString() : null,
       inspectionNote: clean(form.inspectionNote),
       notes: clean(form.notes),
+      geometryGeoJson: form.geometryGeoJson,
+      geometrySourceName: form.geometryGeoJson ? clean(form.geometrySourceName) : null,
     };
     try {
       setSaving(true);
@@ -223,6 +236,8 @@ export function VacantLandsPage() {
     'حالة الإشغال': findStatus(x.status).label,
     'الاستخدام الحالي': x.currentUse || '',
     'الموقع والوصف': x.locationDescription || '',
+    'حدود الموقع': x.geometryGeoJson ? 'مدخلة - غير مساحية معتمدة' : 'غير مدخلة',
+    'مصدر الحدود المعلن': x.geometrySourceName || '',
     'آخر مُحدّث': x.updatedByName || '',
   }));
   const exportExcel = () => {
@@ -245,6 +260,7 @@ export function VacantLandsPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => navigate('/lands/vacant/map')}><MapIcon className="ml-2 h-4 w-4" />الخريطة التفاعلية</Button>
               {canPrint && <Button variant="outline" onClick={exportExcel}><FileDown className="ml-2 h-4 w-4" />تصدير Excel</Button>}
               {canPrint && <Button variant="outline" onClick={() => window.print()}><FileText className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
               {canAdd && <Button onClick={openNew}><Plus className="ml-2 h-4 w-4" />إضافة موقع</Button>}
@@ -310,10 +326,12 @@ export function VacantLandsPage() {
                     <div><p className="text-xs text-muted-foreground">المساحة التقديرية</p><strong>{areaFmt(x.approximateArea)} م²</strong></div>
                     <div><p className="text-xs text-muted-foreground">الشاغرة المعتمدة</p><strong>{x.status === 'VERIFIED_VACANT' ? areaFmt(x.verifiedVacantArea) + ' م²' : 'غير معتمدة'}</strong></div>
                     <div className="col-span-2"><p className="text-xs text-muted-foreground">رقم الصك</p><strong>{x.deed?.deedNumber || '—'}</strong></div>
+                    <div className="col-span-2"><p className="text-xs text-muted-foreground">الحدود الجغرافية</p><strong>{x.geometryGeoJson ? `مرسومة · نحو ${areaFmt(getPolygonMetrics(x.geometryGeoJson).calculatedAreaSqm)} م² هندسيًا` : 'لم ترسم بعد'}</strong></div>
                   </div>
                   {x.locationDescription && <p className="mt-3 line-clamp-2 text-sm">{x.locationDescription}</p>}
                   <p className="mt-3 text-xs text-muted-foreground">أُنشئ بواسطة: {x.createdByName || 'غير محدد'} · آخر تعديل: {x.updatedByName || 'غير محدد'}</p>
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => navigate('/lands/vacant/map?selected=' + encodeURIComponent(x.id))}><MapIcon className="ml-1 h-4 w-4" />الخريطة</Button>
                     {canEdit && (isAdmin || (x.createdById === currentUser?.uid && x.status !== 'VERIFIED_VACANT')) && <Button size="sm" variant="outline" onClick={() => openEdit(x)}><Pencil className="ml-1 h-4 w-4" />تحرير</Button>}
                     {canDelete && (isAdmin || (x.createdById === currentUser?.uid && x.status !== 'VERIFIED_VACANT')) && <Button size="sm" variant="outline" onClick={() => void remove(x)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button>}
                   </div>
@@ -337,7 +355,7 @@ export function VacantLandsPage() {
       </div>}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto" dir="rtl">
+        <DialogContent className="max-h-[92vh] w-[96vw] max-w-5xl overflow-y-auto" dir="rtl">
           <DialogHeader><DialogTitle className="text-xl">{editing ? 'تعديل موقع شاغر' : 'إضافة موقع إلى الحصر المبدئي'}</DialogTitle></DialogHeader>
           <form onSubmit={(e) => void save(e)} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -363,8 +381,8 @@ export function VacantLandsPage() {
               </div>
               <Field title="المساحة التقديرية للموقع (م²) *"><Input required type="number" min="0.01" step="0.01" value={form.approximateArea} onChange={(e) => patch('approximateArea', e.target.value)} /></Field>
               <Field title="المساحة الشاغرة المؤكدة (م²)"><Input type="number" min="0" step="0.01" disabled={!isAdmin || form.status !== 'VERIFIED_VACANT'} value={form.verifiedVacantArea} onChange={(e) => patch('verifiedVacantArea', e.target.value)} placeholder="تُملأ بعد التحقق" /></Field>
-              <Field title="خط العرض"><Input type="number" min="-90" max="90" step="any" value={form.latitude} onChange={(e) => patch('latitude', e.target.value)} placeholder="26.39" /></Field>
-              <Field title="خط الطول"><Input type="number" min="-180" max="180" step="any" value={form.longitude} onChange={(e) => patch('longitude', e.target.value)} placeholder="50.20" /></Field>
+              <Field title="خط العرض"><Input type="number" min="-90" max="90" step="any" readOnly={Boolean(form.geometryGeoJson)} value={form.latitude} onChange={(e) => patch('latitude', e.target.value)} placeholder="26.39" /></Field>
+              <Field title="خط الطول"><Input type="number" min="-180" max="180" step="any" readOnly={Boolean(form.geometryGeoJson)} value={form.longitude} onChange={(e) => patch('longitude', e.target.value)} placeholder="50.20" /></Field>
               <Field title="تاريخ المعاينة"><Input type="date" value={form.inspectionDate} onChange={(e) => patch('inspectionDate', e.target.value)} /></Field>
               <Field title="الاستخدام الحالي"><Input value={form.currentUse} onChange={(e) => patch('currentUse', e.target.value)} placeholder="مثال: أرض فضاء / مواقف" /></Field>
               <Field title="المخصص له الموقع (إن وجد)"><Input value={form.allocationPurpose} onChange={(e) => patch('allocationPurpose', e.target.value)} placeholder="مثال: مشروع جامعي" /></Field>
@@ -380,6 +398,41 @@ export function VacantLandsPage() {
                 </Field>
               </div>
             </div>
+            <InvestmentPolygonEditor
+              key={editing?.id || 'new-vacant-land'}
+              title="حدود الموقع على الخريطة الجوية"
+              helperText="ارسم مضلعًا واحدًا لهذا الموقع، أو ارفع ملف Google Earth بصيغة KML / KMZ، أو ملف GeoJSON. يمكن تعديل النقاط على الخريطة. لا يثبت الرسم شغور الأرض أو ملكيتها."
+              geoJson={form.geometryGeoJson}
+              strictSinglePolygon
+              approximateArea={Number(form.approximateArea) || null}
+              referenceCoordinates={
+                form.latitude.trim() && form.longitude.trim()
+                  ? { latitude: Number(form.latitude), longitude: Number(form.longitude) }
+                  : undefined
+              }
+              fileBaseName={form.code || 'vacant-land'}
+              onImportFile={(fileName) => setForm((previous) => ({ ...previous, geometrySourceName: fileName }))}
+              onGeometryChange={(geoJson, metrics) => setForm((previous) => {
+                const changed = JSON.stringify(previous.geometryGeoJson) !== JSON.stringify(geoJson);
+                if (!changed) return previous;
+                return {
+                  ...previous,
+                  geometryGeoJson: geoJson,
+                  geometrySourceName: geoJson ? 'رسم يدوي على الخريطة' : '',
+                  latitude: metrics.centroid ? String(metrics.centroid.latitude) : '',
+                  longitude: metrics.centroid ? String(metrics.centroid.longitude) : '',
+                  status: previous.status === 'VERIFIED_VACANT' ? 'UNDER_REVIEW' : previous.status,
+                  verifiedVacantArea: '',
+                };
+              })}
+            />
+            {form.geometryGeoJson && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm">
+                المساحة الهندسية المحسوبة من المضلع: <strong>{areaFmt(getPolygonMetrics(form.geometryGeoJson).calculatedAreaSqm)} م²</strong>.
+                هذه القيمة لا تعد مساحة صك أو مساحة شاغرة معتمدة.
+                {form.geometrySourceName && <p className="mt-1">مصدر الحدود: {form.geometrySourceName}</p>}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">لا تمثل هذه البيانات اعتمادًا لفرصة استثمارية. يلزم التحقق الميداني ومطابقة الصك والمخطط قبل إقرار المساحة الشاغرة.</p>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
