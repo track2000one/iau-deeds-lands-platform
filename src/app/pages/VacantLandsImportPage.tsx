@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { apiJson } from '../../lib/http';
 import { usePermissions } from '../../context/PermissionsContext';
 import { Button } from '../components/ui/button';
+import { VacantLandRelationsDialog } from '../components/VacantLandRelationsDialog';
 
 type ImportRow = {
   code: string; name: string; campus: string; deedNumber: string;
@@ -18,7 +19,7 @@ type PreviewRow = {
   linkedDeed: { id: string; deedNumber: string; propertyDescription: string } | null;
   status: 'READY' | 'BLOCKED' | 'INVALID'; issues: string[];
 };
-type Preview = { total: number; ready: number; blocked: number; rows: PreviewRow[] };
+type Preview = { total: number; schemaReady: boolean; deedMatched: number; ready: number; blocked: number; rows: PreviewRow[] };
 
 const columns = {
   code: 'رمز الموقع',
@@ -99,6 +100,7 @@ export function VacantLandsImportPage() {
   const [loading, setLoading] = React.useState(false);
   const [fileName, setFileName] = React.useState('');
   const [search, setSearch] = React.useState('');
+  const [relation, setRelation] = React.useState<{ deedId: string; code: string } | null>(null);
 
   const readFile = async (file?: File) => {
     if (!file) return;
@@ -129,17 +131,20 @@ export function VacantLandsImportPage() {
         method: 'POST', body: JSON.stringify({ rows }),
       });
       setPreview(data);
-      toast[data.blocked ? 'warning' : 'success'](
-        data.blocked ? 'توجد ' + data.blocked + ' مواقع تحتاج تصحيحًا قبل الحفظ'
-          : 'اكتملت المطابقة مع الصكوك؛ جميع المواقع جاهزة للاعتماد الجماعي'
-      );
+      if (!data.schemaReady) {
+        toast.warning('تم فحص أرقام الصكوك فقط؛ الحفظ متوقف لحين تهيئة جدول الأراضي الشاغرة');
+      } else if (data.blocked) {
+        toast.warning('توجد ' + data.blocked + ' مواقع تحتاج تصحيحًا قبل الحفظ');
+      } else {
+        toast.success('اكتملت مطابقة الصكوك، وجميع المواقع جاهزة للمراجعة والاعتماد');
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر مراجعة بيانات الصكوك');
     } finally { setLoading(false); }
   };
 
   const commit = async () => {
-    if (!preview || preview.blocked || !isAdmin) return;
+    if (!preview || !preview.schemaReady || preview.blocked || !isAdmin) return;
     if (!window.confirm('سيتم إدخال ' + preview.ready + ' موقعًا بحالة شاغرة مبدئيًا غير معتمدة، مرتبطة بالصكوك المطابقة. هل تريد اعتماد الاستيراد؟')) return;
     try {
       setLoading(true);
@@ -197,11 +202,15 @@ export function VacantLandsImportPage() {
         <Search className="ml-2 h-4 w-4" />{loading ? 'جارٍ التحقق...' : 'فحص ومطابقة ' + rows.length + ' موقعًا'}
       </Button>
       {preview && <div className="mt-5 space-y-4">
+        {!preview.schemaReady && <div role="status" className="rounded-xl border border-amber-500/50 bg-amber-500/10 p-4 text-sm">
+          <strong>وضع المراجعة فقط</strong>
+          <p className="mt-1">يمكن مطابقة أرقام الصكوك وعرض المباني والمواقع والفرص الاستثمارية المرتبطة بها وفق الصلاحيات. لكن لا يمكن فحص التكرار في سجل الأراضي الشاغرة أو حفظ أي موقع قبل إنشاء جدوله بأمان.</p>
+        </div>}
         <div className="grid grid-cols-3 gap-3">
           {[
             { label: 'الإجمالي', value: preview.total },
-            { label: 'مطابقة ناجحة', value: preview.ready },
-            { label: 'تحتاج تصحيح', value: preview.blocked },
+            { label: 'صكوك مطابقة', value: preview.deedMatched },
+            { label: 'غير جاهزة للحفظ', value: preview.blocked },
           ].map((x) => <div key={x.label} className="rounded-xl border bg-muted/20 p-4 text-center">
             <div className="text-xs text-muted-foreground">{x.label}</div><div className="mt-1 text-2xl font-bold">{x.value}</div>
           </div>)}
@@ -211,14 +220,15 @@ export function VacantLandsImportPage() {
         </label>
         <div className="max-h-[490px] overflow-auto rounded-xl border">
           <table className="w-full min-w-[760px] text-right text-sm">
-            <thead className="sticky top-0 bg-card"><tr>{['#','رمز الموقع','النطاق','رقم الصك','المساحة التقديرية','المطابقة','الملاحظات'].map((h) => <th key={h} className="border-b p-3">{h}</th>)}</tr></thead>
+            <thead className="sticky top-0 bg-card"><tr>{['#','رمز الموقع','النطاق','رقم الصك','المساحة التقديرية','المطابقة','الروابط العقارية','الملاحظات'].map((h) => <th key={h} className="border-b p-3">{h}</th>)}</tr></thead>
             <tbody>{shown.map((x) => <tr key={x.rowNumber} className="border-b odd:bg-muted/20">
               <td className="p-3">{x.rowNumber}</td>
               <td className="p-3">{x.code}</td>
               <td className="p-3">{x.campus || '—'}</td>
               <td className="p-3">{x.linkedDeed?.deedNumber || x.deedNumber || '—'}</td>
               <td className="p-3">{x.approximateArea ?? '—'}</td>
-              <td className="p-3"><span className={x.status === 'READY' ? 'text-emerald-600' : 'text-amber-600'}>{x.status === 'READY' ? 'مطابق' : 'يتطلب مراجعة'}</span></td>
+              <td className="p-3"><span className={x.linkedDeed ? 'text-emerald-600' : 'text-amber-600'}>{x.linkedDeed ? 'الصك مطابق' : 'الصك غير مطابق'}</span></td>
+              <td className="p-3">{x.deedId && <Button type="button" size="sm" variant="outline" onClick={() => setRelation({ deedId: x.deedId!, code: x.code })}>المباني والاستثمارات</Button>}</td>
               <td className="p-3">{x.issues.length ? x.issues.join('، ') : 'مطابق للصك بالسجل الموحد'}</td>
             </tr>)}</tbody>
           </table>
@@ -233,11 +243,18 @@ export function VacantLandsImportPage() {
           <p className="my-2 text-sm text-muted-foreground">يقتصر اعتماد الدفعة على مسؤول المنصة، ويُنشئ المواقع بحالة «شاغرة مبدئيًا – غير معتمدة». لا يغير حالة الاستثمارات أو المباني، ولا يثبت ملكية الموقع أو شغوره.</p>
         </div>
       </div>
-      {preview && preview.blocked === 0 && <p className="mb-3 flex items-center gap-2 text-sm text-emerald-600"><CheckCircle2 className="h-4 w-4" />جميع أرقام الصكوك متطابقة مع السجل الحالي.</p>}
-      <Button disabled={!isAdmin || !preview || preview.blocked > 0 || loading} onClick={() => void commit()}>
+      {preview && preview.schemaReady && preview.blocked === 0 && <p className="mb-3 flex items-center gap-2 text-sm text-emerald-600"><CheckCircle2 className="h-4 w-4" />جميع أرقام الصكوك متطابقة مع السجل الحالي.</p>}
+      <Button disabled={!isAdmin || !preview || !preview.schemaReady || preview.blocked > 0 || loading} onClick={() => void commit()}>
         {loading ? 'جارٍ الحفظ...' : 'اعتماد استيراد الدفعة'}
       </Button>
       {!isAdmin && <p className="mt-2 text-xs text-muted-foreground">يمكنك مراجعة الملف، لكن اعتماد الدفعة متاح فقط لمسؤول النظام.</p>}
+      {preview && !preview.schemaReady && <p className="mt-2 text-sm font-semibold text-amber-600">الحفظ مغلق لجميع المستخدمين، بمن فيهم المسؤول، حتى اكتمال تهيئة قاعدة البيانات.</p>}
     </section>
+    {relation && <VacantLandRelationsDialog
+      open={Boolean(relation)}
+      deedId={relation.deedId}
+      code={relation.code}
+      onOpenChange={(value) => { if (!value) setRelation(null); }}
+    />}
   </div>;
 }

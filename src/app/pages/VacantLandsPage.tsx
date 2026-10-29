@@ -266,7 +266,7 @@ export function VacantLandsPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => navigate('/lands/vacant/map')}><MapIcon className="ml-2 h-4 w-4" />الخريطة التفاعلية</Button>
-              {canAdd && <Button variant="outline" disabled={loading || Boolean(error)} onClick={() => navigate('/lands/vacant/import')}><FileDown className="ml-2 h-4 w-4" />استيراد المواقع وربط الصكوك</Button>}
+              {canAdd && <Button variant="outline" disabled={loading} onClick={() => navigate('/lands/vacant/import')}><FileDown className="ml-2 h-4 w-4" />{error ? 'مطابقة الصكوك (بدون حفظ)' : 'استيراد المواقع وربط الصكوك'}</Button>}
               {canPrint && <Button variant="outline" disabled={loading || Boolean(error)} onClick={exportExcel}><FileDown className="ml-2 h-4 w-4" />تصدير Excel</Button>}
               {canPrint && <Button variant="outline" disabled={loading || Boolean(error)} onClick={() => window.print()}><FileText className="ml-2 h-4 w-4" />طباعة التقرير</Button>}
               {canAdd && <Button disabled={loading || Boolean(error)} onClick={openNew}><Plus className="ml-2 h-4 w-4" />إضافة موقع</Button>}
@@ -317,6 +317,7 @@ export function VacantLandsPage() {
             <h2 className="mb-2 text-lg font-bold">تعذر تحميل سجل الأراضي الشاغرة</h2>
             <p className="mb-3 text-sm">{error}</p>
             <p className="mb-4 text-xs text-muted-foreground">هذه الحالة لا تعني أن إجمالي المواقع صفر. يُرجى معالجة تهيئة قاعدة البيانات قبل بدء الإدخال.</p>
+            {canAdd && <Button variant="secondary" className="mb-3 ml-2" onClick={() => navigate('/lands/vacant/import')}>الانتقال إلى مراجعة أرقام الصكوك دون تغيير البيانات</Button>}
             <Button variant="outline" onClick={() => void load()}>إعادة المحاولة</Button>
           </div> :
           shown.length === 0 ? <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">لا توجد مواقع مطابقة. يمكنك إضافة أول موقع بعد التحقق من الصك.</div> :
