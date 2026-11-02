@@ -34,6 +34,7 @@ import {
   ListTodo,
   Scale,
   Network,
+  Users,
   LandPlot,
 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -91,6 +92,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     ['transaction_follow_up', '/follow-up'],
     ['contracts_follow_up', '/contracts/follow-up'],
     ['site_inspections', '/site-inspections'],
+    ['survey_team', '/survey-team'],
     ['reports', '/reports'],
     ['archive', '/archive'],
   ] as const;
@@ -146,6 +148,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'vacant-lands', path: '/lands/vacant', icon: LandPlot, label: ui('الأراضي الشاغرة', 'Vacant Lands'), module: 'vacant_lands', action: 'canView' },
     { id: 'investments', path: '/investments', icon: LandPlot, label: ui('المساحات والفرص الاستثمارية', 'Investment Areas & Opportunities'), module: 'investments', action: 'canView' },
     { id: 'site-inspections', path: '/site-inspections', icon: ClipboardCheck, label: ui('معاينة أرض أو موقع', 'Land or Site Inspection'), module: 'site_inspections', action: 'canView' },
+    { id: 'survey-team', path: '/survey-team', icon: Users, label: ui('إدارة فريق الحصر الميداني', 'Campus Survey Team'), module: 'survey_team', action: 'canView' },
     { id: 'leased-lands-out', path: '/lands/leased-out', icon: MapPin, label: t('nav.leasedLandsOut'), module: 'leased_lands_out', action: 'canView' },
     { id: 'leased-lands-in', path: '/lands/leased-in', icon: MapPin, label: t('nav.leasedLandsIn'), module: 'leased_lands_in', action: 'canView' },
     { id: 'central-buildings', path: '/buildings/registry', icon: Building, label: ui('السجل المركزي للمباني', 'Central Building Registry'), module: 'central_buildings', action: 'canView' },
