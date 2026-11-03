@@ -57,6 +57,7 @@ import { NativeSelect } from '../components/ui/native-select';
 import { Textarea } from '../components/ui/textarea';
 import { BuildingExcelImportManager, getPendingBuildingImport, isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { CentralBuildingsReports } from '../components/CentralBuildingsReports';
+import { openCentralBuildingReport } from '../utils/centralBuildingPrint';
 import { CentralBuildingPhotos } from '../components/CentralBuildingPhotos';
 import type { CentralBuildingPhoto } from '../api/mosques';
 import {
@@ -797,42 +798,13 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       toast.error('لا تملك صلاحية الطباعة');
       return;
     }
-    const popup = window.open('', '_blank', 'width=900,height=750');
-    if (!popup) {
-      toast.error('يرجى السماح بالنوافذ المنبثقة لطباعة البطاقة');
-      return;
-    }
-    const page = popup.document;
-    page.title = `بطاقة مبنى - ${building.buildingNumber}`;
-    page.documentElement.lang = 'ar';
-    page.documentElement.dir = 'rtl';
-    page.body.style.cssText = 'direction:rtl;font-family:Tahoma,Arial,sans-serif;color:#132744;padding:34px;line-height:1.8';
-    const heading = page.createElement('h1');
-    heading.textContent = 'جامعة الإمام عبدالرحمن بن فيصل — السجل المركزي للمباني';
-    heading.style.cssText = 'font-size:22px;border-bottom:2px solid #14365a;padding-bottom:12px';
-    page.body.appendChild(heading);
-    const heading2 = page.createElement('h2');
-    heading2.textContent = building.name || building.buildingNumber;
-    page.body.appendChild(heading2);
-    const author = page.createElement('p');
-    author.textContent = 'أُعدّ بواسطة: ' + reportPreparerName();
-    author.style.cssText = 'color:#334155;font-size:13px;margin:0 0 14px';
-    page.body.appendChild(author);
-    const table = page.createElement('table');
-    table.style.cssText = 'width:100%;border-collapse:collapse;table-layout:fixed';
-    buildingDetails(building).forEach(([label, value]) => {
-      const tr = page.createElement('tr');
-      const th = page.createElement('th');
-      const td = page.createElement('td');
-      th.textContent = label;
-      td.textContent = value;
-      th.style.cssText = 'text-align:right;width:34%;background:#edf2f7;border:1px solid #b6c6d7;padding:9px';
-      td.style.cssText = 'border:1px solid #b6c6d7;padding:9px;overflow-wrap:anywhere';
-      tr.append(th, td);
-      table.appendChild(tr);
-    });
-    page.body.appendChild(table);
-    popup.setTimeout(() => { popup.focus(); popup.print(); }, 250);
+    void openCentralBuildingReport(building, reportPreparerName())
+      .then((opened) => {
+        if (!opened) toast.error('يرجى السماح بالنوافذ المنبثقة لطباعة بطاقة المبنى');
+      })
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : 'تعذّر إعداد التقرير التفصيلي للمبنى');
+      });
   };
 
   if (!canView) {
