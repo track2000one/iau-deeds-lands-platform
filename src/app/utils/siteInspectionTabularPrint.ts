@@ -4,7 +4,7 @@ import { authenticatedFetch } from '../../lib/http';
 
 export type InspectionPrintColumn =
   | 'inspectionNumber' | 'title' | 'siteName' | 'siteType'
-  | 'visitDate' | 'inspectorName' | 'city' | 'district'
+  | 'visitDate' | 'inspectorName' | 'createdBy' | 'visitPurpose' | 'city' | 'district'
   | 'overallStatus' | 'workflowStatus' | 'priority'
   | 'observations' | 'recommendedAction' | 'attachmentCount';
 
@@ -15,6 +15,8 @@ export const inspectionPrintColumns: { key: InspectionPrintColumn; label: string
   { key: 'siteType', label: 'نوع الموقع' },
   { key: 'visitDate', label: 'تاريخ الزيارة' },
   { key: 'inspectorName', label: 'القائم بالمعاينة' },
+  { key: 'createdBy', label: 'اسم المستخدم (مدخل السجل)' },
+  { key: 'visitPurpose', label: 'سبب الزيارة / العمل المنجز' },
   { key: 'city', label: 'المدينة' },
   { key: 'district', label: 'الحي' },
   { key: 'overallStatus', label: 'الحالة العامة' },
@@ -26,8 +28,8 @@ export const inspectionPrintColumns: { key: InspectionPrintColumn; label: string
 ];
 
 export const defaultInspectionPrintColumns: InspectionPrintColumn[] = [
-  'inspectionNumber', 'siteName', 'visitDate', 'city',
-  'overallStatus', 'workflowStatus', 'observations', 'recommendedAction',
+  'inspectionNumber', 'siteName', 'createdBy', 'inspectorName', 'visitDate', 'siteType',
+  'workflowStatus', 'observations', 'recommendedAction',
 ];
 
 const labels: Record<string, string> = {
@@ -171,6 +173,30 @@ const renderReport = (records: SiteInspection[], options: SiteInspectionTablePri
         ? '<table><thead><tr><th>م</th><th>رقم المعاينة</th><th>الموقع</th><th>اسم الصورة</th><th>الصورة</th></tr></thead><tbody>' + photoBody + '</tbody></table>'
         : '<p class="note">لا توجد صور مرفقة بالمعاينات المحددة.</p>')
     : '';
+  // Activities are grouped by the authenticated creator stored on each inspection.
+  // Do not substitute inspectorName: it is an editable field, not the system user.
+  const perUser = new Map<string, { total: number; building: number; land: number; other: number; actions: string[] }>();
+  for (const record of records) {
+    const name = (record.createdBy || '').trim() || 'غير مسجل';
+    const entry = perUser.get(name) || { total: 0, building: 0, land: 0, other: 0, actions: [] };
+    entry.total += 1;
+    if (record.siteType === 'building') entry.building += 1;
+    else if (record.siteType === 'land') entry.land += 1;
+    else entry.other += 1;
+    entry.actions.push(record.inspectionNumber + ' — ' + record.siteName);
+    perUser.set(name, entry);
+  }
+  const userRows = [...perUser.entries()].sort((a, b) => a[0].localeCompare(b[0], 'ar')).map(([name, item]) =>
+    '<tr><td>' + escapeHtml(name) + '</td><td>' + item.total + '</td><td>' + item.building +
+    '</td><td>' + item.land + '</td><td>' + item.other + '</td><td>' +
+    escapeHtml(item.actions.join(' | ')) + '</td></tr>'
+  ).join('');
+  const activitySummary = '<h2>ملخص الأعمال المسجلة حسب اسم المستخدم</h2>' +
+    '<p class="note">الملخص يقتصر على المعاينات المسجلة والمطابقة للتصفية، ولا يمثل حصرًا شاملًا للمباني أو الأراضي.</p>' +
+    '<table><thead><tr><th>اسم المستخدم (مدخل السجل)</th><th>عدد المعاينات</th><th>معاينات مبانٍ</th>' +
+    '<th>معاينات أراضٍ</th><th>مواقع أخرى</th><th>أرقام المعاينات والمواقع</th></tr></thead><tbody>' +
+    userRows + '</tbody></table>';
+
   const unavailable = photos.filter((photo) => !photo.image).length;
   const photoNotice = unavailable ? ' — عدد الصور التي تعذر تحميلها: ' + unavailable : '';
   return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/><title>' + escapeHtml(options.title) +
@@ -183,7 +209,7 @@ const renderReport = (records: SiteInspection[], options: SiteInspectionTablePri
     '</span><span>التاريخ: ' + escapeHtml(new Date().toLocaleDateString('ar-SA-u-ca-gregory')) +
     '</span><span>التوثيق المصوّر: ' + (options.includePhotos ? 'مضمّن' : 'مستبعد') + '</span></div>' +
     (options.criteria ? '<p class="subtitle">معايير التقرير: ' + escapeHtml(options.criteria) + '</p>' : '') +
-    '</header><table><thead><tr><th scope="col">م</th>' + head + '</tr></thead><tbody>' + body + '</tbody></table>' +
+    '</header>' + activitySummary + '<h2>تفاصيل الأعمال والمعاينات</h2><table><thead><tr><th scope="col">م</th>' + head + '</tr></thead><tbody>' + body + '</tbody></table>' +
     imagesSection + '<footer class="footer">تم إعداد التقرير من المعاينات المسجلة في المنصة، وفق معايير الفرز والتصفية المحددة.</footer></main></body></html>';
 };
 
