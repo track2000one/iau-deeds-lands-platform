@@ -21,6 +21,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { SiteInspectionPrintDialog } from '../components/SiteInspectionPrintDialog';
+import { CampusSurveyTeamPage } from './CampusSurveyTeamPage';
 
 const statusLabels: Record<string, string> = {
   new: 'جديدة',
@@ -45,6 +46,8 @@ export const SiteInspectionsPage: React.FC = () => {
   const { hasPermission, isAdmin } = usePermissions();
   const [items, setItems] = React.useState<SiteInspection[]>([]);
   const [search, setSearch] = React.useState('');
+  const [activeTab, setActiveTab] = React.useState<'records' | 'team'>('records');
+  const canSeeTeam = isAdmin || hasPermission('survey_team', 'canView');
   const [loading, setLoading] = React.useState(true);
   const [printTarget, setPrintTarget] = React.useState<SiteInspection | 'all' | null>(null);
 
@@ -81,6 +84,8 @@ export const SiteInspectionsPage: React.FC = () => {
         item.building?.name,
         item.city,
         item.observations,
+        item.createdBy,
+        item.inspectorName,
       ].some((value) => String(value || '').toLowerCase().includes(query))
     );
   }, [items, search]);
@@ -99,6 +104,19 @@ export const SiteInspectionsPage: React.FC = () => {
 
   return (
     <div className="w-full min-w-0 space-y-4 sm:space-y-6">
+      {canSeeTeam && (
+        <div className="flex flex-wrap gap-2 rounded-xl border bg-card p-3" role="tablist" aria-label="أقسام المعاينات والحصر">
+          <Button type="button" role="tab" aria-selected={activeTab === 'records'}
+            variant={activeTab === 'records' ? 'default' : 'outline'} onClick={() => setActiveTab('records')}>
+            <ClipboardCheck className="ml-2 h-4 w-4" />سجل المعاينات
+          </Button>
+          <Button type="button" role="tab" aria-selected={activeTab === 'team'}
+            variant={activeTab === 'team' ? 'default' : 'outline'} onClick={() => setActiveTab('team')}>
+            متابعة الحصر والتكليفات
+          </Button>
+        </div>
+      )}
+      {activeTab === 'team' && canSeeTeam ? <CampusSurveyTeamPage embedded /> : (<>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold sm:text-3xl">المعاينات الميدانية</h1>
@@ -171,6 +189,7 @@ export const SiteInspectionsPage: React.FC = () => {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {[item.city, item.district].filter(Boolean).join(' - ') || 'الموقع غير محدد'}
                   </p>
+                  <p className="mt-2 text-xs text-muted-foreground">مدخل المعاينة: <strong>{item.createdBy || 'غير مسجل'}</strong></p>
                   {(item.deed || item.building) && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {item.deed && <Badge variant="outline">صك: {item.deed.deedNumber}</Badge>}
@@ -232,6 +251,7 @@ export const SiteInspectionsPage: React.FC = () => {
           onClose={() => setPrintTarget(null)}
         />
       )}
+      </>)}
     </div>
   );
 };
