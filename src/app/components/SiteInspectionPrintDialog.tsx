@@ -35,6 +35,7 @@ type Props = {
   records: SiteInspection[];
   target?: SiteInspection;
   initialSearch?: string;
+  initialCreator?: string;
   onClose: () => void;
 };
 
@@ -44,7 +45,7 @@ const parseDate = (value: string): number => {
 };
 
 export const SiteInspectionPrintDialog: React.FC<Props> = ({
-  records, target, initialSearch = '', onClose,
+  records, target, initialSearch = '', initialCreator = '', onClose,
 }) => {
   const individual = Boolean(target);
   const [title, setTitle] = React.useState(
@@ -54,7 +55,7 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
   const [workflow, setWorkflow] = React.useState('');
   const [condition, setCondition] = React.useState('');
   const [city, setCity] = React.useState('');
-  const [creator, setCreator] = React.useState('');
+  const [creator, setCreator] = React.useState(initialCreator);
   const [from, setFrom] = React.useState('');
   const [to, setTo] = React.useState('');
   const [sortBy, setSortBy] = React.useState('visitDate');
