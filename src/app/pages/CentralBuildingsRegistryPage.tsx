@@ -57,7 +57,9 @@ import { Textarea } from '../components/ui/textarea';
 import { BuildingExcelImportManager, getPendingBuildingImport, isPendingImportedBuilding } from '../components/BuildingExcelImportManager';
 import { CentralBuildingsReports } from '../components/CentralBuildingsReports';
 import { CentralBuildingPhotos } from '../components/CentralBuildingPhotos';
-import type { CentralBuildingPhoto } from '../api/mosques';
+import { CentralBuildingDocuments } from '../components/CentralBuildingDocuments';
+import { CentralBuildingCover } from '../components/CentralBuildingCover';
+import type { CentralBuildingPhoto, CentralBuildingDocument } from '../api/mosques';
 import {
   Dialog,
   DialogContent,
@@ -225,12 +227,19 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const [editingBuilding, setEditingBuilding] =
     useState<MosqueBuilding | null>(null);
   const [form, setForm] = useState<BuildingForm>(EMPTY_FORM);
+  const [pendingPhotoFiles, setPendingPhotoFiles] = useState<File[]>([]);
+  const [pendingDocumentFiles, setPendingDocumentFiles] = useState<File[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<MosqueBuilding | null>(null);
   const [viewTarget, setViewTarget] = useState<MosqueBuilding | null>(null);
   const updateBuildingPhotos = (buildingId: string, photos: CentralBuildingPhoto[]) => {
     setBuildings((records) => records.map((item) => item.id === buildingId ? { ...item, photos } : item));
     setEditingBuilding((item) => item?.id === buildingId ? { ...item, photos } : item);
     setViewTarget((item) => item?.id === buildingId ? { ...item, photos } : item);
+  };
+  const updateBuildingDocuments = (buildingId: string, documents: CentralBuildingDocument[]) => {
+    setBuildings((records) => records.map((item) => item.id === buildingId ? { ...item, documents } : item));
+    setEditingBuilding((item) => item?.id === buildingId ? { ...item, documents } : item);
+    setViewTarget((item) => item?.id === buildingId ? { ...item, documents } : item);
   };
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -412,6 +421,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
 
   const openCreate = () => {
     setEditingBuilding(null);
+    setPendingPhotoFiles([]);
+    setPendingDocumentFiles([]);
     setForm(EMPTY_FORM);
     setMapPickerOpen(false);
     setFormOpen(true);
@@ -423,6 +434,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       return;
     }
     setEditingBuilding(building);
+    setPendingPhotoFiles([]);
+    setPendingDocumentFiles([]);
     setForm({
       buildingNumber: building.buildingNumber || '',
       name: building.name || '',
@@ -604,23 +617,51 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
 
     try {
       setSaving(true);
-      if (editingBuilding) {
-        await mosqueApi.updateBuilding(editingBuilding.id, commonPayload);
-        toast.success('تم تحديث البيانات الأساسية للمبنى في السجل المركزي');
-      } else {
-        await mosqueApi.createBuilding({
-          ...commonPayload,
-          coverageStatus: 'unassessed',
-          creationFeasibility: 'under_study',
-        });
-        toast.success('تم تعريف المبنى في السجل المركزي');
+      const savedBuilding = editingBuilding
+        ? await mosqueApi.updateBuilding(editingBuilding.id, commonPayload)
+        : await mosqueApi.createBuilding({
+            ...commonPayload,
+            coverageStatus: 'unassessed',
+            creationFeasibility: 'under_study',
+          });
+
+      // A new building must be saved before its private files can be attached to its ID.
+      // Successful files are removed from the pending queue to prevent duplicates on retry.
+      for (let i = 0; i < pendingPhotoFiles.length; i += 1) {
+        try {
+          const result = await mosqueApi.uploadBuildingPhotos(savedBuilding.id, [pendingPhotoFiles[i]]);
+          updateBuildingPhotos(savedBuilding.id, result.photos);
+          setPendingPhotoFiles(pendingPhotoFiles.slice(i + 1));
+        } catch (error) {
+          setEditingBuilding(savedBuilding);
+          setPendingPhotoFiles(pendingPhotoFiles.slice(i));
+          await loadData().catch(() => {});
+          toast.error('تم حفظ المبنى، لكن تعذر رفع بعض صوره. بقيت الصور غير المرفوعة للاعتناء بها: ' +
+            (error instanceof Error ? error.message : 'خطأ في الرفع'));
+          return;
+        }
       }
+      for (let i = 0; i < pendingDocumentFiles.length; i += 1) {
+        try {
+          const result = await mosqueApi.uploadBuildingDocuments(savedBuilding.id, [pendingDocumentFiles[i]]);
+          updateBuildingDocuments(savedBuilding.id, result.documents);
+          setPendingDocumentFiles(pendingDocumentFiles.slice(i + 1));
+        } catch (error) {
+          setEditingBuilding(savedBuilding);
+          setPendingDocumentFiles(pendingDocumentFiles.slice(i));
+          await loadData().catch(() => {});
+          toast.error('تم حفظ المبنى، لكن تعذر رفع بعض المرفقات. بقيت الملفات غير المرفوعة في النموذج: ' +
+            (error instanceof Error ? error.message : 'خطأ في الرفع'));
+          return;
+        }
+      }
+      setPendingPhotoFiles([]);
+      setPendingDocumentFiles([]);
       setFormOpen(false);
       await loadData();
+      toast.success(editingBuilding ? 'تم حفظ بيانات المبنى ومرفقاته' : 'تم إنشاء المبنى وحفظ مرفقاته');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'تعذر حفظ بيانات المبنى'
-      );
+      toast.error(error instanceof Error ? error.message : 'تعذر حفظ بيانات المبنى');
     } finally {
       setSaving(false);
     }
@@ -787,7 +828,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               </Button>
             )}
             {canAdd && (
-              <Button onClick={openCreate}>
+              <Button onClick={openCreate} className="bg-emerald-600 font-bold text-white shadow-[0_4px_0_#065f46,0_9px_18px_rgba(5,150,105,0.22)] transition-all hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-[0_6px_0_#065f46,0_12px_22px_rgba(5,150,105,0.25)] active:translate-y-0.5 active:shadow-[0_2px_0_#065f46]">
                 <Plus className="h-4 w-4" />
                 إضافة مبنى مركزي
               </Button>
@@ -964,6 +1005,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                   </div>
                                 </div>
 
+                                {Boolean(building.photos?.length) && <CentralBuildingCover buildingId={building.id} photos={building.photos} />}
                                 <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
                                   <UsageBox
                                     label="العناية"
@@ -1003,10 +1045,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                     </Button>
                                   )}
                                   {canDeleteBuilding(building) && (
-                                    <Button size="sm" variant="outline" disabled={references > 0 || Boolean(building.photos?.length)}
+                                    <Button size="sm" variant="outline" disabled={references > 0 || Boolean(building.photos?.length) || Boolean(building.documents?.length)}
                                       className="gap-1.5 border-red-300 text-red-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-red-50 hover:shadow-md"
                                       onClick={() => setDeleteTarget(building)}
-                                      title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length ? 'احذف صور المبنى أولًا' : 'حذف المبنى'}>
+                                      title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length || building.documents?.length ? 'احذف صور ومرفقات المبنى أولًا' : 'حذف المبنى'}>
                                       <Trash2 className="h-4 w-4" /> حذف
                                     </Button>
                                   )}
@@ -1053,7 +1095,11 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
             </div>
           )}
           {viewTarget && (
-            <CentralBuildingPhotos key={viewTarget.id} buildingId={viewTarget.id} photos={viewTarget.photos} />
+            <>
+              <CentralBuildingPhotos key={viewTarget.id} buildingId={viewTarget.id} photos={viewTarget.photos} />
+              <CentralBuildingDocuments key={viewTarget.id + '-documents'} buildingId={viewTarget.id}
+                documents={viewTarget.documents} pendingFiles={[]} onPendingFilesChange={() => {}} />
+            </>
           )}
           <DialogFooter className="gap-2 sm:justify-start">
             {viewTarget && canPrint && <Button variant="outline" onClick={() => printBuilding(viewTarget)}><Printer className="h-4 w-4" /> طباعة البطاقة</Button>}
@@ -1062,7 +1108,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!saving) setFormOpen(open); }}>
         <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl" dir="rtl">
           <DialogHeader className="text-right sm:text-right">
             <DialogTitle>
@@ -1293,11 +1339,26 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
             key={editingBuilding?.id || 'new-building'}
             buildingId={editingBuilding?.id}
             photos={editingBuilding?.photos}
-            editable={Boolean(editingBuilding && canEditBuilding(editingBuilding))}
+            editable={editingBuilding ? canEditBuilding(editingBuilding) : canAdd}
+            blocked={saving}
+            pendingFiles={pendingPhotoFiles}
+            onPendingFilesChange={setPendingPhotoFiles}
             onPhotosChange={(photos) => {
               if (editingBuilding) updateBuildingPhotos(editingBuilding.id, photos);
             }}
             onReload={loadData}
+          />
+          <CentralBuildingDocuments
+            key={(editingBuilding?.id || 'new-building') + '-documents'}
+            buildingId={editingBuilding?.id}
+            documents={editingBuilding?.documents}
+            editable={editingBuilding ? canEditBuilding(editingBuilding) : canAdd}
+            blocked={saving}
+            pendingFiles={pendingDocumentFiles}
+            onPendingFilesChange={setPendingDocumentFiles}
+            onDocumentsChange={(documents) => {
+              if (editingBuilding) updateBuildingDocuments(editingBuilding.id, documents);
+            }}
           />
 
           <DialogFooter className="gap-2 sm:justify-start">
@@ -1305,7 +1366,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               إلغاء
             </Button>
             <Button onClick={() => void saveBuilding()} disabled={saving}>
-              {saving ? 'جارٍ الحفظ...' : 'حفظ المبنى'}
+              {saving ? 'جارٍ حفظ المبنى والمرفقات...' : 'حفظ المبنى والمرفقات'}
             </Button>
           </DialogFooter>
         </DialogContent>
