@@ -49,6 +49,20 @@ export type CentralBuildingPhoto = {
   fileName: string;
   mimeType: string;
   uploadedAt: string;
+  uploadedBy?: string | null;
+  uploadedByName?: string | null;
+  isPrimary?: boolean;
+};
+
+export type CentralBuildingDocument = {
+  id: string;
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  fileSize?: number;
+  uploadedAt: string;
+  uploadedBy?: string | null;
+  uploadedByName?: string | null;
 };
 
 export type MosqueBuilding = {
@@ -84,6 +98,7 @@ export type MosqueBuilding = {
   approvedAlternative?: string | null;
   notes?: string | null;
   photos?: CentralBuildingPhoto[] | null;
+  documents?: CentralBuildingDocument[] | null;
   createdBy?: string | null;
   createdByName?: string | null;
   createdAt?: string;
@@ -1041,6 +1056,33 @@ export const mosqueApi = {
   deleteBuildingPhoto: (id: string, photoId: string) =>
     apiJson<{ photos: CentralBuildingPhoto[] }>(
       `/api/mosques/buildings/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}`,
+      { method: 'DELETE' },
+    ),
+  setPrimaryBuildingPhoto: (id: string, photoId: string) =>
+    apiJson<{ photos: CentralBuildingPhoto[] }>(
+      `/api/mosques/buildings/${encodeURIComponent(id)}/photos/${encodeURIComponent(photoId)}/primary`,
+      { method: 'PATCH' },
+    ),
+  uploadBuildingDocuments: async (id: string, files: File[]) => {
+    const data = new FormData();
+    files.forEach((file) => data.append('documents', file));
+    const response = await authenticatedFetch(`/api/mosques/buildings/${encodeURIComponent(id)}/documents`, {
+      method: 'POST', body: data,
+    }, 120_000);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body?.message || 'تعذر رفع مرفقات المبنى');
+    return body as { documents: CentralBuildingDocument[] };
+  },
+  buildingDocumentBlob: async (id: string, documentId: string) => {
+    const response = await authenticatedFetch(
+      `/api/mosques/buildings/${encodeURIComponent(id)}/documents/${encodeURIComponent(documentId)}/content`,
+    );
+    if (!response.ok) throw new Error('تعذر تحميل مرفق المبنى');
+    return response.blob();
+  },
+  deleteBuildingDocument: (id: string, documentId: string) =>
+    apiJson<{ documents: CentralBuildingDocument[] }>(
+      `/api/mosques/buildings/${encodeURIComponent(id)}/documents/${encodeURIComponent(documentId)}`,
       { method: 'DELETE' },
     ),
   deleteAllPendingBuildings: () => apiJson<{ deletedCount: number; skippedCount: number; totalPending: number }>(
