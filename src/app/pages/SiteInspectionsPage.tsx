@@ -50,6 +50,7 @@ export const SiteInspectionsPage: React.FC = () => {
   const canSeeTeam = isAdmin || hasPermission('survey_team', 'canView');
   const [loading, setLoading] = React.useState(true);
   const [printTarget, setPrintTarget] = React.useState<SiteInspection | 'all' | null>(null);
+  const [reportCreator, setReportCreator] = React.useState('');
 
   const canAdd = isAdmin || hasPermission('site_inspections', 'canAdd');
   const canDelete = isAdmin || hasPermission('site_inspections', 'canDelete');
@@ -116,7 +117,11 @@ export const SiteInspectionsPage: React.FC = () => {
           </Button>
         </div>
       )}
-      {activeTab === 'team' && canSeeTeam ? <CampusSurveyTeamPage embedded /> : (<>
+      {activeTab === 'team' && canSeeTeam ? <CampusSurveyTeamPage embedded onReportCreator={(username) => {
+        setReportCreator(username);
+        setPrintTarget('all');
+        setActiveTab('records');
+      }} /> : (<>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold sm:text-3xl">المعاينات الميدانية</h1>
@@ -127,7 +132,7 @@ export const SiteInspectionsPage: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           {canPrint && (
-            <Button variant="outline" onClick={() => setPrintTarget('all')} disabled={loading || !items.length}
+            <Button variant="outline" onClick={() => { setReportCreator(''); setPrintTarget('all'); }} disabled={loading || !items.length}
               className="border-emerald-700 text-emerald-900">
               <Printer className="ml-2 h-4 w-4" />
               تقرير شامل / طباعة
@@ -226,7 +231,7 @@ export const SiteInspectionsPage: React.FC = () => {
                     عرض
                   </Button>
                   {canPrint && (
-                    <Button variant="outline" onClick={() => setPrintTarget(item)}>
+                    <Button variant="outline" onClick={() => { setReportCreator(''); setPrintTarget(item); }}>
                       <Printer className="ml-2 h-4 w-4" />
                       طباعة
                     </Button>
@@ -248,6 +253,7 @@ export const SiteInspectionsPage: React.FC = () => {
           records={items}
           target={printTarget === 'all' ? undefined : printTarget}
           initialSearch={printTarget === 'all' ? search : ''}
+          initialCreator={printTarget === 'all' ? reportCreator : ''}
           onClose={() => setPrintTarget(null)}
         />
       )}
