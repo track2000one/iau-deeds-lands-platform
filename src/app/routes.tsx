@@ -35,7 +35,6 @@ const AuditLogPage = lazy(() => import('./pages/AuditLogPage').then((m) => ({ de
 const ArchivePage = lazy(() => import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage })));
 const AppearanceSettingsPage = lazy(() => import('./pages/AppearanceSettingsPage').then((m) => ({ default: m.AppearanceSettingsPage })));
 const CentralBuildingsRegistryPage = lazy(() => import('./pages/CentralBuildingsRegistryPage').then((m) => ({ default: m.CentralBuildingsRegistryPage })));
-const CampusSurveyTeamPage = lazy(() => import('./pages/CampusSurveyTeamPage').then((m) => ({ default: m.CampusSurveyTeamPage })));
 const SiteInspectionsPage = lazy(() => import('./pages/SiteInspectionsPage').then((m) => ({ default: m.SiteInspectionsPage })));
 const VacantLandsPage = lazy(() => import('./pages/VacantLandsPage').then((m) => ({ default: m.VacantLandsPage })));
 const VacantLandsMapPage = lazy(() => import('./pages/VacantLandsMapPage').then((m) => ({ default: m.VacantLandsMapPage })));
@@ -116,7 +115,6 @@ const SCOPED_LANDING_ROUTES = [
   ['transaction_risk_policy', '/follow-up/risks/policy'],
   ['contracts_follow_up', '/contracts/follow-up'],
   ['site_inspections', '/site-inspections'],
-  ['survey_team', '/survey-team'],
   ['reports', '/reports'],
   ['archive', '/archive'],
 ] as const;
@@ -185,7 +183,7 @@ export const router = createHashRouter([
         ],
       },
       { path: 'maps/:deedId?', element: page(<MapsPage />) },
-      { path: 'survey-team', element: <PermissionGuard module="survey_team" action="canView">{page(<CampusSurveyTeamPage />)}</PermissionGuard> },
+      { path: 'survey-team', element: <Navigate to="/site-inspections" replace /> },
       { path: 'lands/vacant', element: vacantLandsPermission(<VacantLandsPage />) },
       { path: 'lands/vacant/map', element: vacantLandsPermission(<VacantLandsMapPage />) },
       { path: 'lands/vacant/import', element: <PermissionGuard module="vacant_lands" action="canAdd">{page(<VacantLandsImportPage />)}</PermissionGuard> },
