@@ -252,7 +252,7 @@ export const SiteInspectionsPage: React.FC = () => {
         <SiteInspectionPrintDialog
           records={items}
           target={printTarget === 'all' ? undefined : printTarget}
-          initialSearch={printTarget === 'all' ? search : ''}
+          initialSearch={printTarget === 'all' && !reportCreator ? search : ''}
           initialCreator={printTarget === 'all' ? reportCreator : ''}
           onClose={() => setPrintTarget(null)}
         />
