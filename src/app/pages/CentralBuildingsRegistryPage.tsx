@@ -234,16 +234,28 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     useState<MosqueBuilding | null>(null);
   const [form, setForm] = useState<BuildingForm>(EMPTY_FORM);
   const [surveyAssignment, setSurveyAssignment] = useState<SurveyBuildingAssignment | null>(null);
+  const [surveyAssignmentLoading, setSurveyAssignmentLoading] = useState(true);
+  const [surveyAssignmentError, setSurveyAssignmentError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     if (!userProfile?.uid || (!canAdd && !canEdit)) {
       setSurveyAssignment(null);
+      setSurveyAssignmentLoading(false);
+      setSurveyAssignmentError('');
       return;
     }
+    setSurveyAssignmentLoading(true);
+    setSurveyAssignmentError('');
     void apiJson<SurveyBuildingAssignment | null>('/api/campus-survey-team/my-assignment')
       .then((assignment) => { if (!cancelled) setSurveyAssignment(assignment); })
-      .catch(() => { if (!cancelled) setSurveyAssignment(null); });
+      .catch(() => {
+        if (!cancelled) {
+          setSurveyAssignment(null);
+          setSurveyAssignmentError('تعذر التحقق من نطاق الحرم المكلف. يرجى التأكد من تهيئة تكليفات الحصر في المنصة.');
+        }
+      })
+      .finally(() => { if (!cancelled) setSurveyAssignmentLoading(false); });
     return () => { cancelled = true; };
   }, [userProfile?.uid, canAdd, canEdit]);
   const [deleteTarget, setDeleteTarget] = useState<MosqueBuilding | null>(null);
@@ -432,6 +444,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   }, [approvedBuildings, usage]);
 
   const openCreate = () => {
+    if (surveyAssignmentLoading || surveyAssignmentError) {
+      toast.error(surveyAssignmentError || 'جارٍ التحقق من تكليف الحصر؛ أعد المحاولة بعد اكتمال التحميل');
+      return;
+    }
     setEditingBuilding(null);
     setForm({
       ...EMPTY_FORM,
@@ -532,6 +548,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   };
 
   const saveBuilding = async () => {
+    if (surveyAssignmentLoading || surveyAssignmentError) {
+      toast.error(surveyAssignmentError || 'تعذر التحقق من نطاق تكليف الحصر');
+      return;
+    }
     if (editingBuilding && !canEditBuilding(editingBuilding)) {
       toast.error('لا يمكنك تعديل سجل أنشأه مستخدم آخر');
       return;
@@ -1133,6 +1153,11 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {surveyAssignmentError && (canAdd || canEdit) && (
+        <div role="alert" className="rounded-xl border border-amber-400/50 bg-amber-50 p-3 text-sm text-amber-900">
+          {surveyAssignmentError} لن يُسمح بحفظ بيانات جديدة قبل نجاح التحقق.
+        </div>
+      )}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl" dir="rtl">
           <DialogHeader className="text-right sm:text-right">
