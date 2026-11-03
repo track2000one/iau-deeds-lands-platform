@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { Building2, ClipboardCheck, LandPlot, RefreshCw, ShieldCheck, Users } from 'lucide-react';
 import { usePermissions } from '../../context/PermissionsContext';
 import { apiJson } from '../../lib/http';
+import { reportPreparerName } from '../utils/reportAttribution';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -33,6 +34,35 @@ type Metric = {
   employeeVacantLands: number | null;
   accountUsername: string | null;
   countsAreProvisional: true;
+};
+
+type StaffWorkReport = {
+  memberName: string;
+  username: string;
+  campus: string;
+  counts: { buildings: number; inspections: number; vacantLands: number | null };
+  vacantLandsTableAvailable: boolean;
+  activities: Array<{
+    type: 'building' | 'inspection' | 'vacant_land';
+    identifier: string;
+    title: string;
+    location: string;
+    date: string;
+    deedNumber: string | null;
+    details: string;
+    inAssignedCampus: boolean;
+  }>;
+  disclaimer: string;
+};
+
+const escapeForPrint = (value: unknown) =>
+  String(value ?? '—').replace(/[&<>"']/g, (char) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
+
+const activityLabel: Record<StaffWorkReport['activities'][number]['type'], string> = {
+  building: 'حصر / تسجيل مبنى',
+  inspection: 'معاينة ميدانية',
+  vacant_land: 'حصر / تسجيل أرض شاغرة',
 };
 
 const STATUS: Record<SurveyStatus, string> = {
@@ -95,6 +125,53 @@ export function CampusSurveyTeamPage({
       toast.error(error instanceof Error ? error.message : 'تعذر تحديث التكليف');
     } finally {
       setBusy('');
+    }
+  };
+
+  const printWork = async (code: string) => {
+    const page = window.open('', '_blank');
+    if (!page) return toast.error('يرجى السماح بالنوافذ المنبثقة لطباعة التقرير');
+    page.document.write('<!doctype html><html lang="ar" dir="rtl"><meta charset="UTF-8"><title>تجهيز التقرير</title><body style="font:18px Tahoma;padding:32px">جارٍ تجهيز تقرير أعمال الموظف...</body></html>');
+    page.document.close();
+    try {
+      const report = await apiJson<StaffWorkReport>('/api/campus-survey-team/work-report/' + encodeURIComponent(code));
+      const counts = report.counts;
+      const rows = report.activities.map((item, index) => [
+        '<tr><td>', index + 1, '</td><td>', escapeForPrint(activityLabel[item.type]),
+        '</td><td>', escapeForPrint(item.identifier), '</td><td>', escapeForPrint(item.title),
+        '</td><td>', escapeForPrint(item.location), '</td><td>',
+        escapeForPrint(new Date(item.date).toLocaleDateString('ar-SA-u-ca-gregory')),
+        '</td><td>', escapeForPrint(item.deedNumber || '—'),
+        '</td><td>', escapeForPrint(item.details || '—'),
+        '</td><td>', item.inAssignedCampus ? 'مرتبط بالحرم' : 'يلزم تحقق من النطاق',
+        '</td></tr>',
+      ].join('')).join('');
+      const html = [
+        '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير أعمال ', escapeForPrint(report.memberName), '</title>',
+        '<style>@page{size:A4 landscape;margin:12mm}body{font:14px/1.8 Tahoma,Arial,sans-serif;color:#19334b;margin:20px}header{border:2px solid #0d5263;padding:15px;background:#eef6f8}h1{margin:0 0 7px}h2{margin:18px 0 9px}.meta{display:flex;gap:24px;flex-wrap:wrap;margin-top:10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #aabdc7;padding:8px;text-align:right;vertical-align:top;overflow-wrap:anywhere}th{background:#0d5263;color:white}tr{break-inside:avoid}button{padding:9px 22px;background:#0d5263;color:white;border:0;border-radius:6px}footer{margin-top:20px;border-top:1px solid #94a3b8;padding-top:10px}@media print{button{display:none}body{margin:0}}</style></head><body>',
+        '<button onclick="window.print()">طباعة / حفظ PDF</button><header><h1>تقرير أعمال فريق الحصر الميداني</h1>',
+        '<div>جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الصكوك والأراضي</div>',
+        '<div class="meta"><span>الموظف: <strong>', escapeForPrint(report.memberName),
+        '</strong></span><span>اسم المستخدم: <strong>', escapeForPrint(report.username),
+        '</strong></span><span>الحرم المكلف: ', escapeForPrint(report.campus),
+        '</span><span>أُعدّ بواسطة: ', escapeForPrint(reportPreparerName()),
+        '</span><span>التاريخ: ', escapeForPrint(new Date().toLocaleDateString('ar-SA-u-ca-gregory')), '</span></div></header>',
+        '<h2>ملخص الأعمال المسجلة</h2><p>المباني: ', counts.buildings, ' — المعاينات: ', counts.inspections,
+        ' — الأراضي الشاغرة: ', counts.vacantLands ?? 'تعذر التحقق من الجدول',
+        '</p><p>', escapeForPrint(report.disclaimer), '</p>',
+        '<h2>تفاصيل الأعمال حسب السجلات</h2><table><thead><tr><th>م</th><th>نوع العمل</th><th>رقم السجل</th>',
+        '<th>المسمى</th><th>الموقع</th><th>التاريخ</th><th>الصك</th><th>الأعمال والملاحظات</th><th>نطاق الحرم</th></tr></thead><tbody>',
+        rows || '<tr><td colspan="9">لا توجد أعمال منسوبة إلى هذا الحساب في السجلات الحالية.</td></tr>',
+        '</tbody></table><footer>بيانات السجل لا تُثبت اكتمال الحصر أو حدود الملكية دون مراجعة المستندات والمعاينة.</footer></body></html>',
+      ].join('');
+      if (!page.closed) {
+        page.document.open();
+        page.document.write(html);
+        page.document.close();
+      }
+    } catch (error) {
+      if (!page.closed) page.document.body.textContent = 'تعذر إنشاء تقرير الأعمال؛ تحقق من ربط الحساب والاتصال بالخادم.';
+      toast.error(error instanceof Error ? error.message : 'تعذر إعداد تقرير الأعمال');
     }
   };
 
@@ -191,6 +268,11 @@ export function CampusSurveyTeamPage({
                       {metric?.accountUsername && onReportCreator && (
                         <Button variant="outline" onClick={() => onReportCreator(metric.accountUsername!)}>
                           تقرير أعمال المعاينات — {metric.accountUsername}
+                        </Button>
+                      )}
+                      {metric?.accountUsername && team?.canManage && (
+                        <Button variant="outline" onClick={() => { void printWork(member.code); }}>
+                          تقرير أعمال الموظف الشامل (المباني / الأراضي / المعاينات)
                         </Button>
                       )}
                     </div>
