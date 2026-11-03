@@ -402,6 +402,7 @@ const buildInspectionReportHtml = (record: SiteInspection): string => {
         ${infoRow('نوع الموقع', labels[record.siteType] || record.siteType)}
         ${infoRow('اسم الموقع', record.siteName)}
         ${infoRow('السجل المرتبط', record.deed ? `صك رقم ${record.deed.deedNumber}` : record.building ? `مبنى رقم ${record.building.buildingNumber} — ${record.building.name || ''}` : '-')}
+        ${infoRow('اسم المستخدم الذي سجّل المعاينة', record.createdBy || 'غير مسجل')}
         ${infoRow('القائم بالمعاينة', record.inspectorName || '-')}
         ${infoRow('الجهة المرافقة', record.accompanyingEntity || '-')}
         ${infoRow('المنطقة', record.region || '-')}
@@ -443,6 +444,7 @@ const buildInspectionReportHtml = (record: SiteInspection): string => {
 
     <footer class="footer">
       <span>تاريخ إعداد التقرير: ${escapeHtml(reportDate)}</span>
+      <span>المستخدم المسجّل للمعاينة: ${escapeHtml(record.createdBy || "غير مسجل")}</span>
       <span>جامعة الإمام عبدالرحمن بن فيصل — منصة إدارة الصكوك والأراضي</span>
     </footer>
   </main>
@@ -557,6 +559,7 @@ export const ViewSiteInspectionPage: React.FC = () => {
           value={record.deed ? `صك رقم ${record.deed.deedNumber}` : record.building ? `مبنى رقم ${record.building.buildingNumber}` : '-'}
         />
         <Info label="تاريخ الزيارة" value={new Date(record.visitDate).toLocaleString('ar-SA')} />
+        <Info label="اسم المستخدم الذي سجّل المعاينة" value={record.createdBy || "غير مسجل"} />
         <Info label="القائم بالمعاينة" value={record.inspectorName || '-'} />
         <Info label="الحالة العامة" value={labels[record.overallStatus] || record.overallStatus} />
         <Info label="الأولوية" value={labels[record.priority] || record.priority} />
