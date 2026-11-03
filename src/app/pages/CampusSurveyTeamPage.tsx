@@ -41,7 +41,7 @@ const STATUS: Record<SurveyStatus, string> = {
 const STATUS_VALUES = Object.keys(STATUS) as SurveyStatus[];
 const ASSIGNMENT_ORDER = ['LEAD', 'WEST', 'RAYYAN', 'EAST'];
 
-export function CampusSurveyTeamPage() {
+export function CampusSurveyTeamPage({ embedded = false }: { embedded?: boolean }) {
   const { isAdmin } = usePermissions();
   const [team, setTeam] = useState<TeamResponse | null>(null);
   const [metrics, setMetrics] = useState<Metric[]>([]);
@@ -106,11 +106,11 @@ export function CampusSurveyTeamPage() {
   };
 
   return (
-    <main className="mx-auto max-w-7xl space-y-5 p-4 md:p-6" dir="rtl">
+    <section className={embedded ? "space-y-5" : "mx-auto max-w-7xl space-y-5 p-4 md:p-6"} dir="rtl">
       <header className="rounded-2xl border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-2">
-            <h1 className="flex items-center gap-2 text-2xl font-extrabold text-foreground"><Users className="h-7 w-7" />إدارة فريق الحصر الميداني</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-extrabold text-foreground"><Users className="h-7 w-7" />متابعة الحصر والتكليفات</h1>
             <p className="text-sm leading-7 text-muted-foreground">
               تكليف مستقل لكل حرم جامعي، بإشراف محمد المغربي. يشمل الحصر السجل المركزي للمباني والمعاينات والأراضي الشاغرة.
             </p>
@@ -228,6 +228,6 @@ export function CampusSurveyTeamPage() {
         <ShieldCheck className="h-4 w-4" />
         لا تُفعل صلاحيات الحرم باستخدام الاسم وحده؛ يجب ربط حساب المستخدم رسميًا ومراجعة نطاقه قبل التشغيل.
       </p>
-    </main>
+    </section>
   );
 }
