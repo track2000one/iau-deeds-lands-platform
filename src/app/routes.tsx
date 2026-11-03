@@ -183,6 +183,7 @@ export const router = createHashRouter([
         ],
       },
       { path: 'maps/:deedId?', element: page(<MapsPage />) },
+      { path: 'survey-team', element: <Navigate to="/site-inspections" replace /> },
       { path: 'lands/vacant', element: vacantLandsPermission(<VacantLandsPage />) },
       { path: 'lands/vacant/map', element: vacantLandsPermission(<VacantLandsMapPage />) },
       { path: 'lands/vacant/import', element: <PermissionGuard module="vacant_lands" action="canAdd">{page(<VacantLandsImportPage />)}</PermissionGuard> },

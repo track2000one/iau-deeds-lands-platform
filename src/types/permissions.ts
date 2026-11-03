@@ -11,6 +11,7 @@ export type ModuleName =
   | 'leased_buildings_out'
   | 'leased_buildings_in'
   | 'central_buildings'
+  | 'survey_team'
   | 'transaction_follow_up'
   | 'transaction_risk_register'
   | 'transaction_risk_executive'
@@ -71,6 +72,7 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   leased_buildings_out: 'المباني المؤجرة',
   leased_buildings_in: 'المباني المستأجرة',
   central_buildings: 'السجل المركزي للمباني',
+  survey_team: 'إدارة فريق الحصر الميداني',
   transaction_follow_up: 'نظام المتابعة',
   transaction_risk_register: 'سجل المخاطر التشغيلية',
   transaction_risk_executive: 'لوحة المخاطر التنفيذية',
@@ -98,6 +100,7 @@ export const MODULE_LABELS_EN: Record<ModuleName, string> = {
   leased_buildings_out: 'Leased Buildings (Out)',
   leased_buildings_in: 'Leased Buildings (In)',
   central_buildings: 'Central Building Registry',
+  survey_team: 'Campus Field Survey Team',
   transaction_follow_up: 'Transaction Follow-up System',
   transaction_risk_register: 'Operational Risk Register',
   transaction_risk_executive: 'Executive Risk Dashboard',
@@ -157,6 +160,7 @@ export const createEmptyPermissions = (): UserPermissions => ({
   leased_buildings_out: { ...NONE },
   leased_buildings_in: { ...NONE },
   central_buildings: { ...NONE },
+  survey_team: { ...NONE },
   transaction_follow_up: { ...NONE },
   transaction_risk_register: { ...NONE },
   transaction_risk_executive: { ...NONE },
@@ -184,6 +188,7 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   leased_buildings_out: { ...FULL },
   leased_buildings_in: { ...FULL },
   central_buildings: { ...FULL },
+  survey_team: { ...FULL },
   transaction_follow_up: { ...FULL },
   transaction_risk_register: { ...FULL },
   transaction_risk_executive: { ...FULL },
