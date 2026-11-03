@@ -115,7 +115,15 @@ export const createCentralBuildingReportHtml = (
           `<figure class="photo-card">${src
             ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(photo.fileName || `صورة ${index + 1}`)}" />`
             : '<div class="photo-error">تعذّر تحميل الصورة من السجل</div>'
-          }<figcaption>${index + 1}. ${escapeHtml(photo.fileName || 'صورة المبنى')}</figcaption></figure>`
+          }<figcaption>${index + 1}. ${escapeHtml(photo.fileName || 'صورة المبنى')}${index === 0 ? ' — الصورة الرئيسية' : ''}${photo.uploadedByName ? ' — أرفقها: ' + escapeHtml(photo.uploadedByName) : ''}</figcaption></figure>`
+        ).join('')}</div>
+      </section>`
+    : '';
+
+  const documentsHtml = building.documents?.length
+    ? `<section class="section"><h2>مرفقات المبنى (مستندات خاصة)</h2>
+        <div class="rows">${building.documents.map((document, index) =>
+          `<div class="row"><span>مرفق ${index + 1}</span><strong>${escapeHtml(document.fileName || 'مستند')}${document.uploadedByName ? ' — أرفقه: ' + escapeHtml(document.uploadedByName) : ''}</strong></div>`
         ).join('')}</div>
       </section>`
     : '';
@@ -195,6 +203,7 @@ export const createCentralBuildingReportHtml = (
   ${section('التوثيق الإداري', administrationFields)}
   ${building.notes ? `<section class="notes"><h2>الملاحظات العامة</h2>${escapeHtml(building.notes)}</section>` : ''}
   ${photosHtml}
+  ${documentsHtml}
   <footer class="footer"><span>منصة إدارة الصكوك والأراضي — السجل المركزي للمباني</span><span>أُعدّ بواسطة: ${escapeHtml(preparer)} · ${escapeHtml(generatedAt)}</span></footer>
 </body>
 </html>`;
@@ -213,7 +222,8 @@ export const printCentralBuildingReport = async (building: MosqueBuilding): Prom
   const cleanup = () => objectUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   let cleanupTimer: number | undefined;
   try {
-    const photos = await Promise.all((building.photos || []).map(async (photo): Promise<PrintablePhoto> => {
+    const orderedPhotos = [...(building.photos || [])].sort((a, b) => Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary)));
+    const photos = await Promise.all(orderedPhotos.map(async (photo): Promise<PrintablePhoto> => {
       try {
         const blob = await mosqueApi.buildingPhotoBlob(building.id, photo.id);
         // Some authenticated storage gateways return images as octet-stream.
