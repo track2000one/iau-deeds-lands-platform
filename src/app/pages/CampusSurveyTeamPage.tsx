@@ -28,6 +28,10 @@ type Metric = {
   buildings: number;
   inspections: number;
   vacantLands: number | null;
+  employeeBuildings: number | null;
+  employeeInspections: number | null;
+  employeeVacantLands: number | null;
+  accountUsername: string | null;
   countsAreProvisional: true;
 };
 
@@ -41,7 +45,9 @@ const STATUS: Record<SurveyStatus, string> = {
 const STATUS_VALUES = Object.keys(STATUS) as SurveyStatus[];
 const ASSIGNMENT_ORDER = ['LEAD', 'WEST', 'RAYYAN', 'EAST'];
 
-export function CampusSurveyTeamPage({ embedded = false }: { embedded?: boolean }) {
+export function CampusSurveyTeamPage({
+  embedded = false, onReportCreator,
+}: { embedded?: boolean; onReportCreator?: (username: string) => void }) {
   const { isAdmin } = usePermissions();
   const [team, setTeam] = useState<TeamResponse | null>(null);
   const [metrics, setMetrics] = useState<Metric[]>([]);
@@ -123,7 +129,7 @@ export function CampusSurveyTeamPage({ embedded = false }: { embedded?: boolean 
 
       <div className="rounded-xl border border-amber-400/50 bg-amber-400/10 p-4 text-sm leading-7 text-foreground">
         لا تشمل أعمال الحصر المنازل والأملاك المجاورة الواقعة خارج حدود ملكية الجامعة.
-        الإحصاءات أدناه استرشادية من السجلات الحالية وليست نسب إنجاز أو دليلًا على اكتمال المعاينة.
+        مؤشرات الموظفين تعتمد على السجلات المنسوبة إلى حساباتهم، وهي أولية وليست نسب إنجاز أو إثباتًا على اكتمال الحصر.
         تفعيل صلاحيات الحرم على وحدات البيانات الثلاث يحتاج اختبارًا منفصلًا قبل تكليف الموظفين بالإدخال الفعلي.
       </div>
 
@@ -161,18 +167,32 @@ export function CampusSurveyTeamPage({ embedded = false }: { embedded?: boolean 
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {member.role === 'member' && (
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { label: 'المباني', count: metric?.buildings, icon: Building2 },
-                        { label: 'المعاينات المرتبطة بمبانٍ', count: metric?.inspections, icon: ClipboardCheck },
-                        { label: 'الأراضي الشاغرة', count: metric?.vacantLands, icon: LandPlot },
-                      ].map(({ label, count, icon: Icon }) => (
-                        <div key={label} className="rounded-xl border bg-muted/30 p-3 text-center">
-                          <Icon className="mx-auto mb-2 h-5 w-5" />
-                          <p className="text-xl font-bold tabular-nums">{count == null ? '—' : count}</p>
-                          <p className="text-xs leading-5 text-muted-foreground">{label}</p>
-                        </div>
-                      ))}
+                    <div className="space-y-2">
+                      <p className="text-sm font-bold">الأعمال المسجلة بواسطة الموظف</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { label: 'مبانٍ سجلها', count: metric?.employeeBuildings, icon: Building2 },
+                          { label: 'معاينات سجلها', count: metric?.employeeInspections, icon: ClipboardCheck },
+                          { label: 'أراضٍ سجلها', count: metric?.employeeVacantLands, icon: LandPlot },
+                        ].map(({ label, count, icon: Icon }) => (
+                          <div key={label} className="rounded-xl border bg-muted/30 p-3 text-center">
+                            <Icon className="mx-auto mb-2 h-5 w-5" />
+                            <p className="text-xl font-bold tabular-nums">{count == null ? '—' : count}</p>
+                            <p className="text-xs leading-5 text-muted-foreground">{label}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs leading-6 text-muted-foreground">
+                        السجلات الموجودة بالحرم (جميع المستخدمين): {metric?.buildings ?? '—'} مبنى،
+                        {' '}{metric?.inspections ?? '—'} معاينة مرتبطة بمبنى،
+                        {' '}{metric?.vacantLands ?? '—'} أرض شاغرة.
+                        معاينات الموظف محسوبة من اسم حسابه حتى لو لم يُربط بعضها بمبنى.
+                      </p>
+                      {metric?.accountUsername && onReportCreator && (
+                        <Button variant="outline" onClick={() => onReportCreator(metric.accountUsername!)}>
+                          تقرير أعمال المعاينات — {metric.accountUsername}
+                        </Button>
+                      )}
                     </div>
                   )}
                   <div className="space-y-2">
