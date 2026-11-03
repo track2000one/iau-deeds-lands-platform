@@ -54,6 +54,7 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
   const [workflow, setWorkflow] = React.useState('');
   const [condition, setCondition] = React.useState('');
   const [city, setCity] = React.useState('');
+  const [creator, setCreator] = React.useState('');
   const [from, setFrom] = React.useState('');
   const [to, setTo] = React.useState('');
   const [sortBy, setSortBy] = React.useState('visitDate');
@@ -66,6 +67,8 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
     Array.from(new Set(records.map((record) => (record.city || '').trim()).filter(Boolean)))
       .sort((a, b) => a.localeCompare(b, 'ar')), [records]);
 
+  const creators = React.useMemo(() => Array.from(new Set(records.map((r) => (r.createdBy || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar')), [records]);
+
   const matches = React.useMemo(() => {
     if (target) return [target];
     const needle = query.trim().toLocaleLowerCase('ar');
@@ -75,12 +78,13 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
       const textMatches = !needle || [
         record.inspectionNumber, record.title, record.siteName, record.city,
         record.district, record.deed?.deedNumber, record.building?.name,
-        record.observations, record.inspectorName,
+        record.observations, record.inspectorName, record.createdBy,
       ].some((value) => String(value || '').toLocaleLowerCase('ar').includes(needle));
       return textMatches
         && (!workflow || record.workflowStatus === workflow)
         && (!condition || record.overallStatus === condition)
         && (!city || record.city === city)
+        && (!creator || (record.createdBy || '') === creator)
         && parseDate(record.visitDate) >= fromTime
         && parseDate(record.visitDate) <= toTime;
     });
@@ -91,9 +95,10 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
       const second = String(b[sortBy as 'inspectionNumber' | 'siteName' | 'workflowStatus'] || '');
       return first.localeCompare(second, 'ar', { numeric: true }) * multiplier;
     });
-  }, [records, target, query, workflow, condition, city, from, to, sortBy, sortDirection]);
+  }, [records, target, query, workflow, condition, city, creator, from, to, sortBy, sortDirection]);
 
   const toggleColumn = (key: InspectionPrintColumn, checked: boolean) => {
+    if (key === 'createdBy') return; // Attribution is mandatory on every printed report.
     setColumns((current) => checked ? [...current, key] : current.filter((item) => item !== key));
   };
 
@@ -107,6 +112,7 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
         workflow ? 'الحالة: ' + (workflows.find((item) => item.value === workflow)?.label || workflow) : '',
         condition ? 'الحالة العامة: ' + (conditions.find((item) => item.value === condition)?.label || condition) : '',
         city ? 'المدينة: ' + city : '',
+        creator ? 'اسم المستخدم: ' + creator : '',
         from ? 'من: ' + from : '',
         to ? 'إلى: ' + to : '',
         'الترتيب: ' + (sortBy === 'visitDate' ? 'تاريخ الزيارة' : sortBy === 'siteName' ? 'الموقع' : sortBy === 'workflowStatus' ? 'الحالة' : 'رقم المعاينة') +
@@ -180,6 +186,13 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
                   </NativeSelect>
                 </div>
                 <div>
+                  <label htmlFor="inspection-report-creator" className={fieldLabel}>اسم المستخدم / مدخل المعاينة</label>
+                  <NativeSelect id="inspection-report-creator" value={creator} onChange={(event) => setCreator(event.target.value)}>
+                    <option value="">جميع المستخدمين</option>
+                    {creators.map((name) => <option key={name} value={name}>{name}</option>)}
+                  </NativeSelect>
+                </div>
+                <div>
                   <label htmlFor="inspection-report-from" className={fieldLabel}>تاريخ الزيارة من</label>
                   <Input id="inspection-report-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
                 </div>
@@ -206,7 +219,7 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
                 </div>
               </div>
               <Button type="button" size="sm" variant="outline" onClick={() => {
-                setQuery(''); setWorkflow(''); setCondition(''); setCity('');
+                setQuery(''); setWorkflow(''); setCondition(''); setCity(''); setCreator('');
                 setFrom(''); setTo(''); setSortBy('visitDate'); setSortDirection('desc');
               }}>مسح التصفية</Button>
             </section>
@@ -228,6 +241,7 @@ export const SiteInspectionPrintDialog: React.FC<Props> = ({
                 <label key={column.key} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:border-emerald-300 hover:bg-emerald-50/30">
                   <Checkbox className="size-5 border-2 border-slate-400 data-[state=checked]:border-emerald-700 data-[state=checked]:bg-emerald-700"
                     checked={columns.includes(column.key)}
+                    disabled={column.key === 'createdBy'}
                     onCheckedChange={(value) => toggleColumn(column.key, value === true)} />
                   <span>{column.label}</span>
                 </label>
