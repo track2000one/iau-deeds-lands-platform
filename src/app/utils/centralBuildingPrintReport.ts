@@ -216,8 +216,11 @@ export const printCentralBuildingReport = async (building: MosqueBuilding): Prom
     const photos = await Promise.all((building.photos || []).map(async (photo): Promise<PrintablePhoto> => {
       try {
         const blob = await mosqueApi.buildingPhotoBlob(building.id, photo.id);
-        if (!blob.type.startsWith('image/')) throw new Error('Invalid image content');
-        const src = URL.createObjectURL(blob);
+        // Some authenticated storage gateways return images as octet-stream.
+        const imageBlob = blob.type.startsWith('image/')
+          ? blob
+          : new Blob([blob], { type: photo.mimeType || 'image/jpeg' });
+        const src = URL.createObjectURL(imageBlob);
         objectUrls.push(src);
         return { photo, src };
       } catch {
