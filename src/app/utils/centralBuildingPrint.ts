@@ -5,10 +5,12 @@ import { mosqueApi } from '../api/mosques';
 // This module reads existing records; it does not alter a building or its attachments.
 
 type PhotoRow = { name: string; url: string | null };
+const HTML_ENTITIES: Record<string, string> = {
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+};
 const escapeHtml = (value: unknown): string =>
   String(value === null || value === undefined || value === '' ? '—' : value)
-    .replace(/[&<>"']/g, (character) =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] || character));
+    .replace(/[&<>"']/g, (character) => HTML_ENTITIES[character] || character);
 
 const numberText = (value: number | null | undefined, suffix = ''): string =>
   value === null || value === undefined
