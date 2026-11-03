@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, Eye, Images, LoaderCircle, Trash2, UploadCloud, X } from 'lucide-react';
+import { Camera, Eye, Images, LoaderCircle, Star, Trash2, UploadCloud, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { mosqueApi, type CentralBuildingPhoto } from '../api/mosques';
@@ -16,6 +16,9 @@ type Props = {
   editable?: boolean;
   onPhotosChange?: (photos: CentralBuildingPhoto[]) => void;
   onReload?: () => Promise<void>;
+  pendingFiles?: File[];
+  onPendingFilesChange?: (files: File[]) => void;
+  blocked?: boolean;
 };
 
 function SecurePhotoThumbnail({ buildingId, photo }: { buildingId: string; photo: CentralBuildingPhoto }) {
@@ -73,15 +76,26 @@ export function CentralBuildingPhotos({
   editable = false,
   onPhotosChange,
   onReload,
+  pendingFiles,
+  onPendingFilesChange,
+  blocked = false,
 }: Props) {
   const gallery = photos || [];
+  const primaryPhoto = gallery.find((photo) => photo.isPrimary) || gallery[0];
+  const orderedGallery = [...gallery].sort((left, right) => Number(right.id === primaryPhoto?.id) - Number(left.id === primaryPhoto?.id));
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const [pending, setPending] = useState<File[]>([]);
+  const [internalPending, setInternalPending] = useState<File[]>([]);
+  const pending = pendingFiles === undefined ? internalPending : pendingFiles;
+  const setPending = (updater: (previous: File[]) => File[]) => {
+    if (pendingFiles === undefined) setInternalPending(updater);
+    else onPendingFilesChange?.(updater(pendingFiles));
+  };
   const [previews, setPreviews] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [primarySavingId, setPrimarySavingId] = useState<string | null>(null);
 
   useEffect(() => {
     const urls = pending.map((file) => URL.createObjectURL(file));
@@ -111,7 +125,7 @@ export function CentralBuildingPhotos({
   };
 
   const uploadSelected = async () => {
-    if (!buildingId || !pending.length || busy) return;
+    if (!buildingId || !pending.length || busy || blocked) return;
     setBusy(true);
     setCompletedCount(0);
     let uploaded = 0;
@@ -134,13 +148,13 @@ export function CentralBuildingPhotos({
       }
     }
 
-    setPending([]);
+    setPending(() => []);
     setBusy(false);
     toast.success('تم حفظ ' + uploaded + (uploaded === 1 ? ' صورة' : ' صور') + ' في معرض المبنى');
   };
 
   const removePhoto = async (photo: CentralBuildingPhoto) => {
-    if (!buildingId || deletingId || busy || !window.confirm('هل تريد حذف هذه الصورة من سجل المبنى نهائيًا؟')) return;
+    if (!buildingId || deletingId || busy || blocked || !window.confirm('هل تريد حذف هذه الصورة من سجل المبنى نهائيًا؟')) return;
     setDeletingId(photo.id);
     try {
       const result = await mosqueApi.deleteBuildingPhoto(buildingId, photo.id);
@@ -150,6 +164,20 @@ export function CentralBuildingPhotos({
       toast.error(error instanceof Error ? error.message : 'تعذر حذف الصورة');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const choosePrimary = async (photo: CentralBuildingPhoto) => {
+    if (!buildingId || blocked || primarySavingId || photo.id === primaryPhoto?.id) return;
+    setPrimarySavingId(photo.id);
+    try {
+      const result = await mosqueApi.setPrimaryBuildingPhoto(buildingId, photo.id);
+      onPhotosChange?.(result.photos);
+      toast.success('تم تحديد الصورة الرئيسية للمبنى');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تغيير الصورة الرئيسية');
+    } finally {
+      setPrimarySavingId(null);
     }
   };
 
@@ -165,7 +193,7 @@ export function CentralBuildingPhotos({
             الصور مرتبطة بالمبنى وتُعرض للمستخدمين المصرح لهم فقط.
           </p>
         </div>
-        {editable && buildingId && (
+        {editable && (
           <div className="flex flex-wrap gap-2">
             <input
               ref={fileInputRef} type="file" accept={PHOTO_ACCEPT} multiple
@@ -177,11 +205,11 @@ export function CentralBuildingPhotos({
               className="hidden" aria-label="التقاط صورة بالكاميرا"
               onChange={(event) => choosePhotos(event.currentTarget.files)}
             />
-            <Button type="button" size="sm" variant="outline" disabled={busy || gallery.length >= MAX_PHOTOS_PER_BUILDING}
+            <Button type="button" size="sm" variant="outline" disabled={busy || blocked || gallery.length >= MAX_PHOTOS_PER_BUILDING}
               onClick={() => fileInputRef.current?.click()}>
               <Images className="h-4 w-4" /> من الجهاز / المعرض
             </Button>
-            <Button type="button" size="sm" variant="outline" disabled={busy || gallery.length >= MAX_PHOTOS_PER_BUILDING}
+            <Button type="button" size="sm" variant="outline" disabled={busy || blocked || gallery.length >= MAX_PHOTOS_PER_BUILDING}
               onClick={() => cameraInputRef.current?.click()}>
               <Camera className="h-4 w-4" /> كاميرا الجوال
             </Button>
@@ -190,24 +218,35 @@ export function CentralBuildingPhotos({
       </div>
 
       {editable && !buildingId && (
-        <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">احفظ المبنى أولًا، ثم افتح «تعديل» لإضافة صوره.</p>
+        <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">اختر الصور الآن؛ سيتم رفعها وربطها بسجل المبنى تلقائيًا بعد نجاح الحفظ.</p>
       )}
 
       {gallery.length ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {gallery.map((photo) => (
+          {orderedGallery.map((photo) => (
             <div key={photo.id} className="overflow-hidden rounded-xl border bg-background shadow-sm">
               {buildingId && <SecurePhotoThumbnail buildingId={buildingId} photo={photo} />}
               <div className="flex items-center justify-between gap-1 p-2">
                 <span className="min-w-0 truncate text-[11px] text-muted-foreground" title={photo.fileName}>{photo.fileName}</span>
+                {photo.id === primaryPhoto?.id && <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">رئيسية</span>}
+                {editable && buildingId && photo.id !== primaryPhoto?.id && (
+                  <button type="button" className="rounded-lg p-1 text-amber-600 hover:bg-amber-50" title="تعيين كصورة رئيسية"
+                    disabled={busy || blocked || Boolean(primarySavingId)} onClick={() => void choosePrimary(photo)}>
+                    {primarySavingId === photo.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}
+                  </button>
+                )}
                 {editable && buildingId && (
                   <button type="button" className="rounded-lg p-1 text-red-600 hover:bg-red-50"
-                    disabled={busy || Boolean(deletingId)} title="حذف الصورة"
+                    disabled={busy || blocked || Boolean(deletingId)} title="حذف الصورة"
                     onClick={() => void removePhoto(photo)}>
                     {deletingId === photo.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   </button>
                 )}
               </div>
+              <p className="px-2 pb-2 text-[10px] leading-4 text-muted-foreground">
+                {photo.uploadedByName ? `أرفقها: ${photo.uploadedByName} · ` : ''}
+                {photo.uploadedAt ? new Date(photo.uploadedAt).toLocaleDateString('ar-SA') : ''}
+              </p>
             </div>
           ))}
         </div>
@@ -215,7 +254,7 @@ export function CentralBuildingPhotos({
         <p className="rounded-xl border border-dashed py-5 text-center text-xs text-muted-foreground">لا توجد صور مضافة لهذا المبنى حتى الآن.</p>
       )}
 
-      {editable && buildingId && pending.length > 0 && (
+      {editable && pending.length > 0 && (
         <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/30 p-3">
           <p className="text-sm font-bold">صور قيد الإضافة ({pending.length})</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -223,7 +262,7 @@ export function CentralBuildingPhotos({
               <div key={file.name + '-' + file.lastModified} className="overflow-hidden rounded-lg border bg-background">
                 <div className="relative h-24 bg-muted/20">
                   <img src={previews[index]} alt={file.name} className="h-full w-full object-cover" />
-                  <button type="button" aria-label="إزالة من الاختيار" disabled={busy}
+                  <button type="button" aria-label="إزالة من الاختيار" disabled={busy || blocked}
                     className="absolute left-1 top-1 rounded-full bg-white p-1 text-red-600 shadow"
                     onClick={() => setPending((previous) => previous.filter((_, i) => i !== index))}>
                     <X className="h-4 w-4" />
@@ -235,13 +274,15 @@ export function CentralBuildingPhotos({
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
-              {busy ? 'تم رفع ' + completedCount + ' من ' + pending.length : 'الصور تُحفظ فور الضغط على «رفع الصور»، بشكل مستقل عن تعديل بيانات المبنى.'}
+              {busy ? 'تم رفع ' + completedCount + ' من ' + pending.length : buildingId ? 'تُرفع الصور عند الضغط على «رفع الصور» أو حفظ المبنى.' : 'ستُرفع الصور تلقائيًا عند حفظ المبنى الجديد.'}
             </p>
-            <Button type="button" disabled={busy} onClick={() => void uploadSelected()}
-              className="bg-emerald-700 text-white hover:bg-emerald-800">
-              {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-              {busy ? 'جارٍ رفع الصور...' : 'رفع الصور (' + pending.length + ')'}
-            </Button>
+            {buildingId && (
+              <Button type="button" disabled={busy || blocked} onClick={() => void uploadSelected()}
+                className="bg-emerald-700 text-white hover:bg-emerald-800">
+                {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+                {busy ? 'جارٍ رفع الصور...' : 'رفع الصور (' + pending.length + ')'}
+              </Button>
+            )}
           </div>
         </div>
       )}
