@@ -1,6 +1,7 @@
 import { reportPreparerName } from '../utils/reportAttribution';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { apiJson } from '../../lib/http';
 import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -76,6 +77,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+
+type SurveyBuildingAssignment = {
+  code: string;
+  campusName: string;
+  campusCode: string;
+  status: string;
+};
 
 type BuildingForm = {
   buildingNumber: string;
@@ -225,6 +233,19 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const [editingBuilding, setEditingBuilding] =
     useState<MosqueBuilding | null>(null);
   const [form, setForm] = useState<BuildingForm>(EMPTY_FORM);
+  const [surveyAssignment, setSurveyAssignment] = useState<SurveyBuildingAssignment | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!userProfile?.uid || (!canAdd && !canEdit)) {
+      setSurveyAssignment(null);
+      return;
+    }
+    void apiJson<SurveyBuildingAssignment | null>('/api/campus-survey-team/my-assignment')
+      .then((assignment) => { if (!cancelled) setSurveyAssignment(assignment); })
+      .catch(() => { if (!cancelled) setSurveyAssignment(null); });
+    return () => { cancelled = true; };
+  }, [userProfile?.uid, canAdd, canEdit]);
   const [deleteTarget, setDeleteTarget] = useState<MosqueBuilding | null>(null);
   const [viewTarget, setViewTarget] = useState<MosqueBuilding | null>(null);
   const updateBuildingPhotos = (buildingId: string, photos: CentralBuildingPhoto[]) => {
@@ -412,7 +433,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
 
   const openCreate = () => {
     setEditingBuilding(null);
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      campusLocation: surveyAssignment?.campusName || '',
+    });
     setMapPickerOpen(false);
     setFormOpen(true);
   };
@@ -427,7 +451,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       buildingNumber: building.buildingNumber || '',
       name: building.name || '',
       deedId: building.deedId || building.deed?.id || '',
-      campusLocation: building.campusLocation || '',
+      campusLocation: surveyAssignment?.campusName || building.campusLocation || '',
       region: building.region || '',
       city: building.city || '',
       district: building.district || '',
@@ -526,6 +550,20 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       toast.error('اختيار رقم الصك إلزامي لكل مبنى في السجل المركزي');
       return;
     }
+    if (surveyAssignment) {
+      if (!form.district.trim() || !form.campusLocation.trim()) {
+        toast.error('اسم الحي والحرم الجامعي حقول إلزامية لأعضاء فريق الحصر');
+        return;
+      }
+      if (form.campusLocation.trim() !== surveyAssignment.campusName) {
+        toast.error('لا يسمح بتأسيس مبنى خارج نطاق التكليف: ' + surveyAssignment.campusName);
+        return;
+      }
+      if (!form.floorsCount.trim() || !Number.isInteger(Number(form.floorsCount)) || Number(form.floorsCount) < 1) {
+        toast.error('أدخل عدد الأدوار الفعلي (دور واحد على الأقل)');
+        return;
+      }
+    }
 
     const latitude = parseCoordinate(form.latitude);
     const longitude = parseCoordinate(form.longitude);
@@ -535,6 +573,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     }
     if (form.longitude.trim() && (longitude == null || !isValidLongitude(longitude))) {
       toast.error('خط الطول غير صحيح. يجب أن يكون بين -180 و 180.');
+      return;
+    }
+    if (surveyAssignment && (latitude == null || longitude == null || (latitude === 0 && longitude === 0))) {
+      toast.error('تحديد خط العرض وخط الطول من الخريطة أو إدخالهما إلزامي لفريق الحصر');
       return;
     }
 
@@ -579,7 +621,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       buildingNumber,
       name,
       deedId: form.deedId,
-      campusLocation: form.campusLocation.trim() || null,
+      campusLocation: surveyAssignment?.campusName || form.campusLocation.trim() || null,
       region: form.region.trim() || null,
       city: form.city.trim() || null,
       district: form.district.trim() || null,
@@ -1099,6 +1141,11 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
             </DialogTitle>
             <DialogDescription>
               كل مبنى يجب ربطه بصك مسجل في سجل الصكوك؛ ويمكن أن يرتبط الصك الواحد بأكثر من مبنى.
+              {surveyAssignment && (
+                <span className="mt-2 block font-semibold text-foreground">
+                  تكليف الحصر: {surveyAssignment.campusName} — البيانات الإلزامية: اسم المبنى / الموقع، الحي، الحرم، خطا الإحداثيات، وعدد الأدوار، بالإضافة إلى رمز المبنى والصك.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -1110,8 +1157,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
             <Field label="رقم المبنى *">
               <Input value={form.buildingNumber} onChange={(event) => setForm((prev) => ({ ...prev, buildingNumber: event.target.value }))} />
             </Field>
-            <Field label="اسم المبنى *">
-              <Input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
+            <Field label="اسم المبنى / الموقع *">
+              <Input value={form.name} placeholder="مثال: مبنى كلية أو إدارة أو مركز..." onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
             </Field>
             <div className="md:col-span-2">
               <Field label="رقم الصك المرتبط بالمبنى *">
@@ -1133,8 +1180,14 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                 </div>
               )}
             </div>
-            <Field label="الحرم / الموقع الجامعي">
-              <Input value={form.campusLocation} onChange={(event) => setForm((prev) => ({ ...prev, campusLocation: event.target.value }))} />
+            <Field label={surveyAssignment ? 'الحرم الجامعي المكلف به *' : 'الحرم / الموقع الجامعي'}>
+              {surveyAssignment ? (
+                <NativeSelect value={surveyAssignment.campusName} disabled aria-label="الحرم الجامعي المرتبط بالتكليف">
+                  <option value={surveyAssignment.campusName}>{surveyAssignment.campusName}</option>
+                </NativeSelect>
+              ) : (
+                <Input value={form.campusLocation} onChange={(event) => setForm((prev) => ({ ...prev, campusLocation: event.target.value }))} />
+              )}
             </Field>
             <Field label="المنطقة">
               <Input value={form.region} onChange={(event) => setForm((prev) => ({ ...prev, region: event.target.value }))} />
@@ -1142,8 +1195,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
             <Field label="المدينة">
               <Input value={form.city} onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))} />
             </Field>
-            <Field label="الحي">
-              <Input value={form.district} onChange={(event) => setForm((prev) => ({ ...prev, district: event.target.value }))} />
+            <Field label={surveyAssignment ? 'اسم الحي *' : 'الحي'}>
+              <Input value={form.district} placeholder="مثال: الحي الذي يقع فيه المبنى" onChange={(event) => setForm((prev) => ({ ...prev, district: event.target.value }))} />
             </Field>
 
             <div className="md:col-span-2 mt-2 border-b pb-2">
@@ -1201,8 +1254,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               <p className="font-black text-foreground">المساحات والتكوين</p>
               <p className="mt-1 text-xs text-muted-foreground">البيانات الكمية اللازمة للحصر وإدارة المبنى والتقارير.</p>
             </div>
-            <Field label="عدد الأدوار">
-              <Input type="number" min={0} value={form.floorsCount} onChange={(event) => setForm((prev) => ({ ...prev, floorsCount: event.target.value }))} />
+            <Field label={surveyAssignment ? 'عدد الأدوار *' : 'عدد الأدوار'}>
+              <Input type="number" min={surveyAssignment ? 1 : 0} step={1} value={form.floorsCount} onChange={(event) => setForm((prev) => ({ ...prev, floorsCount: event.target.value }))} />
             </Field>
             <Field label="عدد أدوار القبو">
               <Input type="number" min={0} value={form.basementFloorsCount} onChange={(event) => setForm((prev) => ({ ...prev, basementFloorsCount: event.target.value }))} />
@@ -1231,10 +1284,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               </Field>
             </div>
 
-            <Field label="خط العرض">
+            <Field label={surveyAssignment ? 'خط العرض *' : 'خط العرض'}>
               <Input dir="ltr" inputMode="decimal" value={form.latitude} onChange={(event) => setForm((prev) => ({ ...prev, latitude: event.target.value }))} />
             </Field>
-            <Field label="خط الطول">
+            <Field label={surveyAssignment ? 'خط الطول *' : 'خط الطول'}>
               <Input dir="ltr" inputMode="decimal" value={form.longitude} onChange={(event) => setForm((prev) => ({ ...prev, longitude: event.target.value }))} />
             </Field>
 
