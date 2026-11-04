@@ -239,9 +239,67 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
   const printReport = () => {
     const chosen = visibleColumns;
     const popup = window.open('', '_blank', 'width=1400,height=900');
-    if (!popup) return;
-    const rows = sorted.map((building) => `<tr>${chosen.map((column) => `<td>${escapeHtml(cellValue(building, column.key))}</td>`).join('')}</tr>`).join('');
-    popup.document.write(withReportPreparer(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير السجل المركزي للمباني</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:24px;color:#172033}h1{font-size:22px;margin:0 0 8px}.meta{color:#667085;font-size:12px;margin-bottom:18px}.stats{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}.stat{border:1px solid #d7dee8;border-radius:10px;padding:8px 12px;font-size:12px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #d8dee8;padding:7px;text-align:right}th{background:#eef5f7;font-weight:700}@media print{body{padding:0}.no-print{display:none}table{font-size:9px}}</style></head><body><div class="no-print" style="margin-bottom:12px"><button onclick="window.print()">طباعة / حفظ PDF</button></div><h1>تقرير السجل المركزي للمباني</h1><div class="meta">تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</div><div class="stats"><span class="stat">النتائج: ${summary.total}</span><span class="stat">المعتمد: ${summary.approved}</span><span class="stat">المعلق: ${summary.pending}</span><span class="stat">بإحداثيات: ${summary.coordinates}</span></div><table><thead><tr>${chosen.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></body></html>`));
+    if (!popup) {
+      window.alert('يرجى السماح بالنوافذ المنبثقة لطباعة التقرير.');
+      return;
+    }
+
+    const reportTitle = coordinates === 'missing'
+      ? 'تقرير المباني الناقصة إحداثيات'
+      : approval === 'pending' ? 'تقرير المباني المعلقة للمراجعة' : 'تقرير السجل المركزي للمباني';
+    const generatedAt = new Date().toLocaleString('ar-SA-u-ca-gregory');
+    const tableRows = sorted.map((building) => '<tr>' +
+      chosen.map((column) => '<td>' + escapeHtml(cellValue(building, column.key)) + '</td>').join('') +
+      '</tr>').join('');
+    const filterLabels = appliedFilters.map((label) => '<span class="filter">' + escapeHtml(label) + '</span>').join('');
+    const html = [
+      '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">',
+      '<meta name="viewport" content="width=device-width,initial-scale=1">',
+      '<title>' + escapeHtml(reportTitle) + '</title>',
+      '<style>',
+      '@page{size:' + (chosen.length > 6 ? 'A3 landscape' : 'A4 landscape') + ';margin:12mm;@bottom-left{content:"صفحة " counter(page) " من " counter(pages);font:10px Tahoma;color:#64748b}}',
+      '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
+      'body{font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#152d43;background:#fff;margin:0;font-size:12px;line-height:1.6}',
+      '.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#e6f2f5;border:1px solid #c7dfe5;padding:12px 16px;margin-bottom:15px;border-radius:10px}',
+      '.toolbar button{background:#095c78;border:0;border-radius:8px;color:#fff;font:700 13px Tahoma;padding:10px 18px;cursor:pointer}',
+      '.head{border:2px solid #137b86;border-radius:12px;padding:15px 18px;background:#f4fbfc;break-inside:avoid}',
+      '.brand{font-size:12px;color:#0f6275;font-weight:800;margin-bottom:5px}',
+      'h1{font-size:22px;line-height:1.5;margin:0 0 7px;color:#11344a}',
+      '.meta{display:flex;flex-wrap:wrap;gap:5px 22px;font-size:11px;color:#334155}',
+      '.filters{margin:11px 0;display:flex;flex-wrap:wrap;gap:7px;align-items:center}',
+      '.filter{background:#eff6f8;border:1px solid #d1e1e7;border-radius:7px;padding:5px 9px;font-size:11px}',
+      '.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0 17px;break-inside:avoid}',
+      '.stat{border:1px solid #ccdce4;border-radius:10px;padding:10px 13px;background:#f9fcfd}',
+      '.stat span{display:block;font-size:11px;color:#526579}.stat strong{font-size:19px;color:#0f4d66}',
+      'table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:11px;line-height:1.7}',
+      'thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}',
+      'th,td{border:1px solid #c9d6df;padding:8px 7px;text-align:right;vertical-align:top;overflow-wrap:anywhere}',
+      'th{background:#dceef2;color:#153950;font-weight:800}tbody tr:nth-child(even){background:#f5fafb}',
+      '.footer{margin-top:13px;border-top:1px solid #cbd5e1;padding-top:8px;font-size:10px;color:#64748b;display:flex;justify-content:space-between}',
+      '@media print{.toolbar{display:none!important}body{margin:0}.head{background:#f4fbfc}}',
+      '</style></head><body>',
+      '<div class="toolbar"><span>معاينة التقرير — تأكد من البيانات والأعمدة قبل الطباعة</span><button type="button" onclick="window.print()">طباعة / حفظ PDF</button></div>',
+      '<header class="head"><div class="brand">جامعة الإمام عبدالرحمن بن فيصل — إدارة أوقاف وأملاك الجامعة</div>',
+      '<h1>' + escapeHtml(reportTitle) + '</h1>',
+      '<div class="meta"><span>أُعدّ بواسطة: <strong>' + escapeHtml(reportPreparerName()) + '</strong></span>',
+      '<span>تاريخ الاستخراج: <strong>' + escapeHtml(generatedAt) + '</strong></span>',
+      '<span>ترتيب حسب: <strong>' + escapeHtml(columns.find((column) => column.key === sort.key)?.label || '') +
+        (sort.direction === 'asc' ? ' (تصاعدي)' : ' (تنازلي)') + '</strong></span></div></header>',
+      '<section class="filters"><strong>معايير التقرير:</strong>' + (filterLabels || '<span class="filter">جميع المباني</span>') + '</section>',
+      '<section class="stats">',
+      '<div class="stat"><span>النتائج</span><strong>' + summary.total.toLocaleString('ar-SA') + '</strong></div>',
+      '<div class="stat"><span>المعتمد</span><strong>' + summary.approved.toLocaleString('ar-SA') + '</strong></div>',
+      '<div class="stat"><span>معلق للمراجعة</span><strong>' + summary.pending.toLocaleString('ar-SA') + '</strong></div>',
+      '<div class="stat"><span>بإحداثيات مكتملة</span><strong>' + summary.coordinates.toLocaleString('ar-SA') + '</strong></div>',
+      '</section>',
+      '<table><thead><tr>' + chosen.map((column) => '<th>' + escapeHtml(column.label) + '</th>').join('') +
+        '</tr></thead><tbody>' + tableRows + '</tbody></table>',
+      '<footer class="footer"><span>منصة إدارة الصكوك والأراضي — السجل المركزي للمباني</span><span>أُعدّ بواسطة: ' +
+        escapeHtml(reportPreparerName()) + ' | ' + escapeHtml(generatedAt) + '</span></footer>',
+      '</body></html>',
+    ].join('');
+    popup.document.open();
+    popup.document.write(withReportPreparer(html));
     popup.document.close();
     popup.focus();
   };
