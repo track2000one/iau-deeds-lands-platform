@@ -816,7 +816,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {canPrint && <CentralBuildingsReports buildings={buildings} usage={usage} usageLoading={usageLoading} />}
+            {canPrint && <CentralBuildingsReports buildings={buildings} deeds={buildingDeeds} usage={usage} usageLoading={usageLoading} />}
             <Button variant="outline" onClick={() => void loadData()} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               تحديث
