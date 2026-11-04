@@ -38,9 +38,9 @@ type ColumnKey =
   | 'accounting';
 
 const columns: Array<{ key: ColumnKey; label: string; width: number }> = [
-  { key: 'approval', label: 'حالة الاعتماد', width: 18 },
   { key: 'buildingNumber', label: 'رقم المبنى', width: 18 },
   { key: 'name', label: 'اسم المبنى', width: 34 },
+  { key: 'approval', label: 'حالة الاعتماد', width: 18 },
   { key: 'campusLocation', label: 'الحرم / الموقع الجامعي', width: 28 },
   { key: 'city', label: 'المدينة', width: 18 },
   { key: 'district', label: 'الحي', width: 20 },
@@ -209,6 +209,12 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
     direction: previous.key === key && previous.direction === 'asc' ? 'desc' : 'asc',
   }));
 
+  const buildingMapUrl = (building: MosqueBuilding): string | null => {
+    const data = effectiveBuilding(building);
+    if (!hasCoordinates(data.latitude, data.longitude)) return null;
+    return 'https://www.google.com/maps?q=' + encodeURIComponent(String(data.latitude) + ',' + String(data.longitude));
+  };
+
   const exportExcel = () => {
     const chosen = visibleColumns;
     const rows = sorted.map((building) => Object.fromEntries(chosen.map((column) => [column.label, cellValue(building, column.key)])));
@@ -258,43 +264,204 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
         التقارير
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent id="central-buildings-reports-view" className="max-h-[92vh] max-w-[96vw] overflow-y-auto sm:max-w-6xl" dir="rtl">
-          <DialogHeader className="text-right sm:text-right">
-            <DialogTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" />تقارير السجل المركزي للمباني</DialogTitle>
-            <DialogDescription>تقارير مرنة مع فلترة النتائج، اختيار الأعمدة، التصدير إلى Excel والطباعة أو الحفظ PDF.</DialogDescription>
+        <DialogContent
+          id="central-buildings-reports-view"
+          className="flex h-[96vh] w-[98vw] max-w-[98vw] flex-col gap-3 overflow-hidden p-4 sm:max-w-[98vw] sm:p-6"
+          dir="rtl"
+        >
+          <DialogHeader className="shrink-0 gap-2 pr-5 text-right sm:text-right">
+            <DialogTitle className="flex items-center gap-2 text-xl font-black">
+              <BarChart3 className="h-6 w-6 text-primary" />
+              تقارير السجل المركزي للمباني
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              تقارير متقدمة مع فرز مباشر، فلاتر مترابطة، تخصيص الأعمدة، طباعة رسمية وتصدير Excel.
+            </DialogDescription>
           </DialogHeader>
-          {/* IAU_REPORT_VIEW_TOGGLE_PLATFORM_V1 */}
-          <div className="flex justify-end"><ReportViewToggle storageKey="iau-central-buildings-reports-view" scopeId="central-buildings-reports-view" /></div>
 
-          <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4 md:grid-cols-2 xl:grid-cols-6">
-            <div className="space-y-1.5 xl:col-span-2"><Label>بحث</Label><div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(e) => setSearch(e.target.value)} className="pr-9" placeholder="رقم أو اسم المبنى..." /></div></div>
-            <div className="space-y-1.5"><Label>حالة الاعتماد</Label><NativeSelect value={approval} onChange={(e) => setApproval(e.target.value as typeof approval)}><option value="all">الكل</option><option value="approved">معتمد</option><option value="pending">معلق للمراجعة</option></NativeSelect></div>
-            <div className="space-y-1.5"><Label>الحرم / الموقع</Label><NativeSelect value={campus} onChange={(e) => setCampus(e.target.value)}><option value="all">كل المواقع</option>{campusOptions.map((value) => <option key={value} value={value}>{value}</option>)}</NativeSelect></div>
-            <div className="space-y-1.5"><Label>المدينة</Label><NativeSelect value={city} onChange={(e) => setCity(e.target.value)}><option value="all">كل المدن</option>{cityOptions.map((value) => <option key={value} value={value}>{value}</option>)}</NativeSelect></div>
-            <div className="space-y-1.5"><Label>الإحداثيات</Label><NativeSelect value={coordinates} onChange={(e) => setCoordinates(e.target.value as typeof coordinates)}><option value="all">الكل</option><option value="complete">مكتملة</option><option value="missing">ناقصة</option></NativeSelect></div>
-            <div className="space-y-1.5 xl:col-span-2"><Label>الارتباط بالوحدات</Label><NativeSelect value={linkType} onChange={(e) => setLinkType(e.target.value as typeof linkType)}><option value="all">كل المباني</option><option value="mosque">العناية بالمساجد والمصليات</option><option value="assets">وحدة الأصول</option><option value="accounting">التحول المحاسبي</option><option value="unlinked">غير مرتبط بأي وحدة</option></NativeSelect></div>
-            <div className="flex items-end xl:col-span-2"><Button type="button" variant="ghost" onClick={resetFilters}><SlidersHorizontal className="h-4 w-4" />إعادة ضبط الفلاتر</Button></div>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-2">
+            <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-900/60" aria-label="تصفية تقارير المباني">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+                <div className="space-y-1.5 lg:col-span-2">
+                  <Label className="text-sm font-bold">بحث شامل</Label>
+                  <div className="relative">
+                    <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input className="h-11 pr-10 text-sm" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="رقم المبنى أو الاسم أو رقم الصك..." />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-bold">حالة الاعتماد</Label>
+                  <NativeSelect value={approval} onChange={(e) => setApproval(e.target.value as typeof approval)}>
+                    <option value="all">الكل</option><option value="approved">معتمد</option><option value="pending">معلق للمراجعة</option>
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-bold">الحرم / الموقع</Label>
+                  <NativeSelect value={campus} onChange={(e) => { setCampus(e.target.value); setCity('all'); setDistrict('all'); }}>
+                    <option value="all">كل المواقع</option>{campusOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-bold">المدينة</Label>
+                  <NativeSelect value={city} onChange={(e) => { setCity(e.target.value); setDistrict('all'); }}>
+                    <option value="all">كل المدن</option>{cityOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-bold">الحي</Label>
+                  <NativeSelect value={district} onChange={(e) => setDistrict(e.target.value)}>
+                    <option value="all">كل الأحياء</option>{districtOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-bold">الإحداثيات</Label>
+                  <NativeSelect value={coordinates} onChange={(e) => setCoordinates(e.target.value as typeof coordinates)}>
+                    <option value="all">الكل</option><option value="complete">مكتملة</option><option value="missing">ناقصة</option>
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5 lg:col-span-2">
+                  <Label className="text-sm font-bold">الارتباط بالوحدات</Label>
+                  <NativeSelect value={linkType} onChange={(e) => setLinkType(e.target.value as typeof linkType)}>
+                    <option value="all">كل المباني</option>
+                    <option value="mosque">العناية بالمساجد والمصليات</option>
+                    <option value="assets">وحدة الأصول</option>
+                    <option value="accounting">التحول المحاسبي</option>
+                    <option value="unlinked">غير مرتبط بأي وحدة</option>
+                  </NativeSelect>
+                </div>
+                <div className="flex items-end lg:col-span-2">
+                  <Button type="button" variant="outline" className="h-10 gap-2" onClick={resetFilters}>
+                    <SlidersHorizontal className="h-4 w-4" />إعادة ضبط الفلاتر
+                  </Button>
+                </div>
+              </div>
+              {appliedFilters.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                  <span className="text-xs font-bold text-muted-foreground">الفلاتر النشطة:</span>
+                  {appliedFilters.map((filter) => <Badge key={filter} variant="secondary" className="px-3 py-1 text-xs">{filter}</Badge>)}
+                  <Button type="button" variant="ghost" size="sm" onClick={resetFilters}>مسح الكل</Button>
+                </div>
+              )}
+            </section>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <button type="button" onClick={resetFilters} className="rounded-2xl border bg-background p-4 text-right shadow-sm transition hover:border-primary/50 hover:shadow-md">
+                <span className="text-sm font-bold text-muted-foreground">إجمالي النتائج</span>
+                <strong className="mt-1 block text-3xl font-black text-foreground">{summary.total.toLocaleString('ar-SA')}</strong>
+              </button>
+              <button type="button" onClick={() => setApproval('approved')} className="rounded-2xl border bg-background p-4 text-right shadow-sm transition hover:border-primary/50 hover:shadow-md">
+                <span className="text-sm font-bold text-muted-foreground">المباني المعتمدة</span>
+                <strong className="mt-1 block text-3xl font-black text-foreground">{summary.approved.toLocaleString('ar-SA')}</strong>
+              </button>
+              <button type="button" onClick={() => setApproval('pending')} className="rounded-2xl border bg-background p-4 text-right shadow-sm transition hover:border-primary/50 hover:shadow-md">
+                <span className="text-sm font-bold text-muted-foreground">معلق للمراجعة</span>
+                <strong className="mt-1 block text-3xl font-black text-foreground">{summary.pending.toLocaleString('ar-SA')}</strong>
+              </button>
+              <button type="button" onClick={() => setCoordinates('missing')} className="rounded-2xl border bg-background p-4 text-right shadow-sm transition hover:border-primary/50 hover:shadow-md">
+                <span className="text-sm font-bold text-muted-foreground">مباني بلا إحداثيات</span>
+                <strong className="mt-1 block text-3xl font-black text-foreground">{(summary.total - summary.coordinates).toLocaleString('ar-SA')}</strong>
+              </button>
+            </div>
+
+            <section className="rounded-2xl border bg-background p-4" aria-label="تخصيص أعمدة التقرير">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-black">أعمدة التقرير</h3>
+                  <p className="text-sm text-muted-foreground">اختر أعمدة المعاينة والتصدير والطباعة. تُحفظ اختياراتك تلقائياً على جهازك.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{selectedColumns.size} عمود</Badge>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setSelectedColumns(new Set(columns.map((item) => item.key)))}>تحديد الكل</Button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {columns.map((column) => <label key={column.key} className={selectedColumns.has(column.key) ? 'cursor-pointer rounded-xl border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-bold text-primary transition' : 'cursor-pointer rounded-xl border bg-background px-3 py-2 text-sm font-bold text-muted-foreground transition'}>
+                  <input type="checkbox" className="ml-2 align-middle" checked={selectedColumns.has(column.key)} onChange={() => setSelectedColumns((current) => {
+                    const next = new Set(current);
+                    if (next.has(column.key)) { if (next.size > 1) next.delete(column.key); }
+                    else next.add(column.key);
+                    return next;
+                  })} />{column.label}
+                </label>)}
+              </div>
+            </section>
+
+            <section className="overflow-hidden rounded-2xl border bg-background" aria-label="جدول نتائج المباني">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/25 px-4 py-3">
+                <div>
+                  <h3 className="text-base font-black">معاينة النتائج</h3>
+                  <p className="text-sm text-muted-foreground">{usageLoading ? 'مؤشرات الارتباط قيد التحميل...' : 'انقر عنوان أي عمود للفرز، ثم تصفح النتائج كاملة.'}</p>
+                </div>
+                <ReportViewToggle key={visibleColumns.map((column) => column.key).join('-')} storageKey="iau-central-buildings-reports-view" scopeId="central-buildings-reports-view" />
+              </div>
+              <div className="max-h-[52vh] min-h-[180px] overflow-auto">
+                <table className="w-full min-w-[1180px] border-separate border-spacing-0 text-sm">
+                  <thead className="sticky top-0 z-20 bg-background">
+                    <tr>
+                      {visibleColumns.map((column, index) => (
+                        <th key={column.key} scope="col"
+                          className={'border-b border-l bg-slate-100 px-3 py-3 text-right font-black text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white ' + (index < 2 ? 'sticky z-20' : '')}
+                          style={index === 0 ? { right: 0, minWidth: 112 } : index === 1 ? { right: 112, minWidth: 220 } : { minWidth: Math.max(105, column.width * 5) }}
+                          aria-sort={sort.key === column.key ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        >
+                          <button type="button" className="inline-flex w-full items-center justify-between gap-2 text-right hover:text-primary" onClick={() => toggleSort(column.key)} title={'فرز حسب ' + column.label}>
+                            <span>{column.label}</span>
+                            {sort.key === column.key ? (sort.direction === 'asc' ? <ArrowUp className="h-4 w-4 shrink-0" /> : <ArrowDown className="h-4 w-4 shrink-0" />) : <ArrowDownUp className="h-3.5 w-3.5 shrink-0 opacity-50" />}
+                          </button>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageRows.map((building) => (
+                      <tr key={building.id} className="group hover:bg-slate-50 dark:hover:bg-slate-900/60">
+                        {visibleColumns.map((column, index) => (
+                          <td key={column.key}
+                            className={'border-b border-l px-3 py-3 align-middle text-slate-900 dark:border-slate-700 dark:text-slate-100 ' + (index < 2 ? 'sticky z-10 bg-white group-hover:bg-slate-50 dark:bg-slate-950 dark:group-hover:bg-slate-900' : '')}
+                            style={index === 0 ? { right: 0, minWidth: 112 } : index === 1 ? { right: 112, minWidth: 220 } : undefined}
+                          >
+                            {column.key === 'coordinates' ? (
+                              buildingMapUrl(building) ? (
+                                <a href={buildingMapUrl(building) || '#'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-bold text-primary underline-offset-2 hover:underline" title={String(cellValue(building, column.key))}>
+                                  <MapPin className="h-4 w-4" />عرض الموقع
+                                </a>
+                              ) : <span className="text-muted-foreground">—</span>
+                            ) : <span className={column.key === 'name' ? 'font-bold' : ''}>{String(cellValue(building, column.key))}</span>}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {!pageRows.length && <tr><td colSpan={visibleColumns.length} className="px-4 py-12 text-center text-base font-medium text-muted-foreground">لا توجد مبانٍ تطابق الفلاتر المختارة.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/15 px-4 py-3 text-sm">
+                <div className="font-bold">
+                  {sorted.length ? ((currentPage - 1) * pageSize + 1).toLocaleString('ar-SA') : '0'} - {Math.min(currentPage * pageSize, sorted.length).toLocaleString('ar-SA')} من {sorted.length.toLocaleString('ar-SA')} مبنى
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label className="text-sm">عدد الصفوف</Label>
+                  <NativeSelect value={String(pageSize)} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} className="w-24">
+                    <option value="25">25</option><option value="50">50</option><option value="100">100</option>
+                  </NativeSelect>
+                  <Button type="button" variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} aria-label="الصفحة السابقة">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <span className="min-w-20 text-center font-bold">صفحة {currentPage.toLocaleString('ar-SA')} / {totalPages.toLocaleString('ar-SA')}</span>
+                  <Button type="button" variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} aria-label="الصفحة التالية">
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </section>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[['النتائج', summary.total], ['المباني المعتمدة', summary.approved], ['معلق للمراجعة', summary.pending], ['بإحداثيات مكتملة', summary.coordinates]].map(([label, value]) => <div key={String(label)} className="rounded-2xl border bg-background p-4"><div className="text-xs text-muted-foreground">{label}</div><div className="mt-1 text-2xl font-black">{value}</div></div>)}
-          </div>
-
-          <div className="rounded-2xl border p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><div className="font-black">أعمدة التقرير</div><p className="text-xs text-muted-foreground">اختر المعلومات التي تريد إظهارها في Excel والطباعة.</p></div><Badge variant="secondary">{selectedColumns.size} عمود</Badge></div>
-            <div className="flex flex-wrap gap-2">{columns.map((column) => <label key={column.key} className={`cursor-pointer rounded-xl border px-3 py-2 text-xs font-bold transition ${selectedColumns.has(column.key) ? 'border-primary/40 bg-primary/5 text-primary' : 'bg-background text-muted-foreground'}`}><input type="checkbox" className="ml-2 align-middle" checked={selectedColumns.has(column.key)} onChange={() => setSelectedColumns((current) => { const next = new Set(current); if (next.has(column.key)) next.delete(column.key); else next.add(column.key); return next; })} />{column.label}</label>)}</div>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border">
-            <div className="flex items-center justify-between gap-2 border-b bg-muted/25 px-4 py-3"><div className="font-black">معاينة النتائج</div><div className="text-xs text-muted-foreground">{usageLoading ? 'مؤشرات الارتباط قيد التحميل...' : `عرض أول ${Math.min(filtered.length, 100)} من ${filtered.length}`}</div></div>
-            <div className="max-h-[360px] overflow-auto"><table className="w-full min-w-[900px] text-xs"><thead className="sticky top-0 bg-background"><tr>{(activeColumns.length ? activeColumns : columns).map((column) => <th key={column.key} className="border-b px-3 py-2 text-right font-black">{column.label}</th>)}</tr></thead><tbody>{filtered.slice(0, 100).map((building) => <tr key={building.id} className="border-b last:border-b-0 hover:bg-muted/20">{(activeColumns.length ? activeColumns : columns).map((column) => <td key={column.key} className="px-3 py-2">{String(cellValue(building, column.key))}</td>)}</tr>)}</tbody></table></div>
-          </div>
-
-          <DialogFooter className="gap-2 sm:justify-start">
-            <Button type="button" onClick={exportExcel} disabled={!filtered.length}><Download className="h-4 w-4" />تصدير Excel</Button>
-            <Button type="button" variant="outline" onClick={printReport} disabled={!filtered.length}><Printer className="h-4 w-4" />طباعة / PDF</Button>
+          <DialogFooter className="shrink-0 gap-2 border-t pt-3 sm:justify-start">
+            <Button type="button" onClick={exportExcel} disabled={!sorted.length}><Download className="h-4 w-4" />تصدير Excel</Button>
+            <Button type="button" variant="outline" onClick={printReport} disabled={!sorted.length}><Printer className="h-4 w-4" />طباعة / PDF</Button>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>إغلاق</Button>
           </DialogFooter>
+          <style>{'#central-buildings-reports-view.iau-report-cards-mode td, #central-buildings-reports-view.iau-report-cards-mode th {position:static!important;}'}</style>
         </DialogContent>
       </Dialog>
     </>
