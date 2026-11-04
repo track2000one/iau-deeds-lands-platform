@@ -1,8 +1,8 @@
 import { withReportPreparer, reportPreparerName } from '../utils/reportAttribution';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { BarChart3, Download, Printer, Search, SlidersHorizontal } from 'lucide-react';
-import { getPendingBuildingImport, isPendingImportedBuilding } from './BuildingExcelImportManager';
+import { ArrowDown, ArrowDownUp, ArrowUp, BarChart3, ChevronLeft, ChevronRight, Download, MapPin, Printer, Search, SlidersHorizontal } from 'lucide-react';
+import { getPendingBuildingImport } from './BuildingExcelImportManager';
 import type { MosqueBuilding } from '../api/mosques';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -51,6 +51,26 @@ const columns: Array<{ key: ColumnKey; label: string; width: number }> = [
 ];
 
 const normalize = (value: unknown) => String(value ?? '').trim().toLowerCase();
+const isValidCoordinate = (value: unknown) =>
+  value !== null && value !== undefined && String(value).trim() !== '' && Number.isFinite(Number(value));
+const hasCoordinates = (latitude: unknown, longitude: unknown) =>
+  isValidCoordinate(latitude) && isValidCoordinate(longitude) &&
+  Math.abs(Number(latitude)) <= 90 && Math.abs(Number(longitude)) <= 180 &&
+  !(Number(latitude) === 0 && Number(longitude) === 0);
+
+const readSelectedColumns = (): Set<ColumnKey> => {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v2') || 'null');
+    if (Array.isArray(saved)) {
+      const valid = saved.filter((key): key is ColumnKey =>
+        columns.some((column) => column.key === key));
+      if (valid.length) return new Set(valid);
+    }
+  } catch {
+    // Private browsing and disabled storage: retain safe defaults.
+  }
+  return new Set(columns.map((column) => column.key));
+};
 
 const effectiveBuilding = (building: MosqueBuilding) => {
   const pending = getPendingBuildingImport(building);
@@ -79,12 +99,34 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
   const [approval, setApproval] = useState<'all' | 'approved' | 'pending'>('all');
   const [campus, setCampus] = useState('all');
   const [city, setCity] = useState('all');
+  const [district, setDistrict] = useState('all');
+  const [sort, setSort] = useState<{ key: ColumnKey; direction: 'asc' | 'desc' }>({ key: 'buildingNumber', direction: 'asc' });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [linkType, setLinkType] = useState<'all' | 'mosque' | 'assets' | 'accounting' | 'unlinked'>('all');
   const [coordinates, setCoordinates] = useState<'all' | 'complete' | 'missing'>('all');
-  const [selectedColumns, setSelectedColumns] = useState<Set<ColumnKey>>(new Set(columns.map((item) => item.key)));
+  const [selectedColumns, setSelectedColumns] = useState<Set<ColumnKey>>(readSelectedColumns);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('iau-central-buildings-report-columns-v2', JSON.stringify([...selectedColumns]));
+    } catch {
+      // Column preferences remain usable in the current session.
+    }
+  }, [selectedColumns]);
+  useEffect(() => {
+    setPage(1);
+  }, [search, approval, campus, city, district, linkType, coordinates, sort]);
 
   const campusOptions = useMemo(() => Array.from(new Set(buildings.map((item) => effectiveBuilding(item).campusLocation).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar')), [buildings]);
-  const cityOptions = useMemo(() => Array.from(new Set(buildings.map((item) => effectiveBuilding(item).city).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar')), [buildings]);
+  const cityOptions = useMemo(() => Array.from(new Set(buildings
+    .map((item) => effectiveBuilding(item))
+    .filter((item) => campus === 'all' || item.campusLocation === campus)
+    .map((item) => item.city).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar')), [buildings, campus]);
+  const districtOptions = useMemo(() => Array.from(new Set(buildings
+    .map((item) => effectiveBuilding(item))
+    .filter((item) => (campus === 'all' || item.campusLocation === campus) && (city === 'all' || item.city === city))
+    .map((item) => item.district).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar')), [buildings, campus, city]);
 
   const filtered = useMemo(() => {
     const needle = normalize(search);
@@ -95,29 +137,31 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
       if (approval === 'pending' && !data.pending) return false;
       if (campus !== 'all' && data.campusLocation !== campus) return false;
       if (city !== 'all' && data.city !== city) return false;
-      const hasCoordinates = Number.isFinite(Number(data.latitude)) && Number.isFinite(Number(data.longitude));
-      if (coordinates === 'complete' && !hasCoordinates) return false;
-      if (coordinates === 'missing' && hasCoordinates) return false;
+      if (district !== 'all' && data.district !== district) return false;
+      const located = hasCoordinates(data.latitude, data.longitude);
+      if (coordinates === 'complete' && !located) return false;
+      if (coordinates === 'missing' && located) return false;
       if (linkType === 'mosque' && !itemUsage?.mosqueProfile) return false;
       if (linkType === 'assets' && !(itemUsage?.assets || 0)) return false;
       if (linkType === 'accounting' && !(itemUsage?.accounting || 0)) return false;
       if (linkType === 'unlinked' && (itemUsage?.mosqueProfile || (itemUsage?.assets || 0) > 0 || (itemUsage?.accounting || 0) > 0)) return false;
-      if (needle && ![data.buildingNumber, data.name, data.campusLocation, data.city, data.district].some((value) => normalize(value).includes(needle))) return false;
+      if (needle && ![data.buildingNumber, data.name, data.campusLocation, data.city, data.district, building.deed?.deedNumber].some((value) => normalize(value).includes(needle))) return false;
       return true;
     });
-  }, [approval, buildings, campus, city, coordinates, linkType, search, usage]);
+  }, [approval, buildings, campus, city, district, coordinates, linkType, search, usage]);
 
   const summary = useMemo(() => ({
     total: filtered.length,
-    approved: filtered.filter((item) => !isPendingImportedBuilding(item)).length,
-    pending: filtered.filter((item) => isPendingImportedBuilding(item)).length,
+    approved: filtered.filter((item) => !effectiveBuilding(item).pending).length,
+    pending: filtered.filter((item) => effectiveBuilding(item).pending).length,
     coordinates: filtered.filter((item) => {
       const data = effectiveBuilding(item);
-      return Number.isFinite(Number(data.latitude)) && Number.isFinite(Number(data.longitude));
+      return hasCoordinates(data.latitude, data.longitude);
     }).length,
   }), [filtered]);
 
   const activeColumns = columns.filter((column) => selectedColumns.has(column.key));
+  const visibleColumns = activeColumns.length ? activeColumns : columns;
 
   const cellValue = (building: MosqueBuilding, key: ColumnKey) => {
     const data = effectiveBuilding(building);
@@ -129,7 +173,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
       case 'campusLocation': return data.campusLocation || '—';
       case 'city': return data.city || '—';
       case 'district': return data.district || '—';
-      case 'coordinates': return Number.isFinite(Number(data.latitude)) && Number.isFinite(Number(data.longitude)) ? `${data.latitude}, ${data.longitude}` : '—';
+      case 'coordinates': return hasCoordinates(data.latitude, data.longitude) ? `${data.latitude}, ${data.longitude}` : '—';
       case 'mosque': return itemUsage?.mosqueProfile ? Math.max(itemUsage.mosqueSites || 0, 1) : 0;
       case 'assets': return itemUsage?.assets || 0;
       case 'accounting': return itemUsage?.accounting || 0;
@@ -137,17 +181,48 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
     }
   };
 
+  const sorted = useMemo(() => [...filtered].sort((first, second) => {
+    const left = cellValue(first, sort.key);
+    const right = cellValue(second, sort.key);
+    const comparison = typeof left === 'number' && typeof right === 'number'
+      ? left - right
+      : String(left).localeCompare(String(right), 'ar', { numeric: true, sensitivity: 'base' });
+    return sort.direction === 'asc' ? comparison : -comparison;
+  }), [filtered, sort, usage]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageRows = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const appliedFilters = [
+    search.trim() ? 'بحث: ' + search.trim() : '',
+    approval !== 'all' ? 'الاعتماد: ' + (approval === 'approved' ? 'معتمد' : 'معلق للمراجعة') : '',
+    campus !== 'all' ? 'الموقع: ' + campus : '',
+    city !== 'all' ? 'المدينة: ' + city : '',
+    district !== 'all' ? 'الحي: ' + district : '',
+    coordinates !== 'all' ? 'الإحداثيات: ' + (coordinates === 'complete' ? 'مكتملة' : 'ناقصة') : '',
+    linkType !== 'all' ? 'الارتباط: ' + ({ mosque: 'العناية بالمساجد', assets: 'الأصول', accounting: 'السجلات المحاسبية', unlinked: 'غير مرتبطة' } as Record<string, string>)[linkType] : '',
+  ].filter(Boolean);
+
+  const toggleSort = (key: ColumnKey) => setSort((previous) => ({
+    key,
+    direction: previous.key === key && previous.direction === 'asc' ? 'desc' : 'asc',
+  }));
+
   const exportExcel = () => {
-    const chosen = activeColumns.length ? activeColumns : columns;
-    const rows = filtered.map((building) => Object.fromEntries(chosen.map((column) => [column.label, cellValue(building, column.key)])));
+    const chosen = visibleColumns;
+    const rows = sorted.map((building) => Object.fromEntries(chosen.map((column) => [column.label, cellValue(building, column.key)])));
     const worksheet = XLSX.utils.json_to_sheet(rows, { header: chosen.map((column) => column.label) });
     worksheet['!cols'] = chosen.map((column) => ({ wch: column.width }));
+    if (worksheet['!ref']) worksheet['!autofilter'] = { ref: worksheet['!ref'] };
     const workbook = XLSX.utils.book_new();
     const infoSheet = XLSX.utils.aoa_to_sheet([
       ['معلومات التقرير', 'القيمة'],
       ['أُعدّ بواسطة', reportPreparerName()],
       ['تاريخ الاستخراج', new Date().toLocaleString('ar-SA-u-ca-gregory')],
-      ['عدد النتائج', filtered.length],
+      ['عدد النتائج', sorted.length],
+      ['ترتيب حسب', columns.find((item) => item.key === sort.key)?.label + (sort.direction === 'asc' ? ' (تصاعدي)' : ' (تنازلي)')],
+      ['الفلاتر', appliedFilters.join(' | ') || 'جميع المباني'],
     ]);
     infoSheet['!cols'] = [{ wch: 28 }, { wch: 46 }];
     XLSX.utils.book_append_sheet(workbook, infoSheet, 'معلومات التقرير');
@@ -156,10 +231,10 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
   };
 
   const printReport = () => {
-    const chosen = activeColumns.length ? activeColumns : columns;
-    const popup = window.open('', '_blank', 'noopener,noreferrer,width=1400,height=900');
+    const chosen = visibleColumns;
+    const popup = window.open('', '_blank', 'width=1400,height=900');
     if (!popup) return;
-    const rows = filtered.map((building) => `<tr>${chosen.map((column) => `<td>${escapeHtml(cellValue(building, column.key))}</td>`).join('')}</tr>`).join('');
+    const rows = sorted.map((building) => `<tr>${chosen.map((column) => `<td>${escapeHtml(cellValue(building, column.key))}</td>`).join('')}</tr>`).join('');
     popup.document.write(withReportPreparer(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير السجل المركزي للمباني</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:24px;color:#172033}h1{font-size:22px;margin:0 0 8px}.meta{color:#667085;font-size:12px;margin-bottom:18px}.stats{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}.stat{border:1px solid #d7dee8;border-radius:10px;padding:8px 12px;font-size:12px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #d8dee8;padding:7px;text-align:right}th{background:#eef5f7;font-weight:700}@media print{body{padding:0}.no-print{display:none}table{font-size:9px}}</style></head><body><div class="no-print" style="margin-bottom:12px"><button onclick="window.print()">طباعة / حفظ PDF</button></div><h1>تقرير السجل المركزي للمباني</h1><div class="meta">تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</div><div class="stats"><span class="stat">النتائج: ${summary.total}</span><span class="stat">المعتمد: ${summary.approved}</span><span class="stat">المعلق: ${summary.pending}</span><span class="stat">بإحداثيات: ${summary.coordinates}</span></div><table><thead><tr>${chosen.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></body></html>`));
     popup.document.close();
     popup.focus();
@@ -170,7 +245,9 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
     setApproval('all');
     setCampus('all');
     setCity('all');
+    setDistrict('all');
     setLinkType('all');
+    setPage(1);
     setCoordinates('all');
   };
 
