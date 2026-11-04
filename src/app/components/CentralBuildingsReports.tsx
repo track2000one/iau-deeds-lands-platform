@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { ArrowDown, ArrowDownUp, ArrowUp, BarChart3, ChevronLeft, ChevronRight, Download, MapPin, Printer, Search, SlidersHorizontal } from 'lucide-react';
 import { getPendingBuildingImport } from './BuildingExcelImportManager';
-import type { MosqueBuilding } from '../api/mosques';
+import type { MosqueBuilding, MosqueBuildingDeedReference } from '../api/mosques';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -21,6 +21,7 @@ type UsageEntry = {
 
 type Props = {
   buildings: MosqueBuilding[];
+  deeds: MosqueBuildingDeedReference[];
   usage: Map<string, UsageEntry>;
   usageLoading?: boolean;
 };
@@ -29,6 +30,8 @@ type ColumnKey =
   | 'approval'
   | 'buildingNumber'
   | 'name'
+  | 'deedStatus'
+  | 'deedNumber'
   | 'campusLocation'
   | 'city'
   | 'district'
@@ -40,6 +43,8 @@ type ColumnKey =
 const columns: Array<{ key: ColumnKey; label: string; width: number }> = [
   { key: 'buildingNumber', label: 'رقم المبنى', width: 18 },
   { key: 'name', label: 'اسم المبنى', width: 34 },
+  { key: 'deedStatus', label: 'الارتباط بالصك', width: 20 },
+  { key: 'deedNumber', label: 'رقم الصك', width: 24 },
   { key: 'approval', label: 'حالة الاعتماد', width: 18 },
   { key: 'campusLocation', label: 'الحرم / الموقع الجامعي', width: 28 },
   { key: 'city', label: 'المدينة', width: 18 },
@@ -60,11 +65,15 @@ const hasCoordinates = (latitude: unknown, longitude: unknown) =>
 
 const readSelectedColumns = (): Set<ColumnKey> => {
   try {
-    const saved = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v2') || 'null');
-    if (Array.isArray(saved)) {
-      const valid = saved.filter((key): key is ColumnKey =>
-        columns.some((column) => column.key === key));
+    const nextSaved = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v3') || 'null');
+    if (Array.isArray(nextSaved)) {
+      const valid = nextSaved.filter((key): key is ColumnKey => columns.some((column) => column.key === key));
       if (valid.length) return new Set(valid);
+    }
+    const previousSaved = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v2') || 'null');
+    if (Array.isArray(previousSaved)) {
+      const valid = previousSaved.filter((key): key is ColumnKey => columns.some((column) => column.key === key));
+      if (valid.length) return new Set([...valid, 'deedStatus', 'deedNumber']);
     }
   } catch {
     // Private browsing and disabled storage: retain safe defaults.
@@ -93,7 +102,7 @@ const escapeHtml = (value: unknown) => String(value ?? '')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#039;');
 
-export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usageLoading = false }) => {
+export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usage, usageLoading = false }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [approval, setApproval] = useState<'all' | 'approved' | 'pending'>('all');
@@ -105,18 +114,29 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
   const [pageSize, setPageSize] = useState(25);
   const [linkType, setLinkType] = useState<'all' | 'mosque' | 'assets' | 'accounting' | 'unlinked'>('all');
   const [coordinates, setCoordinates] = useState<'all' | 'complete' | 'missing'>('all');
+  const [deedLink, setDeedLink] = useState<'all' | 'linked' | 'unlinked'>('all');
   const [selectedColumns, setSelectedColumns] = useState<Set<ColumnKey>>(readSelectedColumns);
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('iau-central-buildings-report-columns-v2', JSON.stringify([...selectedColumns]));
+      window.localStorage.setItem('iau-central-buildings-report-columns-v3', JSON.stringify([...selectedColumns]));
     } catch {
       // Column preferences remain usable in the current session.
     }
   }, [selectedColumns]);
   useEffect(() => {
     setPage(1);
-  }, [search, approval, campus, city, district, linkType, coordinates, sort]);
+  }, [search, approval, campus, city, district, linkType, coordinates, deedLink, sort]);
+
+  const deedById = useMemo(() => new Map(deeds.map((deed) => [String(deed.id), deed])), [deeds]);
+  const getDeedNumber = (building: MosqueBuilding): string => {
+    const inlineNumber = String(building.deed?.deedNumber || '').trim();
+    if (inlineNumber) return inlineNumber;
+    const id = building.deedId || building.deed?.id;
+    return id ? String(deedById.get(String(id))?.deedNumber || '').trim() : '';
+  };
+  const isDeedLinked = (building: MosqueBuilding): boolean =>
+    Boolean(building.deedId || building.deed?.id || getDeedNumber(building));
 
   const campusOptions = useMemo(() => Array.from(new Set(buildings.map((item) => effectiveBuilding(item).campusLocation).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar')), [buildings]);
   const cityOptions = useMemo(() => Array.from(new Set(buildings
@@ -138,6 +158,8 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
       if (campus !== 'all' && data.campusLocation !== campus) return false;
       if (city !== 'all' && data.city !== city) return false;
       if (district !== 'all' && data.district !== district) return false;
+      if (deedLink === 'linked' && !isDeedLinked(building)) return false;
+      if (deedLink === 'unlinked' && isDeedLinked(building)) return false;
       const located = hasCoordinates(data.latitude, data.longitude);
       if (coordinates === 'complete' && !located) return false;
       if (coordinates === 'missing' && located) return false;
@@ -145,20 +167,22 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
       if (linkType === 'assets' && !(itemUsage?.assets || 0)) return false;
       if (linkType === 'accounting' && !(itemUsage?.accounting || 0)) return false;
       if (linkType === 'unlinked' && (itemUsage?.mosqueProfile || (itemUsage?.assets || 0) > 0 || (itemUsage?.accounting || 0) > 0)) return false;
-      if (needle && ![data.buildingNumber, data.name, data.campusLocation, data.city, data.district, building.deed?.deedNumber].some((value) => normalize(value).includes(needle))) return false;
+      if (needle && ![data.buildingNumber, data.name, data.campusLocation, data.city, data.district, getDeedNumber(building)].some((value) => normalize(value).includes(needle))) return false;
       return true;
     });
-  }, [approval, buildings, campus, city, district, coordinates, linkType, search, usage]);
+  }, [approval, buildings, campus, city, district, coordinates, deedLink, deedById, linkType, search, usage]);
 
   const summary = useMemo(() => ({
     total: filtered.length,
     approved: filtered.filter((item) => !effectiveBuilding(item).pending).length,
     pending: filtered.filter((item) => effectiveBuilding(item).pending).length,
+    linkedDeeds: filtered.filter(isDeedLinked).length,
+    unlinkedDeeds: filtered.filter((item) => !isDeedLinked(item)).length,
     coordinates: filtered.filter((item) => {
       const data = effectiveBuilding(item);
       return hasCoordinates(data.latitude, data.longitude);
     }).length,
-  }), [filtered]);
+  }), [filtered, deedById]);
 
   const activeColumns = columns.filter((column) => selectedColumns.has(column.key));
   const visibleColumns = activeColumns.length ? activeColumns : columns;
@@ -170,6 +194,8 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
       case 'approval': return data.pending ? 'معلق للمراجعة' : 'معتمد';
       case 'buildingNumber': return data.buildingNumber || '—';
       case 'name': return data.name || '—';
+      case 'deedStatus': return isDeedLinked(building) ? 'مرتبط بصك' : 'غير مرتبط بصك';
+      case 'deedNumber': return getDeedNumber(building) || (isDeedLinked(building) ? 'رقم الصك غير متوفر' : '—');
       case 'campusLocation': return data.campusLocation || '—';
       case 'city': return data.city || '—';
       case 'district': return data.district || '—';
@@ -188,7 +214,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
       ? left - right
       : String(left).localeCompare(String(right), 'ar', { numeric: true, sensitivity: 'base' });
     return sort.direction === 'asc' ? comparison : -comparison;
-  }), [filtered, sort, usage]);
+  }), [filtered, sort, usage, deedById]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -201,6 +227,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
     city !== 'all' ? 'المدينة: ' + city : '',
     district !== 'all' ? 'الحي: ' + district : '',
     coordinates !== 'all' ? 'الإحداثيات: ' + (coordinates === 'complete' ? 'مكتملة' : 'ناقصة') : '',
+    deedLink !== 'all' ? 'الصك: ' + (deedLink === 'linked' ? 'مرتبط' : 'غير مرتبط') : '',
     linkType !== 'all' ? 'الارتباط: ' + ({ mosque: 'العناية بالمساجد', assets: 'الأصول', accounting: 'السجلات المحاسبية', unlinked: 'غير مرتبطة' } as Record<string, string>)[linkType] : '',
   ].filter(Boolean);
 
@@ -268,7 +295,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
       '.meta{display:flex;flex-wrap:wrap;gap:5px 22px;font-size:11px;color:#334155}',
       '.filters{margin:11px 0;display:flex;flex-wrap:wrap;gap:7px;align-items:center}',
       '.filter{background:#eff6f8;border:1px solid #d1e1e7;border-radius:7px;padding:5px 9px;font-size:11px}',
-      '.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0 17px;break-inside:avoid}',
+      '.stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:12px 0 17px;break-inside:avoid}',
       '.stat{border:1px solid #ccdce4;border-radius:10px;padding:10px 13px;background:#f9fcfd}',
       '.stat span{display:block;font-size:11px;color:#526579}.stat strong{font-size:19px;color:#0f4d66}',
       'table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:11px;line-height:1.7}',
@@ -291,6 +318,8 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
       '<div class="stat"><span>المعتمد</span><strong>' + summary.approved.toLocaleString('ar-SA') + '</strong></div>',
       '<div class="stat"><span>معلق للمراجعة</span><strong>' + summary.pending.toLocaleString('ar-SA') + '</strong></div>',
       '<div class="stat"><span>بإحداثيات مكتملة</span><strong>' + summary.coordinates.toLocaleString('ar-SA') + '</strong></div>',
+      '<div class="stat"><span>مرتبطة بصك</span><strong>' + summary.linkedDeeds.toLocaleString('ar-SA') + '</strong></div>',
+      '<div class="stat"><span>غير مرتبطة بصك</span><strong>' + summary.unlinkedDeeds.toLocaleString('ar-SA') + '</strong></div>',
       '</section>',
       '<table><thead><tr>' + chosen.map((column) => '<th>' + escapeHtml(column.label) + '</th>').join('') +
         '</tr></thead><tbody>' + tableRows + '</tbody></table>',
@@ -313,6 +342,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
     setLinkType('all');
     setPage(1);
     setCoordinates('all');
+    setDeedLink('all');
   };
 
   return (
@@ -377,6 +407,14 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
                     <option value="all">الكل</option><option value="complete">مكتملة</option><option value="missing">ناقصة</option>
                   </NativeSelect>
                 </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-bold">الارتباط بالصك</Label>
+                  <NativeSelect value={deedLink} onChange={(e) => setDeedLink(e.target.value as typeof deedLink)}>
+                    <option value="all">جميع المباني</option>
+                    <option value="linked">مرتبط بصك</option>
+                    <option value="unlinked">غير مرتبط بصك</option>
+                  </NativeSelect>
+                </div>
                 <div className="space-y-1.5 lg:col-span-2">
                   <Label className="text-sm font-bold">الارتباط بالوحدات</Label>
                   <NativeSelect value={linkType} onChange={(e) => setLinkType(e.target.value as typeof linkType)}>
@@ -402,7 +440,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
               )}
             </section>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               <button type="button" onClick={resetFilters} className="rounded-2xl border bg-background p-4 text-right shadow-sm transition hover:border-primary/50 hover:shadow-md">
                 <span className="text-sm font-bold text-muted-foreground">إجمالي النتائج</span>
                 <strong className="mt-1 block text-3xl font-black text-foreground">{summary.total.toLocaleString('ar-SA')}</strong>
@@ -418,6 +456,14 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
               <button type="button" onClick={() => setCoordinates('missing')} className="rounded-2xl border bg-background p-4 text-right shadow-sm transition hover:border-primary/50 hover:shadow-md">
                 <span className="text-sm font-bold text-muted-foreground">مباني بلا إحداثيات</span>
                 <strong className="mt-1 block text-3xl font-black text-foreground">{(summary.total - summary.coordinates).toLocaleString('ar-SA')}</strong>
+              </button>
+              <button type="button" onClick={() => setDeedLink('linked')} className="rounded-2xl border bg-background p-4 text-right shadow-sm transition hover:border-emerald-500/60 hover:shadow-md">
+                <span className="text-sm font-bold text-muted-foreground">مباني مرتبطة بصك</span>
+                <strong className="mt-1 block text-3xl font-black text-emerald-700 dark:text-emerald-300">{summary.linkedDeeds.toLocaleString('ar-SA')}</strong>
+              </button>
+              <button type="button" onClick={() => setDeedLink('unlinked')} className="rounded-2xl border bg-background p-4 text-right shadow-sm transition hover:border-amber-500/60 hover:shadow-md">
+                <span className="text-sm font-bold text-muted-foreground">مباني غير مرتبطة بصك</span>
+                <strong className="mt-1 block text-3xl font-black text-amber-700 dark:text-amber-300">{summary.unlinkedDeeds.toLocaleString('ar-SA')}</strong>
               </button>
             </div>
 
@@ -478,7 +524,13 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, usage, usa
                             className={'border-b border-l px-3 py-3 align-middle text-slate-900 dark:border-slate-700 dark:text-slate-100 ' + (index < 2 ? 'sticky z-10 bg-white group-hover:bg-slate-50 dark:bg-slate-950 dark:group-hover:bg-slate-900' : '')}
                             style={index === 0 ? { right: 0, minWidth: 112 } : index === 1 ? { right: 112, minWidth: 220 } : undefined}
                           >
-                            {column.key === 'coordinates' ? (
+                            {column.key === 'deedStatus' ? (
+                              <span className={isDeedLinked(building) ? 'inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-200' : 'inline-flex rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200'}>
+                                {String(cellValue(building, column.key))}
+                              </span>
+                            ) : column.key === 'deedNumber' ? (
+                              <span dir="ltr" className="inline-block font-semibold tabular-nums">{String(cellValue(building, column.key))}</span>
+                            ) : column.key === 'coordinates' ? (
                               buildingMapUrl(building) ? (
                                 <a href={buildingMapUrl(building) || '#'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-bold text-primary underline-offset-2 hover:underline" title={String(cellValue(building, column.key))}>
                                   <MapPin className="h-4 w-4" />عرض الموقع
