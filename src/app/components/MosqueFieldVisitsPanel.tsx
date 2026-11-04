@@ -4332,11 +4332,19 @@ const ImageField: React.FC<{
   onRemove: (index: number) => void;
 }> = ({ label, images, loading, onFiles, onRemove }) => <div className="rounded-xl border bg-white p-3">
   <div className="mb-2 flex items-center justify-between"><Label className="text-xs font-bold">{label}</Label><Badge variant="outline">{images.length}</Badge></div>
-  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-xs font-semibold text-sky-700 hover:bg-sky-50">
-    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-    {loading ? 'جاري الرفع...' : 'التقاط / اختيار صور'}
-    <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={loading} onChange={(event) => { onFiles(event.target.files); event.target.value = ''; }} />
-  </label>
+  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <label className={`flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 py-3 text-sm font-bold transition ${loading ? 'cursor-wait border-emerald-200 bg-emerald-50 text-emerald-500' : 'cursor-pointer border-emerald-400 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'}`}>
+      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+      {loading ? 'جاري رفع الصور...' : 'التقاط صورة'}
+      <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={loading} aria-label={`التقاط صورة - ${label}`} onChange={(event) => { onFiles(event.target.files); event.target.value = ''; }} />
+    </label>
+    <label className={`flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 py-3 text-sm font-bold transition ${loading ? 'cursor-wait border-sky-200 bg-sky-50 text-sky-400' : 'cursor-pointer border-sky-400 bg-sky-50 text-sky-800 hover:bg-sky-100'}`}>
+      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+      {loading ? 'جاري رفع الصور...' : 'رفع من الجهاز'}
+      <input type="file" accept="image/*" multiple className="sr-only" disabled={loading} aria-label={`رفع صور من الجهاز - ${label}`} onChange={(event) => { onFiles(event.target.files); event.target.value = ''; }} />
+    </label>
+  </div>
+  <p className="mt-2 text-[11px] leading-5 text-slate-500">يمكن التصوير مباشرة أو اختيار صورة أو عدة صور محفوظة من معرض الجوال، دون حذف الصور المضافة.</p>
   {images.length > 0 && <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
     {images.map((image, index) => <div key={`${image.fileId || image.url}-${index}`} className="relative overflow-hidden rounded-xl border bg-white p-1.5 shadow-sm">
       <FieldVisitImagePreview image={image} />
