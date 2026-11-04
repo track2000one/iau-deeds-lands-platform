@@ -210,26 +210,6 @@ const siteCategoryLabel = (site: MosqueSite | null | undefined, category: string
   isStandaloneWomenRoom(site) ? category.replace(/^مصلى النساء\s*[—-]\s*/, '') : category;
 const siteItemTitle = (site: MosqueSite | null | undefined, title: string) =>
   isStandaloneWomenRoom(site) ? title.replace(/مصلى النساء/g, 'المصلى') : title;
-const reuseOldWomenResults = (site: MosqueSite | null | undefined, items: MosqueFieldVisitItem[]) => {
-  if (!isStandaloneWomenRoom(site)) return items;
-  const mapped: Record<string, string> = {
-    'مصلى النساء — النظافة': 'نظافة السجاد والأرضيات',
-    'مصلى النساء — المرافق': 'نظافة مرافق الوضوء ودورات المياه',
-    'مصلى النساء — التكييف': 'كفاءة التكييف والتهوية وعدم وجود تسربات',
-    'مصلى النساء — الإنارة': 'سلامة الإنارة والمفاتيح والمقابس',
-    'مصلى النساء — المظهر العام': 'تنظيم الموقع ووضوح اتجاه القبلة وجاهزيته للصلاة',
-  };
-  const updated = [...items];
-  for (const old of items) {
-    const matching = mapped[old.category];
-    if (!matching || !['good', 'not_available', 'not_applicable'].includes(old.status)) continue;
-    if (String(old.note || '').trim() || (old.beforeImages || []).length || (old.afterImages || []).length) continue;
-    const i = updated.findIndex((item) => item.title === matching && item.status === 'not_checked');
-    if (i >= 0) updated[i] = { ...updated[i], status: old.status };
-  }
-  return updated;
-};
-
 const visitStatusLabels: Record<string, string> = {
   planned: 'مجدولة',
   in_progress: 'جارية',
@@ -1738,14 +1718,14 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       representativeName: visit.representativeName || '', teamMembers: (visit.teamMembers || []).join('، '),
       overallStatus: visit.overallStatus, priority: visit.priority, workflowStatus: visit.workflowStatus,
       generalNotes: visit.generalNotes || '', recommendations: visit.recommendations || '',
-      attachments: [...(visit.attachments || [])], items: reuseOldWomenResults(visit.site, freshItems((() => {
+      attachments: [...(visit.attachments || [])], items: freshItems((() => {
         const savedItems = visit.items || template;
         const automaticAdhanTemplateItem = template.find(isAutomaticAdhanItem);
         if (visit.workflowStatus !== 'closed' && automaticAdhanTemplateItem && !savedItems.some(isAutomaticAdhanItem)) {
           return [...savedItems, automaticAdhanTemplateItem];
         }
         return savedItems;
-      })())),
+      })()),
     });
     setVisitDialog(true);
   };
