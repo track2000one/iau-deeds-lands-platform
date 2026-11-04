@@ -199,7 +199,7 @@ const oldWomenDuplicateCats = new Set(['مصلى النساء — النظافة
   'مصلى النساء — التجهيزات', 'مصلى النساء — المظهر العام']);
 const hideOldWomenDuplicate = (site: MosqueSite | null | undefined, item: MosqueFieldVisitItem) =>
   isStandaloneWomenRoom(site) && oldWomenDuplicateCats.has(item.category) &&
-  item.status !== 'needs_action' && !String(item.note || '').trim() &&
+  ['not_checked', 'good'].includes(item.status) && !String(item.note || '').trim() &&
   !String(item.responsibleEntity || '').trim() && !item.dueDate &&
   !String(item.resolutionNote || '').trim() &&
   !(item.beforeImages || []).length && !(item.afterImages || []).length &&
