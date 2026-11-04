@@ -165,6 +165,8 @@ const defaultVisitScopeForSite = (site?: MosqueSite | null): MosqueFieldVisit['v
 };
 type WomenPrayerPresence = 'present' | 'verified_absent' | 'unverified';
 const womenPrayerPresence = (site?: MosqueSite | null): WomenPrayerPresence => {
+  // A standalone women's prayer room is itself the verified site; it does not require a parent mosque.
+  if (site?.siteType === 'prayer_room' && site.prayerRoomGender === 'women') return 'present';
   if (!site || !['mosque', 'jami'].includes(site.siteType)) return 'unverified';
   if (site.hasWomenPrayerArea) return 'present';
   return site.womenPrayerArea?.presenceStatus === 'verified_absent' ? 'verified_absent' : 'unverified';
