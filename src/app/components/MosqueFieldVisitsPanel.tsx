@@ -207,7 +207,7 @@ const hideOldWomenDuplicate = (site: MosqueSite | null | undefined, item: Mosque
 const shownVisitItems = (site: MosqueSite | null | undefined, items: MosqueFieldVisitItem[]) =>
   items.map((item, index) => ({ item, index })).filter(({ item }) => !hideOldWomenDuplicate(site, item));
 const siteCategoryLabel = (site: MosqueSite | null | undefined, category: string) =>
-  isStandaloneWomenRoom(site) ? category.replace(/^مصلى النساء\\s*[—-]\\s*/, '') : category;
+  isStandaloneWomenRoom(site) ? category.replace(/^مصلى النساء\s*[—-]\s*/, '') : category;
 const siteItemTitle = (site: MosqueSite | null | undefined, title: string) =>
   isStandaloneWomenRoom(site) ? title.replace(/مصلى النساء/g, 'المصلى') : title;
 const reuseOldWomenResults = (site: MosqueSite | null | undefined, items: MosqueFieldVisitItem[]) => {
