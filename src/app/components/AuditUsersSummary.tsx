@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpLeft, Clock3, Users } from 'lucide-react';
+import { ArrowUpLeft, Clock3, Printer, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import {
@@ -11,6 +11,7 @@ type Props = {
   users: AuditUserActivitySummary[];
   loading: boolean;
   onSelectUser: (userId: string) => void;
+  onCustomizeReport: (user: AuditUserActivitySummary) => void;
 };
 
 const formatTime = (value: string | null) =>
@@ -24,7 +25,7 @@ const formatTime = (value: string | null) =>
     : '—';
 
 export const AuditUsersSummary: React.FC<Props> = ({
-  users, loading, onSelectUser,
+  users, loading, onSelectUser, onCustomizeReport,
 }) => (
   <Card>
     <CardHeader className="space-y-2">
@@ -50,7 +51,7 @@ export const AuditUsersSummary: React.FC<Props> = ({
               <TableHead className="text-center">رفع ملفات</TableHead>
               <TableHead className="text-center">عمليات فاشلة</TableHead>
               <TableHead>آخر نشاط موثق</TableHead>
-              <TableHead className="text-center">التفاصيل</TableHead>
+              <TableHead className="text-center">التفاصيل والتقارير</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -90,15 +91,26 @@ export const AuditUsersSummary: React.FC<Props> = ({
                   </span>
                 </TableCell>
                 <TableCell className="text-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onSelectUser(user.userId)}
-                    title={`عرض السجل التفصيلي للمستخدم ${user.username}`}
-                  >
-                    <ArrowUpLeft className="ml-1 h-4 w-4" />
-                    عرض السجل
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onSelectUser(user.userId)}
+                      title={`عرض السجل التفصيلي للمستخدم ${user.username}`}
+                    >
+                      <ArrowUpLeft className="ml-1 h-4 w-4" />
+                      عرض السجل
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => onCustomizeReport(user)}
+                      title={`تخصيص وفرز وطباعة تقرير ${user.username}`}
+                    >
+                      <Printer className="ml-1 h-4 w-4" />
+                      تقرير مفصل
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
