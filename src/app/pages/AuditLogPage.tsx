@@ -20,12 +20,14 @@ import {
 } from 'lucide-react';
 import { apiJson, authenticatedFetch } from '../../lib/http';
 import { AuditUsersSummary } from '../components/AuditUsersSummary';
+import { AuditUserReportDialog } from '../components/AuditUserReportDialog';
 import type {
   AuditFiltersResponse,
   AuditListResponse,
   AuditLogItem,
   AuditStats,
   AuditUsersSummaryResponse,
+  AuditUserActivitySummary,
 } from '../../types/audit';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -142,6 +144,7 @@ export const AuditLogPage: React.FC = () => {
     users: [], totalUsers: 0,
   });
   const [viewMode, setViewMode] = useState<'operations' | 'users'>('operations');
+  const [reportUser, setReportUser] = useState<AuditUserActivitySummary | null>(null);
   const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AuditLogItem | null>(null);
@@ -226,12 +229,12 @@ export const AuditLogPage: React.FC = () => {
     }
   };
 
-  const exportReport = async (format: 'csv' | 'xlsx') => {
+  const exportReport = async (format: 'csv' | 'xlsx', selectedQuery?: string) => {
     if (exporting) return;
     try {
       setExporting(format);
       const response = await authenticatedFetch(
-        `/api/audit/export?${queryString}&format=${format}`,
+        `/api/audit/export?${selectedQuery ?? queryString}&format=${format}`,
         {},
         180_000,
       );
@@ -257,7 +260,7 @@ export const AuditLogPage: React.FC = () => {
     }
   };
 
-  const printFilteredReport = async () => {
+  const printFilteredReport = async (selectedQuery?: string) => {
     // Open synchronously from the click so the browser does not block the report tab.
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -268,7 +271,7 @@ export const AuditLogPage: React.FC = () => {
       printWindow.opener = null;
       printWindow.document.write('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><body style="font-family:Tahoma;padding:3rem">جارٍ تجهيز التقرير الرسمي...</body></html>');
       printWindow.document.close();
-      const response = await authenticatedFetch(`/api/audit/print-report?${queryString}`, {}, 180_000);
+      const response = await authenticatedFetch(`/api/audit/print-report?${selectedQuery ?? queryString}`, {}, 180_000);
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         throw new Error(body?.message || 'تعذر تجهيز التقرير للطباعة');
@@ -325,10 +328,10 @@ export const AuditLogPage: React.FC = () => {
           <Button
             variant="outline"
             disabled={loading || data.total === 0}
-            onClick={printFilteredReport}
-            title="تقرير رسمي يشمل جميع السجلات المطابقة للتصفية حتى 3000 سجل"
+            onClick={() => printFilteredReport()}
+            title="تقرير مفصل لكل مستخدم في قسم مستقل، وفق التصفية الحالية حتى 3000 سجل"
           >
-            طباعة / PDF شامل
+            {userId ? 'طباعة PDF للمستخدم المحدد' : 'طباعة PDF حسب المستخدمين'}
           </Button>
           <Button onClick={loadAll} disabled={loading}>
             <RefreshCcw
@@ -641,8 +644,34 @@ export const AuditLogPage: React.FC = () => {
         </CardContent>
       </Card>
       ) : (
-        <AuditUsersSummary users={userSummaries.users} loading={loading} onSelectUser={openUserReport} />
+        <AuditUsersSummary
+          users={userSummaries.users}
+          loading={loading}
+          onSelectUser={openUserReport}
+          onCustomizeReport={setReportUser}
+        />
       )}
+
+      <AuditUserReportDialog
+        user={reportUser}
+        actions={filtersData.actions}
+        modules={filtersData.modules}
+        labels={{ actions: actionLabels, modules: moduleLabels }}
+        initialFilters={{
+          action,
+          module: moduleName,
+          status,
+          search,
+          from,
+          to,
+          sortBy,
+          sortDir,
+        }}
+        busy={Boolean(exporting)}
+        onClose={() => setReportUser(null)}
+        onPrint={(selectedQuery) => { void printFilteredReport(selectedQuery); }}
+        onExport={(selectedQuery, format) => { void exportReport(format, selectedQuery); }}
+      />
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
