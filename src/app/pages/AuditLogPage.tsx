@@ -251,6 +251,33 @@ export const AuditLogPage: React.FC = () => {
     }
   };
 
+  const printFilteredReport = async () => {
+    // Open synchronously from the click so the browser does not block the report tab.
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('يرجى السماح بفتح نافذة التقرير من إعدادات المتصفح');
+      return;
+    }
+    try {
+      printWindow.opener = null;
+      printWindow.document.write('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><body style="font-family:Tahoma;padding:3rem">جارٍ تجهيز التقرير الرسمي...</body></html>');
+      printWindow.document.close();
+      const response = await authenticatedFetch(`/api/audit/print-report?${queryString}`, {}, 180_000);
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.message || 'تعذر تجهيز التقرير للطباعة');
+      }
+      const html = await response.text();
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+    } catch (error) {
+      printWindow.close();
+      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء تقرير PDF');
+    }
+  };
+
   const openUserReport = (selectedUserId: string) => {
     setUserId(selectedUserId);
     setPage(1);
@@ -289,8 +316,13 @@ export const AuditLogPage: React.FC = () => {
             <Download className="ml-2 h-4 w-4" />
             {exporting === 'csv' ? 'جارٍ إعداد CSV...' : 'تصدير CSV شامل'}
           </Button>
-          <Button variant="outline" onClick={() => window.print()} title="طباعة العرض الحالي أو حفظه بصيغة PDF">
-            طباعة / PDF
+          <Button
+            variant="outline"
+            disabled={loading || data.total === 0}
+            onClick={printFilteredReport}
+            title="تقرير رسمي يشمل جميع السجلات المطابقة للتصفية حتى 3000 سجل"
+          >
+            طباعة / PDF شامل
           </Button>
           <Button onClick={loadAll} disabled={loading}>
             <RefreshCcw
