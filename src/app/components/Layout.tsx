@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
+import { authenticatedFetch } from '../../lib/http';
 import { usePermissions } from '../../context/PermissionsContext';
 import { ThemeInitializer } from './ThemeInitializer';
 import { PlatformNotificationCenter } from './PlatformNotificationCenter';
@@ -127,6 +128,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   React.useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+
+  // Record only the authenticated user's navigation to recognized platform pages.
+  // This does not capture mouse movements, typed content, or browsing outside the platform.
+  React.useEffect(() => {
+    if (!username || location.pathname === '/login') return;
+    void authenticatedFetch('/api/auth/activity', {
+      method: 'POST',
+      body: JSON.stringify({ pathname: location.pathname }),
+    }).catch(() => {
+      // A telemetry failure must never interrupt the user's normal workflow.
+    });
+  }, [location.pathname, username]);
 
   React.useEffect(() => {
     window.localStorage.setItem('iau-sidebar-collapsed', String(sidebarCollapsed));
