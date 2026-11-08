@@ -59,3 +59,23 @@ export interface AuditFiltersResponse {
   actions: string[];
   modules: string[];
 }
+
+export interface AuditUserActivitySummary {
+  userId: string;
+  username: string;
+  userEmail: string;
+  total: number;
+  login: number;
+  logout: number;
+  create: number;
+  update: number;
+  delete: number;
+  upload: number;
+  failed: number;
+  lastActivityAt: string | null;
+}
+
+export interface AuditUsersSummaryResponse {
+  users: AuditUserActivitySummary[];
+  totalUsers: number;
+}
