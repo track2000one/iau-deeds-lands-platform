@@ -820,8 +820,11 @@ export const AdminDashboardPage: React.FC = () => {
       </Dialog>
 
       <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent
+          dir="rtl"
+          className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-md"
+        >
+          <DialogHeader className="text-right sm:text-right">
             <DialogTitle>تغيير كلمة المرور</DialogTitle>
             <DialogDescription>
               سيتم تعيين كلمة مرور جديدة للمستخدم: {passwordUser?.username}
@@ -838,18 +841,6 @@ export const AdminDashboardPage: React.FC = () => {
               placeholder="8 أحرف على الأقل"
             />
           </div>
-
-          {editForm.role === 'employee' && (
-            <PermissionMatrix
-              value={editForm.permissions}
-              onChange={(permissions) =>
-                setEditForm((current) => ({
-                  ...current,
-                  permissions,
-                }))
-              }
-            />
-          )}
 
           <DialogFooter>
             <Button
