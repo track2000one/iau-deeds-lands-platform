@@ -122,7 +122,7 @@ export const AuditUserReportDialog: React.FC<Props> = ({
     setPage(1);
   };
 
-  const ready = Boolean(user && !badDates && !loading && items && items.total > 0 && !error);
+  const ready = Boolean(user && !badDates && !loading && items && !error);
 
   return (
     <Dialog open={Boolean(user)} onOpenChange={(open) => { if (!open) onClose(); }}>
