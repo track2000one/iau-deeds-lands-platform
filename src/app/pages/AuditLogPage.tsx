@@ -131,6 +131,8 @@ export const AuditLogPage: React.FC = () => {
   const [action, setAction] = useState('');
   const [moduleName, setModuleName] = useState('');
   const [status, setStatus] = useState('');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'username' | 'action' | 'module' | 'status'>('createdAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [userId, setUserId] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -149,6 +151,8 @@ export const AuditLogPage: React.FC = () => {
     const params = new URLSearchParams({
       page: String(page),
       limit: '50',
+      sortBy,
+      sortDir,
     });
 
     if (search.trim()) params.set('search', search.trim());
@@ -160,7 +164,7 @@ export const AuditLogPage: React.FC = () => {
     if (to) params.set('to', to);
 
     return params.toString();
-  }, [page, search, action, moduleName, status, userId, from, to]);
+  }, [page, search, action, moduleName, status, userId, from, to, sortBy, sortDir]);
 
   const loadAll = async () => {
     try {
@@ -198,6 +202,8 @@ export const AuditLogPage: React.FC = () => {
     setAction('');
     setModuleName('');
     setStatus('');
+    setSortBy('createdAt');
+    setSortDir('desc');
     setUserId('');
     setFrom('');
     setTo('');
@@ -423,6 +429,35 @@ export const AuditLogPage: React.FC = () => {
             <option value="">جميع الحالات</option>
             <option value="success">ناجحة</option>
             <option value="failed">فاشلة</option>
+          </NativeSelect>
+
+          <NativeSelect
+            value={sortBy}
+            onChange={(event) => {
+              setSortBy(event.target.value as typeof sortBy);
+              setPage(1);
+            }}
+            title="فرز التقرير حسب"
+            aria-label="فرز التقرير حسب"
+          >
+            <option value="createdAt">الفرز: التاريخ والوقت</option>
+            <option value="username">الفرز: المستخدم</option>
+            <option value="action">الفرز: نوع العملية</option>
+            <option value="module">الفرز: القسم</option>
+            <option value="status">الفرز: الحالة</option>
+          </NativeSelect>
+
+          <NativeSelect
+            value={sortDir}
+            onChange={(event) => {
+              setSortDir(event.target.value as typeof sortDir);
+              setPage(1);
+            }}
+            title="اتجاه الفرز"
+            aria-label="اتجاه الفرز"
+          >
+            <option value="desc">ترتيب تنازلي</option>
+            <option value="asc">ترتيب تصاعدي</option>
           </NativeSelect>
 
           <Input
