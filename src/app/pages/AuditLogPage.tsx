@@ -4,6 +4,8 @@ import {
   AlertTriangle,
   CalendarDays,
   Download,
+  FileSpreadsheet,
+  ClipboardList,
   Eye,
   Filter,
   LogIn,
@@ -16,12 +18,14 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
-import { apiJson } from '../../lib/http';
+import { apiJson, authenticatedFetch } from '../../lib/http';
+import { AuditUsersSummary } from '../components/AuditUsersSummary';
 import type {
   AuditFiltersResponse,
   AuditListResponse,
   AuditLogItem,
   AuditStats,
+  AuditUsersSummaryResponse,
 } from '../../types/audit';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -78,12 +82,24 @@ const moduleLabels: Record<string, string> = {
   attachments: 'المرفقات',
   uploads: 'رفع الملفات',
   archive: 'الأرشفة',
+  investments: 'الاستثمارات والعقارات',
+  vacant_lands: 'الأراضي الشاغرة',
+  central_buildings: 'السجل المركزي للمباني',
+  transaction_follow_up: 'نظام المتابعة',
+  contracts_followup: 'متابعة العقود',
+  site_inspections: 'المعاينات الميدانية',
+  mosques: 'المساجد والمصليات',
+  assets: 'وحدة الأصول',
+  accounting_transformation: 'التحول المحاسبي',
+  organization_units: 'الجهات والوحدات',
+  audit: 'سجل الرقابة والتقارير',
 };
 
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleString('ar-SA-u-nu-latn', {
+    timeZone: 'Asia/Riyadh',
     dateStyle: 'medium',
-    timeStyle: 'short',
+    timeStyle: 'medium',
   });
 
 const safeJson = (value: unknown) => {
@@ -94,11 +110,6 @@ const safeJson = (value: unknown) => {
   } catch {
     return String(value);
   }
-};
-
-const escapeCsv = (value: unknown) => {
-  const text = String(value ?? '').replace(/"/g, '""');
-  return `"${text}"`;
 };
 
 export const AuditLogPage: React.FC = () => {
@@ -125,6 +136,11 @@ export const AuditLogPage: React.FC = () => {
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
 
+  const [userSummaries, setUserSummaries] = useState<AuditUsersSummaryResponse>({
+    users: [], totalUsers: 0,
+  });
+  const [viewMode, setViewMode] = useState<'operations' | 'users'>('operations');
+  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AuditLogItem | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -150,16 +166,18 @@ export const AuditLogPage: React.FC = () => {
     try {
       setLoading(true);
 
-      const [statsResponse, filtersResponse, listResponse] =
+      const [statsResponse, filtersResponse, listResponse, userResponse] =
         await Promise.all([
-          apiJson<AuditStats>('/api/audit/stats'),
+          apiJson<AuditStats>(`/api/audit/stats?${queryString}`),
           apiJson<AuditFiltersResponse>('/api/audit/filters'),
           apiJson<AuditListResponse>(`/api/audit?${queryString}`),
+          apiJson<AuditUsersSummaryResponse>(`/api/audit/users-summary?${queryString}`),
         ]);
 
       setStats(statsResponse);
       setFiltersData(filtersResponse);
       setData(listResponse);
+      setUserSummaries(userResponse);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -202,51 +220,41 @@ export const AuditLogPage: React.FC = () => {
     }
   };
 
-  const exportCsv = () => {
-    const rows = [
-      [
-        'التاريخ',
-        'المستخدم',
-        'البريد',
-        'الدور',
-        'العملية',
-        'القسم',
-        'السجل',
-        'الحالة',
-        'عنوان IP',
-        'الوصف',
-      ],
-      ...data.items.map((item) => [
-        formatDateTime(item.createdAt),
-        item.username || 'غير معروف',
-        item.userEmail || '',
-        item.userRole || '',
-        actionLabels[item.action] || item.action,
-        moduleLabels[item.module] || item.module,
-        item.entityLabel || item.entityId || '',
-        item.status === 'success' ? 'ناجحة' : 'فاشلة',
-        item.ipAddress || '',
-        item.description || '',
-      ]),
-    ];
+  const exportReport = async (format: 'csv' | 'xlsx') => {
+    if (exporting) return;
+    try {
+      setExporting(format);
+      const response = await authenticatedFetch(
+        `/api/audit/export?${queryString}&format=${format}`,
+        {},
+        180_000,
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.message || 'تعذر تصدير سجل العمليات');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const filename = response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1];
+      link.href = url;
+      link.download = filename || `iau-user-audit-${new Date().toISOString().slice(0, 10)}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast.success('تم تنزيل جميع العمليات المطابقة للتصفية');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر التصدير');
+    } finally {
+      setExporting(null);
+    }
+  };
 
-    const csv = rows
-      .map((row) => row.map(escapeCsv).join(','))
-      .join('\n');
-
-    const blob = new Blob([`\uFEFF${csv}`], {
-      type: 'text/csv;charset=utf-8;',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-
-    link.href = url;
-    link.download = `audit-log-${new Date()
-      .toISOString()
-      .slice(0, 10)}.csv`;
-    link.click();
-
-    URL.revokeObjectURL(url);
+  const openUserReport = (selectedUserId: string) => {
+    setUserId(selectedUserId);
+    setPage(1);
+    setViewMode('operations');
   };
 
   return (
@@ -260,17 +268,29 @@ export const AuditLogPage: React.FC = () => {
             </h1>
           </div>
           <p className="text-muted-foreground">
-            متابعة العمليات الإدارية والأمنية ومعرفة المستخدم الذي نفذ كل إجراء.
+            رقابة إدارية موثقة على الدخول والإضافات والتعديلات والحذف، مع تقارير قابلة للتصفية والتصدير الشامل.
           </p>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button variant="outline" onClick={exportCsv}>
-            <Download className="ml-2 h-4 w-4" />
-            تصدير CSV
+<Button
+            variant="outline"
+            disabled={Boolean(exporting) || loading || data.total === 0}
+            onClick={() => exportReport('xlsx')}
+          >
+            <FileSpreadsheet className="ml-2 h-4 w-4" />
+            {exporting === 'xlsx' ? 'جارٍ إعداد Excel...' : 'تصدير Excel شامل'}
           </Button>
-          <Button variant="outline" onClick={() => window.print()}>
-            طباعة التقرير
+          <Button
+            variant="outline"
+            disabled={Boolean(exporting) || loading || data.total === 0}
+            onClick={() => exportReport('csv')}
+          >
+            <Download className="ml-2 h-4 w-4" />
+            {exporting === 'csv' ? 'جارٍ إعداد CSV...' : 'تصدير CSV شامل'}
+          </Button>
+          <Button variant="outline" onClick={() => window.print()} title="طباعة العرض الحالي أو حفظه بصيغة PDF">
+            طباعة / PDF
           </Button>
           <Button onClick={loadAll} disabled={loading}>
             <RefreshCcw
@@ -399,11 +419,37 @@ export const AuditLogPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant={viewMode === 'operations' ? 'default' : 'outline'}
+            onClick={() => setViewMode('operations')}
+          >
+            <ClipboardList className="ml-2 h-4 w-4" />
+            سجل العمليات ({data.total})
+          </Button>
+          <Button
+            variant={viewMode === 'users' ? 'default' : 'outline'}
+            onClick={() => setViewMode('users')}
+          >
+            <Users className="ml-2 h-4 w-4" />
+            الملفات الرقابية للمستخدمين ({userSummaries.totalUsers})
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          الساعة والدقيقة والثانية بتوقيت الرياض · التقارير تعتمد على العمليات الموثقة فعليًا
+        </p>
+      </div>
+
+      {viewMode === 'operations' ? (
       <Card>
         <CardHeader>
           <CardTitle>
             العمليات المسجلة ({data.total})
           </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            عرض {data.items.length} سجل من أصل {data.total} مطابق للتصفية. التصدير يشمل كل الصفحات.
+          </p>
         </CardHeader>
 
         <CardContent>
@@ -442,9 +488,15 @@ export const AuditLogPage: React.FC = () => {
                         {formatDateTime(item.createdAt)}
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">
+                        <button
+                          type="button"
+                          className="font-medium text-primary hover:underline"
+                          onClick={() => item.userId && openUserReport(item.userId)}
+                          disabled={!item.userId}
+                          title="عرض جميع عمليات هذا المستخدم"
+                        >
                           {item.username || 'غير معروف'}
-                        </div>
+                        </button>
                         <div className="text-xs text-muted-foreground" dir="ltr">
                           {item.userEmail || '-'}
                         </div>
@@ -521,6 +573,9 @@ export const AuditLogPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+      ) : (
+        <AuditUsersSummary users={userSummaries.users} loading={loading} onSelectUser={openUserReport} />
+      )}
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
@@ -555,6 +610,9 @@ export const AuditLogPage: React.FC = () => {
 
               <Separator />
 
+              {selected.action === 'update' && (
+                <AuditFieldChanges previous={selected.previousData} next={selected.newData} />
+              )}
               <JsonBlock label="البيانات السابقة" value={selected.previousData} />
               <JsonBlock label="البيانات الجديدة" value={selected.newData} />
               <JsonBlock label="بيانات تقنية إضافية" value={selected.metadata} />
@@ -623,3 +681,62 @@ const JsonBlock = ({ label, value }: { label: string; value: unknown }) => (
     </pre>
   </div>
 );
+
+const normalizeRecord = (value: unknown): Record<string, unknown> | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const nested = record.data || record.record || record.item;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return nested as Record<string, unknown>;
+  }
+  return record;
+};
+
+const AuditFieldChanges: React.FC<{ previous: unknown; next: unknown }> = ({
+  previous, next,
+}) => {
+  const oldRecord = normalizeRecord(previous);
+  const newRecord = normalizeRecord(next);
+  if (!oldRecord || !newRecord) return null;
+  const changed = Object.keys(newRecord)
+    .filter((key) =>
+      Object.prototype.hasOwnProperty.call(oldRecord, key) &&
+      !/password|token|secret|authorization|hash|cookie|private.?key/i.test(key) &&
+      JSON.stringify(oldRecord[key]) !== JSON.stringify(newRecord[key])
+    )
+    .slice(0, 50);
+  if (!changed.length) return null;
+  const preview = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return '—';
+    const content = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    return content.length > 250 ? `${content.slice(0, 250)}…` : content;
+  };
+  return (
+    <div className="space-y-2 rounded-xl border p-3">
+      <h3 className="font-semibold">مقارنة الحقول التي تغيرت ({changed.length})</h3>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>الحقل</TableHead>
+              <TableHead>قبل التعديل</TableHead>
+              <TableHead>بعد التعديل</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {changed.map((key) => (
+              <TableRow key={key}>
+                <TableCell className="font-mono text-xs" dir="ltr">{key}</TableCell>
+                <TableCell className="max-w-[240px] break-words text-xs">{preview(oldRecord[key])}</TableCell>
+                <TableCell className="max-w-[240px] break-words text-xs">{preview(newRecord[key])}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        تظهر المقارنة عند توفر البيانات السابقة والجديدة للحقل نفسه في سجل التدقيق.
+      </p>
+    </div>
+  );
+};
