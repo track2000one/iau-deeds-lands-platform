@@ -1120,6 +1120,28 @@ const dateTimeLocal = (value?: string | null) => {
   const pad = (part: number) => String(part).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
+// datetime-local has no timezone. Treat all visit and tour times as Riyadh wall-clock time,
+// independently of the browser/device timezone, and store UTC ISO timestamps on the server.
+const riyadhDateTimeLocal = (value: Date | string = new Date()): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Riyadh',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value || '';
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
+};
+
+const riyadhDateTimeToISO = (value: string): string | null => {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}:00+03:00`);
+  if (Number.isNaN(date.getTime()) || riyadhDateTimeLocal(date) !== value) return null;
+  return date.toISOString();
+};
+
 const dateOnly = (value?: string | null) => value ? dateTimeLocal(value).slice(0, 10) : '';
 const freshItems = (items: MosqueFieldVisitItem[]) => normalizeQuranChecklistItems(items).map((item) => ({
   ...item,
@@ -1155,7 +1177,7 @@ const emptyVisit = (items: MosqueFieldVisitItem[] = [], currentUsername = 'مس�
   siteId: '',
   visitType: 'initial',
   visitScope: 'whole_site',
-  visitDate: dateTimeLocal(new Date().toISOString()),
+  visitDate: riyadhDateTimeLocal(),
   departureAt: '',
   representativeName: '',
   teamMembers: currentUsername || 'مستخدم',
@@ -1200,7 +1222,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [tourSearch, setTourSearch] = React.useState('');
   const [fieldVisitAssignees, setFieldVisitAssignees] = React.useState<MosqueCompletionTaskAssignee[]>([]);
   const [tourForm, setTourForm] = React.useState({
-    title: '', scheduledDate: new Date().toISOString().slice(0, 10), scope: '',
+    title: '', scheduledDate: riyadhDateTimeLocal(), scope: '',
     teamMembers: currentUsername || 'مستخدم', notes: '', siteIds: [] as string[],
     visitAssignments: {} as Record<string, TourVisitAssignment>,
   });
@@ -1544,8 +1566,8 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
 
   const openTour = () => {
     setTourForm({
-      title: `جولة ميدانية - ${new Date().toLocaleDateString('ar-SA-u-ca-gregory')}`,
-      scheduledDate: new Date().toISOString().slice(0, 10),
+      title: `جولة ميدانية - ${new Date().toLocaleDateString('ar-SA-u-ca-gregory', { timeZone: 'Asia/Riyadh' })}`,
+      scheduledDate: riyadhDateTimeLocal(),
       scope: '', teamMembers: currentUsername || 'مستخدم', notes: '', siteIds: [],
       visitAssignments: {},
     });
@@ -1555,8 +1577,13 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
 
   const saveTour = async () => {
     const teamMembers = splitMembers(tourForm.teamMembers);
-    if (!tourForm.title.trim() || !tourForm.scheduledDate || !teamMembers.length || !tourForm.siteIds.length) {
-      toast.error('أكمل عنوان الجولة وتاريخها واختر موقعًا واحدًا على الأقل');
+    const scheduledAt = riyadhDateTimeToISO(tourForm.scheduledDate);
+    if (!tourForm.title.trim() || !teamMembers.length || !tourForm.siteIds.length) {
+      toast.error('أكمل عنوان الجولة وتاريخها ووقتها واختر موقعًا واحدًا على الأقل');
+      return;
+    }
+    if (!scheduledAt) {
+      toast.error('أدخل تاريخًا ووقتًا صحيحين للجولة بتوقيت الرياض');
       return;
     }
 
@@ -1608,7 +1635,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
       setSaving(true);
       const created = await mosqueApi.createFieldTour({
         title: tourForm.title,
-        scheduledDate: new Date(`${tourForm.scheduledDate}T09:00:00`).toISOString(),
+        scheduledDate: scheduledAt,
         scope: tourForm.scope,
         teamMembers,
         notes: tourForm.notes,
@@ -1714,7 +1741,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
     setVisitForm({
       tourId: visit.tourId || '', siteId: visit.siteId, visitType: visit.visitType,
       visitScope: visit.visitScope || defaultVisitScopeForSite(visit.site),
-      visitDate: dateTimeLocal(visit.visitDate), departureAt: dateTimeLocal(visit.departureAt),
+      visitDate: riyadhDateTimeLocal(visit.visitDate), departureAt: visit.departureAt ? riyadhDateTimeLocal(visit.departureAt) : '',
       representativeName: visit.representativeName || '', teamMembers: (visit.teamMembers || []).join('، '),
       overallStatus: visit.overallStatus, priority: visit.priority, workflowStatus: visit.workflowStatus,
       generalNotes: visit.generalNotes || '', recommendations: visit.recommendations || '',
@@ -2373,8 +2400,18 @@ const applyQuranRackMovement = async (siteId: string, itemType: QuranEquipmentIt
 
   const saveVisit = async () => {
     const teamMembers = splitMembers(visitForm.teamMembers);
-    if (!visitForm.siteId || !visitForm.visitDate || !teamMembers.length) {
-      toast.error('اختر المسجد أو المصلى وأدخل تاريخ الزيارة');
+    if (!visitForm.siteId || !teamMembers.length) {
+      toast.error('اختر المسجد أو المصلى وأدخل منفذ الزيارة');
+      return;
+    }
+    const visitArrivalAt = riyadhDateTimeToISO(visitForm.visitDate);
+    const visitDepartureAt = visitForm.departureAt ? riyadhDateTimeToISO(visitForm.departureAt) : null;
+    if (!visitArrivalAt || (visitForm.departureAt && !visitDepartureAt)) {
+      toast.error('أدخل تاريخًا ووقتًا صحيحين للوصول والمغادرة بتوقيت الرياض');
+      return;
+    }
+    if (visitDepartureAt && new Date(visitDepartureAt).getTime() < new Date(visitArrivalAt).getTime()) {
+      toast.error('وقت المغادرة يجب أن يساوي وقت الوصول أو يأتي بعده');
       return;
     }
     const targetSite = sites.find((site) => site.id === visitForm.siteId) || null;
@@ -2522,8 +2559,8 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
       const payload = {
         ...visitForm,
         tourId: visitForm.tourId || null,
-        visitDate: new Date(visitForm.visitDate).toISOString(),
-        departureAt: visitForm.departureAt ? new Date(visitForm.departureAt).toISOString() : null,
+        visitDate: visitArrivalAt,
+        departureAt: visitDepartureAt,
         teamMembers,
         items: preparedVisitItems.map((item) => ({
           ...item,
@@ -3686,7 +3723,10 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="عنوان الجولة *"><Input value={tourForm.title} onChange={(event) => setTourForm({ ...tourForm, title: event.target.value })} /></Field>
-          <Field label="تاريخ الجولة *"><Input type="date" value={tourForm.scheduledDate} onChange={(event) => setTourForm({ ...tourForm, scheduledDate: event.target.value })} /></Field>
+          <Field label="تاريخ ووقت الجولة (بتوقيت الرياض) *">
+            <Input type="datetime-local" step={60} value={tourForm.scheduledDate} onChange={(event) => setTourForm({ ...tourForm, scheduledDate: event.target.value })} />
+            <p className="mt-1 text-[11px] text-slate-500">يظهر تاريخ ووقت فتح نموذج الجولة تلقائيًا، ويمكن تعديلهما قبل الحفظ. ستُنشأ الزيارات التابعة بالموعد المحدد.</p>
+          </Field>
           <div className="md:col-span-2">
             <Field label="منشئ الجولة"><Input value={tourForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field>
             <p className="mt-1 text-[11px] text-slate-500">يُسجل منشئ الجولة تلقائيًا، بينما يتم إسناد كل زيارة فرعية إلى المستخدم المحدد أدناه.</p>
@@ -4023,8 +4063,11 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>تم التحقق من عدم وجود مصلى نساء في هذا الموقع؛ لذلك لا يظهر نطاق خاص بالنساء في الزيارة.</span>
           </div>}
-          <Field label="تاريخ ووقت الوصول *"><Input type="datetime-local" value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} /></Field>
-          <Field label="وقت المغادرة"><Input type="datetime-local" value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field>
+          <Field label="تاريخ ووقت الوصول (بتوقيت الرياض) *">
+            <Input type="datetime-local" step={60} value={visitForm.visitDate} onChange={(event) => setVisitForm({ ...visitForm, visitDate: event.target.value })} />
+            <p className="mt-1 text-[11px] text-slate-500">يُحدد وقت بدء الزيارة الحالية تلقائيًا عند إنشاء سجل جديد، ويمكن تعديله.</p>
+          </Field>
+          <Field label="وقت المغادرة (بتوقيت الرياض)"><Input type="datetime-local" step={60} value={visitForm.departureAt} onChange={(event) => setVisitForm({ ...visitForm, departureAt: event.target.value })} /></Field>
           <Field label="ممثل الموقع"><Input value={visitForm.representativeName} onChange={(event) => setVisitForm({ ...visitForm, representativeName: event.target.value })} /></Field>
           <Field label="حالة سجل الزيارة"><NativeSelect value={visitForm.workflowStatus} onChange={(event) => setVisitForm({ ...visitForm, workflowStatus: event.target.value as MosqueFieldVisit['workflowStatus'] })}>{Object.entries(visitStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field>
           <div className="md:col-span-3"><Field label="منفذ الزيارة"><Input value={visitForm.teamMembers} readOnly className="bg-slate-100 font-semibold text-slate-700" /></Field><p className="mt-1 text-[11px] text-slate-500">يُسجل اسم المستخدم الحالي تلقائيًا. السجلات السابقة تحتفظ بأسماء الفريق المحفوظة تاريخيًا.</p></div>
@@ -4035,7 +4078,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
         <div className="space-y-3"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black">قائمة الفحص الميداني</h3><p className="text-xs text-slate-500">تتغير خيارات النتيجة تلقائيًا حسب نوع بند الفحص، ويمكن إضافة بنود ميدانية غير موجودة في القائمة الأساسية لتدخل في نفس مسار الاعتماد والمتابعة.</p></div><div className="flex flex-wrap items-center gap-2"><Button type="button" size="sm" variant="outline" className="border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100" onClick={addManualVisitItem}><Plus className="ml-1 h-4 w-4" />إضافة بند ميداني</Button><Badge variant="outline">{visibleVisitItems.filter(({ item }) => item.status !== 'not_checked').length} / {visibleVisitItems.length}</Badge></div></div>{visibleVisitItems.map(({ item, index }) => <Card id={isManualFieldVisitItem(item) && index === visitForm.items.length - 1 ? 'manual-field-visit-item-last' : undefined} key={item.id || `visit-item-${index}`} className={item.status === 'needs_action' ? 'border-amber-300 bg-amber-50/30' : ''}><CardContent className="space-y-3 pt-4"><div className="flex flex-col gap-2 lg:flex-row lg:items-center">{isManualFieldVisitItem(item) ? <div className="min-w-0 flex-1 rounded-xl border border-sky-200 bg-sky-50/60 p-3"><div className="mb-2 flex items-center justify-between gap-2"><Badge variant="outline" className="border-sky-300 bg-white text-sky-800">بند مضاف يدويًا</Badge><Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => removeManualVisitItem(index)}><Trash2 className="ml-1 h-4 w-4" />حذف</Button></div><div className="grid gap-2 md:grid-cols-[180px_1fr]"><Input value={item.category || ''} onChange={(event) => setVisitItem(index, { category: event.target.value })} maxLength={120} placeholder="التصنيف — مثال: السلامة" /><Input value={item.title || ''} onChange={(event) => setVisitItem(index, { title: event.target.value })} maxLength={300} placeholder="اكتب البند الذي تريد فحصه *" /></div></div> : <div className="min-w-0 flex-1"><div className="mb-1 flex flex-wrap items-center gap-2">{isWomenVisitItem(item) && !isStandaloneWomenRoom(selectedVisitSite) && <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-800">مصلى النساء</Badge>}<span className={getFieldVisitCategoryBadgeClass(item.category)}><span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-current opacity-70 shadow-[0_0_8px_currentColor]" /><span aria-hidden className="pointer-events-none absolute inset-x-2 top-0 h-px bg-white/95" /><span className="relative">{siteCategoryLabel(selectedVisitSite, item.category)}</span></span></div><p className="font-bold text-slate-800">{siteItemTitle(selectedVisitSite, item.title)}</p></div>}{isAutomaticAdhanItem(item) ? <div className="flex shrink-0 items-center gap-2 lg:w-[26rem] lg:justify-end"><Badge variant="outline" className="border-indigo-300 bg-indigo-50 px-3 py-2 text-indigo-800">النتيجة والأولوية تلقائية</Badge></div> : <><NativeSelect className="lg:w-64" value={selectedCarpetItemStatus(item)} onChange={(event) => setVisitItem(index, carpetStatusSelectionPatch(item, event.target.value))}>{getItemStatusOptions(item).map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</NativeSelect><NativeSelect className="lg:w-36" value={item.priority} onChange={(event) => setVisitItem(index, { priority: event.target.value as MosqueFieldVisitItem['priority'] })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></>}</div>{isAutomaticAdhanItem(item) && <AutomaticAdhanEditor item={item} onChange={(patch) => updateAutomaticAdhanDetails(index, patch)} />}{isQuranFieldVisitItem(item) && <QuranFieldInventoryEditor item={item} stock={selectedQuranStock} baselineClosed={quranOpeningBaselineStatus?.closed ?? null} onChange={(patch) => updateQuranInventoryDetails(index, patch)} />}{isQuranRackFieldVisitItem(item) && item.status !== 'not_applicable' && <QuranRackInventoryEditor item={item} dashboard={quranRackDashboard} siteRow={getSelectedQuranRackStock(quranEquipmentItemType(item))} onChange={(patch) => updateQuranRackDetails(index, patch)} />}{isActivityApprovalItem(item) && !['not_available', 'not_applicable', 'not_checked'].includes(item.status) && <ActivityApprovalEvidenceField files={item.beforeImages || []} loading={uploadingKey === `${index}-activityApprovalEvidence`} onFiles={(files) => void uploadActivityApprovalEvidence(index, files)} onRemove={(fileIndex) => removeItemImage(index, 'beforeImages', fileIndex)} />}{item.status === 'needs_action' && <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-2">{isNonApprovedPublicationsItem(item) && <NonApprovedPublicationsEditor item={item} onChange={(patch) => updateNonApprovedPublicationsDetails(index, patch)} />}<div className="md:col-span-2"><Field label="وصف الملاحظة *"><Textarea rows={2} value={item.note || ''} onChange={(event) => setVisitItem(index, { note: event.target.value })} /></Field></div><Field label="الجهة المسؤولة"><Input value={item.responsibleEntity || ''} onChange={(event) => setVisitItem(index, { responsibleEntity: event.target.value })} placeholder="مثال: إدارة التشغيل والصيانة" /></Field><Field label="المهلة المستهدفة"><Input type="date" value={dateOnly(item.dueDate)} onChange={(event) => setVisitItem(index, { dueDate: event.target.value })} /></Field><Field label="حالة المعالجة"><NativeSelect value={item.resolutionStatus} onChange={(event) => setVisitItem(index, { resolutionStatus: event.target.value as MosqueFieldVisitItem['resolutionStatus'] })}>{Object.entries(resolutionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</NativeSelect></Field><Field label={['resolved', 'closed'].includes(item.resolutionStatus) ? 'وصف الإجراء / المعالجة المنفذة *' : 'وصف الإجراء / المعالجة المنفذة'}><Textarea rows={2} value={item.resolutionNote || ''} onChange={(event) => setVisitItem(index, { resolutionNote: event.target.value })} placeholder="اكتب ما تم تنفيذه لمعالجة الملاحظة" /></Field><div className={(isActivityApprovalItem(item) || isQuranFieldVisitItem(item)) ? 'hidden' : 'md:col-span-2 rounded-2xl border border-emerald-200 bg-white p-3'}><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><b className="text-sm text-emerald-900">سجل المعالجة المصور — قبل / بعد</b><p className="mt-1 text-[11px] text-slate-500">وثّق الحالة قبل المعالجة، ثم أضف صورة بعد التنفيذ لإغلاق الملاحظة والتحقق منها.</p></div><div className="flex gap-2"><Badge variant="outline">قبل: {(item.beforeImages || []).length}</Badge><Badge variant="outline">بعد: {(item.afterImages || []).length}</Badge></div></div><div className="grid gap-3 md:grid-cols-2"><ImageField label="صور قبل المعالجة *" images={item.beforeImages} loading={uploadingKey === `${index}-beforeImages`} onFiles={(files) => void uploadItemImages(index, 'beforeImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'beforeImages', imageIndex)} /><ImageField label={item.resolutionStatus === 'closed' ? 'صور بعد المعالجة *' : 'صور بعد المعالجة'} images={item.afterImages} loading={uploadingKey === `${index}-afterImages`} onFiles={(files) => void uploadItemImages(index, 'afterImages', files)} onRemove={(imageIndex) => removeItemImage(index, 'afterImages', imageIndex)} /></div></div></div>}</CardContent></Card>)}</div>
         <div className="grid gap-4 md:grid-cols-2"><Field label="الملاحظات العامة"><Textarea rows={4} value={visitForm.generalNotes} onChange={(event) => setVisitForm({ ...visitForm, generalNotes: event.target.value })} /></Field><Field label="التوصيات"><Textarea rows={4} value={visitForm.recommendations} onChange={(event) => setVisitForm({ ...visitForm, recommendations: event.target.value })} /></Field></div>
         <VisitAttachmentField attachments={visitForm.attachments} loading={uploadingKey === 'visit-attachments'} onFiles={(files) => void uploadVisitAttachments(files)} onRemove={removeVisitAttachment} onDescriptionChange={updateVisitAttachmentDescription} />
-        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setVisitDialog(false)}>إلغاء</Button>{editingVisit && canPrint && <Button variant="outline" onClick={() => requestVisitPrint({ ...editingVisit, ...visitForm, teamMembers: splitMembers(visitForm.teamMembers), visitDate: new Date(visitForm.visitDate).toISOString(), departureAt: visitForm.departureAt ? new Date(visitForm.departureAt).toISOString() : null } as MosqueFieldVisit)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>}<Button onClick={() => void saveVisit()} disabled={saving || Boolean(uploadingKey)}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}{editingVisit ? 'حفظ نتائج الزيارة' : 'إنشاء الزيارة'}</Button></DialogFooter>
+        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setVisitDialog(false)}>إلغاء</Button>{editingVisit && canPrint && <Button variant="outline" onClick={() => requestVisitPrint({ ...editingVisit, ...visitForm, teamMembers: splitMembers(visitForm.teamMembers), visitDate: riyadhDateTimeToISO(visitForm.visitDate) || editingVisit.visitDate, departureAt: visitForm.departureAt ? riyadhDateTimeToISO(visitForm.departureAt) : null } as MosqueFieldVisit)}><Printer className="ml-2 h-4 w-4" />طباعة</Button>}<Button onClick={() => void saveVisit()} disabled={saving || Boolean(uploadingKey)}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}{editingVisit ? 'حفظ نتائج الزيارة' : 'إنشاء الزيارة'}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   </div>;
