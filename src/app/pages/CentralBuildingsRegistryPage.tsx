@@ -12,6 +12,8 @@ import {
   Database,
   Eye,
   Landmark,
+  LayoutGrid,
+  List,
   Link2,
   MapPin,
   MapPinned,
@@ -243,6 +245,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   };
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [buildingView, setBuildingView] = useState<'table' | 'cards'>('table');
   const [visibleGroupCounts, setVisibleGroupCounts] = useState<Record<string, number>>({});
 
   const loadData = async () => {
@@ -366,19 +369,25 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     >();
 
     filteredBuildings.forEach((building) => {
-      const campus = String(building.campusLocation || '').trim();
       const city = String(building.city || '').trim();
       const district = String(building.district || '').trim();
-      const title = campus || district || city || 'موقع غير محدد';
-      const subtitleParts = [city, district].filter(
-        (value, index, values) => value && value !== title && values.indexOf(value) === index
-      );
-      const subtitle = subtitleParts.join(' — ') || 'لم تحدد بيانات الموقع التفصيلية';
-      const key = normalizeKey([campus || '__no_campus__', city || '__no_city__'].join('|')) || 'unassigned';
-      const current = groups.get(key) || { key, title, subtitle, buildings: [] };
+      // District defines the group; campus remains an attribute of each building.
+      const title = district
+        ? (/^(حي|حارة)\s/.test(district) ? district : `حي ${district}`)
+        : 'حي غير محدد';
+      const key = JSON.stringify([normalizeKey(city) || '__no_city__', normalizeKey(district) || '__no_district__']);
+      const current = groups.get(key) || { key, title, subtitle: '', buildings: [] };
       current.buildings.push(building);
       groups.set(key, current);
     });
+
+    for (const group of groups.values()) {
+      const sites = Array.from(new Set(group.buildings
+        .map((building) => String(building.campusLocation || '').trim())
+        .filter(Boolean)));
+      const city = String(group.buildings[0]?.city || '').trim() || 'مدينة غير محددة';
+      group.subtitle = [city, sites.length === 1 ? sites[0] : sites.length > 1 ? `${sites.length} مواقع جامعية` : 'الموقع الجامعي غير محدد'].join(' — ');
+    }
 
     return Array.from(groups.values())
       .map((group) => ({
@@ -893,7 +902,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
           <div>
             <CardTitle>المباني المعرفة</CardTitle>
             <CardDescription>
-              المباني مجمعة حسب الحرم / الموقع الجامعي، ولا يتم إنشاء بطاقات المجموعة إلا عند فتحها. البحث يفتح النتائج المطابقة مباشرة.
+              المباني مصنفة حسب المدينة والحي، ويمكن عرض محتويات كل حي في جدول أو بطاقات. يبقى الحرم الجامعي ضمن بيانات المبنى، ويعرض البحث النتائج المطابقة مباشرة.
             </CardDescription>
           </div>
           <div className="relative w-full lg:w-[430px]">
@@ -923,6 +932,34 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <span>{buildingGroups.length} مجموعات أحياء — {filteredBuildings.length} مبنى</span>
+                </div>
+                <div className="flex items-center gap-1 rounded-lg border bg-background p-1" role="group" aria-label="طريقة عرض المباني">
+                  <Button
+                    type="button"
+                    variant={buildingView === 'table' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="gap-1.5"
+                    aria-pressed={buildingView === 'table'}
+                    onClick={() => setBuildingView('table')}
+                  >
+                    <List className="h-4 w-4" /> جدول
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={buildingView === 'cards' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="gap-1.5"
+                    aria-pressed={buildingView === 'cards'}
+                    onClick={() => setBuildingView('cards')}
+                  >
+                    <LayoutGrid className="h-4 w-4" /> بطاقات
+                  </Button>
+                </div>
+              </div>
               {buildingGroups.map((group) => {
                 const searchActive = Boolean(search.trim());
                 const expanded = searchActive || expandedGroups.has(group.key);
@@ -942,6 +979,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-base font-black text-foreground">{group.title}</span>
                           <Badge variant="secondary">{group.buildings.length} مبنى</Badge>
+                          <Badge variant="outline">{group.buildings.filter((building) => Boolean(building.deedId || building.deed)).length} مرتبط بصك</Badge>
                         </div>
                         <p className="mt-1 truncate text-xs text-muted-foreground">{group.subtitle}</p>
                       </div>
@@ -952,6 +990,81 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
 
                     {expanded && (
                       <div className="border-t p-4">
+                        {buildingView === 'table' ? (
+                          <div className="overflow-x-auto rounded-xl border">
+                            <table className="w-full min-w-[1080px] border-collapse text-sm">
+                              <thead className="bg-muted/60">
+                                <tr className="text-right">
+                                  <th scope="col" className="border-b px-3 py-3 font-bold">رقم المبنى</th>
+                                  <th scope="col" className="border-b px-3 py-3 font-bold">اسم المبنى</th>
+                                  <th scope="col" className="border-b px-3 py-3 font-bold">الحرم / الموقع الجامعي</th>
+                                  <th scope="col" className="border-b px-3 py-3 font-bold">المدينة</th>
+                                  <th scope="col" className="border-b px-3 py-3 font-bold">الصك</th>
+                                  <th scope="col" className="border-b px-3 py-3 font-bold">الارتباطات</th>
+                                  <th scope="col" className="border-b px-3 py-3 font-bold">منشئ السجل</th>
+                                  <th scope="col" className="border-b px-3 py-3 font-bold">الإجراءات</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {visibleBuildings.map((building) => {
+                                  const pendingEnvelope = getPendingBuildingImport(building);
+                                  const item = usage.get(building.id);
+                                  const references =
+                                    (item?.mosqueSites || 0) +
+                                    (item?.assets || 0) +
+                                    (item?.accounting || 0) +
+                                    (item?.inspections || 0);
+                                  const displayNumber = pendingEnvelope?.draft.buildingNumber || building.buildingNumber;
+                                  const displayName = pendingEnvelope?.draft.name || building.name;
+                                  const displayCampus = pendingEnvelope?.draft.campusLocation || building.campusLocation;
+                                  return (
+                                    <tr key={building.id} className="border-b last:border-b-0 hover:bg-primary/5">
+                                      <td className="whitespace-nowrap px-3 py-3 font-bold">{displayNumber || '—'}</td>
+                                      <td className="min-w-[180px] px-3 py-3">
+                                        <span className="font-semibold">{displayName || 'بدون مسمى'}</span>
+                                        {pendingEnvelope && <Badge variant="outline" className="mr-2 border-amber-300 text-amber-800">معلق</Badge>}
+                                      </td>
+                                      <td className="px-3 py-3">{displayCampus || 'غير محدد'}</td>
+                                      <td className="px-3 py-3">{pendingEnvelope?.draft.city || building.city || '—'}</td>
+                                      <td className="px-3 py-3">
+                                        {building.deed?.deedNumber ? (
+                                          <span className="font-medium text-emerald-700 dark:text-emerald-300">{building.deed.deedNumber}</span>
+                                        ) : <span className="text-amber-700 dark:text-amber-300">{building.deedId ? 'مرتبط — رقم غير متاح' : 'غير مرتبط'}</span>}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-3" title="مجموع ارتباطات المساجد والأصول والمحاسبة والمعاينات">
+                                        {usageLoading ? '…' : references}
+                                      </td>
+                                      <td className="px-3 py-3">{building.createdByName || (building.createdBy ? 'مستخدم سابق' : 'سجل قديم')}</td>
+                                      <td className="px-3 py-3">
+                                        <div className="flex flex-wrap gap-1.5">
+                                          <Button size="sm" variant="outline" onClick={() => setViewTarget(building)}><Eye className="h-4 w-4" /> عرض</Button>
+                                          {canEditBuilding(building) && !pendingEnvelope && (
+                                            <Button size="sm" variant="outline" onClick={() => openEdit(building)}><Pencil className="h-4 w-4" /> تعديل</Button>
+                                          )}
+                                          {canPrint && (
+                                            <Button size="sm" variant="outline" onClick={() => printBuilding(building)}><Printer className="h-4 w-4" /> طباعة</Button>
+                                          )}
+                                          {canDeleteBuilding(building) && (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="border-red-300 text-red-700 hover:bg-red-50"
+                                              disabled={references > 0 || Boolean(building.photos?.length) || Boolean(building.documents?.length)}
+                                              title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length || building.documents?.length ? 'احذف صور ومرفقات المبنى أولًا' : 'حذف المبنى'}
+                                              onClick={() => setDeleteTarget(building)}
+                                            >
+                                              <Trash2 className="h-4 w-4" /> حذف
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
                         <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
                           {visibleBuildings.map((building) => {
                             const item = usage.get(building.id);
@@ -1060,6 +1173,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                             );
                           })}
                         </div>
+                        )}
 
                         {!searchActive && visibleCount < group.buildings.length && (
                           <div className="mt-4 flex justify-center">
