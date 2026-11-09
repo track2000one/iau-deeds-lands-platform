@@ -641,7 +641,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                   </NativeSelect>
                 </div>
                 <div className="flex items-end lg:col-span-2">
-                  <Button type="button" variant="outline" className="h-10 gap-2" onClick={resetFilters}>
+                  <Button type="button" variant="outline" className="h-10 gap-2 border-amber-400 bg-amber-50 font-bold text-amber-900 shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-500 hover:bg-amber-100 hover:text-amber-950 hover:shadow-md focus-visible:ring-amber-500 dark:border-amber-500 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/60" onClick={resetFilters}>
                     <SlidersHorizontal className="h-4 w-4" />إعادة ضبط الفلاتر
                   </Button>
                 </div>
@@ -666,7 +666,10 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                     <Button
                       type="button"
                       size="sm"
-                      variant={buildingSelectionMode === 'custom' ? 'outline' : 'default'}
+                      variant="default"
+                      className={buildingSelectionMode === 'custom'
+                        ? 'gap-2 border border-blue-600 bg-blue-100 font-bold text-blue-900 shadow-sm hover:bg-blue-200 hover:text-blue-950 focus-visible:ring-blue-500 dark:border-blue-400 dark:bg-blue-950 dark:text-blue-100 dark:hover:bg-blue-900'
+                        : 'gap-2 border border-blue-700 bg-blue-700 font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-lg focus-visible:ring-blue-500 dark:border-blue-500 dark:bg-blue-700 dark:hover:bg-blue-600'}
                       onClick={() => {
                         setBuildingSelectionMode('custom');
                         setSelectedBuildingIds(new Set());
@@ -680,6 +683,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                       variant="outline"
                       size="sm"
                       disabled={buildingSelectionMode === 'all'}
+                      className="gap-2 border-teal-500 bg-teal-50 font-bold text-teal-800 shadow-sm transition-all enabled:hover:-translate-y-0.5 enabled:hover:bg-teal-100 enabled:hover:text-teal-950 enabled:hover:shadow-md focus-visible:ring-teal-500 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-500 disabled:shadow-none dark:border-teal-600 dark:bg-teal-950/50 dark:text-teal-200 dark:enabled:hover:bg-teal-900/70 dark:disabled:border-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
                       onClick={() => {
                         setBuildingSelectionMode('all');
                         setSelectedBuildingIds(new Set());
@@ -706,6 +710,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Button type="button" variant="outline" size="sm"
+                          className="border-blue-400 bg-blue-50 font-bold text-blue-900 hover:bg-blue-100 hover:text-blue-950 focus-visible:ring-blue-500 disabled:opacity-50 dark:border-blue-600 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/70"
                           disabled={!buildingOptions.length}
                           onClick={() => setSelectedBuildingIds((previous) => {
                             const next = new Set(previous);
@@ -715,6 +720,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                           تحديد الكل {buildingNameSearch.trim() ? 'المطابق للبحث' : 'في الموقع'}
                         </Button>
                         <Button type="button" variant="outline" size="sm"
+                          className="border-rose-400 bg-rose-50 font-bold text-rose-800 hover:bg-rose-100 hover:text-rose-950 focus-visible:ring-rose-500 disabled:opacity-50 dark:border-rose-600 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-900/70"
                           disabled={!selectedBuildingIds.size}
                           onClick={() => setSelectedBuildingIds(new Set())}>
                           مسح التحديد
@@ -782,7 +788,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                 <div className="flex flex-wrap items-center gap-2 border-t pt-3">
                   <span className="text-xs font-bold text-muted-foreground">الفلاتر النشطة:</span>
                   {appliedFilters.map((filter) => <Badge key={filter} variant="secondary" className="px-3 py-1 text-xs">{filter}</Badge>)}
-                  <Button type="button" variant="ghost" size="sm" onClick={resetFilters}>مسح الكل</Button>
+                  <Button type="button" variant="outline" size="sm" className="border-amber-400 bg-amber-50 font-bold text-amber-900 hover:bg-amber-100 hover:text-amber-950 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/60" onClick={resetFilters}>مسح الكل</Button>
                 </div>
               )}
             </section>
@@ -845,7 +851,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">{selectedColumns.size} عمود</Badge>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setSelectedColumns(new Set(columns.map((item) => item.key)))}>تحديد الكل</Button>
+                  <Button type="button" variant="outline" size="sm" className="border-blue-400 bg-blue-50 font-bold text-blue-900 hover:bg-blue-100 hover:text-blue-950 dark:border-blue-600 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/70" onClick={() => setSelectedColumns(new Set(columns.map((item) => item.key)))}>تحديد الكل</Button>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -937,9 +943,9 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
           </div>
 
           <DialogFooter className="shrink-0 gap-2 border-t pt-3 sm:justify-start">
-            <Button type="button" onClick={exportExcel} disabled={!sorted.length}><Download className="h-4 w-4" />تصدير Excel</Button>
-            <Button type="button" variant="outline" onClick={() => { void printReport(); }} disabled={!sorted.length || printing}><Printer className="h-4 w-4" />{printing ? 'جارٍ تجهيز الصور والتقرير...' : 'طباعة / PDF مع الصور'}</Button>
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>إغلاق</Button>
+            <Button type="button" onClick={exportExcel} disabled={!sorted.length} className="gap-2 border border-emerald-700 bg-emerald-700 font-bold text-white shadow-md transition-all enabled:hover:-translate-y-0.5 enabled:hover:bg-emerald-800 enabled:hover:shadow-lg focus-visible:ring-emerald-500 disabled:opacity-45 dark:border-emerald-600 dark:bg-emerald-700 dark:hover:bg-emerald-600"><Download className="h-4 w-4" />تصدير Excel</Button>
+            <Button type="button" onClick={() => { void printReport(); }} disabled={!sorted.length || printing} className="gap-2 border border-indigo-700 bg-indigo-700 font-bold text-white shadow-md transition-all enabled:hover:-translate-y-0.5 enabled:hover:bg-indigo-800 enabled:hover:shadow-lg focus-visible:ring-indigo-500 disabled:opacity-45 dark:border-indigo-600 dark:bg-indigo-700 dark:hover:bg-indigo-600"><Printer className="h-4 w-4" />{printing ? 'جارٍ تجهيز الصور والتقرير...' : 'طباعة / PDF مع الصور'}</Button>
+            <Button type="button" variant="outline" className="border-slate-300 bg-slate-100 font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-950 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={() => setOpen(false)}>إغلاق</Button>
           </DialogFooter>
           <style>{'#central-buildings-reports-view.iau-report-cards-mode td, #central-buildings-reports-view.iau-report-cards-mode th {position:static!important;}'}</style>
         </DialogContent>
