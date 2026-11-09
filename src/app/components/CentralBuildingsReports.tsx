@@ -1,7 +1,15 @@
 import { withReportPreparer, reportPreparerName } from '../utils/reportAttribution';
+import {
+  buildCentralBuildingsPhotoAppendix,
+  centralBuildingsPhotoPrintCss,
+  MAX_PRINT_PHOTOS,
+  photoSelectionForReport,
+  type BuildingReportPhotoMode,
+} from '../utils/centralBuildingsPhotoAppendix';
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { ArrowDown, ArrowDownUp, ArrowUp, BarChart3, ChevronLeft, ChevronRight, Download, MapPin, Printer, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowDown, ArrowDownUp, ArrowUp, BarChart3, ChevronLeft, ChevronRight, Download, Images, MapPin, Printer, Search, SlidersHorizontal } from 'lucide-react';
+import { toast } from 'sonner';
 import { getPendingBuildingImport } from './BuildingExcelImportManager';
 import type { MosqueBuilding, MosqueBuildingDeedReference } from '../api/mosques';
 import { Badge } from './ui/badge';
@@ -128,6 +136,8 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
   const [coordinates, setCoordinates] = useState<'all' | 'complete' | 'missing'>('all');
   const [deedLink, setDeedLink] = useState<'all' | 'linked' | 'unlinked'>('all');
   const [selectedColumns, setSelectedColumns] = useState<Set<ColumnKey>>(readSelectedColumns);
+  const [photoMode, setPhotoMode] = useState<BuildingReportPhotoMode>('primary');
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     try {
@@ -250,6 +260,8 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageRows = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const photoGroups = useMemo(() => photoSelectionForReport(sorted, photoMode), [sorted, photoMode]);
+  const selectedPhotoCount = photoGroups.reduce((total, group) => total + group.photos.length, 0);
 
   const appliedFilters = [
     search.trim() ? 'بحث: ' + search.trim() : '',
@@ -295,13 +307,34 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     XLSX.writeFile(workbook, `تقرير-السجل-المركزي-للمباني-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const printReport = () => {
+  const printReport = async () => {
+    if (printing) return;
+    if (selectedPhotoCount > MAX_PRINT_PHOTOS) {
+      toast.error(`التقرير يتضمن ${selectedPhotoCount} صورة. الحد المسموح للطباعة هو ${MAX_PRINT_PHOTOS} صورة؛ اختر الصورة الرئيسية أو صفِّ المباني لتقليل العدد.`);
+      return;
+    }
     const chosen = visibleColumns;
     const popup = window.open('', '_blank', 'width=1400,height=900');
     if (!popup) {
       window.alert('يرجى السماح بالنوافذ المنبثقة لطباعة التقرير.');
       return;
     }
+
+    setPrinting(true);
+    popup.document.open();
+    popup.document.write('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>تجهيز تقرير المباني</title><body style="font:16px Tahoma,Arial;padding:40px;color:#153950"><h2>جارٍ إعداد التقرير وتحميل صور المباني المحددة…</h2><p>ستظهر معاينة التقرير بعد الانتهاء من جلب الصور المصرح بها.</p></body></html>');
+    popup.document.close();
+
+    let objectUrls: string[] = [];
+    try {
+      const appendix = photoMode !== 'none' && selectedPhotoCount > 0
+        ? await buildCentralBuildingsPhotoAppendix(photoGroups)
+        : { html: '', urls: [] as string[], imageCount: 0, failedCount: 0 };
+      objectUrls = appendix.urls;
+      if (popup.closed) {
+        objectUrls.forEach((url) => URL.revokeObjectURL(url));
+        return;
+      }
 
     const reportTitle = coordinates === 'missing'
       ? 'تقرير المباني الناقصة إحداثيات'
@@ -335,9 +368,10 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       'th,td{border:1px solid #c9d6df;padding:8px 7px;text-align:right;vertical-align:top;overflow-wrap:anywhere}',
       'th{background:#dceef2;color:#153950;font-weight:800}tbody tr:nth-child(even){background:#f5fafb}',
       '.footer{margin-top:13px;border-top:1px solid #cbd5e1;padding-top:8px;font-size:10px;color:#64748b;display:flex;justify-content:space-between}',
+      centralBuildingsPhotoPrintCss,
       '@media print{.toolbar{display:none!important}body{margin:0}.head{background:#f4fbfc}}',
       '</style></head><body>',
-      '<div class="toolbar"><span>معاينة التقرير — تأكد من البيانات والأعمدة قبل الطباعة</span><button type="button" onclick="window.print()">طباعة / حفظ PDF</button></div>',
+      '<div class="toolbar"><span id="print-image-status">معاينة التقرير — راجع البيانات والصور قبل الطباعة</span><button id="iau-print-action" type="button" ' + (appendix.imageCount ? 'disabled ' : '') + 'onclick="window.print()">طباعة / حفظ PDF</button></div>',
       '<header class="head"><div class="brand">جامعة الإمام عبدالرحمن بن فيصل — إدارة أوقاف وأملاك الجامعة</div>',
       '<h1>' + escapeHtml(reportTitle) + '</h1>',
       '<div class="meta"><span>أُعدّ بواسطة: <strong>' + escapeHtml(reportPreparerName()) + '</strong></span>',
@@ -355,6 +389,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       '</section>',
       '<table><thead><tr>' + chosen.map((column) => '<th>' + escapeHtml(column.label) + '</th>').join('') +
         '</tr></thead><tbody>' + tableRows + '</tbody></table>',
+      appendix.html,
       '<footer class="footer"><span>منصة إدارة الصكوك والأراضي — السجل المركزي للمباني</span><span>أُعدّ بواسطة: ' +
         escapeHtml(reportPreparerName()) + ' | ' + escapeHtml(generatedAt) + '</span></footer>',
       '</body></html>',
@@ -362,7 +397,64 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     popup.document.open();
     popup.document.write(withReportPreparer(html));
     popup.document.close();
+
+    // The preview is ready only when protected images have finished decoding (or timed out).
+    const imageElements = Array.from(popup.document.images);
+    if (imageElements.length) {
+      await Promise.race([
+        Promise.all(imageElements.map((img) => {
+          if (img.complete) return Promise.resolve();
+          return new Promise<void>((resolve) => {
+            img.addEventListener('load', () => resolve(), { once: true });
+            img.addEventListener('error', () => resolve(), { once: true });
+          });
+        })),
+        new Promise<void>((resolve) => window.setTimeout(resolve, 15000)),
+      ]);
+    }
+
+    if (popup.closed) {
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      return;
+    }
+
+    const status = popup.document.getElementById('print-image-status');
+    const printable = popup.document.getElementById('iau-print-action') as HTMLButtonElement | null;
+    if (status && appendix.imageCount) {
+      status.textContent = `الملحق المصور: ${appendix.imageCount} صورة من ${photoGroups.length} مبنى` +
+        (appendix.failedCount ? ` — تعذر جلب ${appendix.failedCount} صورة، راجع مواضعها في المعاينة` : ' — جاهز للطباعة');
+    }
+    if (printable) printable.disabled = false;
+    let cleaned = false;
+    let closePoll: number | undefined;
+    let expiryTimer: number | undefined;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      objectUrls = [];
+      if (closePoll !== undefined) window.clearInterval(closePoll);
+      if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
+    };
+    popup.addEventListener('afterprint', () => {
+      cleanup();
+      if (!popup.closed) popup.close();
+    }, { once: true });
+    closePoll = window.setInterval(() => {
+      if (popup.closed) cleanup();
+    }, 2000);
+    expiryTimer = window.setTimeout(() => {
+      cleanup();
+      if (!popup.closed) popup.close();
+    }, 20 * 60 * 1000);
     popup.focus();
+    } catch (error) {
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      if (!popup.closed) popup.close();
+      toast.error(error instanceof Error ? error.message : 'تعذر تجهيز الصور في تقرير المباني');
+    } finally {
+      setPrinting(false);
+    }
   };
 
   const resetFilters = () => {
@@ -516,6 +608,29 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
               </button>
             </div>
 
+            <section className="rounded-2xl border bg-background p-4" aria-label="الصور في تقرير المباني">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <h3 className="flex items-center gap-2 text-base font-black"><Images className="h-5 w-5 text-primary" /> الصور المرفقة في التقرير</h3>
+                  <p className="text-sm text-muted-foreground">تُدرج الصور داخل ملحق توثيق مصور بعد الجدول، بحسب المباني المطابقة للفرز والتصفية. تتضمن اسم المبنى ورقمه وتفاصيل الصورة.</p>
+                  <p className="text-xs text-muted-foreground">هذه الخيارات خاصة بالطباعة وPDF فقط. لسلامة الأداء، الحد الأعلى ${MAX_PRINT_PHOTOS} صورة في التقرير الواحد؛ يمكن تضييق الفلاتر عند تجاوزه.</p>
+                </div>
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                  <Badge variant="secondary">{selectedPhotoCount} صورة من {photoGroups.length} مبنى</Badge>
+                  <NativeSelect
+                    value={photoMode}
+                    aria-label="تحديد الصور التي ستظهر في التقرير المطبوع"
+                    onChange={(event) => setPhotoMode(event.target.value as BuildingReportPhotoMode)}
+                    className="w-full min-w-56 sm:w-64"
+                  >
+                    <option value="none">طباعة البيانات بدون صور</option>
+                    <option value="primary">الصورة الرئيسية لكل مبنى</option>
+                    <option value="all">جميع صور المباني المرفقة</option>
+                  </NativeSelect>
+                </div>
+              </div>
+            </section>
+
             <section className="rounded-2xl border bg-background p-4" aria-label="تخصيص أعمدة التقرير">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -617,7 +732,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
 
           <DialogFooter className="shrink-0 gap-2 border-t pt-3 sm:justify-start">
             <Button type="button" onClick={exportExcel} disabled={!sorted.length}><Download className="h-4 w-4" />تصدير Excel</Button>
-            <Button type="button" variant="outline" onClick={printReport} disabled={!sorted.length}><Printer className="h-4 w-4" />طباعة / PDF</Button>
+            <Button type="button" variant="outline" onClick={() => { void printReport(); }} disabled={!sorted.length || printing}><Printer className="h-4 w-4" />{printing ? 'جارٍ تجهيز الصور والتقرير...' : 'طباعة / PDF مع الصور'}</Button>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>إغلاق</Button>
           </DialogFooter>
           <style>{'#central-buildings-reports-view.iau-report-cards-mode td, #central-buildings-reports-view.iau-report-cards-mode th {position:static!important;}'}</style>
