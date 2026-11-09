@@ -613,7 +613,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                 <div className="min-w-0 flex-1 space-y-1">
                   <h3 className="flex items-center gap-2 text-base font-black"><Images className="h-5 w-5 text-primary" /> الصور المرفقة في التقرير</h3>
                   <p className="text-sm text-muted-foreground">تُدرج الصور داخل ملحق توثيق مصور بعد الجدول، بحسب المباني المطابقة للفرز والتصفية. تتضمن اسم المبنى ورقمه وتفاصيل الصورة.</p>
-                  <p className="text-xs text-muted-foreground">هذه الخيارات خاصة بالطباعة وPDF فقط. لسلامة الأداء، الحد الأعلى ${MAX_PRINT_PHOTOS} صورة في التقرير الواحد؛ يمكن تضييق الفلاتر عند تجاوزه.</p>
+                  <p className="text-xs text-muted-foreground">هذه الخيارات خاصة بالطباعة وPDF فقط. لسلامة الأداء، الحد الأعلى {MAX_PRINT_PHOTOS} صورة في التقرير الواحد؛ يمكن تضييق الفلاتر عند تجاوزه.</p>
                 </div>
                 <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                   <Badge variant="secondary">{selectedPhotoCount} صورة من {photoGroups.length} مبنى</Badge>
