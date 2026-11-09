@@ -8,7 +8,7 @@ import {
 } from '../utils/centralBuildingsPhotoAppendix';
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { ArrowDown, ArrowDownUp, ArrowUp, BarChart3, ChevronLeft, ChevronRight, Download, Images, MapPin, Printer, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowDown, ArrowDownUp, ArrowUp, BarChart3, ChevronLeft, ChevronRight, Download, Images, ListChecks, MapPin, Printer, Search, SlidersHorizontal, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPendingBuildingImport } from './BuildingExcelImportManager';
 import type { MosqueBuilding, MosqueBuildingDeedReference } from '../api/mosques';
@@ -129,6 +129,9 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
   const [city, setCity] = useState('all');
   const [district, setDistrict] = useState('all');
   const [creatorId, setCreatorId] = useState('all');
+  const [buildingSelectionMode, setBuildingSelectionMode] = useState<'all' | 'custom'>('all');
+  const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(new Set());
+  const [buildingNameSearch, setBuildingNameSearch] = useState('');
   const [sort, setSort] = useState<{ key: ColumnKey; direction: 'asc' | 'desc' }>({ key: 'buildingNumber', direction: 'asc' });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -148,7 +151,15 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
   }, [selectedColumns]);
   useEffect(() => {
     setPage(1);
-  }, [search, approval, campus, city, district, creatorId, linkType, coordinates, deedLink, sort]);
+  }, [search, approval, campus, city, district, creatorId, linkType, coordinates, deedLink, sort, buildingSelectionMode, selectedBuildingIds]);
+
+  // A new site, neighborhood or other filter must never carry over hidden
+  // building IDs from an earlier selection.
+  useEffect(() => {
+    setBuildingSelectionMode('all');
+    setSelectedBuildingIds(new Set());
+    setBuildingNameSearch('');
+  }, [search, approval, campus, city, district, creatorId, linkType, coordinates, deedLink]);
 
   const deedById = useMemo(() => new Map(deeds.map((deed) => [String(deed.id), deed])), [deeds]);
   const getDeedNumber = (building: MosqueBuilding): string => {
@@ -187,7 +198,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     .filter((item) => (campus === 'all' || item.campusLocation === campus) && (city === 'all' || item.city === city))
     .map((item) => item.district).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar')), [buildings, campus, city]);
 
-  const filtered = useMemo(() => {
+  const eligibleBuildings = useMemo(() => {
     const needle = normalize(search);
     return buildings.filter((building) => {
       const data = effectiveBuilding(building);
@@ -211,6 +222,40 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       return true;
     });
   }, [approval, buildings, campus, city, district, creatorId, coordinates, deedLink, deedById, linkType, search, usage]);
+
+  // Everything downstream (KPIs, table, photos, PDF and Excel) consumes this one
+  // filtered collection; only the explicitly checked IDs survive custom selection.
+  const filtered = useMemo(
+    () => buildingSelectionMode === 'all'
+      ? eligibleBuildings
+      : eligibleBuildings.filter((building) => selectedBuildingIds.has(building.id)),
+    [eligibleBuildings, buildingSelectionMode, selectedBuildingIds],
+  );
+
+  const selectedBuildingRows = useMemo(
+    () => eligibleBuildings.filter((building) => selectedBuildingIds.has(building.id)),
+    [eligibleBuildings, selectedBuildingIds],
+  );
+  const buildingOptions = useMemo(() => {
+    const needle = normalize(buildingNameSearch);
+    return [...eligibleBuildings].filter((building) => {
+      const data = effectiveBuilding(building);
+      return !needle || [data.name, data.buildingNumber, data.campusLocation, data.city, data.district]
+        .some((value) => normalize(value).includes(needle));
+    }).sort((left, right) => String(effectiveBuilding(left).name).localeCompare(
+      String(effectiveBuilding(right).name), 'ar', { numeric: true, sensitivity: 'base' },
+    ));
+  }, [eligibleBuildings, buildingNameSearch]);
+
+  const changeBuildingSelection = (buildingId: string, checked: boolean) => {
+    setBuildingSelectionMode('custom');
+    setSelectedBuildingIds((previous) => {
+      const next = new Set(previous);
+      if (checked) next.add(buildingId);
+      else next.delete(buildingId);
+      return next;
+    });
+  };
 
   const summary = useMemo(() => ({
     total: filtered.length,
@@ -270,6 +315,15 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     city !== 'all' ? 'المدينة: ' + city : '',
     district !== 'all' ? 'الحي: ' + district : '',
     creatorId !== 'all' ? 'اسم المستخدم: ' + (creatorOptions.find((item) => item.id === creatorId)?.name || 'غير معروف') : '',
+    buildingSelectionMode === 'custom'
+      ? 'المباني المختارة (' + selectedBuildingRows.length + '): ' +
+        (selectedBuildingRows.length
+          ? selectedBuildingRows.slice(0, 12).map((building) => {
+              const item = effectiveBuilding(building);
+              return item.name + ' (' + item.buildingNumber + ')';
+            }).join('، ') + (selectedBuildingRows.length > 12 ? '، وغيرها' : '')
+          : 'لا توجد مبانٍ محددة')
+      : '',
     coordinates !== 'all' ? 'الإحداثيات: ' + (coordinates === 'complete' ? 'مكتملة' : 'ناقصة') : '',
     deedLink !== 'all' ? 'الصك: ' + (deedLink === 'linked' ? 'مرتبط' : 'غير مرتبط') : '',
     linkType !== 'all' ? 'الارتباط: ' + ({ mosque: 'العناية بالمساجد', assets: 'الأصول', accounting: 'السجلات المحاسبية', unlinked: 'غير مرتبطة' } as Record<string, string>)[linkType] : '',
@@ -481,6 +535,9 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     setCity('all');
     setDistrict('all');
     setCreatorId('all');
+    setBuildingSelectionMode('all');
+    setSelectedBuildingIds(new Set());
+    setBuildingNameSearch('');
     setLinkType('all');
     setPage(1);
     setCoordinates('all');
@@ -589,6 +646,138 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                   </Button>
                 </div>
               </div>
+              <section className="space-y-3 rounded-xl border border-primary/20 bg-background p-3" aria-label="تحديد المباني بالاسم">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <h3 className="flex items-center gap-2 text-sm font-black">
+                      <ListChecks className="h-4 w-4 text-primary" />
+                      اختيار أسماء المباني للتقرير
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      يتوفر {eligibleBuildings.length} مبنى حسب فلاتر الموقع والحي. يمكنك اختيار 3 مبانٍ فقط من أصل 10، ويشملها الجدول والطباعة والصور وExcel.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={buildingSelectionMode === 'custom' ? 'default' : 'secondary'}>
+                      {buildingSelectionMode === 'custom'
+                        ? `مختار ${selectedBuildingRows.length} من ${eligibleBuildings.length}`
+                        : `جميع المباني (${eligibleBuildings.length})`}
+                    </Badge>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={buildingSelectionMode === 'custom' ? 'outline' : 'default'}
+                      onClick={() => {
+                        setBuildingSelectionMode('custom');
+                        setSelectedBuildingIds(new Set());
+                        setBuildingNameSearch('');
+                      }}
+                    >
+                      <ListChecks className="h-4 w-4" /> تحديد مبانٍ معينة
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={buildingSelectionMode === 'all'}
+                      onClick={() => {
+                        setBuildingSelectionMode('all');
+                        setSelectedBuildingIds(new Set());
+                        setBuildingNameSearch('');
+                      }}
+                    >
+                      عرض جميع المباني
+                    </Button>
+                  </div>
+                </div>
+
+                {buildingSelectionMode === 'custom' && (
+                  <div className="space-y-3 border-t pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="relative w-full max-w-md">
+                        <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={buildingNameSearch}
+                          onChange={(event) => setBuildingNameSearch(event.target.value)}
+                          placeholder="ابحث باسم المبنى أو رقمه لاختياره"
+                          aria-label="البحث في أسماء المباني المتاحة للتحديد"
+                          className="pr-9"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm"
+                          disabled={!buildingOptions.length}
+                          onClick={() => setSelectedBuildingIds((previous) => {
+                            const next = new Set(previous);
+                            buildingOptions.forEach((building) => next.add(building.id));
+                            return next;
+                          })}>
+                          تحديد الكل {buildingNameSearch.trim() ? 'المطابق للبحث' : 'في الموقع'}
+                        </Button>
+                        <Button type="button" variant="outline" size="sm"
+                          disabled={!selectedBuildingIds.size}
+                          onClick={() => setSelectedBuildingIds(new Set())}>
+                          مسح التحديد
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="max-h-56 overflow-y-auto rounded-lg border bg-background p-2">
+                      {buildingOptions.length ? (
+                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                          {buildingOptions.map((building) => {
+                            const data = effectiveBuilding(building);
+                            return (
+                              <label
+                                key={building.id}
+                                className={selectedBuildingIds.has(building.id)
+                                  ? 'flex cursor-pointer items-start gap-2 rounded-lg border border-primary/50 bg-primary/5 p-3 text-sm'
+                                  : 'flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm hover:bg-muted/50'}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedBuildingIds.has(building.id)}
+                                  onChange={(event) => changeBuildingSelection(building.id, event.target.checked)}
+                                  className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                                  aria-label={`تضمين ${data.name || data.buildingNumber} في التقرير`}
+                                />
+                                <span className="min-w-0">
+                                  <strong className="block break-words">{data.name || 'بدون اسم'}</strong>
+                                  <span className="text-xs text-muted-foreground">
+                                    رقم المبنى: {data.buildingNumber || '—'} · {data.campusLocation || data.district || 'موقع غير محدد'}
+                                  </span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="py-7 text-center text-sm text-muted-foreground">لا توجد مبانٍ مطابقة للبحث ضمن فلاتر الموقع الحالية.</p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className={selectedBuildingRows.length ? 'text-xs font-medium text-primary' : 'text-xs font-medium text-amber-700'}>
+                        {selectedBuildingRows.length
+                          ? `التقرير سيشمل ${selectedBuildingRows.length} مبنى فقط. اضغط على اسم آخر لإضافته أو إزالته.`
+                          : 'لم تحدد أي مبنى بعد؛ اختر أسماء المباني المطلوب تضمينها في التقرير.'}
+                      </p>
+                      {selectedBuildingRows.length > 0 && selectedBuildingRows.length <= 8 && (
+                        <div className="flex flex-wrap gap-1">
+                          {selectedBuildingRows.map((building) => (
+                            <button key={building.id} type="button"
+                              onClick={() => changeBuildingSelection(building.id, false)}
+                              className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-1 text-xs text-foreground hover:bg-muted"
+                              title="إزالة المبنى من التقرير">
+                              {effectiveBuilding(building).name || effectiveBuilding(building).buildingNumber}
+                              <X className="h-3 w-3" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </section>
+
               {appliedFilters.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 border-t pt-3">
                   <span className="text-xs font-bold text-muted-foreground">الفلاتر النشطة:</span>
