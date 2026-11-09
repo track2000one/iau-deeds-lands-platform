@@ -168,6 +168,21 @@ const parseCoordinate = (value: string): number | null => {
 const isValidLatitude = (value: number) => value >= -90 && value <= 90;
 const isValidLongitude = (value: number) => value >= -180 && value <= 180;
 
+const buildingMapUrl = (building: MosqueBuilding): string | null => {
+  if (building.latitude == null || building.longitude == null) return null;
+  const latitude = Number(building.latitude);
+  const longitude = Number(building.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+};
+
+const openBuildingMap = (building: MosqueBuilding) => {
+  const url = buildingMapUrl(building);
+  if (!url) return;
+  window.open(url, '_blank', 'noopener,noreferrer');
+};
+
 const buildingDetails = (building: MosqueBuilding): Array<[string, string]> => [
   ['رقم المبنى', building.buildingNumber],
   ['اسم المبنى', building.name || '—'],
@@ -1051,6 +1066,15 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                       <td className="px-3 py-3">
                                         <div className="flex flex-wrap gap-1.5">
                                           <Button size="sm" variant="outline" onClick={() => setViewTarget(building)}><Eye className="h-4 w-4" /> عرض</Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={!buildingMapUrl(building)}
+                                            title={buildingMapUrl(building) ? 'فتح موقع المبنى على خرائط Google' : 'إحداثيات المبنى غير متوفرة أو غير صحيحة'}
+                                            onClick={() => openBuildingMap(building)}
+                                          >
+                                            <MapPinned className="h-4 w-4" /> خريطة
+                                          </Button>
                                           {canEditBuilding(building) && !pendingEnvelope && (
                                             <Button size="sm" variant="outline" onClick={() => openEdit(building)}><Pencil className="h-4 w-4" /> تعديل</Button>
                                           )}
@@ -1159,6 +1183,16 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                 <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
                                   <Button size="sm" variant="outline" className="gap-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setViewTarget(building)}>
                                     <Eye className="h-4 w-4" /> عرض
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                                    disabled={!buildingMapUrl(building)}
+                                    title={buildingMapUrl(building) ? 'فتح موقع المبنى على خرائط Google' : 'إحداثيات المبنى غير متوفرة أو غير صحيحة'}
+                                    onClick={() => openBuildingMap(building)}
+                                  >
+                                    <MapPinned className="h-4 w-4" /> خريطة
                                   </Button>
                                   {canEditBuilding(building) && !pendingEnvelope && (
                                     <Button size="sm" variant="outline" className="gap-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => openEdit(building)}>
