@@ -372,9 +372,17 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       const city = String(building.city || '').trim();
       const district = String(building.district || '').trim();
       // District defines the group; campus remains an attribute of each building.
-      const title = district
-        ? (/^(حي|حارة)\s/.test(district) ? district : `حي ${district}`)
-        : 'حي غير محدد';
+      const districtName = normalizeKey(
+        district
+          .replace(/^حي\s+/, '')
+          .replace(/\s+بالحرم\s+الشرقي$/, '')
+      );
+      // Display alias only: preserve the original district and campus fields for filters and reports.
+      const title = districtName === normalizeKey('مدينة الملك فيصل الجامعية')
+        ? 'حي مدينة الملك فيصل الجامعية بالحرم الشرقي'
+        : district
+          ? (/^(حي|حارة)\s/.test(district) ? district : `حي ${district}`)
+          : 'حي غير محدد';
       const key = JSON.stringify([normalizeKey(city) || '__no_city__', normalizeKey(district) || '__no_district__']);
       const current = groups.get(key) || { key, title, subtitle: '', buildings: [] };
       current.buildings.push(building);
@@ -386,7 +394,12 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
         .map((building) => String(building.campusLocation || '').trim())
         .filter(Boolean)));
       const city = String(group.buildings[0]?.city || '').trim() || 'مدينة غير محددة';
-      group.subtitle = [city, sites.length === 1 ? sites[0] : sites.length > 1 ? `${sites.length} مواقع جامعية` : 'الموقع الجامعي غير محدد'].join(' — ');
+      const siteLabel = sites.length === 1 ? sites[0]
+        : sites.length > 1 ? `${sites.length} مواقع جامعية` : 'الموقع الجامعي غير محدد';
+      // Avoid showing «الحرم الشرقي» twice when it is already part of the group title.
+      const subtitleSite = group.title === 'حي مدينة الملك فيصل الجامعية بالحرم الشرقي' &&
+        normalizeKey(siteLabel) === normalizeKey('الحرم الشرقي') ? '' : siteLabel;
+      group.subtitle = [city, subtitleSite].filter(Boolean).join(' — ');
     }
 
     return Array.from(groups.values())
