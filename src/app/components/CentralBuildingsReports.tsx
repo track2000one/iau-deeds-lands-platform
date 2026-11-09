@@ -30,6 +30,7 @@ type ColumnKey =
   | 'approval'
   | 'buildingNumber'
   | 'name'
+  | 'createdBy'
   | 'deedStatus'
   | 'deedNumber'
   | 'campusLocation'
@@ -43,6 +44,7 @@ type ColumnKey =
 const columns: Array<{ key: ColumnKey; label: string; width: number }> = [
   { key: 'buildingNumber', label: 'رقم المبنى', width: 18 },
   { key: 'name', label: 'اسم المبنى', width: 34 },
+  { key: 'createdBy', label: 'اسم المستخدم', width: 26 },
   { key: 'deedStatus', label: 'الارتباط بالصك', width: 20 },
   { key: 'deedNumber', label: 'رقم الصك', width: 24 },
   { key: 'approval', label: 'حالة الاعتماد', width: 18 },
@@ -56,6 +58,10 @@ const columns: Array<{ key: ColumnKey; label: string; width: number }> = [
 ];
 
 const normalize = (value: unknown) => String(value ?? '').trim().toLowerCase();
+const UNKNOWN_CREATOR = '__unknown_creator__';
+const creatorName = (building: MosqueBuilding) =>
+  String(building.createdByName || '').trim() ||
+  (building.createdBy ? 'اسم المستخدم غير متاح' : 'غير محدد (سجل قديم)');
 const isValidCoordinate = (value: unknown) =>
   value !== null && value !== undefined && String(value).trim() !== '' && Number.isFinite(Number(value));
 const hasCoordinates = (latitude: unknown, longitude: unknown) =>
@@ -65,15 +71,20 @@ const hasCoordinates = (latitude: unknown, longitude: unknown) =>
 
 const readSelectedColumns = (): Set<ColumnKey> => {
   try {
-    const nextSaved = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v3') || 'null');
-    if (Array.isArray(nextSaved)) {
-      const valid = nextSaved.filter((key): key is ColumnKey => columns.some((column) => column.key === key));
+    const currentSaved = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v4') || 'null');
+    if (Array.isArray(currentSaved)) {
+      const valid = currentSaved.filter((key): key is ColumnKey => columns.some((column) => column.key === key));
       if (valid.length) return new Set(valid);
+    }
+    const previousV3 = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v3') || 'null');
+    if (Array.isArray(previousV3)) {
+      const valid = previousV3.filter((key): key is ColumnKey => columns.some((column) => column.key === key));
+      if (valid.length) return new Set([...valid, 'createdBy']);
     }
     const previousSaved = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v2') || 'null');
     if (Array.isArray(previousSaved)) {
       const valid = previousSaved.filter((key): key is ColumnKey => columns.some((column) => column.key === key));
-      if (valid.length) return new Set([...valid, 'deedStatus', 'deedNumber']);
+      if (valid.length) return new Set([...valid, 'deedStatus', 'deedNumber', 'createdBy']);
     }
   } catch {
     // Private browsing and disabled storage: retain safe defaults.
@@ -109,6 +120,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
   const [campus, setCampus] = useState('all');
   const [city, setCity] = useState('all');
   const [district, setDistrict] = useState('all');
+  const [creatorId, setCreatorId] = useState('all');
   const [sort, setSort] = useState<{ key: ColumnKey; direction: 'asc' | 'desc' }>({ key: 'buildingNumber', direction: 'asc' });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -119,14 +131,14 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('iau-central-buildings-report-columns-v3', JSON.stringify([...selectedColumns]));
+      window.localStorage.setItem('iau-central-buildings-report-columns-v4', JSON.stringify([...selectedColumns]));
     } catch {
       // Column preferences remain usable in the current session.
     }
   }, [selectedColumns]);
   useEffect(() => {
     setPage(1);
-  }, [search, approval, campus, city, district, linkType, coordinates, deedLink, sort]);
+  }, [search, approval, campus, city, district, creatorId, linkType, coordinates, deedLink, sort]);
 
   const deedById = useMemo(() => new Map(deeds.map((deed) => [String(deed.id), deed])), [deeds]);
   const getDeedNumber = (building: MosqueBuilding): string => {
@@ -137,6 +149,23 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
   };
   const isDeedLinked = (building: MosqueBuilding): boolean =>
     Boolean(building.deedId || building.deed?.id || getDeedNumber(building));
+
+  const creatorOptions = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string; count: number }>();
+    for (const building of buildings) {
+      const id = building.createdBy || UNKNOWN_CREATOR;
+      const entry = byId.get(id);
+      if (entry) {
+        entry.count += 1;
+        if (building.createdByName && entry.name === 'اسم المستخدم غير متاح') {
+          entry.name = building.createdByName.trim();
+        }
+      } else {
+        byId.set(id, { id, name: creatorName(building), count: 1 });
+      }
+    }
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name, 'ar', { sensitivity: 'base' }));
+  }, [buildings]);
 
   const campusOptions = useMemo(() => Array.from(new Set(buildings.map((item) => effectiveBuilding(item).campusLocation).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar')), [buildings]);
   const cityOptions = useMemo(() => Array.from(new Set(buildings
@@ -158,6 +187,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       if (campus !== 'all' && data.campusLocation !== campus) return false;
       if (city !== 'all' && data.city !== city) return false;
       if (district !== 'all' && data.district !== district) return false;
+      if (creatorId !== 'all' && (building.createdBy || UNKNOWN_CREATOR) !== creatorId) return false;
       if (deedLink === 'linked' && !isDeedLinked(building)) return false;
       if (deedLink === 'unlinked' && isDeedLinked(building)) return false;
       const located = hasCoordinates(data.latitude, data.longitude);
@@ -167,10 +197,10 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       if (linkType === 'assets' && !(itemUsage?.assets || 0)) return false;
       if (linkType === 'accounting' && !(itemUsage?.accounting || 0)) return false;
       if (linkType === 'unlinked' && (itemUsage?.mosqueProfile || (itemUsage?.assets || 0) > 0 || (itemUsage?.accounting || 0) > 0)) return false;
-      if (needle && ![data.buildingNumber, data.name, data.campusLocation, data.city, data.district, getDeedNumber(building)].some((value) => normalize(value).includes(needle))) return false;
+      if (needle && ![data.buildingNumber, data.name, data.campusLocation, data.city, data.district, getDeedNumber(building), creatorName(building)].some((value) => normalize(value).includes(needle))) return false;
       return true;
     });
-  }, [approval, buildings, campus, city, district, coordinates, deedLink, deedById, linkType, search, usage]);
+  }, [approval, buildings, campus, city, district, creatorId, coordinates, deedLink, deedById, linkType, search, usage]);
 
   const summary = useMemo(() => ({
     total: filtered.length,
@@ -194,6 +224,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       case 'approval': return data.pending ? 'معلق للمراجعة' : 'معتمد';
       case 'buildingNumber': return data.buildingNumber || '—';
       case 'name': return data.name || '—';
+      case 'createdBy': return creatorName(building);
       case 'deedStatus': return isDeedLinked(building) ? 'مرتبط بصك' : 'غير مرتبط بصك';
       case 'deedNumber': return getDeedNumber(building) || (isDeedLinked(building) ? 'رقم الصك غير متوفر' : '—');
       case 'campusLocation': return data.campusLocation || '—';
@@ -226,6 +257,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     campus !== 'all' ? 'الموقع: ' + campus : '',
     city !== 'all' ? 'المدينة: ' + city : '',
     district !== 'all' ? 'الحي: ' + district : '',
+    creatorId !== 'all' ? 'اسم المستخدم: ' + (creatorOptions.find((item) => item.id === creatorId)?.name || 'غير معروف') : '',
     coordinates !== 'all' ? 'الإحداثيات: ' + (coordinates === 'complete' ? 'مكتملة' : 'ناقصة') : '',
     deedLink !== 'all' ? 'الصك: ' + (deedLink === 'linked' ? 'مرتبط' : 'غير مرتبط') : '',
     linkType !== 'all' ? 'الارتباط: ' + ({ mosque: 'العناية بالمساجد', assets: 'الأصول', accounting: 'السجلات المحاسبية', unlinked: 'غير مرتبطة' } as Record<string, string>)[linkType] : '',
@@ -339,6 +371,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     setCampus('all');
     setCity('all');
     setDistrict('all');
+    setCreatorId('all');
     setLinkType('all');
     setPage(1);
     setCoordinates('all');
@@ -413,6 +446,22 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                     <option value="all">جميع المباني</option>
                     <option value="linked">مرتبط بصك</option>
                     <option value="unlinked">غير مرتبط بصك</option>
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="central-buildings-report-creator" className="text-sm font-bold">اسم المستخدم</Label>
+                  <NativeSelect
+                    id="central-buildings-report-creator"
+                    title="تصفية حسب مستخدم إضافة المبنى"
+                    value={creatorId}
+                    onChange={(e) => setCreatorId(e.target.value)}
+                  >
+                    <option value="all">جميع المستخدمين</option>
+                    {creatorOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} ({item.count})
+                      </option>
+                    ))}
                   </NativeSelect>
                 </div>
                 <div className="space-y-1.5 lg:col-span-2">
