@@ -369,6 +369,8 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       'th{background:#dceef2;color:#153950;font-weight:800}tbody tr:nth-child(even){background:#f5fafb}',
       '.footer{margin-top:13px;border-top:1px solid #cbd5e1;padding-top:8px;font-size:10px;color:#64748b;display:flex;justify-content:space-between}',
       centralBuildingsPhotoPrintCss,
+      '.empty-photo-note{padding:12px 14px;margin:17px 0;border:1px dashed #a9bac5;border-radius:8px;color:#465c70;background:#f8fafc;font-size:12px}',
+      '.toolbar button:disabled{opacity:.5;cursor:not-allowed}',
       '@media print{.toolbar{display:none!important}body{margin:0}.head{background:#f4fbfc}}',
       '</style></head><body>',
       '<div class="toolbar"><span id="print-image-status">معاينة التقرير — راجع البيانات والصور قبل الطباعة</span><button id="iau-print-action" type="button" ' + (appendix.imageCount ? 'disabled ' : '') + 'onclick="window.print()">طباعة / حفظ PDF</button></div>',
@@ -389,7 +391,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       '</section>',
       '<table><thead><tr>' + chosen.map((column) => '<th>' + escapeHtml(column.label) + '</th>').join('') +
         '</tr></thead><tbody>' + tableRows + '</tbody></table>',
-      appendix.html,
+      appendix.html || (photoMode !== 'none' ? '<p class="empty-photo-note">لا توجد صور مرفقة بالمباني المطابقة لمعايير التقرير. تم الاكتفاء بالبيانات.</p>' : ''),
       '<footer class="footer"><span>منصة إدارة الصكوك والأراضي — السجل المركزي للمباني</span><span>أُعدّ بواسطة: ' +
         escapeHtml(reportPreparerName()) + ' | ' + escapeHtml(generatedAt) + '</span></footer>',
       '</body></html>',
@@ -418,11 +420,26 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       return;
     }
 
+    // A secured image may arrive in a format the browser cannot render (e.g. HEIC).
+    // Replace broken image elements with a visible note rather than printing blank boxes.
+    let incompatibleImages = 0;
+    for (const image of imageElements) {
+      if (image.complete && image.naturalWidth === 0) {
+        const fallback = popup.document.createElement('div');
+        fallback.className = 'image-unavailable';
+        fallback.textContent = 'تعذر عرض هذه الصورة بصيغتها الحالية في المتصفح؛ يرجى استخدام JPG أو PNG للطباعة.';
+        image.replaceWith(fallback);
+        incompatibleImages += 1;
+      }
+    }
+
     const status = popup.document.getElementById('print-image-status');
     const printable = popup.document.getElementById('iau-print-action') as HTMLButtonElement | null;
     if (status && appendix.imageCount) {
       status.textContent = `الملحق المصور: ${appendix.imageCount} صورة من ${photoGroups.length} مبنى` +
-        (appendix.failedCount ? ` — تعذر جلب ${appendix.failedCount} صورة، راجع مواضعها في المعاينة` : ' — جاهز للطباعة');
+        (appendix.failedCount || incompatibleImages
+          ? ` — صور تحتاج مراجعة: ${appendix.failedCount + incompatibleImages}`
+          : ' — جاهز للطباعة');
     }
     if (printable) printable.disabled = false;
     let cleaned = false;
