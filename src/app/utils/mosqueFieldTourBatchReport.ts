@@ -216,7 +216,9 @@ export const prepareTourBatchPrint = async (args: {
           'النطاق: ' + (scopeStates[visit.visitScope] || visit.visitScope),
           'الحالة: ' + (visitStates[visit.workflowStatus] || visit.workflowStatus),
           'التاريخ: ' + dateRiyadh(visit.visitDate),
-          'المستخدم المنفذ: ' + (visit.assignedToName || 'غير محدد'),
+          'منشئ الزيارة: ' + (visit.createdByName || (visit.createdBy ? 'مستخدم سابق أو غير متاح' : 'غير مسجل')),
+          'المسند إليه: ' + (visit.assignedToName || 'غير محدد'),
+          ...(visit.lastEditedByName ? ['آخر تعديل بواسطة: ' + visit.lastEditedByName] : []),
           'ملاحظات مفتوحة: ' + open.length,
         ]) + '</p></div>' +
         '<div class="info">' +
@@ -244,6 +246,7 @@ export const prepareTourBatchPrint = async (args: {
           'التاريخ: ' + dateRiyadh(tour.scheduledDate)]) + '</p></div>' +
         '<div class="info">' +
           info('منشئ الجولة', creatorName) +
+          (tour.lastEditedByName ? info('آخر تعديل بواسطة', tour.lastEditedByName) : '') +
           info('الفريق', (tour.teamMembers || []).join('، ')) +
           info('نطاق الجولة', tour.scope) +
           info('عدد الزيارات', String(visits.length)) +
