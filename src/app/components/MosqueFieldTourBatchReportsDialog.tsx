@@ -104,7 +104,7 @@ export const MosqueFieldTourBatchReportsDialog: React.FC<Props> = ({
       ? (namesById.get(tour.createdBy) || 'مستخدم سابق — ' + tour.createdBy.slice(0, 8))
       : 'غير مسجل'),
     visits: byTour.get(tour.id) || [],
-  })), [tours, byTour, namesById]);
+  })).filter((entry) => entry.visits.length > 0), [tours, byTour, namesById]);
 
   const dateIsInvalid = Boolean(from && to && from > to);
   const filteredEntries = React.useMemo(() => {
@@ -112,6 +112,8 @@ export const MosqueFieldTourBatchReportsDialog: React.FC<Props> = ({
     const selectedUser = userKey.startsWith('id:') ? userKey.slice(3) : '';
     const selectedName = userKey.startsWith('name:') ? userKey.slice(5) : '';
     const rows = allEntries.filter(({ tour, visits: tourVisits, creatorName }) => {
+      // Cancelled tours remain retrievable for audit only when explicitly filtered.
+      if (!status && tour.status === 'cancelled') return false;
       const date = localDate(tour.scheduledDate);
       if (from && date < from) return false;
       if (to && date > to) return false;
@@ -191,7 +193,7 @@ export const MosqueFieldTourBatchReportsDialog: React.FC<Props> = ({
       'الجولات: ' + (mode === 'all' ? 'جميع الجولات المطابقة' : 'جولات محددة يدويًا'),
       search ? 'بحث: ' + search : '',
       siteId ? 'الموقع: ' + (siteOptions.find((x) => x[0] === siteId)?.[1] || 'موقع مختار') : '',
-      status ? 'حالة الجولة: ' + statusLabels[status] : '',
+      status ? 'حالة الجولة: ' + statusLabels[status] : 'حالة الجولة: غير ملغاة',
       userKey ? 'اسم المستخدم (منشئ أو منفذ): ' +
         (userOptions.find((x) => x[0] === userKey)?.[1] || 'مستخدم مختار') : '',
       from ? 'من تاريخ: ' + from : '',
