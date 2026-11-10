@@ -560,6 +560,9 @@ export type MosqueFieldVisit = {
   assignedToUserId?: string | null;
   assignedToName?: string | null;
   createdBy?: string | null;
+  createdByName?: string | null;
+  lastEditedByName?: string | null;
+  lastEditedAt?: string | null;
   isOwner?: boolean;
   isAssignee?: boolean;
   hasStarted?: boolean;
@@ -582,6 +585,9 @@ export type MosqueFieldTour = {
   status: 'scheduled' | 'in_progress' | 'completed' | 'postponed' | 'cancelled';
   notes?: string | null;
   createdBy?: string | null;
+  createdByName?: string | null;
+  lastEditedByName?: string | null;
+  lastEditedAt?: string | null;
   isOwner?: boolean;
   hasStarted?: boolean;
   canEdit?: boolean;
