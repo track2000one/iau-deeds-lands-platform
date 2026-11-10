@@ -1296,18 +1296,18 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   React.useEffect(() => { void load(); }, [load]);
 
   // Tour completion and site coverage measure two different aspects of the field program.
-  // Exclude cancelled tours from the completion denominator, but retain them in the audit total.
+  // Exclude cancelled and empty tours from operational KPIs. Deleted visits cannot leave a counted empty tour.
   const tourStats = React.useMemo(() => {
-    const eligible = tours.filter((tour) => tour.status !== 'cancelled');
+    const eligible = tours.filter((tour) => tour.status !== 'cancelled' && (tour.visits || []).length > 0);
     const completed = eligible.filter((tour) => tour.status === 'completed').length;
     return {
-      total: tours.length,
+      total: eligible.length,
       eligible: eligible.length,
       completed,
       inProgress: eligible.filter((tour) => tour.status === 'in_progress').length,
       scheduled: eligible.filter((tour) => tour.status === 'scheduled').length,
       postponed: eligible.filter((tour) => tour.status === 'postponed').length,
-      cancelled: tours.length - eligible.length,
+      cancelled: tours.filter((tour) => tour.status === 'cancelled').length,
       progressPercent: eligible.length ? Math.round((completed / eligible.length) * 100) : 0,
     };
   }, [tours]);
@@ -3189,7 +3189,7 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="flex items-center gap-2 font-black text-[#0b4a3f]"><Route className="h-4 w-4" />إحصائيات الجولات الميدانية</h3>
-              <span className="text-xs font-semibold text-slate-600">البيانات حسب حالات الجولات المسجلة</span>
+              <span className="text-xs font-semibold text-slate-600">تُحتسب الجولات المرتبطة بزيارات فقط، مع استبعاد الجولات الملغاة والخالية من الزيارات</span>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <FieldVisitOverviewMetric label="إجمالي الجولات" value={tourStats.total} icon={Route} />
