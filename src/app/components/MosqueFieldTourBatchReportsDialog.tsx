@@ -100,7 +100,7 @@ export const MosqueFieldTourBatchReportsDialog: React.FC<Props> = ({
 
   const allEntries = React.useMemo<TourBatchReportEntry[]>(() => tours.map((tour) => ({
     tour,
-    creatorName: (tour.createdBy
+    creatorName: tour.createdByName || (tour.createdBy
       ? (namesById.get(tour.createdBy) || 'مستخدم سابق — ' + tour.createdBy.slice(0, 8))
       : 'غير مسجل'),
     visits: byTour.get(tour.id) || [],
@@ -125,7 +125,7 @@ export const MosqueFieldTourBatchReportsDialog: React.FC<Props> = ({
         normalizeName(visit.assignedToName || '') === selectedName)) return false;
       if (needle && ![tour.title, tour.tourNumber, tour.scope || '', creatorName,
         ...tourVisits.flatMap((visit) =>
-          [visit.site.name, visit.visitNumber, visit.assignedToName || ''])]
+          [visit.site.name, visit.visitNumber, visit.createdByName || '', visit.assignedToName || ''])]
         .some((value) => normalizeName(value).includes(needle))) return false;
       return true;
     });
