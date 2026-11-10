@@ -3478,6 +3478,29 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
           <DialogDescription>حدد عنوان التقرير ومعايير الفرز والتصفية والأعمدة التي تريد ظهورها في الجدول قبل الانتقال إلى الطباعة. يتم تحديث عدد النتائج مباشرة.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {canPrint && (
+            <section className="rounded-2xl border-2 border-teal-300 bg-gradient-to-l from-teal-50 to-sky-50 p-4 shadow-sm" aria-label="التقرير الشامل المصور للجولات">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="flex items-center gap-2 text-base font-black text-teal-950">
+                    <Printer className="h-5 w-5 text-teal-700" /> تقرير PDF شامل لكل جولة مع الصور
+                  </h3>
+                  <p className="mt-1 text-xs leading-6 text-teal-900">
+                    ملف PDF واحد، ولكل جولة تقرير مستقل بزياراتها ونتائج الفحص والصور.
+                    يمكنك تحديد جولات معينة والفرز حسب الموقع والحالة والتاريخ واسم المستخدم.
+                  </p>
+                </div>
+                <Button type="button"
+                  className="gap-2 border border-teal-800 bg-teal-700 font-black text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-teal-800 hover:text-white hover:shadow-lg"
+                  onClick={() => {
+                    setProgramPrintDialog(false);
+                    setBatchTourReportOpen(true);
+                  }}>
+                  <Printer className="h-4 w-4" /> إعداد وطباعة الجولات المصورة
+                </Button>
+              </div>
+            </section>
+          )}
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <b className="text-sm text-emerald-950">نوع التقرير</b>
