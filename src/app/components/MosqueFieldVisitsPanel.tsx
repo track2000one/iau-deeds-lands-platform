@@ -1,4 +1,5 @@
 import { withReportPreparer } from '../utils/reportAttribution';
+import { MosqueFieldTourBatchReportsDialog } from './MosqueFieldTourBatchReportsDialog';
 import React from 'react';
 import {
   AlertTriangle,
@@ -1248,6 +1249,7 @@ export const MosqueFieldVisitsPanel: React.FC<Props> = ({ sites, currentUsername
   const [visitPrintColumns, setVisitPrintColumns] = React.useState<VisitReportColumnKey[]>([...defaultVisitReportColumns]);
   const [preparingPrint, setPreparingPrint] = React.useState(false);
   const [programPrintDialog, setProgramPrintDialog] = React.useState(false);
+  const [batchTourReportOpen, setBatchTourReportOpen] = React.useState(false);
   const [programReportTitle, setProgramReportTitle] = React.useState(defaultFieldProgramReportTitle);
   const [programReportMode, setProgramReportMode] = React.useState<'visits' | 'needs'>('visits');
   const [programNeedPreset, setProgramNeedPreset] = React.useState<MosqueNeedPreset>('carpet');
@@ -3407,7 +3409,12 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
       <CardContent className="pt-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div><p className="font-black text-[#0b4a3f]">{view === 'visits' ? 'سجل الزيارات الميدانية' : 'الجولات الميدانية'}</p><p className="mt-1 text-xs text-slate-500">{view === 'visits' ? 'ابحث وصفِّ الزيارات المسجلة ثم افتح بطاقة الزيارة أو تقريرها.' : 'استعرض الجولات المنظمة والمواقع المرتبطة بكل جولة.'}</p></div>
-          {view === 'tours' && <Button type="button" size="sm" variant="outline" className={tourCardsVisible ? 'border-slate-300 text-slate-700' : 'border-emerald-300 bg-emerald-50 text-emerald-800'} onClick={() => setTourCardsVisible((current) => !current)}>{tourCardsVisible ? <EyeOff className="ml-2 h-4 w-4" /> : <Eye className="ml-2 h-4 w-4" />}{tourCardsVisible ? 'إخفاء بطاقات الجولات' : 'إظهار بطاقات الجولات'}</Button>}
+          {view === 'tours' && <div className="flex flex-wrap items-center gap-2">
+            {canPrint && <Button type="button" size="sm" className="gap-2 border border-teal-800 bg-teal-700 font-bold text-white shadow-sm hover:bg-teal-800" onClick={() => setBatchTourReportOpen(true)}>
+              <Printer className="h-4 w-4" /> PDF شامل للجولات مع الصور
+            </Button>}
+            <Button type="button" size="sm" variant="outline" className={tourCardsVisible ? 'border-slate-300 text-slate-700' : 'border-emerald-300 bg-emerald-50 text-emerald-800'} onClick={() => setTourCardsVisible((current) => !current)}>{tourCardsVisible ? <EyeOff className="ml-2 h-4 w-4" /> : <Eye className="ml-2 h-4 w-4" />}{tourCardsVisible ? 'إخفاء بطاقات الجولات' : 'إظهار بطاقات الجولات'}</Button>
+          </div>}
           {view === 'visits' && <div className="flex-1 space-y-2 md:max-w-5xl">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <div className="relative"><Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" /><Input className="pr-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث برقم الزيارة أو الموقع أو المنفذ" /></div>
@@ -3613,7 +3620,14 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
             </div>
           </div>}
         </div>
-        <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setProgramPrintDialog(false)}>إلغاء</Button><Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={exportProgramExcel} disabled={programReportMode === 'needs' ? !programNeedSummaries.length : !filteredVisits.length}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />{programReportMode === 'needs' ? 'Excel للاحتياجات' : 'Excel + الصور'}</Button><Button onClick={printProgramReport} disabled={programReportMode === 'visits' && !filteredVisits.length}><Printer className="ml-2 h-4 w-4" />متابعة إلى الطباعة</Button></DialogFooter>
+        <DialogFooter className="flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setProgramPrintDialog(false)}>إلغاء</Button>
+          {canPrint && <Button type="button" className="gap-2 border border-teal-800 bg-teal-700 font-bold text-white hover:bg-teal-800" onClick={() => { setProgramPrintDialog(false); setBatchTourReportOpen(true); }}>
+            <Printer className="h-4 w-4" /> PDF شامل لكل جولة مع الصور
+          </Button>}
+          <Button className="border border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white" onClick={exportProgramExcel} disabled={programReportMode === 'needs' ? !programNeedSummaries.length : !filteredVisits.length}><FileSpreadsheet className="ml-2 h-4 w-4 text-white" />{programReportMode === 'needs' ? 'Excel للاحتياجات' : 'Excel + الصور'}</Button>
+          <Button onClick={printProgramReport} disabled={programReportMode === 'visits' && !filteredVisits.length}><Printer className="ml-2 h-4 w-4" />متابعة إلى الطباعة</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
 
@@ -3711,6 +3725,14 @@ if (['completed', 'follow_up', 'closed'].includes(visitForm.workflowStatus)) {
         </>}
       </DialogContent>
     </Dialog>
+
+    {canPrint && <MosqueFieldTourBatchReportsDialog
+      open={batchTourReportOpen}
+      onOpenChange={setBatchTourReportOpen}
+      tours={tours}
+      visits={visits}
+      users={fieldVisitAssignees}
+    />}
 
     <Dialog open={tourDialog} onOpenChange={setTourDialog}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[1040px]" dir="rtl">
