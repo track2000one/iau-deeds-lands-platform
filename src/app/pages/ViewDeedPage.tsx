@@ -20,6 +20,7 @@ import {
   Loader2,
   Printer,
   Ruler,
+  Upload,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -413,6 +414,8 @@ export const ViewDeedPage: React.FC = () => {
   const { t } = useTranslation();
   const { isAdmin, hasPermission } = usePermissions();
   const canPrint = isAdmin || hasPermission('deeds', 'canPrint');
+  const canManageAttachments = isAdmin ||
+    hasPermission('deeds', 'canAdd') || hasPermission('deeds', 'canEdit');
 
   const {
     getDeedById,
@@ -429,6 +432,9 @@ export const ViewDeedPage: React.FC = () => {
   const [backendAttachments, setBackendAttachments] = useState<BackendAttachment[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [fileUploadProgress, setFileUploadProgress] = useState<{
+    type: UiAttachmentType; current: number; total: number;
+  } | null>(null);
   const [showAttachmentLinkForm, setShowAttachmentLinkForm] = useState(false);
   const [attachmentTitle, setAttachmentTitle] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
@@ -705,6 +711,103 @@ export const ViewDeedPage: React.FC = () => {
       setIsUploadingAttachment(false);
     }
   };
+  const uploadDeedFiles = async (type: UiAttachmentType, files: File[]) => {
+    if (!deedId) {
+      toast.error('رقم الصك غير متوفر');
+      return;
+    }
+    if (!canManageAttachments) {
+      toast.error('ليس لديك صلاحية رفع مرفقات هذا الصك');
+      return;
+    }
+    if (isUploadingAttachment || !files.length) return;
+
+    const MAX_FILE_BYTES = 20 * 1024 * 1024;
+    const allowedMimeTypes = new Set([
+      'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'video/mp4',
+    ]);
+    const acceptedFiles: File[] = [];
+    const errors: string[] = [];
+    files.forEach((file) => {
+      if (file.size <= 0) {
+        errors.push(`${file.name}: الملف فارغ`);
+      } else if (file.size > MAX_FILE_BYTES) {
+        errors.push(`${file.name}: يتجاوز الحد 20 ميجابايت`);
+      } else if (!allowedMimeTypes.has(file.type)) {
+        errors.push(`${file.name}: نوع الملف غير مدعوم`);
+      } else {
+        acceptedFiles.push(file);
+      }
+    });
+
+    if (!acceptedFiles.length) {
+      toast.error(errors.slice(0, 3).join(' — ') || 'لم يتم اختيار ملفات مناسبة للرفع');
+      return;
+    }
+
+    setIsUploadingAttachment(true);
+    let successCount = 0;
+    try {
+      for (let i = 0; i < acceptedFiles.length; i += 1) {
+        const file = acceptedFiles[i];
+        setFileUploadProgress({ type, current: i + 1, total: acceptedFiles.length });
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('entityType', 'deed');
+          formData.append('entityId', deedId);
+          formData.append('attachmentType', toApiAttachmentType(type));
+          formData.append('title', file.name);
+
+          // This endpoint stores the physical file and its categorized attachment
+          // in a single authenticated request. The browser sets the multipart boundary.
+          const response = await authenticatedFetch('/api/uploads', {
+            method: 'POST',
+            headers: { 'x-upload-module': 'deeds' },
+            body: formData,
+          }, 120_000);
+
+          const body = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(body?.message || 'تعذر رفع الملف');
+          }
+          if (!body?.attachment?.id) {
+            throw new Error('تم رفع الملف لكن لم يتم تأكيد حفظه ضمن مرفقات الصك');
+          }
+          setBackendAttachments((previous) =>
+            previous.some((item) => item.id === body.attachment.id)
+              ? previous
+              : [body.attachment as BackendAttachment, ...previous]);
+          successCount += 1;
+        } catch (error) {
+          errors.push(`${file.name}: ${error instanceof Error ? error.message : 'تعذر الرفع'}`);
+        }
+      }
+    } finally {
+      setFileUploadProgress(null);
+      setIsUploadingAttachment(false);
+      await loadBackendAttachments();
+    }
+
+    if (successCount) {
+      toast.success(`تم رفع وحفظ ${successCount} ${successCount === 1 ? 'ملف' : 'ملفات'} في قسم المرفقات الصحيح`);
+    }
+    if (errors.length) {
+      toast.error(
+        `تعذر رفع ${errors.length} ملف/ملفات: ${errors.slice(0, 3).join(' — ')}`,
+        { duration: 9000 },
+      );
+    }
+  };
+
   const getAttachmentsByType = (type: UiAttachmentType) => {
     const remoteAttachments = backendAttachments.filter(
       (att) => fromApiAttachmentType(String(att.attachmentType)) === type
@@ -1069,21 +1172,57 @@ export const ViewDeedPage: React.FC = () => {
             </Badge>
           </div>
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full sm:w-auto text-xs md:text-sm"
-            disabled={isUploadingAttachment}
-            onClick={() => {
-              setUploadTab(type as UiAttachmentType);
-              setShowAttachmentLinkForm(true);
-              setAttachmentTitle('');
-              setAttachmentUrl('');
-            }}
-          >
-            <LinkIcon className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-            إضافة رابط
-          </Button>
+          {canManageAttachments && (
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <input
+                id={`deed-file-upload-${type}`}
+                type="file"
+                multiple
+                accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp4,image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                className="sr-only"
+                aria-label={`رفع صور أو ملفات إلى قسم ${title}`}
+                disabled={isUploadingAttachment}
+                onChange={(event) => {
+                  const selected = Array.from(event.currentTarget.files || []);
+                  event.currentTarget.value = '';
+                  void uploadDeedFiles(type, selected);
+                }}
+              />
+              <Button
+                type="button"
+                size="sm"
+                className="flex-1 gap-1.5 border border-emerald-700 bg-emerald-700 font-bold text-white shadow-sm hover:bg-emerald-800 hover:text-white sm:flex-none"
+                disabled={isUploadingAttachment}
+                onClick={() => document.getElementById(`deed-file-upload-${type}`)?.click()}
+                title="رفع عدة صور أو ملفات من الجهاز أو الجوال"
+              >
+                {fileUploadProgress?.type === type ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {fileUploadProgress?.type === type
+                  ? `جارٍ الرفع ${fileUploadProgress.current}/${fileUploadProgress.total}`
+                  : 'رفع صور / ملفات'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="flex-1 gap-1.5 border-sky-400 bg-sky-50 font-semibold text-sky-900 hover:bg-sky-100 hover:text-sky-950 sm:flex-none dark:border-sky-600 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-900"
+                disabled={isUploadingAttachment}
+                onClick={() => {
+                  setUploadTab(type);
+                  setShowAttachmentLinkForm(true);
+                  setAttachmentTitle('');
+                  setAttachmentUrl('');
+                }}
+              >
+                <LinkIcon className="h-4 w-4" />
+                إضافة رابط
+              </Button>
+            </div>
+          )}
         </div>
         {showAttachmentLinkForm && uploadTab === type && (
           <Card className="border-dashed p-3 md:p-4">
