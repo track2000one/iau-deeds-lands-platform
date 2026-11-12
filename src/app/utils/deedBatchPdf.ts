@@ -1199,13 +1199,11 @@ export const generateDeedImagesPdf = async (
           renderedCategories.add(attachment.printCategory);
         }
 
-        let pagesAdded = 0;
-
         if (isPdf) {
-          pagesAdded = await addPdfDocument(pdf, blob);
+          await addPdfDocument(pdf, blob);
           successfulPdfDocuments += 1;
         } else {
-          pagesAdded = await addImageDocument(pdf, blob, signal);
+          await addImageDocument(pdf, blob, signal);
           successfulImageDocuments += 1;
         }
 
