@@ -543,21 +543,25 @@ export const AllDeedsPage: React.FC = () => {
           if (!pdfGenerating) setPdfOptionsOpen(open);
         }}
       >
-        <DialogContent className="max-w-2xl" dir="rtl">
+        <DialogContent className="max-h-[94dvh] overflow-y-auto sm:max-w-[1050px]" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <FileDown className="h-5 w-5 text-[#0b4a3f]" />
               إنشاء ملف PDF موحد لمستندات الصكوك
             </DialogTitle>
             <DialogDescription className="leading-6">
-              يجمع النظام مستندات الصك في ملف واحد؛ ملفات PDF تُدمج بكامل صفحاتها الأصلية، والصور تُضاف في صفحات مستقلة دون قص.
+              اختر الصكوك حسب البحث والتصفية والفرز. يجمع الملف مستندات الصك الأصلية مع صور المخطط والموقع المحفوظة، وفق خياراتك، دون تعديل صفحات PDF الأصلية.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-2 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700">نطاق الصكوك</label>
-              <NativeSelect value={pdfScope} onChange={(event) => setPdfScope(event.target.value as 'all' | 'filtered')} className="h-11 rounded-xl">
+              <NativeSelect value={pdfScope} onChange={(event) => {
+                  setPdfScope(event.target.value as 'all' | 'filtered');
+                  clearPdfSelection();
+                  setPdfCity(''); setPdfDistrict('');
+                }} className="h-11 rounded-xl">
                 <option value="all">جميع الصكوك ({deeds.length.toLocaleString('ar-SA')})</option>
                 <option value="filtered">النتائج الظاهرة حاليًا ({filteredDeeds.length.toLocaleString('ar-SA')})</option>
               </NativeSelect>
@@ -565,13 +569,184 @@ export const AllDeedsPage: React.FC = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700">ترتيب الصكوك</label>
-              <NativeSelect value={pdfSort} onChange={(event) => setPdfSort(event.target.value as 'deedNumber' | 'city' | 'updatedAt')} className="h-11 rounded-xl">
+              <NativeSelect value={pdfSort} onChange={(event) => setPdfSort(event.target.value as typeof pdfSort)} className="h-11 rounded-xl">
                 <option value="deedNumber">حسب رقم الصك</option>
-                <option value="city">حسب المدينة ثم رقم الصك</option>
-                <option value="updatedAt">الأحدث تحديثًا أولًا</option>
+                <option value="city">حسب المدينة</option>
+                <option value="district">حسب الحي</option>
+                <option value="area">حسب المساحة</option>
+                <option value="updatedAt">حسب تاريخ آخر تحديث</option>
               </NativeSelect>
             </div>
 
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">اتجاه الفرز</label>
+              <NativeSelect value={pdfSortDirection}
+                onChange={(event) => setPdfSortDirection(event.target.value as 'asc' | 'desc')}
+                className="h-11 rounded-xl">
+                <option value="asc">تصاعدي</option>
+                <option value="desc">تنازلي</option>
+              </NativeSelect>
+            </div>
+            <div className="flex items-end justify-between gap-2">
+              <Button type="button" variant="outline"
+                className="h-11 w-full gap-2 border-amber-400 bg-amber-50 font-bold text-amber-900 hover:bg-amber-100"
+                onClick={resetPdfFilters}>
+                <Settings2 className="h-4 w-4" /> إعادة ضبط الفلاتر
+              </Button>
+            </div>
+            <section className="space-y-3 rounded-2xl border border-sky-200 bg-sky-50/60 p-4 md:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 font-black text-slate-900"><Filter className="h-4 w-4 text-sky-700" /> البحث والتصفية داخل تقرير الصكوك</h3>
+                <Badge variant="secondary">{pdfEligibleDeeds.length} صك مطابق</Badge>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="relative md:col-span-2">
+                  <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <Input
+                    className="h-11 bg-white pr-10"
+                    value={pdfSearch}
+                    aria-label="بحث في الصكوك المطلوب تجميعها"
+                    placeholder="ابحث برقم الصك أو بيان العقار أو رقم المخطط أو القطعة"
+                    onChange={(event) => {
+                      setPdfSearch(event.target.value);
+                      clearPdfSelection();
+                    }}
+                  />
+                </div>
+                <NativeSelect value={pdfCity} aria-label="تصفية المدينة"
+                  onChange={(event) => {
+                    setPdfCity(event.target.value);
+                    setPdfDistrict('');
+                    clearPdfSelection();
+                  }} className="h-11 rounded-xl bg-white">
+                  <option value="">جميع المدن</option>
+                  {pdfCities.map((city) => <option key={city} value={city}>{city}</option>)}
+                </NativeSelect>
+                <NativeSelect value={pdfDistrict} aria-label="تصفية الحي"
+                  onChange={(event) => {
+                    setPdfDistrict(event.target.value);
+                    clearPdfSelection();
+                  }} className="h-11 rounded-xl bg-white">
+                  <option value="">جميع الأحياء</option>
+                  {pdfDistricts.map((district) => <option key={district} value={district}>{district}</option>)}
+                </NativeSelect>
+                <NativeSelect value={pdfPlanned} aria-label="حالة تخطيط الأرض"
+                  onChange={(event) => {
+                    setPdfPlanned(event.target.value as typeof pdfPlanned);
+                    clearPdfSelection();
+                  }} className="h-11 rounded-xl bg-white">
+                  <option value="all">الأراضي المخططة وغير المخططة</option>
+                  <option value="planned">المخططة فقط</option>
+                  <option value="unplanned">غير المخططة فقط</option>
+                </NativeSelect>
+              </div>
+              <div className="space-y-3 rounded-xl border bg-white p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <b className="text-sm text-slate-900">اختيار صكوك محددة للتجميع</b>
+                    <p className="text-xs text-slate-600">يمكن تحديد 3 صكوك من أصل 11، أو أي عدد من النتائج المطابقة فقط.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant={pdfSelectionMode === 'all' ? 'default' : 'outline'}
+                      onClick={clearPdfSelection}
+                      className={pdfSelectionMode === 'all' ? 'bg-teal-700 font-bold text-white hover:bg-teal-800' : ''}>
+                      جميع المطابق ({pdfEligibleDeeds.length})
+                    </Button>
+                    <Button type="button" size="sm" variant={pdfSelectionMode === 'selected' ? 'default' : 'outline'}
+                      onClick={() => {
+                        setPdfSelectionMode('selected');
+                        setPdfSelectedIds(new Set());
+                      }}
+                      className={pdfSelectionMode === 'selected' ? 'bg-blue-700 font-bold text-white hover:bg-blue-800' : ''}>
+                      <ListChecks className="ml-1 h-4 w-4" /> اختيار يدوي
+                    </Button>
+                  </div>
+                </div>
+                {pdfSelectionMode === 'selected' && (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                      <Badge className="bg-blue-100 font-bold text-blue-900 hover:bg-blue-100">
+                        المختار: {pdfChosenDeeds.length} من {pdfEligibleDeeds.length}
+                      </Badge>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm"
+                          className="border-blue-300 bg-blue-50 text-blue-900 hover:bg-blue-100"
+                          onClick={() => setPdfSelectedIds(new Set(pdfEligibleDeeds.map((deed) => deed.id)))}>
+                          تحديد كل المطابق
+                        </Button>
+                        <Button type="button" variant="outline" size="sm"
+                          className="border-rose-300 bg-rose-50 text-rose-900 hover:bg-rose-100"
+                          onClick={() => setPdfSelectedIds(new Set())}>
+                          مسح التحديد
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="max-h-52 overflow-y-auto rounded-xl border bg-slate-50 p-2">
+                      {pdfEligibleDeeds.length === 0 ? (
+                        <p className="py-5 text-center text-sm text-slate-500">لا توجد صكوك مطابقة للفلاتر المختارة.</p>
+                      ) : (
+                        <div className="grid gap-2 md:grid-cols-2">
+                          {pdfEligibleDeeds.map((deed) => (
+                            <label key={deed.id}
+                              className={pdfSelectedIds.has(deed.id)
+                                ? 'flex cursor-pointer items-start gap-2 rounded-lg border border-blue-400 bg-blue-50 p-3 text-sm'
+                                : 'flex cursor-pointer items-start gap-2 rounded-lg border bg-white p-3 text-sm hover:bg-sky-50'}>
+                              <input
+                                type="checkbox"
+                                checked={pdfSelectedIds.has(deed.id)}
+                                onChange={(event) => setPdfSelectedIds((previous) => {
+                                  const next = new Set(previous);
+                                  if (event.target.checked) next.add(deed.id);
+                                  else next.delete(deed.id);
+                                  return next;
+                                })}
+                                className="mt-1 h-4 w-4 shrink-0 accent-blue-700"
+                                aria-label={`تضمين الصك ${deed.deedNumber}`}
+                              />
+                              <span className="min-w-0">
+                                <b className="block text-slate-900">الصك رقم {deed.deedNumber}</b>
+                                <span className="block break-words text-xs text-slate-600">
+                                  {deed.propertyDescription || 'بيان العقار غير محدد'} · {deed.city || 'مدينة غير محددة'} · {deed.district || 'حي غير محدد'}
+                                </span>
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+            <section className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 md:col-span-2">
+              <h3 className="flex items-center gap-2 font-black text-emerald-950">
+                <FileImage className="h-5 w-5" /> أنواع المستندات والصور المراد تضمينها
+              </h3>
+              <p className="text-xs leading-5 text-emerald-900">
+                تُدرج مستندات الصك الأصلية أولًا دائمًا عند توفرها؛ ويمكن إضافة صور المخطط والموقع المحفوظة للصك. لا تُنشأ صورة موقع افتراضية في حال عدم وجود مرفق محفوظ.
+              </p>
+              <div className="grid gap-2 md:grid-cols-2">
+                <label className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-white p-3 text-sm font-semibold text-slate-800">
+                  <input type="checkbox" checked readOnly className="h-4 w-4 accent-emerald-700" />
+                  مستند الصك الأصلي (عند توفره)
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white p-3 text-sm font-semibold text-slate-800">
+                  <input type="checkbox" checked={pdfIncludePlans} onChange={(event) => setPdfIncludePlans(event.target.checked)}
+                    className="h-4 w-4 accent-emerald-700" />
+                  صورة المخطط / المخطط المرفق
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white p-3 text-sm font-semibold text-slate-800">
+                  <input type="checkbox" checked={pdfIncludeLocations} onChange={(event) => setPdfIncludeLocations(event.target.checked)}
+                    className="h-4 w-4 accent-emerald-700" />
+                  صورة الموقع المحفوظة
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white p-3 text-sm font-semibold text-slate-800">
+                  <input type="checkbox" checked={pdfIncludeOther} onChange={(event) => setPdfIncludeOther(event.target.checked)}
+                    className="h-4 w-4 accent-emerald-700" />
+                  المرفقات الإضافية (اختياري)
+                </label>
+              </div>
+            </section>
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-bold text-slate-700">اسم الملف — اختياري</label>
               <Input
@@ -612,7 +787,7 @@ export const AllDeedsPage: React.FC = () => {
           </div>
 
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-900">
-            يتم إدراج مرفقات «صورة الصك» سواء كانت PDF أو صورًا. ولا يتم دمج الرفع المساحي أو صور الموقع أو المخططات أو العقود ضمن هذا التقرير.
+            يتضمن التقرير {pdfChosenDeeds.length.toLocaleString('ar-SA')} صكًا مختارًا. ملفات PDF الأصلية تُدرج بصفحاتها كاملة، وتُضاف صور المخطط والموقع من المرفقات المحفوظة فقط. إذا تعذر تحميل مرفق فسيظهر تنبيه بعد إنشاء الملف دون تغيير بيانات الصك.
           </div>
 
           <DialogFooter className="gap-2 sm:justify-start">
@@ -628,7 +803,8 @@ export const AllDeedsPage: React.FC = () => {
               <>
                 <Button
                   onClick={() => void runBatchDeedsPdf({ closeOptionsOnSuccess: true })}
-                  className="bg-[#0b4a3f] text-white hover:bg-[#126152]"
+                  disabled={!pdfChosenDeeds.length}
+                  className="bg-[#0b4a3f] font-bold text-white hover:bg-[#126152]"
                 >
                   <FileDown className="ml-2 h-4 w-4" />
                   إنشاء ملف PDF
