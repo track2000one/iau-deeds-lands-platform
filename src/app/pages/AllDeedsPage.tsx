@@ -9,6 +9,8 @@ import {
   Eye,
   FileText,
   FileDown,
+  FileImage,
+  ListChecks,
   Filter,
   Loader2,
   Map,
@@ -67,7 +69,17 @@ export const AllDeedsPage: React.FC = () => {
   const [deedToDelete, setDeedToDelete] = useState<string | null>(null);
   const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
   const [pdfScope, setPdfScope] = useState<'all' | 'filtered'>('all');
-  const [pdfSort, setPdfSort] = useState<'deedNumber' | 'city' | 'updatedAt'>('deedNumber');
+  const [pdfSort, setPdfSort] = useState<'deedNumber' | 'city' | 'district' | 'area' | 'updatedAt'>('deedNumber');
+  const [pdfSortDirection, setPdfSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [pdfSearch, setPdfSearch] = useState('');
+  const [pdfCity, setPdfCity] = useState('');
+  const [pdfDistrict, setPdfDistrict] = useState('');
+  const [pdfPlanned, setPdfPlanned] = useState<'all' | 'planned' | 'unplanned'>('all');
+  const [pdfSelectionMode, setPdfSelectionMode] = useState<'all' | 'selected'>('all');
+  const [pdfSelectedIds, setPdfSelectedIds] = useState<Set<string>>(new Set());
+  const [pdfIncludePlans, setPdfIncludePlans] = useState(true);
+  const [pdfIncludeLocations, setPdfIncludeLocations] = useState(true);
+  const [pdfIncludeOther, setPdfIncludeOther] = useState(false);
   const [pdfIncludeCover, setPdfIncludeCover] = useState(true);
   const [pdfIncludeHeaders, setPdfIncludeHeaders] = useState(true);
   const [pdfFileName, setPdfFileName] = useState('');
@@ -103,6 +115,54 @@ export const AllDeedsPage: React.FC = () => {
     () => filteredDeeds.reduce((sum, deed) => sum + (Number(deed.area) || 0), 0),
     [filteredDeeds]
   );
+  const pdfBaseDeeds = pdfScope === 'all' ? deeds : filteredDeeds;
+  const pdfCities = useMemo(() =>
+    [...new Set(pdfBaseDeeds.map((deed) => deed.city).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'ar')),
+    [pdfBaseDeeds],
+  );
+  const pdfDistricts = useMemo(() =>
+    [...new Set(pdfBaseDeeds
+      .filter((deed) => !pdfCity || deed.city === pdfCity)
+      .map((deed) => deed.district).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'ar')),
+    [pdfBaseDeeds, pdfCity],
+  );
+  const pdfEligibleDeeds = useMemo(() => {
+    const term = pdfSearch.trim().toLocaleLowerCase('ar');
+    return pdfBaseDeeds.filter((deed) => {
+      if (pdfCity && deed.city !== pdfCity) return false;
+      if (pdfDistrict && deed.district !== pdfDistrict) return false;
+      if (pdfPlanned === 'planned' && !deed.isPlanned) return false;
+      if (pdfPlanned === 'unplanned' && deed.isPlanned) return false;
+      if (term && ![deed.deedNumber, deed.propertyDescription, deed.city,
+        deed.district, deed.planNumber, deed.plotNumber]
+        .some((value) => String(value || '').toLocaleLowerCase('ar').includes(term))) return false;
+      return true;
+    });
+  }, [pdfBaseDeeds, pdfSearch, pdfCity, pdfDistrict, pdfPlanned]);
+  const pdfChosenDeeds = useMemo(
+    () => pdfSelectionMode === 'all'
+      ? pdfEligibleDeeds
+      : pdfEligibleDeeds.filter((deed) => pdfSelectedIds.has(deed.id)),
+    [pdfEligibleDeeds, pdfSelectionMode, pdfSelectedIds],
+  );
+  const resetPdfFilters = () => {
+    setPdfScope('all');
+    setPdfSearch('');
+    setPdfCity('');
+    setPdfDistrict('');
+    setPdfPlanned('all');
+    setPdfSort('deedNumber');
+    setPdfSortDirection('asc');
+    setPdfSelectionMode('all');
+    setPdfSelectedIds(new Set());
+  };
+  const clearPdfSelection = () => {
+    setPdfSelectionMode('all');
+    setPdfSelectedIds(new Set());
+  };
+
 
   const handleDelete = (id: string) => {
     if (!isAdmin) {
@@ -138,27 +198,33 @@ export const AllDeedsPage: React.FC = () => {
     navigate(`/maps/${deed.id}`);
   }, [navigate]);
 
-  const sortPdfDeeds = React.useCallback((rows: typeof deeds, sortBy: 'deedNumber' | 'city' | 'updatedAt') => {
-    const sorted = [...rows];
-    if (sortBy === 'city') {
-      return sorted.sort((a, b) =>
-        String(a.city || '').localeCompare(String(b.city || ''), 'ar')
-        || String(a.deedNumber || '').localeCompare(String(b.deedNumber || ''), 'ar', { numeric: true })
+  const sortPdfDeeds = React.useCallback((
+    rows: typeof deeds,
+    sortBy: 'deedNumber' | 'city' | 'district' | 'area' | 'updatedAt',
+    direction: 'asc' | 'desc',
+  ) => {
+    const sign = direction === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      let value = 0;
+      if (sortBy === 'city' || sortBy === 'district') {
+        value = String(a[sortBy] || '').localeCompare(String(b[sortBy] || ''), 'ar');
+      } else if (sortBy === 'area') {
+        value = (Number(a.area) || 0) - (Number(b.area) || 0);
+      } else if (sortBy === 'updatedAt') {
+        value = new Date(a.updatedAt || a.createdAt || 0).getTime() -
+          new Date(b.updatedAt || b.createdAt || 0).getTime();
+      } else {
+        value = String(a.deedNumber || '').localeCompare(String(b.deedNumber || ''), 'ar', { numeric: true });
+      }
+      return sign * value || String(a.deedNumber || '').localeCompare(
+        String(b.deedNumber || ''), 'ar', { numeric: true },
       );
-    }
-    if (sortBy === 'updatedAt') {
-      return sorted.sort((a, b) =>
-        new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime()
-      );
-    }
-    return sorted.sort((a, b) =>
-      String(a.deedNumber || '').localeCompare(String(b.deedNumber || ''), 'ar', { numeric: true })
-    );
+    });
   }, []);
 
   const runBatchDeedsPdf = React.useCallback(async (config?: {
     scope?: 'all' | 'filtered';
-    sort?: 'deedNumber' | 'city' | 'updatedAt';
+    sort?: 'deedNumber' | 'city' | 'district' | 'area' | 'updatedAt';
     includeCover?: boolean;
     includeHeaders?: boolean;
     fileName?: string;
@@ -171,8 +237,7 @@ export const AllDeedsPage: React.FC = () => {
     const includeCover = config?.includeCover ?? pdfIncludeCover;
     const includeHeaders = config?.includeHeaders ?? pdfIncludeHeaders;
     const fileName = config?.fileName ?? pdfFileName;
-    const source = scope === 'all' ? deeds : filteredDeeds;
-    const rows = sortPdfDeeds(source, sort);
+    const rows = sortPdfDeeds(pdfChosenDeeds, sort, pdfSortDirection);
 
     if (!rows.length) {
       toast.info('لا توجد صكوك ضمن النطاق المحدد');
@@ -193,8 +258,17 @@ export const AllDeedsPage: React.FC = () => {
       const result = await generateDeedImagesPdf(rows, {
         includeCover,
         includeHeaders,
+        includePlanImages: pdfIncludePlans,
+        includeLocationImages: pdfIncludeLocations,
+        includeAdditionalDocuments: pdfIncludeOther,
         fileName: fileName.trim() || undefined,
-        scopeLabel: scope === 'all' ? 'جميع الصكوك' : 'نتائج التصفية الحالية',
+        scopeLabel: [
+          scope === 'all' ? 'جميع الصكوك' : 'نتائج تصفية الصفحة',
+          pdfCity ? 'المدينة: ' + pdfCity : '',
+          pdfDistrict ? 'الحي: ' + pdfDistrict : '',
+          pdfPlanned !== 'all' ? (pdfPlanned === 'planned' ? 'المخططة' : 'غير المخططة') : '',
+          pdfSelectionMode === 'selected' ? 'صكوك محددة يدويًا' : '',
+        ].filter(Boolean).join(' — '),
         signal: controller.signal,
         onProgress: setPdfProgress,
       });
@@ -227,11 +301,18 @@ export const AllDeedsPage: React.FC = () => {
     pdfGenerating,
     pdfScope,
     pdfSort,
+    pdfSortDirection,
     pdfIncludeCover,
     pdfIncludeHeaders,
+    pdfIncludePlans,
+    pdfIncludeLocations,
+    pdfIncludeOther,
+    pdfCity,
+    pdfDistrict,
+    pdfPlanned,
+    pdfSelectionMode,
     pdfFileName,
-    deeds,
-    filteredDeeds,
+    pdfChosenDeeds,
     sortPdfDeeds,
   ]);
 
@@ -254,13 +335,7 @@ export const AllDeedsPage: React.FC = () => {
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           {canPrint && (
             <Button
-              onClick={() => void runBatchDeedsPdf({
-                scope: 'all',
-                sort: 'deedNumber',
-                includeCover: true,
-                includeHeaders: true,
-                closeOptionsOnSuccess: false,
-              })}
+              onClick={() => setPdfOptionsOpen(true)}
               disabled={pdfGenerating || deeds.length === 0}
               className="h-11 w-full border border-[#0b4a3f] bg-[#0b4a3f] text-white shadow-[0_12px_30px_rgba(11,74,63,0.18)] hover:bg-[#126152] sm:w-auto"
             >
