@@ -498,7 +498,7 @@ const createCover = (
 
   const cards = [
     ['عدد الصكوك', deedCount.toLocaleString('ar-SA')],
-    ['عدد مستندات الصكوك', documentCount.toLocaleString('ar-SA')],
+    ['إجمالي المرفقات المختارة', documentCount.toLocaleString('ar-SA')],
     ['تاريخ إنشاء الملف', new Date().toLocaleDateString('ar-SA-u-ca-gregory')],
   ];
 
@@ -737,7 +737,7 @@ const createDeedSeparator = (
       emphasis: true,
     },
     {
-      label: 'عدد مستندات الصك',
+      label: 'عدد المرفقات المختارة',
       value: documentCount.toLocaleString('ar-SA'),
       accent: '#0b6b57',
       background: '#edf8f4',
@@ -803,7 +803,7 @@ const createDeedSeparator = (
   context.direction = 'rtl';
   context.fillStyle = '#123d73';
   context.font = '800 29px Tahoma, Arial, sans-serif';
-  context.fillText('تبدأ مستندات هذا الصك في الصفحة التالية', 700, 1613);
+  context.fillText('تبدأ مرفقات هذا الصك في الصفحة التالية', 700, 1613);
 
   context.fillStyle = '#718493';
   context.font = '500 22px Tahoma, Arial, sans-serif';
@@ -1148,7 +1148,6 @@ export const generateDeedImagesPdf = async (
   let successfulDocuments = 0;
   let successfulPdfDocuments = 0;
   let successfulImageDocuments = 0;
-  let copiedDocumentPages = 0;
   let skippedDocuments = 0;
   const successfulDeeds = new Set<string>();
   const indexEntries: Array<{ deed: Deed; page: number }> = [];
@@ -1211,7 +1210,6 @@ export const generateDeedImagesPdf = async (
         }
 
         successfulDocuments += 1;
-        copiedDocumentPages += pagesAdded;
         successfulDeeds.add(item.deed.id);
         deedHasSuccessfulDocument = true;
       } catch (error) {
