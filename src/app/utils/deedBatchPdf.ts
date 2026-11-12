@@ -29,6 +29,9 @@ export type DeedBatchPdfProgress = {
 export type DeedBatchPdfOptions = {
   includeCover?: boolean;
   includeHeaders?: boolean;
+  includePlanImages?: boolean;
+  includeLocationImages?: boolean;
+  includeAdditionalDocuments?: boolean;
   fileName?: string;
   scopeLabel?: string;
   signal?: AbortSignal;
@@ -111,42 +114,70 @@ const isProbablyImageAttachment = (attachment: BatchAttachment) => {
   return Boolean(getDriveFileId(attachment) || url);
 };
 
-const isExcludedDeedAttachmentType = (attachment: BatchAttachment) => {
-  const type = String(attachment.attachmentType || '').toLowerCase();
-  return [
-    'plan_image',
-    'location_image',
-    'contract_image',
-    'delivery_minutes',
-    'inspection_image',
-    'survey_document',
-    'survey',
-  ].includes(type);
+type PrintableCategory = 'deed' | 'plan' | 'location' | 'additional';
+type PrintableAttachment = BatchAttachment & { printCategory: PrintableCategory };
+
+const excludedLegacyDeedTypes = new Set([
+  'plan_image', 'plan', 'location_image', 'site', 'contract_image',
+  'delivery_minutes', 'inspection_image', 'survey_document', 'survey',
+]);
+
+const getPrintableDeedDocuments = (
+  attachments: BatchAttachment[],
+  options: DeedBatchPdfOptions,
+): PrintableAttachment[] => {
+  const eligible = attachments.filter((attachment) => Boolean(getAttachmentUrl(attachment)));
+  const typeOf = (attachment: BatchAttachment) =>
+    String(attachment.attachmentType || '').toLowerCase();
+
+  const explicitDeeds = eligible.filter((attachment) =>
+    ['deed_image', 'deed'].includes(typeOf(attachment)));
+  // Legacy deeds may use the generic "other" type; keep the older fallback
+  // only when no explicitly tagged deed document is available.
+  const legacyDeeds = explicitDeeds.length ? [] : eligible.filter((attachment) => {
+    const type = typeOf(attachment);
+    if (excludedLegacyDeedTypes.has(type)) return false;
+    return type === 'other' || !type || isProbablyPdfAttachment(attachment) ||
+      isProbablyImageAttachment(attachment) ||
+      /صك|deed|وثيقة\\s*الملكية|ملكية/i.test(getAttachmentName(attachment));
+  });
+  const documents: PrintableAttachment[] = [
+    ...[...explicitDeeds, ...legacyDeeds].map((a) => ({ ...a, printCategory: 'deed' as const })),
+  ];
+
+  if (options.includePlanImages) {
+    documents.push(...eligible.filter((a) => ['plan_image', 'plan'].includes(typeOf(a)))
+      .map((a) => ({ ...a, printCategory: 'plan' as const })));
+  }
+  if (options.includeLocationImages) {
+    documents.push(...eligible.filter((a) => ['location_image', 'site'].includes(typeOf(a)))
+      .map((a) => ({ ...a, printCategory: 'location' as const })));
+  }
+  if (options.includeAdditionalDocuments) {
+    // Generic legacy attachments already included as deed fallbacks must not repeat.
+    const additionalTypes = new Set([
+      'other', 'additional', 'contract_image', 'delivery_minutes',
+      'inspection_image', 'survey_document', 'survey',
+    ]);
+    documents.push(...eligible.filter((a) => additionalTypes.has(typeOf(a)))
+      .map((a) => ({ ...a, printCategory: 'additional' as const })));
+  }
+
+  const unique = new Set<string>();
+  return documents.filter((a) => {
+    const key = String(a.id || getAttachmentUrl(a) ||
+      `${a.attachmentType}:${getAttachmentName(a)}`);
+    if (unique.has(key)) return false;
+    unique.add(key);
+    return true;
+  });
 };
 
-const getPrintableDeedDocuments = (attachments: BatchAttachment[]) => {
-  const explicit = attachments.filter((attachment) => {
-    const type = String(attachment.attachmentType || '').toLowerCase();
-    return ['deed_image', 'deed'].includes(type) && Boolean(getAttachmentUrl(attachment));
-  });
-  if (explicit.length) return explicit;
-
-  // Compatibility with old records whose deed document was saved as "other".
-  return attachments.filter((attachment) => {
-    if (isExcludedDeedAttachmentType(attachment)) return false;
-    if (!getAttachmentUrl(attachment)) return false;
-
-    const type = String(attachment.attachmentType || '').toLowerCase();
-    const title = getAttachmentName(attachment).trim();
-
-    return (
-      type === 'other'
-      || !type
-      || isProbablyPdfAttachment(attachment)
-      || isProbablyImageAttachment(attachment)
-      || /صك|deed|وثيقة\s*الملكية|ملكية/i.test(title)
-    );
-  });
+const categoryTitles: Record<PrintableCategory, string> = {
+  deed: 'مستندات الصك الأصلية',
+  plan: 'صورة المخطط',
+  location: 'صورة الموقع',
+  additional: 'مرفقات إضافية',
 };
 
 
@@ -829,6 +860,38 @@ const addFullPageJpeg = async (
   });
 };
 
+const createDocumentCategoryPage = (deed: Deed, category: PrintableCategory) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1100;
+  canvas.height = 1556;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('تعذر تجهيز فاصل المرفقات');
+  ctx.fillStyle = '#f6fafc';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#0b6b57';
+  ctx.fillRect(0, 0, canvas.width, 28);
+  ctx.fillStyle = '#123d73';
+  ctx.textAlign = 'right';
+  ctx.direction = 'rtl';
+  ctx.font = 'bold 43px Tahoma, Arial, sans-serif';
+  ctx.fillText('جامعة الإمام عبدالرحمن بن فيصل', 985, 210);
+  ctx.font = 'bold 31px Tahoma, Arial, sans-serif';
+  ctx.fillText('إدارة أوقاف وأملاك الجامعة', 985, 275);
+  ctx.fillStyle = '#0f766e';
+  ctx.fillRect(105, 505, 900, 8);
+  ctx.fillStyle = '#123d73';
+  ctx.font = 'bold 67px Tahoma, Arial, sans-serif';
+  ctx.fillText(categoryTitles[category], 985, 660);
+  ctx.font = 'bold 39px Tahoma, Arial, sans-serif';
+  ctx.fillText(`الصك رقم ${deed.deedNumber || '—'}`, 985, 760);
+  ctx.font = '30px Tahoma, Arial, sans-serif';
+  ctx.fillText(deed.propertyDescription || '', 985, 850, 900);
+  ctx.fillStyle = '#536b81';
+  ctx.font = '28px Tahoma, Arial, sans-serif';
+  ctx.fillText('تُدرج المرفقات المحفوظة لهذا القسم في الصفحات التالية', 985, 970);
+  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.9));
+};
+
 const addImageDocument = async (
   pdf: PDFDocument,
   blob: Blob,
@@ -923,7 +986,7 @@ export const generateDeedImagesPdf = async (
     throw new Error('لا توجد صكوك ضمن النطاق المحدد');
   }
 
-  const collectedByDeed = new Map<number, BatchAttachment[]>();
+  const collectedByDeed = new Map<number, PrintableAttachment[]>();
   let skippedDeeds = 0;
   let nextDeedIndex = 0;
   let completedDeeds = 0;
@@ -961,7 +1024,7 @@ export const generateDeedImagesPdf = async (
 
         totalAttachmentRecords += allAttachments.length;
 
-        const documents = getPrintableDeedDocuments(allAttachments);
+        const documents = getPrintableDeedDocuments(allAttachments, options);
         if (documents.length) {
           collectedByDeed.set(index, documents);
         } else {
@@ -988,7 +1051,7 @@ export const generateDeedImagesPdf = async (
 
   const collected: Array<{
     deed: Deed;
-    attachments: BatchAttachment[];
+    attachments: PrintableAttachment[];
   }> = [];
 
   deeds.forEach((deed, deedIndex) => {
@@ -1047,6 +1110,7 @@ export const generateDeedImagesPdf = async (
     }
 
     let separatorAdded = false;
+    const renderedCategories = new Set<PrintableCategory>();
 
     for (const attachment of item.attachments) {
       renderIndex += 1;
@@ -1055,7 +1119,7 @@ export const generateDeedImagesPdf = async (
         phase: 'rendering',
         current: renderIndex,
         total: documentCount,
-        label: `تجهيز ${getAttachmentName(attachment)} — الصك ${item.deed.deedNumber || ''}`,
+        label: `تجهيز ${categoryTitles[attachment.printCategory]}: ${getAttachmentName(attachment)} — الصك ${item.deed.deedNumber || ''}`,
       });
 
       try {
@@ -1072,6 +1136,15 @@ export const generateDeedImagesPdf = async (
             createDeedSeparator(item.deed, item.attachments.length)
           );
           separatorAdded = true;
+        }
+        // Preserve the original pages of PDF attachments untouched. Insert a
+        // readable label before the first plan/location/additional attachment.
+        if (includeHeaders && attachment.printCategory !== 'deed' &&
+          !renderedCategories.has(attachment.printCategory)) {
+          await addFullPageJpeg(
+            pdf, createDocumentCategoryPage(item.deed, attachment.printCategory)
+          );
+          renderedCategories.add(attachment.printCategory);
         }
 
         let pagesAdded = 0;
@@ -1120,7 +1193,7 @@ export const generateDeedImagesPdf = async (
     fileName,
     deedCount: successfulDeeds.size,
     documentCount: successfulDocuments,
-    pageCount: copiedDocumentPages,
+    pageCount: pdf.getPageCount(),
     pdfCount: successfulPdfDocuments,
     imageCount: successfulImageDocuments,
     skippedDeeds,
