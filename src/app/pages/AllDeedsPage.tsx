@@ -53,6 +53,7 @@ import {
 import {
   generateDeedImagesPdf,
   type DeedBatchPdfProgress,
+  type DeedPdfCompression,
 } from '../utils/deedBatchPdf';
 
 export const AllDeedsPage: React.FC = () => {
@@ -84,6 +85,8 @@ export const AllDeedsPage: React.FC = () => {
   const [pdfIncludeHeaders, setPdfIncludeHeaders] = useState(true);
   const [pdfIncludeIndex, setPdfIncludeIndex] = useState(true);
   const [pdfFileName, setPdfFileName] = useState('');
+  const [pdfCompression, setPdfCompression] = useState<DeedPdfCompression>('email');
+  const [pdfMaxFileSizeMb, setPdfMaxFileSizeMb] = useState(15);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<DeedBatchPdfProgress | null>(null);
   const pdfAbortRef = React.useRef<AbortController | null>(null);
@@ -263,6 +266,8 @@ export const AllDeedsPage: React.FC = () => {
         includePlanImages: pdfIncludePlans,
         includeLocationImages: pdfIncludeLocations,
         includeAdditionalDocuments: pdfIncludeOther,
+        compression: pdfCompression,
+        maxFileSizeMb: pdfMaxFileSizeMb,
         fileName: fileName.trim() || undefined,
         scopeLabel: [
           scope === 'all' ? 'جميع الصكوك' : 'نتائج تصفية الصفحة',
@@ -276,7 +281,7 @@ export const AllDeedsPage: React.FC = () => {
       });
 
       toast.success(
-        `تم إنشاء ملف PDF واحد يحتوي على ${result.documentCount.toLocaleString('ar-SA')} مستند (${result.pageCount.toLocaleString('ar-SA')} صفحة) لـ ${result.deedCount.toLocaleString('ar-SA')} صك`
+        `تم تنزيل ملف PDF بحجم ${result.fileSizeMb.toFixed(2)} ميجابايت، يضم ${result.documentCount.toLocaleString('ar-SA')} مرفقًا (${result.pageCount.toLocaleString('ar-SA')} صفحة) لـ ${result.deedCount.toLocaleString('ar-SA')} صك`
       );
 
       if (result.skippedDocuments || result.skippedDeeds) {
@@ -310,6 +315,8 @@ export const AllDeedsPage: React.FC = () => {
     pdfIncludePlans,
     pdfIncludeLocations,
     pdfIncludeOther,
+    pdfCompression,
+    pdfMaxFileSizeMb,
     pdfCity,
     pdfDistrict,
     pdfPlanned,
@@ -750,6 +757,53 @@ export const AllDeedsPage: React.FC = () => {
                 </label>
               </div>
             </section>
+            <section className="space-y-3 rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 p-4 md:col-span-2">
+              <h3 className="flex items-center gap-2 font-black text-indigo-950">
+                <FileDown className="h-5 w-5" /> التحكم بحجم ملف PDF قبل التنزيل
+              </h3>
+              <p className="text-xs leading-6 text-indigo-900">
+                يتم ضغط الصور وصفحات الغلاف والفهرس وفق الجودة المختارة. تبقى صفحات ملفات PDF الأصلية دون تعديل لحماية وضوح الصكوك.
+                حجم الملف النهائي يعتمد أيضًا على المستندات الأصلية التي جرى دمجها.
+              </p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label htmlFor="deed-pdf-compression" className="text-sm font-bold text-slate-800">مستوى الضغط والجودة</label>
+                  <NativeSelect
+                    id="deed-pdf-compression"
+                    value={pdfCompression}
+                    onChange={(event) => setPdfCompression(event.target.value as DeedPdfCompression)}
+                    className="h-11 rounded-xl bg-white"
+                  >
+                    <option value="email">حجم صغير مناسب للإرسال بالبريد</option>
+                    <option value="balanced">متوازن — جودة جيدة وحجم متوسط</option>
+                    <option value="high">جودة عالية للطباعة والأرشفة</option>
+                  </NativeSelect>
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="deed-pdf-max-size" className="text-sm font-bold text-slate-800">أقصى حجم مسموح للتنزيل</label>
+                  <NativeSelect
+                    id="deed-pdf-max-size"
+                    value={String(pdfMaxFileSizeMb)}
+                    onChange={(event) => setPdfMaxFileSizeMb(Number(event.target.value))}
+                    className="h-11 rounded-xl bg-white"
+                  >
+                    <option value="10">10 ميجابايت — للمرفقات الصغيرة</option>
+                    <option value="15">15 ميجابايت — للبريد الإلكتروني</option>
+                    <option value="20">20 ميجابايت</option>
+                    <option value="25">25 ميجابايت</option>
+                    <option value="0">بدون حد — تحميل مهما كان الحجم</option>
+                  </NativeSelect>
+                </div>
+              </div>
+              <p className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs leading-6 text-indigo-900">
+                <strong>طريقة العمل:</strong> يُقاس حجم الملف الفعلي بعد تجهيزه وقبل تنزيله.
+                {pdfMaxFileSizeMb > 0
+                  ? ` إذا تجاوز ${pdfMaxFileSizeMb} ميجابايت فسيُمنع التنزيل وتظهر رسالة بالحجم الحقيقي واقتراح لتقليل العدد أو اختيار جودة أخف.`
+                  : ' لن يمنع النظام تنزيل الملف مهما كان حجمه؛ يمكن مشاركة الملفات الكبيرة عبر OneDrive.'}
+                حدود إرسال البريد تختلف حسب إعدادات جهة العمل. لا يمكن ضمان وصول الحجم المحدد بالضغط وحده إذا كانت ملفات PDF الأصلية كبيرة.
+              </p>
+            </section>
+
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-bold text-slate-700">اسم الملف — اختياري</label>
               <Input
