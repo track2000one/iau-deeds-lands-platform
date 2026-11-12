@@ -29,6 +29,7 @@ export type DeedBatchPdfProgress = {
 export type DeedBatchPdfOptions = {
   includeCover?: boolean;
   includeHeaders?: boolean;
+  includeIndex?: boolean;
   includePlanImages?: boolean;
   includeLocationImages?: boolean;
   includeAdditionalDocuments?: boolean;
@@ -892,6 +893,55 @@ const createDocumentCategoryPage = (deed: Deed, category: PrintableCategory) => 
   return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.9));
 };
 
+const TOC_ROWS_PER_PAGE = 16;
+const createDeedsIndexPage = (
+  entries: Array<{ deed: Deed; page: number }>, pageIndex: number, total: number,
+) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1400;
+  canvas.height = 1980;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('تعذر تجهيز فهرس الصكوك');
+  ctx.fillStyle = '#f7fafc';
+  ctx.fillRect(0, 0, 1400, 1980);
+  ctx.fillStyle = '#0b6b57';
+  ctx.fillRect(0, 0, 1400, 24);
+  ctx.textAlign = 'right';
+  ctx.direction = 'rtl';
+  ctx.fillStyle = '#153c5e';
+  ctx.font = 'bold 51px Tahoma, Arial, sans-serif';
+  ctx.fillText('فهرس الصكوك المجمعة', 1250, 155);
+  ctx.font = '27px Tahoma, Arial, sans-serif';
+  ctx.fillStyle = '#536b81';
+  ctx.fillText('الصكوك المختارة وفق معايير الفرز والتصفية — موقع بداية كل صك داخل الملف', 1250, 220);
+  ctx.fillStyle = '#e6f1f5';
+  ctx.fillRect(100, 275, 1200, 78);
+  ctx.fillStyle = '#143c5b';
+  ctx.font = 'bold 29px Tahoma, Arial, sans-serif';
+  ctx.fillText('رقم الصك', 1220, 325);
+  ctx.fillText('المدينة / الحي', 870, 325);
+  ctx.fillText('الصفحة', 255, 325);
+  entries.forEach(({ deed, page }, i) => {
+    const y = 397 + i * 88;
+    ctx.fillStyle = i % 2 ? '#ffffff' : '#eef5f9';
+    ctx.fillRect(100, y - 45, 1200, 76);
+    ctx.fillStyle = '#1c3d5a';
+    ctx.font = 'bold 28px Tahoma, Arial, sans-serif';
+    ctx.fillText(deed.deedNumber || '—', 1220, y, 320);
+    ctx.font = '25px Tahoma, Arial, sans-serif';
+    ctx.fillText([deed.city, deed.district].filter(Boolean).join(' — ') || 'غير محدد', 870, y, 490);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 31px Tahoma, Arial, sans-serif';
+    ctx.fillText(String(page), 255, y);
+    ctx.textAlign = 'right';
+  });
+  ctx.fillStyle = '#687b8c';
+  ctx.textAlign = 'center';
+  ctx.font = '25px Tahoma, Arial, sans-serif';
+  ctx.fillText(`فهرس ${pageIndex + 1} من ${total}`, 700, 1855);
+  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92));
+};
+
 const addImageDocument = async (
   pdf: PDFDocument,
   blob: Blob,
@@ -1101,6 +1151,7 @@ export const generateDeedImagesPdf = async (
   let copiedDocumentPages = 0;
   let skippedDocuments = 0;
   const successfulDeeds = new Set<string>();
+  const indexEntries: Array<{ deed: Deed; page: number }> = [];
 
   let renderIndex = 0;
 
@@ -1110,6 +1161,8 @@ export const generateDeedImagesPdf = async (
     }
 
     let separatorAdded = false;
+    let deedHasSuccessfulDocument = false;
+    const deedPage = pdf.getPageCount() + 1;
     const renderedCategories = new Set<PrintableCategory>();
 
     for (const attachment of item.attachments) {
@@ -1160,6 +1213,7 @@ export const generateDeedImagesPdf = async (
         successfulDocuments += 1;
         copiedDocumentPages += pagesAdded;
         successfulDeeds.add(item.deed.id);
+        deedHasSuccessfulDocument = true;
       } catch (error) {
         if (signal?.aborted) throw error;
         console.error(
@@ -1171,11 +1225,36 @@ export const generateDeedImagesPdf = async (
         skippedDocuments += 1;
       }
     }
+    if (deedHasSuccessfulDocument) {
+      indexEntries.push({ deed: item.deed, page: deedPage });
+    }
   }
   if (!successfulDocuments) {
     throw new Error(
       'تم العثور على مستندات للصكوك، لكن تعذر تحميلها أو دمجها. تحقق من صلاحيات ملفات Google Drive ثم حاول مرة أخرى.'
     );
+  }
+
+  // The index is inserted after the cover once all attachment page counts are known.
+  // Page numbers account for the index pages added at the beginning of the file.
+  if (options.includeIndex !== false && indexEntries.length) {
+    const pages = Math.ceil(indexEntries.length / TOC_ROWS_PER_PAGE);
+    const withOffset = indexEntries.map((entry) => ({
+      ...entry,
+      page: entry.page + pages,
+    }));
+    const insertAt = includeCover ? 1 : 0;
+    for (let index = 0; index < pages; index += 1) {
+      if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+      const bytes = createDeedsIndexPage(
+        withOffset.slice(index * TOC_ROWS_PER_PAGE, (index + 1) * TOC_ROWS_PER_PAGE),
+        index,
+        pages,
+      );
+      const image = await pdf.embedJpg(bytes);
+      const page = pdf.insertPage(insertAt + index, [A4_WIDTH, A4_HEIGHT]);
+      page.drawImage(image, { x: 0, y: 0, width: A4_WIDTH, height: A4_HEIGHT });
+    }
   }
 
   const rawName = options.fileName
