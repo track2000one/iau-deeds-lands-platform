@@ -87,6 +87,7 @@ export const AllDeedsPage: React.FC = () => {
   const [pdfFileName, setPdfFileName] = useState('');
   const [pdfCompression, setPdfCompression] = useState<DeedPdfCompression>('email');
   const [pdfMaxFileSizeMb, setPdfMaxFileSizeMb] = useState(15);
+  const [pdfOversizedAction, setPdfOversizedAction] = useState<'split' | 'block'>('split');
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<DeedBatchPdfProgress | null>(null);
   const pdfAbortRef = React.useRef<AbortController | null>(null);
@@ -268,6 +269,7 @@ export const AllDeedsPage: React.FC = () => {
         includeAdditionalDocuments: pdfIncludeOther,
         compression: pdfCompression,
         maxFileSizeMb: pdfMaxFileSizeMb,
+        oversizedFileAction: pdfOversizedAction,
         fileName: fileName.trim() || undefined,
         scopeLabel: [
           scope === 'all' ? 'جميع الصكوك' : 'نتائج تصفية الصفحة',
@@ -280,9 +282,20 @@ export const AllDeedsPage: React.FC = () => {
         onProgress: setPdfProgress,
       });
 
-      toast.success(
-        `تم تنزيل ملف PDF بحجم ${result.fileSizeMb.toFixed(2)} ميجابايت، يضم ${result.documentCount.toLocaleString('ar-SA')} مرفقًا (${result.pageCount.toLocaleString('ar-SA')} صفحة) لـ ${result.deedCount.toLocaleString('ar-SA')} صك`
-      );
+      if (result.splitCount > 1) {
+        toast.success(
+          `تم تجهيز التقرير في ${result.splitCount} ملفات PDF مستقلة ضمن الحد المحدد، وتنزيلها داخل ملف ZIP واحد. فك ضغط ZIP وأرسل كل جزء على حدة.`,
+          { duration: 12000 },
+        );
+        toast.info(
+          `أحجام الأجزاء: ${result.parts?.map((part, index) => `جزء ${index + 1}: ${part.fileSizeMb.toFixed(1)} MB`).join(' — ') || ''}. لا ترسل ZIP كاملًا إن كان أكبر من حد البريد.`,
+          { duration: 14000 },
+        );
+      } else {
+        toast.success(
+          `تم تنزيل ملف PDF بحجم ${result.fileSizeMb.toFixed(2)} ميجابايت، يضم ${result.documentCount.toLocaleString('ar-SA')} مرفقًا (${result.pageCount.toLocaleString('ar-SA')} صفحة) لـ ${result.deedCount.toLocaleString('ar-SA')} صك`,
+        );
+      }
 
       if (result.skippedDocuments || result.skippedDeeds) {
         toast.warning(
@@ -317,6 +330,7 @@ export const AllDeedsPage: React.FC = () => {
     pdfIncludeOther,
     pdfCompression,
     pdfMaxFileSizeMb,
+    pdfOversizedAction,
     pdfCity,
     pdfDistrict,
     pdfPlanned,
@@ -795,10 +809,32 @@ export const AllDeedsPage: React.FC = () => {
                   </NativeSelect>
                 </div>
               </div>
+              <div className="space-y-2 rounded-xl border border-indigo-200 bg-white p-3">
+                <label htmlFor="deed-pdf-oversize-action" className="text-sm font-bold text-slate-800">الإجراء عند تجاوز الحجم المحدد</label>
+                <NativeSelect
+                  id="deed-pdf-oversize-action"
+                  value={pdfOversizedAction}
+                  onChange={(event) => setPdfOversizedAction(event.target.value as 'split' | 'block')}
+                  disabled={pdfMaxFileSizeMb === 0}
+                  className="h-11 rounded-xl bg-white"
+                >
+                  <option value="split">تقسيم تلقائي إلى ملفات PDF أصغر (داخل ZIP واحد)</option>
+                  <option value="block">إيقاف التنزيل وعرض حجم التقرير فقط</option>
+                </NativeSelect>
+                {pdfOversizedAction === 'split' && pdfMaxFileSizeMb > 0 && (
+                  <p className="text-xs leading-6 text-indigo-900">
+                    إذا تجاوز التقرير {pdfMaxFileSizeMb} ميجابايت، يحتفظ النظام بمستندات كل صك في جزء واحد قدر الإمكان، ويضع الأجزاء في ملف ZIP لسهولة التنزيل.
+                    <strong> لفك الضغط ثم إرسال كل جزء PDF بمفرده:</strong> اضغط بزر الفأرة الأيمن على ZIP واختر «استخراج الكل».
+                    ملف ZIP الكامل قد يتجاوز حد Outlook، لذا لا ترسله كاملًا إذا تجاوز الحد.
+                  </p>
+                )}
+              </div>
               <p className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs leading-6 text-indigo-900">
                 <strong>طريقة العمل:</strong> يُقاس حجم الملف الفعلي بعد تجهيزه وقبل تنزيله.
                 {pdfMaxFileSizeMb > 0
-                  ? ` إذا تجاوز ${pdfMaxFileSizeMb} ميجابايت فسيُمنع التنزيل وتظهر رسالة بالحجم الحقيقي واقتراح لتقليل العدد أو اختيار جودة أخف.`
+                  ? pdfOversizedAction === 'split'
+                    ? ` إذا تجاوز ${pdfMaxFileSizeMb} ميجابايت فسيُقسَّم إلى أجزاء PDF مستقلة لا يتجاوز أيٌّ منها الحد، مع الحفاظ على مستندات الصك مجمعة ما أمكن. إذا تجاوز صك منفرد الحد فستظهر رسالة دون إسقاط صفحاته.`
+                    : ` إذا تجاوز ${pdfMaxFileSizeMb} ميجابايت فسيُمنع التنزيل وتظهر رسالة بالحجم الحقيقي واقتراح لتقليل العدد أو اختيار جودة أخف.`
                   : ' لن يمنع النظام تنزيل الملف مهما كان حجمه؛ يمكن مشاركة الملفات الكبيرة عبر OneDrive.'}
                 حدود إرسال البريد تختلف حسب إعدادات جهة العمل. لا يمكن ضمان وصول الحجم المحدد بالضغط وحده إذا كانت ملفات PDF الأصلية كبيرة.
               </p>
