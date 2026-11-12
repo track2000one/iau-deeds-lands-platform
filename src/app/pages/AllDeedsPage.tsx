@@ -82,6 +82,7 @@ export const AllDeedsPage: React.FC = () => {
   const [pdfIncludeOther, setPdfIncludeOther] = useState(false);
   const [pdfIncludeCover, setPdfIncludeCover] = useState(true);
   const [pdfIncludeHeaders, setPdfIncludeHeaders] = useState(true);
+  const [pdfIncludeIndex, setPdfIncludeIndex] = useState(true);
   const [pdfFileName, setPdfFileName] = useState('');
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<DeedBatchPdfProgress | null>(null);
@@ -258,6 +259,7 @@ export const AllDeedsPage: React.FC = () => {
       const result = await generateDeedImagesPdf(rows, {
         includeCover,
         includeHeaders,
+        includeIndex: pdfIncludeIndex,
         includePlanImages: pdfIncludePlans,
         includeLocationImages: pdfIncludeLocations,
         includeAdditionalDocuments: pdfIncludeOther,
@@ -304,6 +306,7 @@ export const AllDeedsPage: React.FC = () => {
     pdfSortDirection,
     pdfIncludeCover,
     pdfIncludeHeaders,
+    pdfIncludeIndex,
     pdfIncludePlans,
     pdfIncludeLocations,
     pdfIncludeOther,
@@ -767,6 +770,19 @@ export const AllDeedsPage: React.FC = () => {
               <span>
                 <span className="block text-sm font-bold text-slate-800">إضافة غلاف رسمي</span>
                 <span className="mt-1 block text-xs leading-5 text-slate-500">يتضمن اسم الجامعة والإدارة وعدد الصكوك والمستندات وتاريخ إنشاء الملف.</span>
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
+              <input
+                type="checkbox"
+                checked={pdfIncludeIndex}
+                onChange={(event) => setPdfIncludeIndex(event.target.checked)}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <span className="block text-sm font-bold text-slate-800">فهرس الصكوك وصفحاتها</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">فهرس مرتب للصكوك المختارة مع رقم الصفحة التي يبدأ عندها كل صك داخل الملف الموحد.</span>
               </span>
             </label>
 
