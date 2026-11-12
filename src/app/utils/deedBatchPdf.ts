@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
+import JSZip from 'jszip';
 import type { Deed } from '../../types/deed';
 import { isApiEnabled } from '../../lib/api';
 import { authenticatedFetch } from '../../lib/http';
@@ -37,6 +38,7 @@ const PDF_QUALITY_SETTINGS: Record<DeedPdfCompression, { maxDimension: number; j
 export type DeedBatchPdfOptions = {
   compression?: DeedPdfCompression;
   maxFileSizeMb?: number; // 0 disables size cap. Enforced on the final generated PDF.
+  oversizedFileAction?: 'split' | 'block';
   includeCover?: boolean;
   includeHeaders?: boolean;
   includeIndex?: boolean;
@@ -56,6 +58,8 @@ export type DeedBatchPdfResult = {
   pageCount: number;
   fileSizeBytes: number;
   fileSizeMb: number;
+  splitCount: number;
+  parts?: Array<{ fileName: string; fileSizeMb: number; deedCount: number }>;
   pdfCount: number;
   imageCount: number;
   skippedDeeds: number;
@@ -1030,8 +1034,7 @@ const sanitizeFileName = (value: string) => {
   return clean || 'ملف مستندات الصكوك';
 };
 
-const savePdfBytes = (bytes: Uint8Array, fileName: string) => {
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+const saveDownloadBlob = (blob: Blob, fileName: string) => {
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
 
@@ -1041,7 +1044,153 @@ const savePdfBytes = (bytes: Uint8Array, fileName: string) => {
   link.click();
   link.remove();
 
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 15_000);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+};
+
+const savePdfBytes = (bytes: Uint8Array, fileName: string) =>
+  saveDownloadBlob(new Blob([bytes], { type: 'application/pdf' }), fileName);
+
+type DeedPageSpan = { deed: Deed; start: number; end: number; attachmentCount: number };
+
+const renderDeedPdfPart = async (
+  source: PDFDocument,
+  spans: DeedPageSpan[],
+  partNumber: number,
+  options: DeedBatchPdfOptions,
+  quality: number,
+): Promise<Uint8Array> => {
+  const signal = options.signal;
+  if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+
+  const part = await PDFDocument.create();
+  part.setTitle(`IAU Deeds - Part ${partNumber}`);
+  part.setAuthor('Imam Abdulrahman Bin Faisal University');
+  part.setCreator('IAU Deeds Platform');
+
+  if (options.includeCover !== false) {
+    await addFullPageJpeg(
+      part,
+      createCover(
+        spans.length,
+        spans.reduce((total, item) => total + item.attachmentCount, 0),
+        `الجزء ${partNumber} — ${options.scopeLabel || 'مستندات الصكوك'}`,
+        quality,
+      ),
+    );
+  }
+
+  const indexEntries: Array<{ deed: Deed; page: number }> = [];
+  for (const span of spans) {
+    if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+    indexEntries.push({ deed: span.deed, page: part.getPageCount() + 1 });
+    const pageNumbers = Array.from({ length: span.end - span.start }, (_, index) => span.start + index);
+    const copiedPages = await part.copyPages(source, pageNumbers);
+    copiedPages.forEach((page) => part.addPage(page));
+  }
+
+  if (options.includeIndex !== false) {
+    const pages = Math.ceil(indexEntries.length / TOC_ROWS_PER_PAGE);
+    const withOffset = indexEntries.map((entry) => ({ ...entry, page: entry.page + pages }));
+    for (let index = 0; index < pages; index++) {
+      const bytes = createDeedsIndexPage(
+        withOffset.slice(index * TOC_ROWS_PER_PAGE, (index + 1) * TOC_ROWS_PER_PAGE),
+        index,
+        pages,
+        quality,
+      );
+      const image = await part.embedJpg(bytes);
+      const page = part.insertPage(options.includeCover !== false ? 1 + index : index, [A4_WIDTH, A4_HEIGHT]);
+      page.drawImage(image, { x: 0, y: 0, width: A4_WIDTH, height: A4_HEIGHT });
+    }
+  }
+
+  return part.save({ useObjectStreams: true, addDefaultPage: false });
+};
+
+const saveSplitDeedPdfParts = async (
+  pdf: PDFDocument,
+  indexEntries: Array<{ deed: Deed; page: number }>,
+  collected: Array<{ deed: Deed; attachments: PrintableAttachment[] }>,
+  targetSizeMb: number,
+  fileName: string,
+  options: DeedBatchPdfOptions,
+  quality: number,
+): Promise<{ fileName: string; fileSizeBytes: number; parts: Array<{ fileName: string; fileSizeMb: number; deedCount: number }> }> => {
+  const maxBytes = Math.floor(targetSizeMb * 1024 * 1024);
+  const indexPageCount = options.includeIndex === false ? 0
+    : Math.ceil(indexEntries.length / TOC_ROWS_PER_PAGE);
+
+  const spans: DeedPageSpan[] = indexEntries.map((entry, index) => ({
+    deed: entry.deed,
+    start: entry.page - 1 + indexPageCount,
+    end: index + 1 < indexEntries.length
+      ? indexEntries[index + 1].page - 1 + indexPageCount
+      : pdf.getPageCount(),
+    attachmentCount: collected.find((item) => item.deed.id === entry.deed.id)?.attachments.length || 0,
+  }));
+
+  const completed: Array<{ spans: DeedPageSpan[]; bytes: Uint8Array }> = [];
+  let current: DeedPageSpan[] = [];
+  let currentBytes: Uint8Array | null = null;
+
+  for (const span of spans) {
+    if (options.signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+    options.onProgress?.({
+      phase: 'rendering',
+      current: completed.reduce((sum, part) => sum + part.spans.length, 0) + current.length,
+      total: spans.length,
+      label: `تقسيم الصكوك إلى أجزاء لا تتجاوز ${targetSizeMb} ميجابايت`,
+    });
+    const proposed = [...current, span];
+    const proposedBytes = await renderDeedPdfPart(pdf, proposed, completed.length + 1, options, quality);
+    if (proposedBytes.byteLength <= maxBytes) {
+      current = proposed;
+      currentBytes = proposedBytes;
+      continue;
+    }
+
+    if (current.length && currentBytes) {
+      completed.push({ spans: current, bytes: currentBytes });
+      current = [span];
+      currentBytes = await renderDeedPdfPart(pdf, current, completed.length + 1, options, quality);
+    } else {
+      current = proposed;
+      currentBytes = proposedBytes;
+    }
+
+    if (currentBytes.byteLength > maxBytes) {
+      const actualMb = (currentBytes.byteLength / (1024 * 1024)).toFixed(1);
+      throw new Error(
+        `تعذر تقسيم التقرير آليًا: مستندات الصك ${span.deed.deedNumber || 'غير محدد'} وحدها بحجم ${actualMb} ميجابايت، وتتجاوز الحد ${targetSizeMb} ميجابايت. احتفظ بها كملف مستقل وشاركها عبر OneDrive، أو أعد إنشاء تقرير بعدد أقل من مرفقات هذا الصك.`,
+      );
+    }
+  }
+  if (current.length && currentBytes) completed.push({ spans: current, bytes: currentBytes });
+  if (completed.length < 2) throw new Error('تعذر تقسيم الملف إلى جزأين ضمن الحد المحدد.');
+
+  const zip = new JSZip();
+  const base = fileName.replace(/\.pdf$/i, '');
+  const width = Math.max(2, String(completed.length).length);
+  const parts: Array<{ fileName: string; fileSizeMb: number; deedCount: number }> = [];
+  completed.forEach((part, index) => {
+    const partName = `${base} - الجزء ${String(index + 1).padStart(width, '0')} من ${completed.length}.pdf`;
+    zip.file(partName, part.bytes);
+    parts.push({
+      fileName: partName,
+      fileSizeMb: part.bytes.byteLength / (1024 * 1024),
+      deedCount: part.spans.length,
+    });
+  });
+
+  // PDF bytes are already compressed; STORE avoids losing time on redundant compression.
+  const archive = await zip.generateAsync({
+    type: 'blob',
+    compression: 'STORE',
+  });
+  if (options.signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
+  const archiveFileName = `${base} - أجزاء PDF.zip`;
+  saveDownloadBlob(archive, archiveFileName);
+  return { fileName: archiveFileName, fileSizeBytes: archive.size, parts };
 };
 
 export const generateDeedImagesPdf = async (
@@ -1294,8 +1443,28 @@ export const generateDeedImagesPdf = async (
   const fileSizeBytes = outputBytes.byteLength;
   const fileSizeMb = fileSizeBytes / (1024 * 1024);
   if (maxFileSizeMb > 0 && fileSizeMb > maxFileSizeMb) {
+    if (options.oversizedFileAction === 'split') {
+      const split = await saveSplitDeedPdfParts(
+        pdf, indexEntries, collected, maxFileSizeMb, fileName, options, qualityConfig.separatorQuality,
+      );
+      return {
+        fileName: split.fileName,
+        deedCount: successfulDeeds.size,
+        documentCount: successfulDocuments,
+        pageCount: pdf.getPageCount(),
+        fileSizeBytes: split.fileSizeBytes,
+        fileSizeMb: split.fileSizeBytes / (1024 * 1024),
+        splitCount: split.parts.length,
+        parts: split.parts,
+        pdfCount: successfulPdfDocuments,
+        imageCount: successfulImageDocuments,
+        skippedDeeds,
+        skippedDocuments,
+        skippedImages: skippedDocuments,
+      };
+    }
     throw new Error(
-      `حجم التقرير الفعلي ${fileSizeMb.toFixed(1)} ميجابايت، ويتجاوز الحد الذي حددته (${maxFileSizeMb} ميجابايت). لم يتم تنزيل ملف يتجاوز الحد. جرّب «مناسب للبريد» أو اختر صكوكًا أقل، وإذا كانت ملفات الصك الأصلية PDF كبيرة فلن تُضغط صفحاتها حفاظًا على دقتها، ويمكن مشاركتها عبر OneDrive.`
+      `حجم التقرير الفعلي ${fileSizeMb.toFixed(1)} ميجابايت، ويتجاوز الحد الذي حددته (${maxFileSizeMb} ميجابايت). اختر التقسيم التلقائي أو قلل عدد الصكوك، أو شارك الملف الكامل عبر OneDrive. يحتفظ النظام بصفحات مستندات الصكوك الأصلية دون إعادة ضغط.`
     );
   }
   if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
@@ -1305,6 +1474,7 @@ export const generateDeedImagesPdf = async (
     fileSizeBytes,
     fileSizeMb,
     fileName,
+    splitCount: 1,
     deedCount: successfulDeeds.size,
     documentCount: successfulDocuments,
     pageCount: pdf.getPageCount(),
