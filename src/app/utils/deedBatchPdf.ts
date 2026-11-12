@@ -26,7 +26,17 @@ export type DeedBatchPdfProgress = {
   label: string;
 };
 
+export type DeedPdfCompression = 'email' | 'balanced' | 'high';
+
+const PDF_QUALITY_SETTINGS: Record<DeedPdfCompression, { maxDimension: number; jpegQuality: number; separatorQuality: number }> = {
+  email: { maxDimension: 1700, jpegQuality: 0.76, separatorQuality: 0.82 },
+  balanced: { maxDimension: 2400, jpegQuality: 0.86, separatorQuality: 0.88 },
+  high: { maxDimension: 3200, jpegQuality: 0.95, separatorQuality: 0.96 },
+};
+
 export type DeedBatchPdfOptions = {
+  compression?: DeedPdfCompression;
+  maxFileSizeMb?: number; // 0 disables size cap. Enforced on the final generated PDF.
   includeCover?: boolean;
   includeHeaders?: boolean;
   includeIndex?: boolean;
@@ -44,6 +54,8 @@ export type DeedBatchPdfResult = {
   deedCount: number;
   documentCount: number;
   pageCount: number;
+  fileSizeBytes: number;
+  fileSizeMb: number;
   pdfCount: number;
   imageCount: number;
   skippedDeeds: number;
@@ -418,7 +430,11 @@ const dataUrlToBytes = (dataUrl: string) => {
   return bytes;
 };
 
-const blobToOptimizedJpeg = async (blob: Blob, signal?: AbortSignal) => {
+const blobToOptimizedJpeg = async (
+  blob: Blob,
+  signal?: AbortSignal,
+  quality: DeedPdfCompression = 'balanced',
+) => {
   const image = await loadImageFromBlob(blob, signal);
   const sourceWidth = image.naturalWidth || image.width;
   const sourceHeight = image.naturalHeight || image.height;
@@ -427,7 +443,7 @@ const blobToOptimizedJpeg = async (blob: Blob, signal?: AbortSignal) => {
     throw new Error('أبعاد الصورة غير صالحة');
   }
 
-  const maxDimension = 3200;
+  const { maxDimension, jpegQuality } = PDF_QUALITY_SETTINGS[quality];
   const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
   const width = Math.max(1, Math.round(sourceWidth * scale));
   const height = Math.max(1, Math.round(sourceHeight * scale));
@@ -446,7 +462,7 @@ const blobToOptimizedJpeg = async (blob: Blob, signal?: AbortSignal) => {
   context.drawImage(image, 0, 0, width, height);
 
   return {
-    bytes: dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.95)),
+    bytes: dataUrlToBytes(canvas.toDataURL('image/jpeg', jpegQuality)),
     width,
     height,
   };
@@ -455,7 +471,8 @@ const blobToOptimizedJpeg = async (blob: Blob, signal?: AbortSignal) => {
 const createCover = (
   deedCount: number,
   documentCount: number,
-  scopeLabel: string
+  scopeLabel: string,
+  imageQuality = 0.9,
 ) => {
   const canvas = document.createElement('canvas');
   canvas.width = 1400;
@@ -531,12 +548,13 @@ const createCover = (
     1835
   );
 
-  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.96));
+  return dataUrlToBytes(canvas.toDataURL('image/jpeg', imageQuality));
 };
 
 const createDeedSeparator = (
   deed: Deed,
-  documentCount: number
+  documentCount: number,
+  imageQuality = 0.9,
 ) => {
   const canvas = document.createElement('canvas');
   canvas.width = 1400;
@@ -843,7 +861,7 @@ const createDeedSeparator = (
     1905
   );
 
-  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.97));
+  return dataUrlToBytes(canvas.toDataURL('image/jpeg', imageQuality));
 };
 
 const addFullPageJpeg = async (
@@ -861,7 +879,7 @@ const addFullPageJpeg = async (
   });
 };
 
-const createDocumentCategoryPage = (deed: Deed, category: PrintableCategory) => {
+const createDocumentCategoryPage = (deed: Deed, category: PrintableCategory, imageQuality = 0.88) => {
   const canvas = document.createElement('canvas');
   canvas.width = 1100;
   canvas.height = 1556;
@@ -890,12 +908,13 @@ const createDocumentCategoryPage = (deed: Deed, category: PrintableCategory) => 
   ctx.fillStyle = '#536b81';
   ctx.font = '28px Tahoma, Arial, sans-serif';
   ctx.fillText('تُدرج المرفقات المحفوظة لهذا القسم في الصفحات التالية', 985, 970);
-  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.9));
+  return dataUrlToBytes(canvas.toDataURL('image/jpeg', imageQuality));
 };
 
 const TOC_ROWS_PER_PAGE = 16;
 const createDeedsIndexPage = (
   entries: Array<{ deed: Deed; page: number }>, pageIndex: number, total: number,
+  imageQuality = 0.9,
 ) => {
   const canvas = document.createElement('canvas');
   canvas.width = 1400;
@@ -939,15 +958,16 @@ const createDeedsIndexPage = (
   ctx.textAlign = 'center';
   ctx.font = '25px Tahoma, Arial, sans-serif';
   ctx.fillText(`فهرس ${pageIndex + 1} من ${total}`, 700, 1855);
-  return dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92));
+  return dataUrlToBytes(canvas.toDataURL('image/jpeg', imageQuality));
 };
 
 const addImageDocument = async (
   pdf: PDFDocument,
   blob: Blob,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  compression: DeedPdfCompression = 'balanced',
 ) => {
-  const image = await blobToOptimizedJpeg(blob, signal);
+  const image = await blobToOptimizedJpeg(blob, signal, compression);
   const embedded = await pdf.embedJpg(image.bytes);
   const page = pdf.addPage([A4_WIDTH, A4_HEIGHT]);
 
@@ -1030,6 +1050,13 @@ export const generateDeedImagesPdf = async (
 ): Promise<DeedBatchPdfResult> => {
   const includeCover = options.includeCover !== false;
   const includeHeaders = options.includeHeaders !== false;
+  const compression = options.compression || 'balanced';
+  const qualityConfig = PDF_QUALITY_SETTINGS[compression];
+  if (!qualityConfig) throw new Error('مستوى ضغط PDF المحدد غير صالح');
+  const maxFileSizeMb = options.maxFileSizeMb ?? 0;
+  if (!Number.isFinite(maxFileSizeMb) || maxFileSizeMb < 0) {
+    throw new Error('الحد الأقصى لحجم ملف PDF غير صالح');
+  }
   const signal = options.signal;
 
   if (!deeds.length) {
@@ -1140,7 +1167,8 @@ export const generateDeedImagesPdf = async (
       createCover(
         collected.length,
         documentCount,
-        options.scopeLabel || 'جميع الصكوك'
+        options.scopeLabel || 'جميع الصكوك',
+        qualityConfig.separatorQuality,
       )
     );
   }
@@ -1185,7 +1213,7 @@ export const generateDeedImagesPdf = async (
         if (includeHeaders && !separatorAdded) {
           await addFullPageJpeg(
             pdf,
-            createDeedSeparator(item.deed, item.attachments.length)
+            createDeedSeparator(item.deed, item.attachments.length, qualityConfig.separatorQuality)
           );
           separatorAdded = true;
         }
@@ -1194,7 +1222,7 @@ export const generateDeedImagesPdf = async (
         if (includeHeaders && attachment.printCategory !== 'deed' &&
           !renderedCategories.has(attachment.printCategory)) {
           await addFullPageJpeg(
-            pdf, createDocumentCategoryPage(item.deed, attachment.printCategory)
+            pdf, createDocumentCategoryPage(item.deed, attachment.printCategory, qualityConfig.separatorQuality)
           );
           renderedCategories.add(attachment.printCategory);
         }
@@ -1203,7 +1231,7 @@ export const generateDeedImagesPdf = async (
           await addPdfDocument(pdf, blob);
           successfulPdfDocuments += 1;
         } else {
-          await addImageDocument(pdf, blob, signal);
+          await addImageDocument(pdf, blob, signal, compression);
           successfulImageDocuments += 1;
         }
 
@@ -1246,6 +1274,7 @@ export const generateDeedImagesPdf = async (
         withOffset.slice(index * TOC_ROWS_PER_PAGE, (index + 1) * TOC_ROWS_PER_PAGE),
         index,
         pages,
+        qualityConfig.separatorQuality,
       );
       const image = await pdf.embedJpg(bytes);
       const page = pdf.insertPage(insertAt + index, [A4_WIDTH, A4_HEIGHT]);
@@ -1262,9 +1291,19 @@ export const generateDeedImagesPdf = async (
     addDefaultPage: false,
   });
 
+  const fileSizeBytes = outputBytes.byteLength;
+  const fileSizeMb = fileSizeBytes / (1024 * 1024);
+  if (maxFileSizeMb > 0 && fileSizeMb > maxFileSizeMb) {
+    throw new Error(
+      `حجم التقرير الفعلي ${fileSizeMb.toFixed(1)} ميجابايت، ويتجاوز الحد الذي حددته (${maxFileSizeMb} ميجابايت). لم يتم تنزيل ملف يتجاوز الحد. جرّب «مناسب للبريد» أو اختر صكوكًا أقل، وإذا كانت ملفات الصك الأصلية PDF كبيرة فلن تُضغط صفحاتها حفاظًا على دقتها، ويمكن مشاركتها عبر OneDrive.`
+    );
+  }
+  if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
   savePdfBytes(outputBytes, fileName);
 
   return {
+    fileSizeBytes,
+    fileSizeMb,
     fileName,
     deedCount: successfulDeeds.size,
     documentCount: successfulDocuments,
