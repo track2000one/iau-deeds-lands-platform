@@ -52,10 +52,9 @@ import {
   openGoogleMapsLocation,
   shouldOpenExternalMap,
 } from '../utils/mapNavigation';
-import {
-  generateDeedImagesPdf,
-  type DeedBatchPdfProgress,
-  type DeedPdfCompression,
+import type {
+  DeedBatchPdfProgress,
+  DeedPdfCompression,
 } from '../utils/deedBatchPdf';
 
 const DEED_BATCH_SIZE = 24;
@@ -283,6 +282,12 @@ export const AllDeedsPage: React.FC = () => {
     });
 
     try {
+      // Defer pdf-lib, JSZip, and the batch PDF generator until export is requested.
+      const { generateDeedImagesPdf } = await import('../utils/deedBatchPdf');
+      if (controller.signal.aborted) {
+        toast.info('تم إلغاء إنشاء ملف PDF');
+        return;
+      }
       const result = await generateDeedImagesPdf(rows, {
         includeCover,
         includeHeaders,
