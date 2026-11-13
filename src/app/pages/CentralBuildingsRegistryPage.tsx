@@ -1,3 +1,4 @@
+import { updateInteractiveCardMotion, resetInteractiveCardMotion } from '../utils/interactiveCardMotion';
 import { printCentralBuildingReport } from '../utils/centralBuildingPrintReport';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -1119,8 +1120,12 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                             return (
                               <article
                                 key={building.id}
-                                className="group rounded-2xl border bg-background/60 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
+                                className="group iau-interactive-card iau-card--building rounded-2xl border bg-background/60 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
+                                onPointerMove={updateInteractiveCardMotion}
+                                onPointerLeave={resetInteractiveCardMotion}
+                                onPointerCancel={resetInteractiveCardMotion}
                               >
+                                <span className="iau-card-spotlight" aria-hidden="true" />
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
