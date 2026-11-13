@@ -705,19 +705,44 @@ export const TransactionFollowUpPage: React.FC = () => {
     (template) => template.scope === 'personal' || isAdmin || canDelete,
   );
 
-  const load = React.useCallback(async () => {
+  // Keep list filtering fast: overview KPIs and analytics do not change with list filters.
+  // Request generations prevent stale responses overwriting newer search results.
+  const listRequestRef = React.useRef(0);
+  const overviewRequestRef = React.useRef(0);
+
+  const loadRecords = React.useCallback(async () => {
+    const requestId = ++listRequestRef.current;
     try {
       setLoading(true);
-      const [pageResult, dashboardResult, executiveInboxResult, analyticsResult] = await Promise.all([
-        transactionFollowUpApi.list({
-          page,
-          pageSize: 30,
-          search,
-          status,
-          priority,
-          organizationalUnit: organizationalUnitFilter,
-          mine,
-        }),
+      const pageResult = await transactionFollowUpApi.list({
+        page,
+        pageSize: 30,
+        search,
+        status,
+        priority,
+        organizationalUnit: organizationalUnitFilter,
+        mine,
+      });
+      if (requestId !== listRequestRef.current) return;
+      setRecords(pageResult.items || []);
+      setTotal(pageResult.total || 0);
+      setTotalPages(pageResult.totalPages || 0);
+      if (pageResult.totalPages && page > pageResult.totalPages) {
+        setPage(pageResult.totalPages);
+      }
+    } catch (error) {
+      if (requestId === listRequestRef.current) {
+        toast.error(error instanceof Error ? error.message : 'تعذر تحميل قائمة المعاملات');
+      }
+    } finally {
+      if (requestId === listRequestRef.current) setLoading(false);
+    }
+  }, [page, priority, search, status, organizationalUnitFilter, mine]);
+
+  const loadOverview = React.useCallback(async () => {
+    const requestId = ++overviewRequestRef.current;
+    try {
+      const [dashboardResult, executiveInboxResult, analyticsResult] = await Promise.all([
         transactionFollowUpApi.dashboard(mine),
         transactionFollowUpApi.executiveInbox(mine),
         transactionFollowUpApi.analytics({
@@ -725,24 +750,32 @@ export const TransactionFollowUpPage: React.FC = () => {
           periodDays: analyticsPeriod === 'all' ? 'all' : Number(analyticsPeriod),
         }),
       ]);
-      setRecords(pageResult.items || []);
-      setTotal(pageResult.total || 0);
-      setTotalPages(pageResult.totalPages || 0);
+      if (requestId !== overviewRequestRef.current) return;
       setDashboard(dashboardResult);
       setExecutiveInbox(executiveInboxResult);
       setAnalytics(analyticsResult);
-      if (pageResult.totalPages && page > pageResult.totalPages) setPage(pageResult.totalPages);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر تحميل نظام المتابعة');
-    } finally {
-      setLoading(false);
+      if (requestId === overviewRequestRef.current) {
+        toast.error(error instanceof Error ? error.message : 'تعذر تحميل مؤشرات المتابعة');
+      }
     }
-  }, [page, priority, search, status, organizationalUnitFilter, mine, analyticsPeriod]);
+  }, [mine, analyticsPeriod]);
+
+  // Explicit refresh, saving and workflow actions continue updating all four endpoints.
+  const load = React.useCallback(async () => {
+    await Promise.all([loadRecords(), loadOverview()]);
+  }, [loadRecords, loadOverview]);
 
   React.useEffect(() => {
-    const timer = window.setTimeout(() => void load(), search.trim() ? 250 : 0);
+    // Invalidate any previous list response at filter change, before debounce starts.
+    ++listRequestRef.current;
+    const timer = window.setTimeout(() => void loadRecords(), search.trim() ? 250 : 0);
     return () => window.clearTimeout(timer);
-  }, [load, search]);
+  }, [loadRecords, search]);
+
+  React.useEffect(() => {
+    void loadOverview();
+  }, [loadOverview]);
 
   React.useEffect(() => {
     transactionFollowUpApi.assignees()
