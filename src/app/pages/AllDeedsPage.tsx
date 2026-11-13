@@ -1,5 +1,6 @@
 import { updateInteractiveCardMotion, resetInteractiveCardMotion } from '../utils/interactiveCardMotion';
 import React, { useMemo, useState } from 'react';
+import { useResultsMotion } from '../utils/useResultsMotion';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useDeeds } from '../../context/DeedContext';
@@ -67,6 +68,8 @@ export const AllDeedsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterPlanned, setFilterPlanned] = useState<'all' | 'planned' | 'unplanned'>('all');
+  const [listSortBy, setListSortBy] = useState<'deedNumber' | 'city' | 'district' | 'area' | 'updatedAt'>('deedNumber');
+  const [listSortDirection, setListSortDirection] = useState<'asc' | 'desc'>('asc');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deedToDelete, setDeedToDelete] = useState<string | null>(null);
   const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
@@ -227,6 +230,15 @@ export const AllDeedsPage: React.FC = () => {
       );
     });
   }, []);
+
+  // The on-screen sort is independent of PDF export settings and never mutates source deeds.
+  const sortedDeeds = useMemo(
+    () => sortPdfDeeds(filteredDeeds, listSortBy, listSortDirection),
+    [filteredDeeds, listSortBy, listSortDirection, sortPdfDeeds],
+  );
+  const deedResultsMotionRef = useResultsMotion([
+    searchQuery, filterCity, filterPlanned, listSortBy, listSortDirection, sortedDeeds,
+  ]);
 
   const runBatchDeedsPdf = React.useCallback(async (config?: {
     scope?: 'all' | 'filtered';
@@ -455,13 +467,27 @@ export const AllDeedsPage: React.FC = () => {
               <option value="unplanned">غير مخططة فقط</option>
             </NativeSelect>
           </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-sky-100/80 pt-3">
+            <label htmlFor="iau-deed-list-sort" className="text-sm font-semibold text-slate-700">ترتيب البطاقات:</label>
+            <NativeSelect id="iau-deed-list-sort" value={listSortBy} onChange={(event) => setListSortBy(event.target.value as typeof listSortBy)} className="h-10 w-full sm:w-[200px]">
+              <option value="deedNumber">رقم الصك</option>
+              <option value="city">المدينة</option>
+              <option value="district">الحي</option>
+              <option value="area">المساحة</option>
+              <option value="updatedAt">آخر تحديث</option>
+            </NativeSelect>
+            <NativeSelect aria-label="اتجاه ترتيب الصكوك" value={listSortDirection} onChange={(event) => setListSortDirection(event.target.value as typeof listSortDirection)} className="h-10 w-full sm:w-[160px]">
+              <option value="asc">تصاعدي</option>
+              <option value="desc">تنازلي</option>
+            </NativeSelect>
+          </div>
         </CardContent>
       </Card>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-sky-200/70 bg-white/80 p-4 shadow-sm">
           <p className="text-xs text-muted-foreground">إجمالي الصكوك الظاهرة</p>
-          <p className="mt-1 text-2xl font-black">{filteredDeeds.length.toLocaleString('ar-SA')}</p>
+          <p className="mt-1 text-2xl font-black" aria-live="polite">{filteredDeeds.length.toLocaleString('ar-SA')}</p>
         </div>
         <div className="rounded-2xl border border-sky-200/70 bg-white/80 p-4 shadow-sm">
           <p className="text-xs text-muted-foreground">الأراضي المخططة</p>
@@ -473,6 +499,7 @@ export const AllDeedsPage: React.FC = () => {
         </div>
       </section>
 
+      <div ref={deedResultsMotionRef} className="iau-results-motion-surface">
       {filteredDeeds.length === 0 ? (
         <Card className="border-sky-200/70 bg-white/85 shadow-sm">
           <CardContent className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center">
@@ -485,7 +512,7 @@ export const AllDeedsPage: React.FC = () => {
         </Card>
       ) : (
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredDeeds.map((deed) => (
+          {sortedDeeds.map((deed) => (
             <article
               key={deed.id}
               className="platform-record-card iau-interactive-card iau-card--deed flex h-full flex-col p-4 sm:p-5"
@@ -565,6 +592,7 @@ export const AllDeedsPage: React.FC = () => {
           ))}
         </section>
       )}
+      </div>
 
       <Dialog
         open={pdfOptionsOpen}

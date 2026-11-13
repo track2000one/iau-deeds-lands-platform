@@ -1,0 +1,22 @@
+/* Phase 4: result containers are animated imperatively without remounting cards or tables.
+   Keep overflow visible so table horizontal scrolling and dropdowns remain usable. */
+.iau-results-motion-surface {
+  min-width: 0;
+  position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iau-results-motion-surface {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+@media print {
+  .iau-results-motion-surface {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
