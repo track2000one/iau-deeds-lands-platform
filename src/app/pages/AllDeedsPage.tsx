@@ -1,3 +1,4 @@
+import { updateInteractiveCardMotion, resetInteractiveCardMotion } from '../utils/interactiveCardMotion';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
@@ -487,8 +488,12 @@ export const AllDeedsPage: React.FC = () => {
           {filteredDeeds.map((deed) => (
             <article
               key={deed.id}
-              className="platform-record-card flex h-full flex-col p-4 sm:p-5"
+              className="platform-record-card iau-interactive-card iau-card--deed flex h-full flex-col p-4 sm:p-5"
+              onPointerMove={updateInteractiveCardMotion}
+              onPointerLeave={resetInteractiveCardMotion}
+              onPointerCancel={resetInteractiveCardMotion}
             >
+              <span className="iau-card-spotlight" aria-hidden="true" />
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">رقم الصك</p>
