@@ -159,6 +159,7 @@ const linkedPrayerSiteCount = (building: MosqueBuilding) =>
 
 const GROUP_BATCH_SIZE = 12;
 const GROUPS_VISIBLE_BATCH = 16;
+const EMPTY_VISIBLE_GROUP_COUNTS: Record<string, number> = {};
 const DEFAULT_MAP_CENTER: [number, number] = [26.4207, 50.0888];
 
 const parseCoordinate = (value: string): number | null => {
@@ -266,8 +267,16 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const [buildingView, setBuildingView] = useState<'table' | 'cards'>('table');
   const [buildingSort, setBuildingSort] = useState<'buildingNumber' | 'name' | 'deedNumber'>('buildingNumber');
   const [buildingSortDirection, setBuildingSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [visibleGroupCounts, setVisibleGroupCounts] = useState<Record<string, number>>({});
-  const [visibleGroupLimit, setVisibleGroupLimit] = useState(GROUPS_VISIBLE_BATCH);
+  // Keep the rendering limit tied to current filters without a transient full render.
+  const groupBatchKey = JSON.stringify([search, buildingSort, buildingSortDirection]);
+  const [groupBatch, setGroupBatch] = useState<{
+    key: string;
+    limit: number;
+    counts: Record<string, number>;
+  }>({ key: '', limit: GROUPS_VISIBLE_BATCH, counts: {} });
+  const activeBatch = groupBatch.key === groupBatchKey ? groupBatch : null;
+  const visibleGroupCounts = activeBatch?.counts ?? EMPTY_VISIBLE_GROUP_COUNTS;
+  const visibleGroupLimit = activeBatch?.limit ?? GROUPS_VISIBLE_BATCH;
 
   const loadData = async () => {
     const shouldShowFullLoader = buildings.length === 0;
@@ -442,10 +451,6 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   }, [filteredBuildings, buildingSort, buildingSortDirection]);
 
   // Search and sorting still include all records; only mounted rows/cards are batched.
-  useEffect(() => {
-    setVisibleGroupCounts({});
-    setVisibleGroupLimit(GROUPS_VISIBLE_BATCH);
-  }, [search, buildingSort, buildingSortDirection]);
   const visibleBuildingGroups = useMemo(
     () => buildingGroups.slice(0, visibleGroupLimit),
     [buildingGroups, visibleGroupLimit],
@@ -465,10 +470,15 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   };
 
   const showMoreInGroup = (key: string) => {
-    setVisibleGroupCounts((current) => ({
-      ...current,
-      [key]: (current[key] || GROUP_BATCH_SIZE) + GROUP_BATCH_SIZE,
-    }));
+    setGroupBatch((current) => {
+      const sameFilter = current.key === groupBatchKey;
+      const counts = sameFilter ? current.counts : EMPTY_VISIBLE_GROUP_COUNTS;
+      return {
+        key: groupBatchKey,
+        limit: sameFilter ? current.limit : GROUPS_VISIBLE_BATCH,
+        counts: { ...counts, [key]: (counts[key] || GROUP_BATCH_SIZE) + GROUP_BATCH_SIZE },
+      };
+    });
   };
 
   const totals = useMemo(() => {
@@ -1280,7 +1290,11 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                   <p className="text-sm text-muted-foreground" aria-live="polite">
                     عرض {visibleBuildingGroups.length.toLocaleString('ar-SA')} من {buildingGroups.length.toLocaleString('ar-SA')} مجموعة أحياء
                   </p>
-                  <Button type="button" variant="outline" onClick={() => React.startTransition(() => setVisibleGroupLimit((count) => count + GROUPS_VISIBLE_BATCH))}>
+                  <Button type="button" variant="outline" onClick={() => React.startTransition(() => setGroupBatch((current) => ({
+                    key: groupBatchKey,
+                    counts: current.key === groupBatchKey ? current.counts : {},
+                    limit: (current.key === groupBatchKey ? current.limit : GROUPS_VISIBLE_BATCH) + GROUPS_VISIBLE_BATCH,
+                  })))}>
                     عرض المزيد من الأحياء ({Math.min(GROUPS_VISIBLE_BATCH, buildingGroups.length - visibleGroupLimit).toLocaleString('ar-SA')})
                   </Button>
                 </div>
