@@ -55,20 +55,49 @@ import { getSiteInspection, getSiteInspections } from '../api/siteInspections';
 import { openSiteInspectionReport, openSiteInspectionReports } from '../utils/siteInspectionReport';
 import { Badge } from '../components/ui/badge';
 import { ReportViewToggle } from '../components/ReportViewToggle';
-import {
-  BarChart,
-  Bar,
-  PieChart as RechartsPie,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+const LazyReportCharts = React.lazy(() => import('../components/ReportCharts').then(
+  (module) => ({ default: module.ReportCharts }),
+));
 
-const COLORS = ['#7c6f64', '#8f7a66', '#a38b73', '#5f6f73', '#8b6f47', '#8c7a6b', '#6e7d70', '#9c8f84'];
+const ReportChartsViewport: React.FC<{
+  variant: 'overview' | 'distribution' | 'pie';
+  data: any[];
+}> = ({ variant, data }) => {
+  const surfaceRef = React.useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface || typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '250px 0px' },
+    );
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, []);
+
+  const chartHeight = variant === 'overview' ? 300 : 240;
+  return (
+    <div ref={surfaceRef} style={{ minHeight: chartHeight }}>
+      {visible ? (
+        <React.Suspense fallback={<div className="flex items-center justify-center text-sm text-muted-foreground" style={{ minHeight: chartHeight }}>جارٍ تحميل الرسم البياني...</div>}>
+          <LazyReportCharts variant={variant} data={data} />
+        </React.Suspense>
+      ) : (
+        <div className="flex items-center justify-center text-sm text-muted-foreground" style={{ minHeight: chartHeight }} aria-hidden="true">يُحمّل الرسم عند ظهوره</div>
+      )}
+    </div>
+  );
+};
 
 const FANAN_FONT_FAMILY = "'Fanan', Tahoma, Arial, sans-serif";
 const getFananFontAbsoluteUrl = () =>
@@ -195,6 +224,8 @@ const defaultPrintSettings: PrintSettings = {
   fontSize: 13,
   headerColor: '#1f4e79',
 };
+
+const REPORT_PREVIEW_BATCH_SIZE = 60;
 
 export const ReportsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -520,6 +551,11 @@ export const ReportsPage: React.FC = () => {
     buildingsIn: leasedBuildingsInColumns,
     siteInspections: siteInspectionsColumns,
   });
+
+  // Display-only batches. Export/print continue using the complete sorted dataset.
+  const [previewBatches, setPreviewBatches] = useState<
+    Partial<Record<ReportSectionType, { signature: string; count: number }>>
+  >({});
 
   const printRefs = {
     deeds: useRef<HTMLDivElement>(null),
@@ -2135,6 +2171,11 @@ export const ReportsPage: React.FC = () => {
     const manualOrderEnabled = manualOrderEnabledBySection[type];
     const excludedCount = (excludedRowKeysBySection[type] || []).length;
     const enabledColumns = columns.filter((col) => col.enabled);
+    const previewSignature = JSON.stringify([filters, sortSettings, originalData.length]);
+    const previewBatch = previewBatches[type];
+    const previewRowCount = previewBatch?.signature === previewSignature
+      ? previewBatch.count : REPORT_PREVIEW_BATCH_SIZE;
+    const visiblePreviewRows = sortedData.slice(0, previewRowCount);
     const previewTableWidth =
       enabledColumns.length <= 5
         ? '78%'
@@ -2717,7 +2758,7 @@ export const ReportsPage: React.FC = () => {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          sortedData.map((item, index) => (
+                          visiblePreviewRows.map((item, index) => (
                             <TableRow key={item.id || index} className="hover:bg-blue-50">
                               <TableCell className="px-2 py-2 text-center font-medium text-gray-600">
                                 {index + 1}
@@ -2804,6 +2845,29 @@ export const ReportsPage: React.FC = () => {
                     </Table>
                   </div>
                 </div>
+                {visiblePreviewRows.length < sortedData.length && (
+                  <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-amber-200/70 bg-amber-50/70 px-4 py-3 text-center">
+                    <p className="text-sm font-semibold text-slate-700" aria-live="polite">
+                      تعرض المعاينة {visiblePreviewRows.length.toLocaleString('ar-SA')} من {sortedData.length.toLocaleString('ar-SA')} سجل؛ الطباعة وملفات PDF وExcel تشمل جميع النتائج.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-10 border-amber-300 bg-white font-bold"
+                      onClick={() => React.startTransition(() => setPreviewBatches((current) => {
+                        const previous = current[type];
+                        const count = previous?.signature === previewSignature
+                          ? previous.count : REPORT_PREVIEW_BATCH_SIZE;
+                        return {
+                          ...current,
+                          [type]: { signature: previewSignature, count: count + REPORT_PREVIEW_BATCH_SIZE },
+                        };
+                      }))}
+                    >
+                      عرض {Math.min(REPORT_PREVIEW_BATCH_SIZE, sortedData.length - visiblePreviewRows.length).toLocaleString('ar-SA')} سجل إضافي
+                    </Button>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="summary" className="space-y-4">
@@ -2940,15 +3004,7 @@ export const ReportsPage: React.FC = () => {
                       </CardHeader>
 
                       <CardContent>
-                        <ResponsiveContainer width="100%" height={240}>
-                          <BarChart data={distribution.data}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="value" fill="#8f7a66" />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        <ReportChartsViewport variant="distribution" data={distribution.data} />
                       </CardContent>
                     </Card>
 
@@ -2958,25 +3014,7 @@ export const ReportsPage: React.FC = () => {
                       </CardHeader>
 
                       <CardContent>
-                        <ResponsiveContainer width="100%" height={240}>
-                          <RechartsPie>
-                            <Pie
-                              data={distribution.data}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={(entry) => entry.name}
-                              outerRadius={90}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {distribution.data.map((_, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </RechartsPie>
-                        </ResponsiveContainer>
+                        <ReportChartsViewport variant="pie" data={distribution.data} />
                       </CardContent>
                     </Card>
                   </div>
@@ -3133,23 +3171,7 @@ export const ReportsPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={executiveOverview.categories}>
-                <CartesianGrid strokeDasharray="4 6" stroke="rgba(120,113,108,0.18)" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#57534e' }} interval={0} />
-                <YAxis tick={{ fontSize: 11, fill: '#57534e' }} />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 18,
-                    border: '1px solid rgba(255,255,255,0.7)',
-                    background: 'rgba(255,255,255,0.92)',
-                    boxShadow: '0 18px 50px rgba(15,23,42,0.14)',
-                    backdropFilter: 'blur(18px)',
-                  }}
-                />
-                <Bar dataKey="value" fill="#8f7a66" radius={[10, 10, 2, 2]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ReportChartsViewport variant="overview" data={executiveOverview.categories} />
           </CardContent>
         </Card>
 
