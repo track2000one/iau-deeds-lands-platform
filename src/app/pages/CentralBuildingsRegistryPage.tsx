@@ -158,6 +158,8 @@ const linkedPrayerSiteCount = (building: MosqueBuilding) =>
   building._count?.sites ?? building.sites?.length ?? 0;
 
 const GROUP_BATCH_SIZE = 12;
+const GROUPS_VISIBLE_BATCH = 16;
+const EMPTY_VISIBLE_GROUP_COUNTS: Record<string, number> = {};
 const DEFAULT_MAP_CENTER: [number, number] = [26.4207, 50.0888];
 
 const parseCoordinate = (value: string): number | null => {
@@ -265,7 +267,16 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const [buildingView, setBuildingView] = useState<'table' | 'cards'>('table');
   const [buildingSort, setBuildingSort] = useState<'buildingNumber' | 'name' | 'deedNumber'>('buildingNumber');
   const [buildingSortDirection, setBuildingSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [visibleGroupCounts, setVisibleGroupCounts] = useState<Record<string, number>>({});
+  // Keep the rendering limit tied to current filters without a transient full render.
+  const groupBatchKey = JSON.stringify([search, buildingSort, buildingSortDirection]);
+  const [groupBatch, setGroupBatch] = useState<{
+    key: string;
+    limit: number;
+    counts: Record<string, number>;
+  }>({ key: '', limit: GROUPS_VISIBLE_BATCH, counts: {} });
+  const activeBatch = groupBatch.key === groupBatchKey ? groupBatch : null;
+  const visibleGroupCounts = activeBatch?.counts ?? EMPTY_VISIBLE_GROUP_COUNTS;
+  const visibleGroupLimit = activeBatch?.limit ?? GROUPS_VISIBLE_BATCH;
 
   const loadData = async () => {
     const shouldShowFullLoader = buildings.length === 0;
@@ -439,9 +450,14 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       .sort((a, b) => a.title.localeCompare(b.title, 'ar'));
   }, [filteredBuildings, buildingSort, buildingSortDirection]);
 
+  // Search and sorting still include all records; only mounted rows/cards are batched.
+  const visibleBuildingGroups = useMemo(
+    () => buildingGroups.slice(0, visibleGroupLimit),
+    [buildingGroups, visibleGroupLimit],
+  );
   const buildingResultsMotionRef = useResultsMotion([
     search, buildingView, buildingSort, buildingSortDirection,
-    expandedGroups, visibleGroupCounts, filteredBuildings,
+    expandedGroups, visibleGroupCounts, visibleGroupLimit, filteredBuildings,
   ]);
 
   const toggleGroup = (key: string) => {
@@ -454,10 +470,15 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   };
 
   const showMoreInGroup = (key: string) => {
-    setVisibleGroupCounts((current) => ({
-      ...current,
-      [key]: (current[key] || GROUP_BATCH_SIZE) + GROUP_BATCH_SIZE,
-    }));
+    setGroupBatch((current) => {
+      const sameFilter = current.key === groupBatchKey;
+      const counts = sameFilter ? current.counts : EMPTY_VISIBLE_GROUP_COUNTS;
+      return {
+        key: groupBatchKey,
+        limit: sameFilter ? current.limit : GROUPS_VISIBLE_BATCH,
+        counts: { ...counts, [key]: (counts[key] || GROUP_BATCH_SIZE) + GROUP_BATCH_SIZE },
+      };
+    });
   };
 
   const totals = useMemo(() => {
@@ -1016,12 +1037,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                   </Button>
                 </div>
               </div>
-              {buildingGroups.map((group) => {
+              {visibleBuildingGroups.map((group) => {
                 const searchActive = Boolean(search.trim());
                 const expanded = searchActive || expandedGroups.has(group.key);
-                const visibleCount = searchActive
-                  ? group.buildings.length
-                  : visibleGroupCounts[group.key] || GROUP_BATCH_SIZE;
+                const visibleCount = visibleGroupCounts[group.key] || GROUP_BATCH_SIZE;
                 const visibleBuildings = group.buildings.slice(0, visibleCount);
 
                 return (
@@ -1254,7 +1273,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                         </div>
                         )}
 
-                        {!searchActive && visibleCount < group.buildings.length && (
+                        {visibleCount < group.buildings.length && (
                           <div className="mt-4 flex justify-center">
                             <Button variant="outline" onClick={() => showMoreInGroup(group.key)}>
                               عرض المزيد — متبقي {group.buildings.length - visibleCount} مبنى
@@ -1266,6 +1285,20 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                   </section>
                 );
               })}
+              {visibleGroupLimit < buildingGroups.length && (
+                <div className="flex flex-col items-center gap-2 py-4 text-center">
+                  <p className="text-sm text-muted-foreground" aria-live="polite">
+                    عرض {visibleBuildingGroups.length.toLocaleString('ar-SA')} من {buildingGroups.length.toLocaleString('ar-SA')} مجموعة أحياء
+                  </p>
+                  <Button type="button" variant="outline" onClick={() => React.startTransition(() => setGroupBatch((current) => ({
+                    key: groupBatchKey,
+                    counts: current.key === groupBatchKey ? current.counts : {},
+                    limit: (current.key === groupBatchKey ? current.limit : GROUPS_VISIBLE_BATCH) + GROUPS_VISIBLE_BATCH,
+                  })))}>
+                    عرض المزيد من الأحياء ({Math.min(GROUPS_VISIBLE_BATCH, buildingGroups.length - visibleGroupLimit).toLocaleString('ar-SA')})
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
