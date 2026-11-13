@@ -7,7 +7,6 @@ import {
   type BuildingReportPhotoMode,
 } from '../utils/centralBuildingsPhotoAppendix';
 import React, { useEffect, useMemo, useState } from 'react';
-import * as XLSX from 'xlsx';
 import { ArrowDown, ArrowDownUp, ArrowUp, BarChart3, ChevronLeft, ChevronRight, Download, Images, ListChecks, MapPin, Printer, Search, SlidersHorizontal, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPendingBuildingImport } from './BuildingExcelImportManager';
@@ -141,6 +140,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
   const [selectedColumns, setSelectedColumns] = useState<Set<ColumnKey>>(readSelectedColumns);
   const [photoMode, setPhotoMode] = useState<BuildingReportPhotoMode>('primary');
   const [printing, setPrinting] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   useEffect(() => {
     try {
@@ -340,8 +340,12 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     return 'https://www.google.com/maps?q=' + encodeURIComponent(String(data.latitude) + ',' + String(data.longitude));
   };
 
-  const exportExcel = () => {
-    const chosen = visibleColumns;
+  const exportExcel = async () => {
+    if (exportingExcel) return;
+    setExportingExcel(true);
+    try {
+      const XLSX = await import('xlsx');
+      const chosen = visibleColumns;
     const rows = sorted.map((building) => Object.fromEntries(chosen.map((column) => [column.label, cellValue(building, column.key)])));
     const worksheet = XLSX.utils.json_to_sheet(rows, { header: chosen.map((column) => column.label) });
     worksheet['!cols'] = chosen.map((column) => ({ wch: column.width }));
@@ -358,7 +362,12 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     infoSheet['!cols'] = [{ wch: 28 }, { wch: 46 }];
     XLSX.utils.book_append_sheet(workbook, infoSheet, 'معلومات التقرير');
     XLSX.utils.book_append_sheet(workbook, worksheet, 'تقرير المباني');
-    XLSX.writeFile(workbook, `تقرير-السجل-المركزي-للمباني-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      XLSX.writeFile(workbook, `تقرير-السجل-المركزي-للمباني-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تصدير تقرير المباني Excel');
+    } finally {
+      setExportingExcel(false);
+    }
   };
 
   const printReport = async () => {
@@ -943,7 +952,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
           </div>
 
           <DialogFooter className="shrink-0 gap-2 border-t pt-3 sm:justify-start">
-            <Button type="button" onClick={exportExcel} disabled={!sorted.length} className="gap-2 border border-emerald-700 bg-emerald-700 font-bold text-white shadow-md transition-all enabled:hover:-translate-y-0.5 enabled:hover:bg-emerald-800 enabled:hover:shadow-lg focus-visible:ring-emerald-500 disabled:opacity-45 dark:border-emerald-600 dark:bg-emerald-700 dark:hover:bg-emerald-600"><Download className="h-4 w-4" />تصدير Excel</Button>
+            <Button type="button" onClick={() => void exportExcel()} disabled={!sorted.length || exportingExcel} className="gap-2 border border-emerald-700 bg-emerald-700 font-bold text-white shadow-md transition-all enabled:hover:-translate-y-0.5 enabled:hover:bg-emerald-800 enabled:hover:shadow-lg focus-visible:ring-emerald-500 disabled:opacity-45 dark:border-emerald-600 dark:bg-emerald-700 dark:hover:bg-emerald-600"><Download className={`h-4 w-4 ${exportingExcel ? 'animate-pulse' : ''}`} />{exportingExcel ? 'جارٍ تجهيز Excel...' : 'تصدير Excel'}</Button>
             <Button type="button" onClick={() => { void printReport(); }} disabled={!sorted.length || printing} className="gap-2 border border-indigo-700 bg-indigo-700 font-bold text-white shadow-md transition-all enabled:hover:-translate-y-0.5 enabled:hover:bg-indigo-800 enabled:hover:shadow-lg focus-visible:ring-indigo-500 disabled:opacity-45 dark:border-indigo-600 dark:bg-indigo-700 dark:hover:bg-indigo-600"><Printer className="h-4 w-4" />{printing ? 'جارٍ تجهيز الصور والتقرير...' : 'طباعة / PDF مع الصور'}</Button>
             <Button type="button" variant="outline" className="border-slate-300 bg-slate-100 font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-950 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={() => setOpen(false)}>إغلاق</Button>
           </DialogFooter>
