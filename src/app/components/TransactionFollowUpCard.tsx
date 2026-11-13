@@ -327,7 +327,7 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
         )}
       </div>
 
-      <div className="mt-auto flex items-center gap-2 border-t border-slate-200/80 pt-4">
+      <div className="iau-record-actions mt-auto flex items-center gap-2 border-t border-slate-200/80 pt-4">
         <Button
           variant="outline"
           size="sm"

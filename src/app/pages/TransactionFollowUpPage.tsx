@@ -3903,7 +3903,7 @@ ${styleAssets}
 
       <Dialog open={reportOpen} onOpenChange={(open) => !reportExporting && setReportOpen(open)}>
         <DialogContent
-          className="max-h-[94dvh] overflow-y-auto overscroll-contain !border-slate-200 !bg-[#F5F7FA] !text-slate-950 shadow-2xl [color-scheme:light] [scrollbar-gutter:stable] [&_button]:transition-colors [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:placeholder:!text-slate-500 [&_label]:!text-slate-800 [&_select]:!border-slate-300 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!border-slate-300 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
+          className="iau-animated-dialog max-h-[94dvh] overflow-y-auto overscroll-contain !border-slate-200 !bg-[#F5F7FA] !text-slate-950 shadow-2xl [color-scheme:light] [scrollbar-gutter:stable] [&_button]:transition-colors [&_input]:!border-slate-300 [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:placeholder:!text-slate-500 [&_label]:!text-slate-800 [&_select]:!border-slate-300 [&_select]:!bg-white [&_select]:!text-slate-900 [&_textarea]:!border-slate-300 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 sm:max-w-[1180px]"
           style={{ backgroundColor: '#F5F7FA', color: '#172033', colorScheme: 'light' }}
           dir="rtl"
         >
@@ -5435,7 +5435,7 @@ ${styleAssets}
           if (!open) setCreateFiles([]);
         }}
       >
-        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-3xl" dir="rtl">
+        <DialogContent className="iau-animated-dialog max-h-[92dvh] overflow-y-auto sm:max-w-3xl" dir="rtl">
           <DialogHeader className="text-right">
             <DialogTitle>تسجيل معاملة جديدة</DialogTitle>
             <DialogDescription>سجّل بيانات المعاملة وحدد الموظف والإجراء والمدة المستهدفة.</DialogDescription>
@@ -5584,7 +5584,7 @@ ${styleAssets}
           }
         }}
       >
-        <DialogContent className="followup-transaction-dialog max-h-[94dvh] overflow-y-auto bg-[#F5F7FA] sm:max-w-6xl" dir="rtl">
+        <DialogContent className="iau-animated-dialog followup-transaction-dialog max-h-[94dvh] overflow-y-auto bg-[#F5F7FA] sm:max-w-6xl" dir="rtl">
           {detailLoading && !selected ? (
             <div className="py-16 text-center"><RefreshCw className="mx-auto h-6 w-6 animate-spin" /></div>
           ) : selected ? (

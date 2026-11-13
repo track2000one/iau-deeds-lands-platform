@@ -1185,7 +1185,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                     الإحداثيات: {building.latitude ?? '—'} ، {building.longitude ?? '—'}
                                   </div>
                                 )}
-                                <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
+                                <div className="iau-record-actions mt-4 flex flex-wrap gap-2 border-t pt-3">
                                   <Button size="sm" variant="outline" className="gap-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setViewTarget(building)}>
                                     <Eye className="h-4 w-4" /> عرض
                                   </Button>
@@ -1245,7 +1245,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       </Card>
 
       <Dialog open={Boolean(viewTarget)} onOpenChange={(open) => !open && setViewTarget(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" dir="rtl">
+        <DialogContent className="iau-animated-dialog max-h-[90vh] overflow-y-auto sm:max-w-2xl" dir="rtl">
           <DialogHeader className="text-right sm:text-right">
             <DialogTitle>عرض بيانات المبنى</DialogTitle>
             <DialogDescription>البيانات الأساسية وبيانات المنشئ كما هي مسجلة في السجل المركزي.</DialogDescription>
@@ -1275,7 +1275,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       </Dialog>
 
       <Dialog open={formOpen} onOpenChange={(open) => { if (!saving) setFormOpen(open); }}>
-        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl" dir="rtl">
+        <DialogContent className="iau-animated-dialog max-h-[92vh] overflow-y-auto sm:max-w-4xl" dir="rtl">
           <DialogHeader className="text-right sm:text-right">
             <DialogTitle>
               {editingBuilding ? 'تعديل المبنى المركزي' : 'تعريف مبنى جديد'}
@@ -1539,7 +1539,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       </Dialog>
 
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent className="iau-animated-dialog" dir="rtl">
           <AlertDialogHeader className="text-right sm:text-right">
             <AlertDialogTitle>حذف المبنى من السجل المركزي؟</AlertDialogTitle>
             <AlertDialogDescription>
