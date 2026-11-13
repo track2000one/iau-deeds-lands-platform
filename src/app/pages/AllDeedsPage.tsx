@@ -533,7 +533,7 @@ export const AllDeedsPage: React.FC = () => {
                 </div>
               </dl>
 
-              <div className="platform-record-actions mt-5">
+              <div className="platform-record-actions iau-record-actions mt-5">
                 <Button variant="outline" size="sm" className="h-10" onClick={() => navigate(`/deeds/${deed.id}`)}>
                   <Eye className="ml-1 h-4 w-4" />عرض
                 </Button>
@@ -554,7 +554,7 @@ export const AllDeedsPage: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="platform-record-danger h-10"
+                    className="platform-record-danger iau-record-action h-10"
                     onClick={() => handleDelete(deed.id)}
                   >
                     <Trash2 className="ml-1 h-4 w-4" />حذف
@@ -572,7 +572,7 @@ export const AllDeedsPage: React.FC = () => {
           if (!pdfGenerating) setPdfOptionsOpen(open);
         }}
       >
-        <DialogContent className="max-h-[94dvh] overflow-y-auto sm:max-w-[1050px]" dir="rtl">
+        <DialogContent className="iau-animated-dialog max-h-[94dvh] overflow-y-auto sm:max-w-[1050px]" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <FileDown className="h-5 w-5 text-[#0b4a3f]" />
@@ -928,7 +928,7 @@ export const AllDeedsPage: React.FC = () => {
       </Dialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="iau-animated-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle>{t('deed.deleteDeed')}</AlertDialogTitle>
             <AlertDialogDescription>
