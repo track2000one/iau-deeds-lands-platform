@@ -137,6 +137,7 @@ export const AttachmentPreviewCard: React.FC<{
   const isPdf = isPdfAttachment(attachment);
   const isImage = isImageAttachmentPreview(attachment);
   const previewHeight = compact ? 'h-44' : 'h-64';
+  const [pdfPreviewActive, setPdfPreviewActive] = React.useState(false);
 
   const open = () => {
     if (onOpen) {
@@ -153,12 +154,26 @@ export const AttachmentPreviewCard: React.FC<{
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm transition hover:border-primary/70 hover:shadow-md">
       <div className={`relative w-full ${previewHeight} overflow-hidden bg-muted/20`}>
         {isPdf && previewUrl ? (
-          <iframe
-            src={previewUrl}
-            title={name}
-            loading="lazy"
-            className="h-full w-full border-0 bg-white"
-          />
+          pdfPreviewActive ? (
+            <iframe
+              src={previewUrl}
+              title={name}
+              loading="lazy"
+              className="h-full w-full border-0 bg-white"
+            />
+          ) : (
+            <button
+              type="button"
+              className="flex h-full w-full flex-col items-center justify-center gap-3 px-4 text-center hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-primary"
+              onClick={() => setPdfPreviewActive(true)}
+              title={`تحميل معاينة PDF: ${name}`}
+              aria-label={`معاينة ملف PDF داخل البطاقة: ${name}`}
+            >
+              <FileText className="h-12 w-12 text-red-600" aria-hidden="true" />
+              <span className="text-sm font-bold">عرض معاينة PDF</span>
+              <span className="text-xs text-muted-foreground">اضغط لتحميل المعاينة داخل البطاقة</span>
+            </button>
+          )
         ) : isImage && previewUrl ? (
           <button
             type="button"
@@ -171,6 +186,7 @@ export const AttachmentPreviewCard: React.FC<{
               alt={name}
               className="h-full w-full bg-muted object-contain"
               loading="lazy"
+              decoding="async"
               onError={(event) => {
                 if (event.currentTarget.src !== originalUrl && originalUrl) {
                   event.currentTarget.src = originalUrl;
@@ -241,6 +257,7 @@ export const AttachmentPreviewGrid: React.FC<{
   emptyText?: string;
   compact?: boolean;
 }> = ({ attachments, emptyText = 'لا توجد مرفقات.', compact = false }) => {
+  const [visibleCount, setVisibleCount] = React.useState(12);
   if (!attachments.length) {
     return (
       <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -250,8 +267,9 @@ export const AttachmentPreviewGrid: React.FC<{
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {attachments.map((attachment, index) => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {attachments.slice(0, visibleCount).map((attachment, index) => (
         <AttachmentPreviewCard
           key={
             attachment.id ||
@@ -263,6 +281,21 @@ export const AttachmentPreviewGrid: React.FC<{
           compact={compact}
         />
       ))}
+      </div>
+      {visibleCount < attachments.length && (
+        <div className="flex flex-col items-center gap-2 text-center">
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            معاينة {Math.min(visibleCount, attachments.length).toLocaleString('ar-SA')} من {attachments.length.toLocaleString('ar-SA')} مرفق
+          </p>
+          <button
+            type="button"
+            onClick={() => React.startTransition(() => setVisibleCount((count) => count + 12))}
+            className="min-h-10 rounded-lg border border-primary/40 bg-background px-5 py-2 text-sm font-bold text-foreground hover:border-primary hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            عرض المزيد من المرفقات
+          </button>
+        </div>
+      )}
     </div>
   );
 };
