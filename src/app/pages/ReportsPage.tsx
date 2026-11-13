@@ -53,7 +53,6 @@ import { toast } from 'sonner';
 import type { SiteInspection } from '../../types/siteInspection';
 import { getSiteInspection, getSiteInspections } from '../api/siteInspections';
 import { openSiteInspectionReport, openSiteInspectionReports } from '../utils/siteInspectionReport';
-import * as XLSX from 'xlsx';
 import { Badge } from '../components/ui/badge';
 import { ReportViewToggle } from '../components/ReportViewToggle';
 import {
@@ -1205,8 +1204,10 @@ export const ReportsPage: React.FC = () => {
     return item[key] || '-';
   };
 
-  const exportToExcel = (data: any[], columns: any[], filename: string) => {
+  const exportToExcel = async (data: any[], columns: any[], filename: string) => {
     try {
+      // Only fetch the Excel engine when the user actually requests an export.
+      const XLSX = await import('xlsx');
       const enabledColumns = columns.filter((col) => col.enabled);
 
       const excelData = data.map((item, index) => {
