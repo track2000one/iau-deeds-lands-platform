@@ -1,4 +1,5 @@
 import { reportPreparerName } from '../utils/reportAttribution';
+import { useResultsMotion } from '../utils/useResultsMotion';
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
@@ -610,6 +611,9 @@ export const TransactionFollowUpPage: React.FC = () => {
   const [organizationalUnitFilter, setOrganizationalUnitFilter] = React.useState<TransactionFollowUpOrganizationalUnit | ''>('');
   const [mine, setMine] = React.useState(false);
   const [activeWorkspace, setActiveWorkspace] = React.useState<'daily' | 'transactions' | 'directives' | 'oversight'>('daily');
+  const transactionResultsMotionRef = useResultsMotion([
+    activeWorkspace, search, status, priority, organizationalUnitFilter, page, records, loading,
+  ]);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [directivesDashboardOpen, setDirectivesDashboardOpen] = React.useState(false);
   const [approvalCenterOpen, setApprovalCenterOpen] = React.useState(false);
@@ -3674,7 +3678,7 @@ ${styleAssets}
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <CardTitle>قائمة المعاملات</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">إجمالي النتائج: {total.toLocaleString('ar-SA')}</p>
+              <p className="mt-1 text-xs text-muted-foreground" aria-live="polite">إجمالي النتائج: {total.toLocaleString('ar-SA')}</p>
             </div>
             <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:min-w-[1040px] xl:grid-cols-4">
               <div className="relative">
@@ -3704,6 +3708,7 @@ ${styleAssets}
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-5">
+          <div ref={transactionResultsMotionRef} className="iau-results-motion-surface">
           {loading ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
               <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />
@@ -3755,6 +3760,7 @@ ${styleAssets}
               })}
             </section>
           )}
+          </div>
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
             <span className="text-xs text-muted-foreground">صفحة {page.toLocaleString('ar-SA')} من {Math.max(totalPages, 1).toLocaleString('ar-SA')}</span>
