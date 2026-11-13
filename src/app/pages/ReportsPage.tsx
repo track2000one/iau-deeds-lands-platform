@@ -55,20 +55,49 @@ import { getSiteInspection, getSiteInspections } from '../api/siteInspections';
 import { openSiteInspectionReport, openSiteInspectionReports } from '../utils/siteInspectionReport';
 import { Badge } from '../components/ui/badge';
 import { ReportViewToggle } from '../components/ReportViewToggle';
-import {
-  BarChart,
-  Bar,
-  PieChart as RechartsPie,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+const LazyReportCharts = React.lazy(() => import('../components/ReportCharts').then(
+  (module) => ({ default: module.ReportCharts }),
+));
 
-const COLORS = ['#7c6f64', '#8f7a66', '#a38b73', '#5f6f73', '#8b6f47', '#8c7a6b', '#6e7d70', '#9c8f84'];
+const ReportChartsViewport: React.FC<{
+  variant: 'overview' | 'distribution' | 'pie';
+  data: any[];
+}> = ({ variant, data }) => {
+  const surfaceRef = React.useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface || typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '250px 0px' },
+    );
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, []);
+
+  const chartHeight = variant === 'overview' ? 300 : 240;
+  return (
+    <div ref={surfaceRef} style={{ minHeight: chartHeight }}>
+      {visible ? (
+        <React.Suspense fallback={<div className="flex items-center justify-center text-sm text-muted-foreground" style={{ minHeight: chartHeight }}>جارٍ تحميل الرسم البياني...</div>}>
+          <LazyReportCharts variant={variant} data={data} />
+        </React.Suspense>
+      ) : (
+        <div className="flex items-center justify-center text-sm text-muted-foreground" style={{ minHeight: chartHeight }} aria-hidden="true">يُحمّل الرسم عند ظهوره</div>
+      )}
+    </div>
+  );
+};
 
 const FANAN_FONT_FAMILY = "'Fanan', Tahoma, Arial, sans-serif";
 const getFananFontAbsoluteUrl = () =>
@@ -2975,15 +3004,7 @@ export const ReportsPage: React.FC = () => {
                       </CardHeader>
 
                       <CardContent>
-                        <ResponsiveContainer width="100%" height={240}>
-                          <BarChart data={distribution.data}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="value" fill="#8f7a66" />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        <ReportChartsViewport variant="distribution" data={distribution.data} />
                       </CardContent>
                     </Card>
 
@@ -2993,25 +3014,7 @@ export const ReportsPage: React.FC = () => {
                       </CardHeader>
 
                       <CardContent>
-                        <ResponsiveContainer width="100%" height={240}>
-                          <RechartsPie>
-                            <Pie
-                              data={distribution.data}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={(entry) => entry.name}
-                              outerRadius={90}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {distribution.data.map((_, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </RechartsPie>
-                        </ResponsiveContainer>
+                        <ReportChartsViewport variant="pie" data={distribution.data} />
                       </CardContent>
                     </Card>
                   </div>
@@ -3168,23 +3171,7 @@ export const ReportsPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={executiveOverview.categories}>
-                <CartesianGrid strokeDasharray="4 6" stroke="rgba(120,113,108,0.18)" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#57534e' }} interval={0} />
-                <YAxis tick={{ fontSize: 11, fill: '#57534e' }} />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 18,
-                    border: '1px solid rgba(255,255,255,0.7)',
-                    background: 'rgba(255,255,255,0.92)',
-                    boxShadow: '0 18px 50px rgba(15,23,42,0.14)',
-                    backdropFilter: 'blur(18px)',
-                  }}
-                />
-                <Bar dataKey="value" fill="#8f7a66" radius={[10, 10, 2, 2]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ReportChartsViewport variant="overview" data={executiveOverview.categories} />
           </CardContent>
         </Card>
 
