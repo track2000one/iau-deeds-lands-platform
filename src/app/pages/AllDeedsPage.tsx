@@ -1,5 +1,5 @@
 import { updateInteractiveCardMotion, resetInteractiveCardMotion } from '../utils/interactiveCardMotion';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useResultsMotion } from '../utils/useResultsMotion';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
@@ -58,6 +58,8 @@ import {
   type DeedPdfCompression,
 } from '../utils/deedBatchPdf';
 
+const DEED_BATCH_SIZE = 24;
+
 export const AllDeedsPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -70,6 +72,7 @@ export const AllDeedsPage: React.FC = () => {
   const [filterPlanned, setFilterPlanned] = useState<'all' | 'planned' | 'unplanned'>('all');
   const [listSortBy, setListSortBy] = useState<'deedNumber' | 'city' | 'district' | 'area' | 'updatedAt'>('deedNumber');
   const [listSortDirection, setListSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [visibleDeedCount, setVisibleDeedCount] = useState(DEED_BATCH_SIZE);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deedToDelete, setDeedToDelete] = useState<string | null>(null);
   const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
@@ -235,6 +238,14 @@ export const AllDeedsPage: React.FC = () => {
   const sortedDeeds = useMemo(
     () => sortPdfDeeds(filteredDeeds, listSortBy, listSortDirection),
     [filteredDeeds, listSortBy, listSortDirection, sortPdfDeeds],
+  );
+  // The user sees a manageable first batch; totals, filtering and PDF export remain complete.
+  useEffect(() => {
+    setVisibleDeedCount(DEED_BATCH_SIZE);
+  }, [searchQuery, filterCity, filterPlanned, listSortBy, listSortDirection]);
+  const visibleDeeds = useMemo(
+    () => sortedDeeds.slice(0, visibleDeedCount),
+    [sortedDeeds, visibleDeedCount],
   );
   const deedResultsMotionRef = useResultsMotion([
     searchQuery, filterCity, filterPlanned, listSortBy, listSortDirection, sortedDeeds,
@@ -512,7 +523,7 @@ export const AllDeedsPage: React.FC = () => {
         </Card>
       ) : (
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {sortedDeeds.map((deed) => (
+          {visibleDeeds.map((deed) => (
             <article
               key={deed.id}
               className="platform-record-card iau-interactive-card iau-card--deed flex h-full flex-col p-4 sm:p-5"
@@ -591,6 +602,16 @@ export const AllDeedsPage: React.FC = () => {
             </article>
           ))}
         </section>
+      )}
+      {visibleDeedCount < sortedDeeds.length && (
+        <div className="mt-5 flex flex-col items-center justify-center gap-2 text-center">
+          <p className="text-sm font-semibold text-slate-700" aria-live="polite">
+            عرض {Math.min(visibleDeedCount, sortedDeeds.length).toLocaleString('ar-SA')} من {sortedDeeds.length.toLocaleString('ar-SA')} صك
+          </p>
+          <Button type="button" variant="outline" className="min-h-11 border-sky-300 bg-white font-bold" onClick={() => React.startTransition(() => setVisibleDeedCount((count) => count + DEED_BATCH_SIZE))}>
+            عرض المزيد من الصكوك ({Math.min(DEED_BATCH_SIZE, sortedDeeds.length - visibleDeedCount).toLocaleString('ar-SA')})
+          </Button>
+        </div>
       )}
       </div>
 
