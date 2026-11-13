@@ -196,6 +196,8 @@ const defaultPrintSettings: PrintSettings = {
   headerColor: '#1f4e79',
 };
 
+const REPORT_PREVIEW_BATCH_SIZE = 60;
+
 export const ReportsPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -520,6 +522,11 @@ export const ReportsPage: React.FC = () => {
     buildingsIn: leasedBuildingsInColumns,
     siteInspections: siteInspectionsColumns,
   });
+
+  // Display-only batches. Export/print continue using the complete sorted dataset.
+  const [previewBatches, setPreviewBatches] = useState<
+    Partial<Record<ReportSectionType, { signature: string; count: number }>>
+  >({});
 
   const printRefs = {
     deeds: useRef<HTMLDivElement>(null),
@@ -2135,6 +2142,11 @@ export const ReportsPage: React.FC = () => {
     const manualOrderEnabled = manualOrderEnabledBySection[type];
     const excludedCount = (excludedRowKeysBySection[type] || []).length;
     const enabledColumns = columns.filter((col) => col.enabled);
+    const previewSignature = JSON.stringify([filters, sortSettings, originalData.length]);
+    const previewBatch = previewBatches[type];
+    const previewRowCount = previewBatch?.signature === previewSignature
+      ? previewBatch.count : REPORT_PREVIEW_BATCH_SIZE;
+    const visiblePreviewRows = sortedData.slice(0, previewRowCount);
     const previewTableWidth =
       enabledColumns.length <= 5
         ? '78%'
@@ -2717,7 +2729,7 @@ export const ReportsPage: React.FC = () => {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          sortedData.map((item, index) => (
+                          visiblePreviewRows.map((item, index) => (
                             <TableRow key={item.id || index} className="hover:bg-blue-50">
                               <TableCell className="px-2 py-2 text-center font-medium text-gray-600">
                                 {index + 1}
@@ -2804,6 +2816,29 @@ export const ReportsPage: React.FC = () => {
                     </Table>
                   </div>
                 </div>
+                {visiblePreviewRows.length < sortedData.length && (
+                  <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-amber-200/70 bg-amber-50/70 px-4 py-3 text-center">
+                    <p className="text-sm font-semibold text-slate-700" aria-live="polite">
+                      تعرض المعاينة {visiblePreviewRows.length.toLocaleString('ar-SA')} من {sortedData.length.toLocaleString('ar-SA')} سجل؛ الطباعة وملفات PDF وExcel تشمل جميع النتائج.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-10 border-amber-300 bg-white font-bold"
+                      onClick={() => React.startTransition(() => setPreviewBatches((current) => {
+                        const previous = current[type];
+                        const count = previous?.signature === previewSignature
+                          ? previous.count : REPORT_PREVIEW_BATCH_SIZE;
+                        return {
+                          ...current,
+                          [type]: { signature: previewSignature, count: count + REPORT_PREVIEW_BATCH_SIZE },
+                        };
+                      }))}
+                    >
+                      عرض {Math.min(REPORT_PREVIEW_BATCH_SIZE, sortedData.length - visiblePreviewRows.length).toLocaleString('ar-SA')} سجل إضافي
+                    </Button>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="summary" className="space-y-4">
