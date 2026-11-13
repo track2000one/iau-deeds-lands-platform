@@ -1,5 +1,5 @@
 import { updateInteractiveCardMotion, resetInteractiveCardMotion } from '../utils/interactiveCardMotion';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useResultsMotion } from '../utils/useResultsMotion';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
@@ -72,7 +72,7 @@ export const AllDeedsPage: React.FC = () => {
   const [filterPlanned, setFilterPlanned] = useState<'all' | 'planned' | 'unplanned'>('all');
   const [listSortBy, setListSortBy] = useState<'deedNumber' | 'city' | 'district' | 'area' | 'updatedAt'>('deedNumber');
   const [listSortDirection, setListSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [visibleDeedCount, setVisibleDeedCount] = useState(DEED_BATCH_SIZE);
+  const [deedBatch, setDeedBatch] = useState({ key: '', count: DEED_BATCH_SIZE });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deedToDelete, setDeedToDelete] = useState<string | null>(null);
   const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
@@ -239,10 +239,9 @@ export const AllDeedsPage: React.FC = () => {
     () => sortPdfDeeds(filteredDeeds, listSortBy, listSortDirection),
     [filteredDeeds, listSortBy, listSortDirection, sortPdfDeeds],
   );
-  // The user sees a manageable first batch; totals, filtering and PDF export remain complete.
-  useEffect(() => {
-    setVisibleDeedCount(DEED_BATCH_SIZE);
-  }, [searchQuery, filterCity, filterPlanned, listSortBy, listSortDirection]);
+  // Keyed batch resets synchronously, avoiding a costly one-frame full render after searching.
+  const deedBatchKey = JSON.stringify([searchQuery, filterCity, filterPlanned, listSortBy, listSortDirection]);
+  const visibleDeedCount = deedBatch.key === deedBatchKey ? deedBatch.count : DEED_BATCH_SIZE;
   const visibleDeeds = useMemo(
     () => sortedDeeds.slice(0, visibleDeedCount),
     [sortedDeeds, visibleDeedCount],
@@ -608,7 +607,10 @@ export const AllDeedsPage: React.FC = () => {
           <p className="text-sm font-semibold text-slate-700" aria-live="polite">
             عرض {Math.min(visibleDeedCount, sortedDeeds.length).toLocaleString('ar-SA')} من {sortedDeeds.length.toLocaleString('ar-SA')} صك
           </p>
-          <Button type="button" variant="outline" className="min-h-11 border-sky-300 bg-white font-bold" onClick={() => React.startTransition(() => setVisibleDeedCount((count) => count + DEED_BATCH_SIZE))}>
+          <Button type="button" variant="outline" className="min-h-11 border-sky-300 bg-white font-bold" onClick={() => React.startTransition(() => setDeedBatch((current) => ({
+            key: deedBatchKey,
+            count: (current.key === deedBatchKey ? current.count : DEED_BATCH_SIZE) + DEED_BATCH_SIZE,
+          })))}>
             عرض المزيد من الصكوك ({Math.min(DEED_BATCH_SIZE, sortedDeeds.length - visibleDeedCount).toLocaleString('ar-SA')})
           </Button>
         </div>
