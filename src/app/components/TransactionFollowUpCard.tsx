@@ -1,3 +1,4 @@
+import { updateInteractiveCardMotion, resetInteractiveCardMotion } from '../utils/interactiveCardMotion';
 import React from 'react';
 import {
   ArrowLeftRight,
@@ -215,7 +216,13 @@ export const TransactionFollowUpCard: React.FC<Props> = ({
   };
 
   return (
-    <article className="platform-record-card followup-transaction-card flex h-full flex-col p-4 sm:p-5">
+    <article
+      className="platform-record-card followup-transaction-card iau-interactive-card iau-card--transaction flex h-full flex-col p-4 sm:p-5"
+      onPointerMove={updateInteractiveCardMotion}
+      onPointerLeave={resetInteractiveCardMotion}
+      onPointerCancel={resetInteractiveCardMotion}
+    >
+      <span className="iau-card-spotlight" aria-hidden="true" />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="followup-transaction-card__label text-xs">رقم المعاملة</p>
