@@ -1,6 +1,7 @@
 import { updateInteractiveCardMotion, resetInteractiveCardMotion } from '../utils/interactiveCardMotion';
 import { printCentralBuildingReport } from '../utils/centralBuildingPrintReport';
 import React, { useEffect, useMemo, useState } from 'react';
+import { useResultsMotion } from '../utils/useResultsMotion';
 import { useNavigate } from 'react-router';
 import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -262,6 +263,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [buildingView, setBuildingView] = useState<'table' | 'cards'>('table');
+  const [buildingSort, setBuildingSort] = useState<'buildingNumber' | 'name' | 'deedNumber'>('buildingNumber');
+  const [buildingSortDirection, setBuildingSortDirection] = useState<'asc' | 'desc'>('asc');
   const [visibleGroupCounts, setVisibleGroupCounts] = useState<Record<string, number>>({});
 
   const loadData = async () => {
@@ -421,12 +424,25 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     return Array.from(groups.values())
       .map((group) => ({
         ...group,
-        buildings: group.buildings.sort((a, b) =>
-          String(a.buildingNumber || '').localeCompare(String(b.buildingNumber || ''), 'ar', { numeric: true })
-        ),
+        buildings: group.buildings.sort((a, b) => {
+          const valueFor = (building: MosqueBuilding) =>
+            buildingSort === 'name' ? building.name
+              : buildingSort === 'deedNumber' ? building.deed?.deedNumber
+              : building.buildingNumber;
+          const compare = String(valueFor(a) || '').localeCompare(
+            String(valueFor(b) || ''), 'ar', { numeric: true },
+          );
+          return (buildingSortDirection === 'asc' ? 1 : -1) * compare ||
+            String(a.buildingNumber || '').localeCompare(String(b.buildingNumber || ''), 'ar', { numeric: true });
+        }),
       }))
       .sort((a, b) => a.title.localeCompare(b.title, 'ar'));
-  }, [filteredBuildings]);
+  }, [filteredBuildings, buildingSort, buildingSortDirection]);
+
+  const buildingResultsMotionRef = useResultsMotion([
+    search, buildingView, buildingSort, buildingSortDirection,
+    expandedGroups, visibleGroupCounts, filteredBuildings,
+  ]);
 
   const toggleGroup = (key: string) => {
     setExpandedGroups((current) => {
@@ -960,11 +976,22 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               لا توجد مبانٍ مطابقة للبحث.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div ref={buildingResultsMotionRef} className="iau-results-motion-surface space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                   <MapPin className="h-4 w-4 text-primary" />
-                  <span>{buildingGroups.length} مجموعات أحياء — {filteredBuildings.length} مبنى</span>
+                  <span aria-live="polite">{buildingGroups.length} مجموعات أحياء — {filteredBuildings.length} مبنى</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <NativeSelect aria-label="فرز المباني" value={buildingSort} onChange={(event) => setBuildingSort(event.target.value as typeof buildingSort)} className="h-10 w-full sm:w-[160px]">
+                    <option value="buildingNumber">رقم المبنى</option>
+                    <option value="name">اسم المبنى</option>
+                    <option value="deedNumber">رقم الصك المرتبط</option>
+                  </NativeSelect>
+                  <NativeSelect aria-label="اتجاه فرز المباني" value={buildingSortDirection} onChange={(event) => setBuildingSortDirection(event.target.value as typeof buildingSortDirection)} className="h-10 w-full sm:w-[140px]">
+                    <option value="asc">تصاعدي</option>
+                    <option value="desc">تنازلي</option>
+                  </NativeSelect>
                 </div>
                 <div className="flex items-center gap-1 rounded-lg border bg-background p-1" role="group" aria-label="طريقة عرض المباني">
                   <Button
