@@ -1,0 +1,58 @@
+/* Record card enhancement: no changes to content, existing theme surfaces or status colors. */
+.iau-interactive-card {
+  --iau-card-glow-rgb: 56, 189, 248;
+  position: relative;
+  isolation: isolate;
+}
+.iau-interactive-card.iau-card--deed { --iau-card-glow-rgb: 37, 99, 235; }
+.iau-interactive-card.iau-card--building { --iau-card-glow-rgb: 16, 185, 129; }
+.iau-interactive-card.iau-card--transaction { --iau-card-glow-rgb: 34, 211, 238; }
+.iau-interactive-card > :not(.iau-card-spotlight) {
+  position: relative;
+  z-index: 1;
+}
+.iau-interactive-card > .iau-card-spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    350px circle at var(--iau-card-pointer-x, 50%) var(--iau-card-pointer-y, 50%),
+    rgba(var(--iau-card-glow-rgb), .19),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+@media screen and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .neo-platform-shell main article.iau-interactive-card {
+    transform-style: preserve-3d;
+    transition: transform 180ms cubic-bezier(.2, .7, .2, 1), filter 180ms ease, border-color 180ms ease, box-shadow 180ms ease !important;
+  }
+  .neo-platform-shell main article.iau-interactive-card:hover {
+    transform: perspective(1200px) translateY(-4px) rotateX(var(--iau-card-rotate-x, 0deg)) rotateY(var(--iau-card-rotate-y, 0deg)) !important;
+    filter: drop-shadow(0 10px 15px rgba(var(--iau-card-glow-rgb), .15));
+    z-index: 2;
+  }
+  .iau-interactive-card:hover > .iau-card-spotlight,
+  .iau-interactive-card:focus-within > .iau-card-spotlight { opacity: 1; }
+}
+@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .neo-platform-shell main article.iau-interactive-card,
+  .neo-platform-shell main article.iau-interactive-card:hover {
+    transform: none !important;
+    filter: none !important;
+  }
+  .iau-interactive-card > .iau-card-spotlight {
+    display: none;
+    transition: none !important;
+  }
+}
+@media print {
+  .iau-interactive-card, .iau-interactive-card:hover {
+    transform: none !important;
+    filter: none !important;
+  }
+  .iau-interactive-card > .iau-card-spotlight { display: none !important; }
+}
