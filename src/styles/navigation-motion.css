@@ -1,0 +1,110 @@
+/* IAU Deeds: restrained navigation motion, without affecting page data or controls. */
+@media screen {
+  .future-sidebar .iau-motion-nav-item {
+    position: relative;
+    isolation: isolate;
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease !important;
+  }
+
+  .future-sidebar .iau-motion-nav-icon {
+    transition: transform 180ms cubic-bezier(.2, .75, .2, 1), filter 180ms ease;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .future-sidebar .iau-motion-nav-item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, .13);
+    }
+
+    .future-sidebar .iau-motion-nav-item:hover .iau-motion-nav-icon {
+      transform: translateX(-2px) scale(1.07);
+      filter: drop-shadow(0 0 5px rgba(125, 211, 252, .3));
+    }
+
+    [dir="ltr"] .future-sidebar .iau-motion-nav-item:hover .iau-motion-nav-icon {
+      transform: translateX(2px) scale(1.07);
+    }
+  }
+
+  .future-sidebar .iau-motion-nav-item:active {
+    transform: scale(.99);
+  }
+
+  .future-sidebar .iau-motion-nav-item:focus-visible {
+    outline: 2px solid #38bdf8;
+    outline-offset: 2px;
+  }
+
+  .future-sidebar .iau-motion-nav-item.is-active::after {
+    content: "";
+    position: absolute;
+    inset-inline-start: 4px;
+    top: 24%;
+    bottom: 24%;
+    width: 3px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: .78;
+    pointer-events: none;
+  }
+
+  .iau-route-reveal {
+    position: relative;
+    min-height: 100%;
+    animation: iau-route-arrive 260ms cubic-bezier(.2, .7, .2, 1) both;
+  }
+
+  .iau-route-reveal::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(90deg,
+      rgba(56, 189, 248, .025),
+      rgba(56, 189, 248, .17),
+      rgba(14, 165, 233, .035));
+    animation: iau-route-curtain 380ms cubic-bezier(.22, 1, .36, 1) both;
+  }
+
+  @keyframes iau-route-arrive {
+    from { opacity: .84; transform: translate3d(10px, 0, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+
+  @keyframes iau-route-curtain {
+    0% { clip-path: inset(0 0 0 100%); opacity: 0; }
+    42% { clip-path: inset(0 0 0 0); opacity: 1; }
+    100% { clip-path: inset(0 100% 0 0); opacity: 0; }
+  }
+
+  [dir="ltr"] .iau-route-reveal { animation-name: iau-route-arrive-ltr; }
+
+  @keyframes iau-route-arrive-ltr {
+    from { opacity: .84; transform: translate3d(-10px, 0, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+
+  [dir="ltr"] .iau-route-reveal::before { animation-name: iau-route-curtain-ltr; }
+
+  @keyframes iau-route-curtain-ltr {
+    0% { clip-path: inset(0 100% 0 0); opacity: 0; }
+    42% { clip-path: inset(0 0 0 0); opacity: 1; }
+    100% { clip-path: inset(0 0 0 100%); opacity: 0; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .future-sidebar .iau-motion-nav-item,
+  .future-sidebar .iau-motion-nav-icon,
+  .iau-route-reveal {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .iau-route-reveal::before {
+    display: none;
+    animation: none !important;
+  }
+}

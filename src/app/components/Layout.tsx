@@ -387,8 +387,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     variant="ghost"
                     title={item.label}
                     aria-label={item.label}
+                    aria-current={isActive ? 'page' : undefined}
                     className={`
-                      future-nav-item w-full ${isRTL ? 'justify-end' : 'justify-start'} gap-3 text-base font-medium min-h-12 h-auto px-3 py-2.5 whitespace-normal
+                      future-nav-item iau-motion-nav-item w-full ${isRTL ? 'justify-end' : 'justify-start'} gap-3 text-base font-medium min-h-12 h-auto px-3 py-2.5 whitespace-normal
                       ${sidebarCollapsed ? 'lg:justify-center lg:px-2 lg:gap-0' : ''}
                       ${isActive ? 'is-active font-bold' : ''}
                     `}
@@ -397,7 +398,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       setSidebarOpen(false);
                     }}
                   >
-                    <Icon className={`shrink-0 ${sidebarCollapsed ? 'lg:h-5 lg:w-5' : 'h-4.5 w-4.5'}`} />
+                    <Icon className={`iau-motion-nav-icon shrink-0 ${sidebarCollapsed ? 'lg:h-5 lg:w-5' : 'h-4.5 w-4.5'}`} />
                     <span className={`min-w-0 flex-1 whitespace-normal break-words leading-6 ${isRTL ? 'text-right' : 'text-left'} ${sidebarCollapsed ? 'lg:hidden' : ''}`} title={item.label}>
                       {item.label}
                     </span>
@@ -416,7 +417,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </aside>
 
         <main className={`app-main min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background/70 ${isFollowUpRoute ? 'follow-up-app-theme' : ''}`}>
-          <div className="mobile-page-shell w-full max-w-none px-2 py-2.5 sm:px-3 sm:py-4 md:px-5 md:py-5 2xl:px-7">
+          <div
+            key={location.pathname}
+            className="iau-route-reveal mobile-page-shell w-full max-w-none px-2 py-2.5 sm:px-3 sm:py-4 md:px-5 md:py-5 2xl:px-7"
+          >
             {children}
           </div>
         </main>
