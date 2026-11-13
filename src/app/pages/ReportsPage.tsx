@@ -353,6 +353,7 @@ export const ReportsPage: React.FC = () => {
   const [inspectionReportIncludeLocation, setInspectionReportIncludeLocation] = useState(true);
   const [printingInspectionId, setPrintingInspectionId] = useState<string | null>(null);
   const [printingAllInspections, setPrintingAllInspections] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -1205,6 +1206,8 @@ export const ReportsPage: React.FC = () => {
   };
 
   const exportToExcel = async (data: any[], columns: any[], filename: string) => {
+    if (exportingExcel) return;
+    setExportingExcel(true);
     try {
       // Only fetch the Excel engine when the user actually requests an export.
       const XLSX = await import('xlsx');
@@ -1237,6 +1240,8 @@ export const ReportsPage: React.FC = () => {
     } catch (error) {
       console.error('Excel Export Error:', error);
       toast.error(t('reports.exportError') || 'فشل في التصدير');
+    } finally {
+      setExportingExcel(false);
     }
   };
 
@@ -2637,12 +2642,13 @@ export const ReportsPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
                   <Button
-                    onClick={() => exportToExcel(sortedData, columns, printSettings.reportTitle || title)}
+                    onClick={() => void exportToExcel(sortedData, columns, printSettings.reportTitle || title)}
+                    disabled={exportingExcel}
                     variant="outline"
                     className="w-full h-10 md:h-11 text-sm md:text-base"
                   >
-                    <FileSpreadsheet className="h-4 w-4 ml-2 text-green-600" />
-                    Excel
+                    {exportingExcel ? <Loader2 className="h-4 w-4 ml-2 animate-spin text-green-600" /> : <FileSpreadsheet className="h-4 w-4 ml-2 text-green-600" />}
+                    {exportingExcel ? 'جاري تجهيز Excel...' : 'Excel'}
                   </Button>
 
                   <Button
