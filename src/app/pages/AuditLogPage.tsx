@@ -21,6 +21,7 @@ import {
 import { apiJson, authenticatedFetch } from '../../lib/http';
 import { AuditUsersSummary } from '../components/AuditUsersSummary';
 import { AuditUserReportDialog } from '../components/AuditUserReportDialog';
+import { OperationalMonitoringPanel } from '../components/OperationalMonitoringPanel';
 import type {
   AuditFiltersResponse,
   AuditListResponse,
@@ -74,6 +75,9 @@ const actionLabels: Record<string, string> = {
   download: 'تنزيل',
   print: 'طباعة',
   export: 'تصدير',
+  authentication_failed: 'جلسة غير صالحة',
+  access_denied: 'محاولة وصول مرفوضة',
+  server_error: 'خطأ في الخادم',
 };
 
 const moduleLabels: Record<string, string> = {
@@ -354,6 +358,8 @@ export const AuditLogPage: React.FC = () => {
         <StatCard icon={LogIn} label="دخول فاشل" value={stats.failedLogins} />
         <StatCard icon={Users} label="مستخدمون اليوم" value={stats.activeUsersToday} />
       </div>
+
+      <OperationalMonitoringPanel />
 
       <Card>
         <CardHeader>
