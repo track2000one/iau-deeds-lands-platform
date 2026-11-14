@@ -7,6 +7,19 @@
 :{$PORT:8080} {
     root * /srv
     encode gzip
-    try_files {path} /index.html
-    file_server
+
+    # Vite fingerprints these filenames. An old deployment's files must never
+    # be silently rewritten to index.html after a new deployment.
+    handle /assets/* {
+        header Cache-Control "public, max-age=31536000, immutable"
+        file_server
+    }
+
+    # Always revalidate the SPA shell and the build-info.json release manifest.
+    # Other non-fingerprinted public files are safe to refresh as well.
+    handle {
+        header Cache-Control "no-store, max-age=0, must-revalidate"
+        try_files {path} /index.html
+        file_server
+    }
 }
