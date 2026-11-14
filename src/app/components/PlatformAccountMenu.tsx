@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionsContext';
 import { Button } from './ui/button';
+import { ReleaseStatus } from './ReleaseStatus';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 const formatLastLogin = (value?: Date | null) => {
@@ -109,6 +110,10 @@ export const PlatformAccountMenu: React.FC = () => {
             </span>
             <b className="text-left text-[11px] leading-5 text-slate-700">{formatLastLogin(userProfile?.lastLoginAt)}</b>
           </div>
+        </div>
+
+        <div className="px-3 pb-2">
+          <ReleaseStatus compact />
         </div>
 
         <div className="grid gap-2 border-t border-slate-200 bg-white p-3">
