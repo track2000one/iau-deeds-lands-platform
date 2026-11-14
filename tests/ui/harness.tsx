@@ -67,6 +67,75 @@ function SampleReportPagination() {
   );
 }
 
+/**
+ * Exercises the same PDF merge function used by the live deed report screen,
+ * but exclusively with an in-memory, two-page synthetic PDF.
+ */
+function SyntheticDeedPdfExport() {
+  const [status, setStatus] = React.useState('');
+  const [generating, setGenerating] = React.useState(false);
+
+  const run = async () => {
+    if (generating) return;
+    setGenerating(true);
+    setStatus('جاري اختبار الدمج');
+    try {
+      const { PDFDocument } = await import('pdf-lib');
+      const { generateDeedImagesPdf } = await import('../../src/app/utils/deedBatchPdf');
+
+      const original = await PDFDocument.create();
+      original.addPage([400, 600]);
+      original.addPage([600, 800]);
+      const bytes = await original.save();
+      const encoded = btoa(String.fromCharCode(...bytes));
+      const attachmentUrl = `data:application/pdf;base64,${encoded}`;
+
+      const documentTypes = [
+        { id: 'synthetic-deed', attachmentType: 'deed_image' },
+        { id: 'synthetic-plan', attachmentType: 'plan_image' },
+        { id: 'synthetic-location', attachmentType: 'location_image' },
+      ];
+      const deed = {
+        id: 'synthetic-ci-deed',
+        deedNumber: 'CI-DEED-TEST-001',
+        attachments: documentTypes.map(({ id, attachmentType }) => ({
+          id,
+          title: `${attachmentType}.pdf`,
+          attachmentType,
+          mimeType: 'application/pdf',
+          fileUrl: attachmentUrl,
+        })),
+      } as Parameters<typeof generateDeedImagesPdf>[0][number];
+
+      const result = await generateDeedImagesPdf([deed], {
+        includeCover: false,
+        includeHeaders: false,
+        includeIndex: false,
+        includePlanImages: true,
+        includeLocationImages: true,
+        fileName: 'synthetic-deed-test',
+        compression: 'high',
+        maxFileSizeMb: 0,
+      });
+      setStatus(`${result.pdfCount} مستندات PDF، ${result.pageCount} صفحات؛ ${result.deedCount} صك`);
+    } catch (error) {
+      setStatus(`فشل: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <section data-testid="real-pdf-merge">
+      <h2>اختبار التجميع الفعلي لمستندات الصك والمخطط والموقع</h2>
+      <button type="button" disabled={generating} onClick={() => void run()}>
+        {generating ? 'جارٍ إنشاء PDF التجريبي' : 'إنشاء PDF تجريبي متعدد الصفحات'}
+      </button>
+      <p data-testid="real-pdf-result" aria-live="polite">{status}</p>
+    </section>
+  );
+}
+
 function Harness() {
   return (
     <div className="neo-platform-shell min-h-screen p-4">
@@ -89,6 +158,7 @@ function Harness() {
           <AttachmentPreviewGrid attachments={attachments} compact />
         </section>
         <SampleReportPagination />
+        <SyntheticDeedPdfExport />
         <section data-testid="report-charts">
           <h2>رسوم التقرير التجريبية</h2>
           <div style={{ width: '100%', height: 300 }}>

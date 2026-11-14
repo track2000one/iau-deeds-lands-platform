@@ -97,6 +97,32 @@ test('release verifier distinguishes up-to-date, newer version and offline error
   await expect(release.getByText(/تعذر التحقق/)).toBeVisible();
 });
 
+test('real PDF merger preserves source pages and includes deed, plan and site documents', async ({ page }) => {
+  await page.goto('/tests/ui/harness.html');
+  const fixture = page.getByTestId('real-pdf-merge');
+  const event = page.waitForEvent('download');
+  await fixture.getByRole('button', { name: 'إنشاء PDF تجريبي متعدد الصفحات' }).click();
+  const download = await event;
+  expect(download.suggestedFilename()).toBe('synthetic-deed-test.pdf');
+  const { PDFDocument } = await import('pdf-lib');
+  const { readFile } = await import('node:fs/promises');
+  const pdf = await PDFDocument.load(await readFile(await download.path()));
+  expect(pdf.getPageCount()).toBe(6);
+  const sizes = pdf.getPages().map((item) => ({
+    width: Math.round(item.getWidth()),
+    height: Math.round(item.getHeight()),
+  }));
+  expect(sizes).toEqual([
+    { width: 400, height: 600 },
+    { width: 600, height: 800 },
+    { width: 400, height: 600 },
+    { width: 600, height: 800 },
+    { width: 400, height: 600 },
+    { width: 600, height: 800 },
+  ]);
+  await expect(fixture.getByTestId('real-pdf-result')).toContainText('3 مستندات PDF، 6 صفحات');
+});
+
 test('report chart renders with representative, synthetic counts', async ({ page }) => {
   await page.goto('/tests/ui/harness.html');
   const chart = page.getByTestId('report-charts');
