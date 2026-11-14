@@ -55,6 +55,7 @@ import { getSiteInspection, getSiteInspections } from '../api/siteInspections';
 import { openSiteInspectionReport, openSiteInspectionReports } from '../utils/siteInspectionReport';
 import { Badge } from '../components/ui/badge';
 import { ReportViewToggle } from '../components/ReportViewToggle';
+import { REPORT_PREVIEW_BATCH_SIZE, getVisibleReportRows, nextReportPreviewCount } from '../utils/reportPreviewPagination';
 const LazyReportCharts = React.lazy(() => import('../components/ReportCharts').then(
   (module) => ({ default: module.ReportCharts }),
 ));
@@ -224,8 +225,6 @@ const defaultPrintSettings: PrintSettings = {
   fontSize: 13,
   headerColor: '#1f4e79',
 };
-
-const REPORT_PREVIEW_BATCH_SIZE = 60;
 
 export const ReportsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -2212,7 +2211,7 @@ export const ReportsPage: React.FC = () => {
     const previewBatch = previewBatches[type];
     const previewRowCount = previewBatch?.signature === previewSignature
       ? previewBatch.count : REPORT_PREVIEW_BATCH_SIZE;
-    const visiblePreviewRows = sortedData.slice(0, previewRowCount);
+    const visiblePreviewRows = getVisibleReportRows(sortedData, previewRowCount);
     const previewTableWidth =
       enabledColumns.length <= 5
         ? '78%'
@@ -2897,7 +2896,7 @@ export const ReportsPage: React.FC = () => {
                           ? previous.count : REPORT_PREVIEW_BATCH_SIZE;
                         return {
                           ...current,
-                          [type]: { signature: previewSignature, count: count + REPORT_PREVIEW_BATCH_SIZE },
+                          [type]: { signature: previewSignature, count: nextReportPreviewCount(count, sortedData.length) },
                         };
                       }))}
                     >
