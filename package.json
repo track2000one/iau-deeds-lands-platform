@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:ui:contracts": "node scripts/check-ui-contracts.mjs",
+    "test:ui:browser": "playwright test --config tests/ui/playwright.config.mjs"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
