@@ -28,7 +28,9 @@ jobs:
 
   ui-browser:
     name: UI browser smoke (isolated demo data)
-    runs-on: ubuntu-latest
+    # Playwright 1.56 Chromium binaries are supported on Ubuntu 24.04.
+    # ubuntu-latest currently targets 26.04, which this pinned version rejects.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
