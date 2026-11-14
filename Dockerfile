@@ -17,6 +17,8 @@ RUN npm run build
 
 FROM caddy:2-alpine AS runtime
 COPY Caddyfile /etc/caddy/Caddyfile
+# Fail production builds early if the web-server cache rules are invalid.
+RUN caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 COPY --from=build /app/dist /srv
 ENV PORT=8080
 EXPOSE 8080
