@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 import '../../src/styles/index.css';
 import { AttachmentPreviewGrid } from '../../src/app/components/AttachmentPreview';
 import { ReleaseStatus } from '../../src/app/components/ReleaseStatus';
+import { BUILD_INFO } from '../../src/app/utils/buildInfo';
 import { ReportCharts } from '../../src/app/components/ReportCharts';
 import {
   getVisibleReportRows,
@@ -101,5 +102,8 @@ function Harness() {
     </div>
   );
 }
+
+// Public test metadata only; no credentials or backend responses.
+(window as Window & { __IAU_UI_TEST_BUILD_INFO__?: typeof BUILD_INFO }).__IAU_UI_TEST_BUILD_INFO__ = BUILD_INFO;
 
 createRoot(document.getElementById('root')!).render(<Harness />);
