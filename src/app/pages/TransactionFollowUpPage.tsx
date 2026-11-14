@@ -2746,6 +2746,7 @@ ${styleAssets}
     const exportOrientation = override?.orientation || reportOrientation;
     const exportFrom = override?.from || reportFrom;
     const exportTo = override?.to || reportTo;
+    let renderCanvas: HTMLCanvasElement | null = null;
     try {
       setReportExporting(true);
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
@@ -2759,6 +2760,7 @@ ${styleAssets}
         useCORS: true,
         logging: false,
       });
+      renderCanvas = canvas;
 
       const landscape = exportOrientation === 'landscape';
       const pdf = new jsPDF({ orientation: exportOrientation, unit: 'mm', format: 'a4' });
@@ -2804,6 +2806,8 @@ ${styleAssets}
           undefined,
           'FAST',
         );
+        pageCanvas.width = 0;
+        pageCanvas.height = 0;
         pageIndex += 1;
       }
 
@@ -2812,6 +2816,10 @@ ${styleAssets}
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر إنشاء ملف PDF');
     } finally {
+      if (renderCanvas) {
+        renderCanvas.width = 0;
+        renderCanvas.height = 0;
+      }
       setReportExporting(false);
     }
   };
