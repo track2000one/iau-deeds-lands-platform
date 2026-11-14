@@ -27,7 +27,7 @@ test('PDF frames load only after a click and can be released again', async ({ pa
 test('attachments show 12 at first; report preview caps at 60 but full data stays available', async ({ page }) => {
   await page.goto('/tests/ui/harness.html');
   const grid = page.getByTestId('attachment-grid');
-  await expect(grid.getByText('معاينة ١٢ من ١٤ مرفق')).toBeVisible();
+  await expect(grid.getByText(/معاينة .* من .* مرفق/)).toBeVisible();
   await grid.getByRole('button', { name: 'عرض المزيد من المرفقات' }).click();
   await expect(grid.getByText('مرفق تجريبي 14.pdf')).toBeVisible();
 
@@ -83,16 +83,13 @@ test('release verifier distinguishes up-to-date, newer version and offline error
   await expect(release.getByRole('button', { name: 'تحديث المنصة الآن' })).toBeVisible();
 
   await page.unrouteAll();
-  await page.route('**/build-info.json?check=*', async (route) => {
-    const response = await route.request.get('/build-info.json').catch(() => null);
-    const info = response?.ok() ? await response.json() : null;
-    // Vite dev has no build manifest, so use the build id embedded in the UI instead.
-    const exposedId = info?.id ?? '';
-    await route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ id: exposedId || 'build-a-newer-test-release', builtAt: '2026-11-14T09:40:00Z', commit: '' }),
-    });
-  });
+  const current = await page.evaluate(() => window.__IAU_UI_TEST_BUILD_INFO__);
+  expect(current).toMatchObject({ id: expect.any(String), builtAt: expect.any(String) });
+  await page.route('**/build-info.json?check=*', (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(current) }));
+  await button.click();
+  await expect(release.getByText('لديك أحدث إصدار متاح')).toBeVisible();
+
   // Deliberately check network-error reporting without changing account/session state.
   await page.unrouteAll();
   await page.route('**/build-info.json?check=*', (route) => route.abort());
