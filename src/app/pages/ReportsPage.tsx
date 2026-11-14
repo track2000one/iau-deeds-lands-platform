@@ -385,6 +385,27 @@ export const ReportsPage: React.FC = () => {
   const [printingInspectionId, setPrintingInspectionId] = useState<string | null>(null);
   const [printingAllInspections, setPrintingAllInspections] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
+  // Keep print URLs and polling timers bounded, including navigation away mid-print.
+  const printResourcesRef = useRef<{ urls: Map<string, number>; intervals: Set<number> }>({
+    urls: new Map(),
+    intervals: new Set(),
+  });
+  React.useEffect(() => () => {
+    for (const interval of printResourcesRef.current.intervals) window.clearInterval(interval);
+    printResourcesRef.current.intervals.clear();
+    for (const [url, timer] of printResourcesRef.current.urls) {
+      window.clearTimeout(timer);
+      URL.revokeObjectURL(url);
+    }
+    printResourcesRef.current.urls.clear();
+  }, []);
+  const trackPrintableUrl = (url: string) => {
+    const timer = window.setTimeout(() => {
+      printResourcesRef.current.urls.delete(url);
+      URL.revokeObjectURL(url);
+    }, 60_000);
+    printResourcesRef.current.urls.set(url, timer);
+  };
 
   React.useEffect(() => {
     let cancelled = false;
@@ -1890,23 +1911,30 @@ export const ReportsPage: React.FC = () => {
     }
 
     if (autoPrint) {
+      const startedAt = Date.now();
       const timer = window.setInterval(() => {
+        const finishPolling = () => {
+          window.clearInterval(timer);
+          printResourcesRef.current.intervals.delete(timer);
+        };
+        if (printWindow.closed || Date.now() - startedAt > 15_000) {
+          finishPolling();
+          return;
+        }
         try {
           if (printWindow.document.readyState === 'complete') {
-            window.clearInterval(timer);
+            finishPolling();
             printWindow.focus();
-
-            setTimeout(() => {
-              printWindow.print();
-            }, 500);
+            window.setTimeout(() => printWindow.print(), 500);
           }
         } catch {
-          window.clearInterval(timer);
+          finishPolling();
         }
       }, 250);
+      printResourcesRef.current.intervals.add(timer);
     }
 
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    trackPrintableUrl(url);
   };
 
   const exportToPDF = async (
@@ -1918,6 +1946,7 @@ export const ReportsPage: React.FC = () => {
     filters?: ReportFilters
   ) => {
     let renderFrame: HTMLIFrameElement | null = null;
+    let renderCanvas: HTMLCanvasElement | null = null;
 
     try {
       const [{ jsPDF }, html2canvasModule] = await Promise.all([
@@ -1995,6 +2024,7 @@ export const ReportsPage: React.FC = () => {
         scrollX: 0,
         scrollY: 0,
       });
+      renderCanvas = canvas;
 
       if (!canvas.width || !canvas.height) {
         throw new Error('تم إنشاء صورة تقرير فارغة.');
@@ -2053,6 +2083,9 @@ export const ReportsPage: React.FC = () => {
           undefined,
           'FAST'
         );
+        // The PDF already contains an encoded copy; free this temporary bitmap.
+        sliceCanvas.width = 0;
+        sliceCanvas.height = 0;
 
         offsetY += sliceHeight;
         pageIndex += 1;
@@ -2073,7 +2106,7 @@ export const ReportsPage: React.FC = () => {
       document.body.appendChild(downloadLink);
       downloadLink.click();
       downloadLink.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+      trackPrintableUrl(objectUrl);
 
       toast.success('تم تنزيل PDF بالمحتوى العربي كاملًا.');
     } catch (error) {
@@ -2081,6 +2114,10 @@ export const ReportsPage: React.FC = () => {
       toast.error('تعذر إنشاء PDF. استخدم «معاينة وطباعة» مؤقتًا.');
     } finally {
       renderFrame?.remove();
+      if (renderCanvas) {
+        renderCanvas.width = 0;
+        renderCanvas.height = 0;
+      }
     }
   };
 
