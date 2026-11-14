@@ -9,16 +9,47 @@ permissions:
 
 jobs:
   build:
+    name: Build + report release contracts
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Verify mosque needs reports (all types)
         run: node scripts/check-mosque-need-reports.mjs
       - name: Build frontend
         run: npm run build
+      - name: Test reports, release manifest and build contracts
+        run: npm run test:ui:contracts
+
+  ui-browser:
+    name: UI browser smoke (isolated demo data)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install pinned test-only Playwright runner
+        run: npm install --no-save --package-lock=false @playwright/test@1.56.1
+      - name: Install browser and system dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Exercise actual UI components in a local browser
+        run: npm run test:ui:browser
+      - name: Upload screenshots and trace only on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-browser-failure-evidence
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
