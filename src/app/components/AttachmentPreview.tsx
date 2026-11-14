@@ -155,12 +155,22 @@ export const AttachmentPreviewCard: React.FC<{
       <div className={`relative w-full ${previewHeight} overflow-hidden bg-muted/20`}>
         {isPdf && previewUrl ? (
           pdfPreviewActive ? (
-            <iframe
-              src={previewUrl}
-              title={name}
-              loading="lazy"
-              className="h-full w-full border-0 bg-white"
-            />
+            <div className="relative h-full w-full">
+              <iframe
+                src={previewUrl}
+                title={name}
+                loading="lazy"
+                className="h-full w-full border-0 bg-white"
+              />
+              <button
+                type="button"
+                onClick={() => setPdfPreviewActive(false)}
+                className="absolute end-2 top-2 rounded-lg border border-slate-300 bg-white/95 px-2.5 py-1 text-xs font-bold text-slate-800 shadow hover:bg-white"
+                aria-label={`إغلاق معاينة PDF: ${name}`}
+              >
+                إغلاق المعاينة
+              </button>
+            </div>
           ) : (
             <button
               type="button"

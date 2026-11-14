@@ -1167,6 +1167,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                               <article
                                 key={building.id}
                                 className="group iau-interactive-card iau-card--building rounded-2xl border bg-background/60 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
+                                data-deed-linked={Boolean(building.deedId || building.deed?.deedNumber)}
                                 onPointerMove={updateInteractiveCardMotion}
                                 onPointerLeave={resetInteractiveCardMotion}
                                 onPointerCancel={resetInteractiveCardMotion}
