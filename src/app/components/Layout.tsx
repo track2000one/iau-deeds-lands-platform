@@ -7,6 +7,7 @@ import { usePermissions } from '../../context/PermissionsContext';
 import { ThemeInitializer } from './ThemeInitializer';
 import { PlatformNotificationCenter } from './PlatformNotificationCenter';
 import { PlatformAccountMenu } from './PlatformAccountMenu';
+import { ReleaseStatus } from './ReleaseStatus';
 import { PLATFORM_LOGO_URL } from '../config/branding';
 import {
   Home,
@@ -409,9 +410,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             <Separator className={`my-4 bg-sidebar-border ${sidebarCollapsed ? 'lg:mx-2' : ''}`} />
 
-            <div className={`px-3 py-2 text-xs opacity-70 ${isRTL ? 'text-right' : 'text-left'} ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
-              <p className="font-medium">v2060.1.0</p>
-              <p className="mt-1">© 2060 IAU</p>
+            <div className={`px-1 py-2 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+              <ReleaseStatus />
             </div>
           </ScrollArea>
         </aside>
