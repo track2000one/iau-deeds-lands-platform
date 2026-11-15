@@ -43,12 +43,20 @@ import type {
 } from '../../types/accountingTransformation';
 import { buildOfficialAccountingTransformationExcel } from '../../utils/officialAccountingTransformationExcel';
 import { buildAccountingStyledExcel } from '../utils/accountingStyledExcel';
+import { getBuildingReportFieldValue, isBuildingReportField } from '../utils/accountingBuildingReportFields';
 import { ACCOUNTING_COMMITTEE_STATUS_LABELS } from '../config/accountingTransformationFields';
 import { getAccountingDisplayFields, getAccountingRecordTypeLabel } from '../config/accountingRecordPresentation';
 
 const printableFields = [
+  // Dedicated building statement, in the requested order.
+  ['buildingNumber', 'رقم المبنى'], ['buildingArea', 'المساحة (م²)'],
+  ['buildingCoordinates', 'الإحداثيات'], ['buildingLocation', 'الموقع'],
+  ['buildingUniqueNumber', 'الرقم الفريد للمبنى'], ['assetDescription', 'وصف الأصل'],
+  ['buildingNationalAddress', 'العنوان الوطني'], ['buildingCardNumber', 'رقم البطاقة'],
+  // Distinguish the land footprint from the gross built-up area.
+  ['buildingLandArea', 'مساحة أرض المبنى (م²)'],
   ['recordNumber', 'رقم السجل'], ['recordType', 'نوع الأصل'], ['entityName', 'الجهة'],
-  ['entityAssetNumber', 'رقم الأصل بالجهة'], ['assetDescription', 'وصف الأصل'],
+  ['entityAssetNumber', 'رقم الأصل بالجهة'],
   ['accountingGroup', 'المجموعة المحاسبية'], ['accountingGroupCode', 'رمز المجموعة'],
   ['accountingAssetCode', 'رمز الأصل المحاسبي'], ['region', 'المنطقة'], ['city', 'المدينة'],
   ['committeeStatus', 'حالة اللجنة'], ['censusProgress', 'اكتمال الحصر'],
@@ -57,6 +65,10 @@ const printableFields = [
 ] as const;
 type FieldKey = (typeof printableFields)[number][0];
 const DEFAULT_PRINT_FIELDS: FieldKey[] = ['recordNumber', 'recordType', 'assetDescription', 'entityAssetNumber', 'accountingAssetCode', 'city', 'committeeStatus', 'overallProgress'];
+const BUILDING_PRINT_FIELDS: FieldKey[] = [
+  'buildingNumber', 'buildingArea', 'buildingCoordinates', 'buildingLocation',
+  'buildingUniqueNumber', 'assetDescription', 'buildingNationalAddress', 'buildingCardNumber',
+];
 
 type ReportSettings = { universityName: string; departmentName: string; reportTitle: string; statementTitle: string };
 const STORAGE_KEY = 'iau-accounting-transformation-report-settings';
@@ -102,7 +114,11 @@ const OutputCard: React.FC<{
 };
 
 const displayValue = (item: AccountingTransformationRecord, key: FieldKey) => {
-  const value = item[key];
+  if (isBuildingReportField(key)) return getBuildingReportFieldValue(item, key);
+  if (key === 'assetDescription' && item.recordType === 'building') {
+    return String(item.assetDescription || item.payload?.G || '-').trim() || '-';
+  }
+  const value = item[key as keyof AccountingTransformationRecord];
   if (key === 'recordType') return getAccountingRecordTypeLabel(item.recordType);
   if (key === 'committeeStatus') return ACCOUNTING_COMMITTEE_STATUS_LABELS[item.committeeStatus] || item.committeeStatus;
   if (key === 'createdAt' || key === 'updatedAt') return value ? new Date(String(value)).toLocaleString('ar-SA') : '-';
@@ -169,8 +185,12 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [selectedFields, setSelectedFields] = useState<FieldKey[]>(DEFAULT_PRINT_FIELDS);
-  const [sortKey, setSortKey] = useState<FieldKey>('recordNumber');
+  const [selectedFields, setSelectedFields] = useState<FieldKey[]>(
+    () => searchParams.get('type') === 'building' ? [...BUILDING_PRINT_FIELDS] : [...DEFAULT_PRINT_FIELDS],
+  );
+  const [sortKey, setSortKey] = useState<FieldKey>(
+    searchParams.get('type') === 'building' ? 'buildingNumber' : 'recordNumber',
+  );
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [cityFilter, setCityFilter] = useState('all');
   const [readinessFilter, setReadinessFilter] = useState('all');
@@ -556,7 +576,13 @@ export const AccountingTransformationReportsPage: React.FC = () => {
         <div className="border-t p-4">
           <form onSubmit={submitSearch} className="grid gap-3 xl:grid-cols-[1fr_210px_210px_auto]">
             <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(e) => setSearch(e.target.value)} className="h-11 pr-9" placeholder="رقم السجل أو الأصل أو الوصف أو المدينة..." /></div>
-            <NativeSelect value={recordType} onChange={(e) => { setRecordType(e.target.value); setPage(1); }} className="h-11"><option value="all">كل الأنواع</option><option value="fixed_asset">نموذج ب — سجل الأصول</option><option value="land">الأراضي</option><option value="building">المباني</option></NativeSelect>
+            <NativeSelect value={recordType} onChange={(e) => {
+              const nextType = e.target.value;
+              setRecordType(nextType);
+              setSelectedFields(nextType === 'building' ? [...BUILDING_PRINT_FIELDS] : [...DEFAULT_PRINT_FIELDS]);
+              setSortKey(nextType === 'building' ? 'buildingNumber' : 'recordNumber');
+              setPage(1);
+            }} className="h-11"><option value="all">كل الأنواع</option><option value="fixed_asset">نموذج ب — سجل الأصول</option><option value="land">الأراضي</option><option value="building">المباني</option></NativeSelect>
             <NativeSelect value={committeeStatus} onChange={(e) => { setCommitteeStatus(e.target.value); setPage(1); }} className="h-11"><option value="all">كل حالات اللجنة</option>{Object.entries(ACCOUNTING_COMMITTEE_STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect>
             <div className="flex gap-2"><Button type="submit">بحث</Button><Button type="button" variant="outline" onClick={resetFilters}><RotateCcw className="ml-1 h-4 w-4" />إعادة</Button></div>
           </form>
@@ -617,7 +643,14 @@ export const AccountingTransformationReportsPage: React.FC = () => {
             <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <strong className="text-xs text-slate-800">أعمدة التقرير ({selectedFields.length})</strong>
-                <div className="flex gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setSelectedFields(printableFields.map(([key]) => key))}>كل الأعمدة</Button><Button type="button" size="sm" variant="outline" onClick={() => setSelectedFields([...DEFAULT_PRINT_FIELDS])}>الأعمدة الأساسية</Button></div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" className="border-sky-300 text-sky-800" onClick={() => {
+                    setRecordType('building');
+                    setSelectedFields([...BUILDING_PRINT_FIELDS]);
+                    setSortKey('buildingNumber');
+                    setPage(1);
+                  }}>حقول المباني الثمانية</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setSelectedFields(printableFields.map(([key]) => key))}>كل الأعمدة</Button><Button type="button" size="sm" variant="outline" onClick={() => setSelectedFields([...DEFAULT_PRINT_FIELDS])}>الأعمدة الأساسية</Button></div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                 {printableFields.map(([key, label]) => (
@@ -627,6 +660,10 @@ export const AccountingTransformationReportsPage: React.FC = () => {
                   </label>
                 ))}
               </div>
+              <p className="mt-2 text-xs text-slate-500">
+                في تقرير المباني: «المساحة» هي المساحة الكاملة لمسطحات البناء (AE)، و«الموقع» يجمع المنطقة والمدينة (AL/AM).
+                يمكن إضافة مساحة أرض المبنى (AF) من قائمة الأعمدة عند الحاجة. القيم غير المتاحة تُعرض بشرطة دون تقدير.
+              </p>
               {!selectedFields.length && <p className="mt-2 text-xs font-bold text-red-700">اختر عمودًا واحدًا على الأقل لتفعيل الطباعة.</p>}
             </div>
           </section>
