@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import {
@@ -52,9 +52,10 @@ const printableFields = [
   ['accountingAssetCode', 'رمز الأصل المحاسبي'], ['region', 'المنطقة'], ['city', 'المدينة'],
   ['committeeStatus', 'حالة اللجنة'], ['censusProgress', 'اكتمال الحصر'],
   ['inventoryProgress', 'اكتمال الجرد'], ['valuationProgress', 'اكتمال التقييم'],
-  ['overallProgress', 'الاكتمال العام'], ['createdAt', 'تاريخ الإدخال'], ['updatedAt', 'آخر تحديث'],
+  ['overallProgress', 'الاكتمال العام'], ['createdBy', 'مدخل السجل'], ['updatedBy', 'آخر تعديل بواسطة'], ['createdAt', 'تاريخ الإدخال'], ['updatedAt', 'آخر تحديث'],
 ] as const;
 type FieldKey = (typeof printableFields)[number][0];
+const DEFAULT_PRINT_FIELDS: FieldKey[] = ['recordNumber', 'recordType', 'assetDescription', 'entityAssetNumber', 'accountingAssetCode', 'city', 'committeeStatus', 'overallProgress'];
 
 type ReportSettings = { universityName: string; departmentName: string; reportTitle: string; statementTitle: string };
 const STORAGE_KEY = 'iau-accounting-transformation-report-settings';
@@ -153,16 +154,37 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   const [cycles, setCycles] = useState<AccountingTransformationCycle[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState(searchParams.get('cycle') || '');
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [appliedSearch, setAppliedSearch] = useState('');
-  const [recordType, setRecordType] = useState('all');
-  const [committeeStatus, setCommitteeStatus] = useState('all');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [appliedSearch, setAppliedSearch] = useState(searchParams.get('search') || '');
+  const [recordType, setRecordType] = useState(
+    ['building', 'land', 'fixed_asset'].includes(searchParams.get('type') || '') ? String(searchParams.get('type')) : 'all',
+  );
+  const [committeeStatus, setCommitteeStatus] = useState(
+    Object.hasOwn(ACCOUNTING_COMMITTEE_STATUS_LABELS, searchParams.get('status') || '')
+      ? String(searchParams.get('status')) : 'all',
+  );
   const [group, setGroup] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [selectedFields] = useState<FieldKey[]>(printableFields.map(([key]) => key));
+  const [selectedFields, setSelectedFields] = useState<FieldKey[]>(DEFAULT_PRINT_FIELDS);
+  const [sortKey, setSortKey] = useState<FieldKey>('recordNumber');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [cityFilter, setCityFilter] = useState('all');
+  const [readinessFilter, setReadinessFilter] = useState('all');
+  const [ownershipFilter, setOwnershipFilter] = useState('all');
+  const [printScope, setPrintScope] = useState<'all' | 'selected'>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('landscape');
+  const [paperSize, setPaperSize] = useState<'A4' | 'A3'>('A4');
+  const [fontSize, setFontSize] = useState(9);
+  const [reportTitle, setReportTitle] = useState(
+    searchParams.get('type') === 'building' ? 'بيان المباني — لجنة متابعة متطلبات التحول المحاسبي' : DEFAULT_SETTINGS.reportTitle,
+  );
+  const [loadError, setLoadError] = useState('');
+  const [loadedCount, setLoadedCount] = useState(0);
+  const requestToken = useRef(0);
   const [officialTemplate, setOfficialTemplate] = useState<AccountingExcelTemplateMeta | null>(null);
   const [templateHistory, setTemplateHistory] = useState<AccountingExcelTemplateMeta[]>([]);
   const [templateLoading, setTemplateLoading] = useState(true);
@@ -199,23 +221,55 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   const selectedCycle = cycles.find((cycle) => cycle.id === selectedCycleId) || null;
 
   const load = async () => {
+    const token = ++requestToken.current;
     setLoading(true);
+    setLoadError('');
+    setSourceItems([]);
+    setLoadedCount(0);
     try {
-      const response = await getAccountingTransformationRecords({
+      const query = {
         search: appliedSearch,
         recordType,
         committeeStatus,
         cycleId: selectedCycleId || undefined,
-        all: true,
-      });
-      setSourceItems(response.items || []);
-      if (response.truncated) toast.warning(`تم تحميل أول ${response.items.length.toLocaleString('ar-SA')} سجل لحماية أداء الصفحة. استخدم تصفية أدق عند الحاجة.`);
+      };
+      // Read every matching record rather than only the visible 36 cards or the
+      // server's 5,000-row "all" shortcut. Never print a partial data set.
+      const first = await getAccountingTransformationRecords({ ...query, page: 1, limit: 200 });
+      const collected = [...(first.items || [])];
+      const pages = Math.max(1, first.totalPages || Math.ceil(first.total / 200));
+      if (token !== requestToken.current) return;
+      setLoadedCount(collected.length);
+      for (let pageNumber = 2; pageNumber <= pages; pageNumber += 1) {
+        if (token !== requestToken.current) return;
+        const next = await getAccountingTransformationRecords({ ...query, page: pageNumber, limit: 200 });
+        collected.push(...(next.items || []));
+        if (token !== requestToken.current) return;
+        setLoadedCount(collected.length);
+      }
+      if (collected.length !== first.total) {
+        throw new Error('عدد السجلات المحملة لا يطابق الإجمالي؛ لم يتم اعتماد نتائج جزئية.');
+      }
+      if (token === requestToken.current) setSourceItems(collected);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر تحميل التقرير');
-    } finally { setLoading(false); }
+      if (token === requestToken.current) {
+        const message = error instanceof Error ? error.message : 'تعذر تحميل التقرير';
+        setSourceItems([]);
+        setLoadError(message);
+        toast.error(message);
+      }
+    } finally {
+      if (token === requestToken.current) setLoading(false);
+    }
   };
-  useEffect(() => { void load(); }, [appliedSearch, recordType, committeeStatus, selectedCycleId]);
-  useEffect(() => { setPage(1); }, [group, dateFrom, dateTo, pageSize, selectedCycleId]);
+  useEffect(() => {
+    void load();
+    return () => { requestToken.current += 1; };
+  }, [appliedSearch, recordType, committeeStatus, selectedCycleId]);
+  useEffect(() => { setPage(1); }, [
+    group, dateFrom, dateTo, pageSize, selectedCycleId, cityFilter,
+    readinessFilter, ownershipFilter, sortKey, sortDirection,
+  ]);
 
   const datedItems = useMemo(() => sourceItems.filter((item) => {
     const time = new Date(item.createdAt).getTime();
@@ -241,9 +295,49 @@ export const AccountingTransformationReportsPage: React.FC = () => {
     return Array.from(map.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'ar'));
   }, [datedItems]);
 
-  const filteredItems = useMemo(() => group === 'all' ? datedItems : datedItems.filter((item) => groupKeyFor(item) === group), [datedItems, group]);
+  const cityOptions = useMemo(
+    () => Array.from(new Set(datedItems.map((item) => String(item.city || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar')),
+    [datedItems],
+  );
+  const filteredItems = useMemo(() => {
+    const items = datedItems.filter((item) =>
+      (group === 'all' || groupKeyFor(item) === group) &&
+      (cityFilter === 'all' || String(item.city || '').trim() === cityFilter) &&
+      (readinessFilter === 'all' || item.readinessStatus === readinessFilter) &&
+      (ownershipFilter === 'all' || item.ownershipMode === ownershipFilter)
+    );
+    const numericKeys: FieldKey[] = ['censusProgress', 'inventoryProgress', 'valuationProgress', 'overallProgress'];
+    return [...items].sort((a, b) => {
+      let comparison = 0;
+      if (numericKeys.includes(sortKey)) {
+        comparison = Number(a[sortKey] || 0) - Number(b[sortKey] || 0);
+      } else if (sortKey === 'createdAt' || sortKey === 'updatedAt') {
+        comparison = new Date(String(a[sortKey])).getTime() - new Date(String(b[sortKey])).getTime();
+      } else {
+        comparison = displayValue(a, sortKey).localeCompare(displayValue(b, sortKey), 'ar', { numeric: true, sensitivity: 'base' });
+      }
+      return (sortDirection === 'asc' ? comparison : -comparison) || a.id.localeCompare(b.id);
+    });
+  }, [datedItems, group, cityFilter, readinessFilter, ownershipFilter, sortKey, sortDirection]);
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const pageRows = filteredItems.slice((page - 1) * pageSize, page * pageSize);
+  const selectedVisibleCount = useMemo(
+    () => filteredItems.reduce((total, item) => total + (selectedIds.has(item.id) ? 1 : 0), 0),
+    [filteredItems, selectedIds],
+  );
+  const printItems = useMemo(
+    () => printScope === 'all' ? filteredItems : filteredItems.filter((item) => selectedIds.has(item.id)),
+    [filteredItems, selectedIds, printScope],
+  );
+  const toggleSelectedId = (id: string, checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    setPrintScope('selected');
+  };
   const summary = useMemo(() => {
     const total = filteredItems.length;
     const fixedAssets = filteredItems.filter((item) => item.recordType === 'fixed_asset').length;
