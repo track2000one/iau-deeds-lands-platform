@@ -42,6 +42,7 @@ import type {
   AccountingTransformationRecord,
 } from '../../types/accountingTransformation';
 import { buildOfficialAccountingTransformationExcel } from '../../utils/officialAccountingTransformationExcel';
+import { buildAccountingStyledExcel } from '../utils/accountingStyledExcel';
 import { ACCOUNTING_COMMITTEE_STATUS_LABELS } from '../config/accountingTransformationFields';
 import { getAccountingDisplayFields, getAccountingRecordTypeLabel } from '../config/accountingRecordPresentation';
 
@@ -190,6 +191,7 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   const [templateLoading, setTemplateLoading] = useState(true);
   const [templateUploading, setTemplateUploading] = useState(false);
   const [officialExporting, setOfficialExporting] = useState(false);
+  const [styledExcelExporting, setStyledExcelExporting] = useState(false);
   const [officialExcelMessage, setOfficialExcelMessage] = useState('');
   const [settings] = useState<ReportSettings>(() => {
     try {
@@ -425,6 +427,42 @@ export const AccountingTransformationReportsPage: React.FC = () => {
     } finally { setOfficialExporting(false); }
   };
 
+  const exportStyledExcel = async () => {
+    if (!canPrint || loading || loadError || !printItems.length || !selectedFields.length || styledExcelExporting) return;
+    setStyledExcelExporting(true);
+    try {
+      // Keep EXACTLY the same rows, column order and print settings as the PDF.
+      const selected = printableFields.filter(([key]) => selectedFields.includes(key));
+      const fileBytes = await buildAccountingStyledExcel({
+        items: printItems,
+        fields: selected.map(([key, label]) => ({ key, label })),
+        displayValue,
+        universityName: settings.universityName,
+        departmentName: settings.departmentName,
+        reportTitle: reportTitle || settings.reportTitle,
+        statementTitle: settings.statementTitle,
+        cycleLabel: selectedCycle ? `#${selectedCycle.cycleNumber} — ${selectedCycle.name}` : 'الدورة الحالية المعتمدة',
+        recordTypeLabel: recordType === 'all' ? 'الكل' : getAccountingRecordTypeLabel(recordType as AccountingRecordType),
+        groupLabel: group === 'all' ? 'جميع المجموعات' : groups.find((entry) => entry.key === group)?.label || '-',
+        scopeLabel: printScope === 'all' ? 'كل النتائج المطابقة' : 'السجلات المحددة',
+        sortLabel: selected.find(([key]) => key === sortKey)?.[1] || printableFields.find(([key]) => key === sortKey)?.[1] || 'رقم السجل',
+        sortDirection,
+        paperSize,
+        pageOrientation,
+        fontSize,
+      });
+      saveAs(
+        new Blob([fileBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        `IAU_Accounting_Styled_Report_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+      toast.success(`تم إنشاء تقرير Excel منسق يشمل ${printItems.length.toLocaleString('ar-SA')} سجلًا.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء ملف Excel المنسق');
+    } finally {
+      setStyledExcelExporting(false);
+    }
+  };
+
   const printTabularReport = () => {
     if (!canPrint || loading || loadError || !printItems.length || !selectedFields.length) return;
     const selected = printableFields.filter(([key]) => selectedFields.includes(key));
@@ -502,8 +540,9 @@ export const AccountingTransformationReportsPage: React.FC = () => {
           <CardTitle className="flex items-center gap-2"><FileOutput className="h-5 w-5 text-sky-700" />مخرجات الدورة</CardTitle>
           <p className="text-xs leading-6 text-slate-500">كل مخرج يعتمد على الدورة والتصفية المحددتين أعلاه. لا يتم تغيير بيانات الدورة عند إنشاء التقرير.</p>
         </CardHeader>
-        <CardContent className="grid gap-4 p-4 lg:grid-cols-3">
+        <CardContent className="grid gap-4 p-4 md:grid-cols-2 2xl:grid-cols-4">
           <OutputCard title="تقرير PDF / طباعة" description={"تقرير رسمي يشمل " + printItems.length.toLocaleString("ar-SA") + " سجلًا، وفق النطاق والفرز والأعمدة المحددة."} icon={<Printer className="h-5 w-5" />} tone="sky" action={<Button className="w-full" disabled={!canPrint || loading || Boolean(loadError) || !printItems.length || !selectedFields.length} onClick={printTabularReport}><Printer className="ml-2 h-4 w-4" />إنشاء التقرير</Button>} />
+          <OutputCard title="Excel منسق مثل PDF" description={"نفس " + printItems.length.toLocaleString("ar-SA") + " سجلًا ونفس الأعمدة والفرز، بترويسة رسمية وألوان وطباعة RTL."} icon={<FileSpreadsheet className="h-5 w-5" />} tone="emerald" action={<Button className="w-full bg-emerald-700 hover:bg-emerald-800" disabled={!canPrint || loading || Boolean(loadError) || !printItems.length || !selectedFields.length || styledExcelExporting} onClick={exportStyledExcel}><Download className="ml-2 h-4 w-4" />{styledExcelExporting ? 'جاري إنشاء Excel...' : 'تنزيل Excel المنسق'}</Button>} />
           <OutputCard title="Excel حسب التصفية" description="ملخص المتابعة مع أوراق منفصلة للأراضي والمباني ونموذج ب." icon={<Download className="h-5 w-5" />} tone="emerald" action={<Button className="w-full bg-emerald-700 hover:bg-emerald-800" disabled={!canPrint || loading || Boolean(loadError) || !filteredItems.length} onClick={exportExcel}><Download className="ml-2 h-4 w-4" />تنزيل Excel</Button>} />
           <OutputCard title="النموذج الرسمي المعبأ" description={cycleTemplate ? `يستخدم الإصدار ${cycleTemplate.versionNumber || 1} المثبت لهذه البيانات.` : 'يلزم رفع أو تثبيت نموذج رسمي أولًا.'} icon={<FileSpreadsheet className="h-5 w-5" />} tone="violet" action={<Button className="w-full bg-violet-700 hover:bg-violet-800" disabled={officialExporting || loading || Boolean(loadError) || !filteredItems.length || !cycleTemplate} onClick={exportOfficialExcel}>{officialExporting ? 'جاري التجهيز...' : 'إنشاء النموذج الرسمي'}</Button>} />
         </CardContent>
@@ -530,8 +569,8 @@ export const AccountingTransformationReportsPage: React.FC = () => {
 
           <section aria-label="إعدادات الطباعة والفرز" className="mt-4 rounded-2xl border border-sky-200 bg-sky-50/40 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="flex items-center gap-2 text-sm font-black text-slate-900"><Printer className="h-4 w-4 text-sky-700" />تخصيص تقرير الطباعة / PDF</h3>
-              <span className="text-xs text-slate-600">التصدير يشمل النتائج المطابقة كافة، وليس الصفحة الظاهرة فقط.</span>
+              <h3 className="flex items-center gap-2 text-sm font-black text-slate-900"><Printer className="h-4 w-4 text-sky-700" />تخصيص تقرير الطباعة / PDF / Excel</h3>
+              <span className="text-xs text-slate-600">تستعمل مخرجات PDF وExcel المنسق نفس شروط التصفية والفرز والاختيار، وليس الصفحة الظاهرة فقط.</span>
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <label className="text-xs font-bold">المدينة
