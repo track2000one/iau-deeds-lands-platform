@@ -1,15 +1,15 @@
 import ExcelJS from 'exceljs';
 import type { AccountingTransformationRecord } from '../../types/accountingTransformation';
 
-type AccountingExcelField = {
-  key: keyof AccountingTransformationRecord;
+type AccountingExcelField<Key extends string> = {
+  key: Key;
   label: string;
 };
 
-type AccountingStyledExcelOptions = {
+type AccountingStyledExcelOptions<Key extends string> = {
   items: AccountingTransformationRecord[];
-  fields: AccountingExcelField[];
-  displayValue: (item: AccountingTransformationRecord, key: AccountingExcelField['key']) => string;
+  fields: AccountingExcelField<Key>[];
+  displayValue: (item: AccountingTransformationRecord, key: Key) => string;
   universityName: string;
   departmentName: string;
   reportTitle: string;
@@ -38,6 +38,11 @@ const percentFields = new Set([
 
 const widthFor = (field: string): number => {
   if (field === 'assetDescription') return 45;
+  if (field === 'buildingCoordinates') return 34;
+  if (field === 'buildingLocation' || field === 'buildingNationalAddress') return 35;
+  if (field === 'buildingUniqueNumber') return 28;
+  if (field === 'buildingNumber' || field === 'buildingCardNumber') return 22;
+  if (field === 'buildingArea' || field === 'buildingLandArea') return 22;
   if (field === 'entityName' || field === 'accountingGroup') return 30;
   if (field === 'recordNumber' || field === 'accountingAssetCode' || field === 'entityAssetNumber') return 24;
   if (field === 'createdAt' || field === 'updatedAt') return 25;
@@ -54,7 +59,7 @@ const safeText = (value: string): string => value.replace(/[\u0000-\u0008\u000B-
  * ordered, filtered records, selected columns and report metadata.
  * No server-side changes, extra record queries or imported data mutations.
  */
-export async function buildAccountingStyledExcel(options: AccountingStyledExcelOptions): Promise<Uint8Array> {
+export async function buildAccountingStyledExcel<Key extends string>(options: AccountingStyledExcelOptions<Key>): Promise<Uint8Array> {
   if (!options.fields.length || !options.items.length) throw new Error('لا توجد سجلات أو أعمدة لإنشاء التقرير.');
 
   const workbook = new ExcelJS.Workbook();
@@ -108,6 +113,14 @@ export async function buildAccountingStyledExcel(options: AccountingStyledExcelO
     cell.border = { top: { style: 'thin', color: { argb: LINE } }, bottom: { style: 'thin', color: { argb: LINE } }, left: { style: 'thin', color: { argb: LINE } }, right: { style: 'thin', color: { argb: LINE } } };
   });
 
+  const areaFields = new Set(['buildingArea', 'buildingLandArea']);
+  const formattedArea = (value: string): string | number => {
+    const compact = value.trim().replace(/[,،\s]/g, '');
+    return /^\d+(?:\.\d+)?$/.test(compact) && Number.isFinite(Number(compact))
+      ? Number(compact)
+      : value;
+  };
+
   options.items.forEach((item, index) => {
     const row = sheet.getRow(dataHeaderRow + 1 + index);
     row.height = options.fields.some(({ key }) => key === 'assetDescription') ? 32 : 26;
@@ -116,14 +129,17 @@ export async function buildAccountingStyledExcel(options: AccountingStyledExcelO
       ...options.fields.map((field) => ({
         key: field.key,
         value: percentFields.has(field.key)
-          ? Number(item[field.key] || 0)
-          : safeText(options.displayValue(item, field.key)),
+          ? Number(item[field.key as keyof AccountingTransformationRecord] || 0)
+          : areaFields.has(field.key)
+            ? formattedArea(safeText(options.displayValue(item, field.key)))
+            : safeText(options.displayValue(item, field.key)),
       })),
     ];
     values.forEach(({ key, value }, columnIndex) => {
       const cell = row.getCell(columnIndex + 1);
       cell.value = value;
       if (percentFields.has(key)) cell.numFmt = '0"%"';
+      if (areaFields.has(key) && typeof value === 'number') cell.numFmt = '#,##0.##';
       cell.font = { name: 'Arial', size: options.fontSize, color: { argb: TEXT }, bold: key === 'ordinal' };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: index % 2 ? PALE : 'FFFFFFFF' } };
       cell.alignment = { vertical: 'middle', horizontal: key === 'assetDescription' ? 'right' : 'center', wrapText: true, readingOrder: 'rtl' };
