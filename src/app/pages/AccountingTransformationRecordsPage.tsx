@@ -11,6 +11,7 @@ import {
   Layers3,
   Pencil,
   PlusCircle,
+  Printer,
   Search,
   Trash2,
 } from 'lucide-react';
@@ -160,6 +161,7 @@ export const AccountingTransformationRecordsPage: React.FC = () => {
   const [selectedCycle, setSelectedCycle] = useState<AccountingTransformationCycle | null>(null);
 
   const canAdd = isAdmin || hasPermission('accounting_transformation', 'canAdd');
+  const canPrint = isAdmin || hasPermission('accounting_transformation', 'canPrint');
   const canEdit = isAdmin || hasPermission('accounting_transformation', 'canEdit');
   const canDelete = isAdmin || hasPermission('accounting_transformation', 'canDelete');
   const commonFilters = useMemo(() => ({ search: appliedSearch, recordType, committeeStatus, cycleId: cycleId || undefined }), [appliedSearch, recordType, committeeStatus, cycleId]);
@@ -232,6 +234,14 @@ export const AccountingTransformationRecordsPage: React.FC = () => {
     { type: 'building', label: 'Legacy — المباني', value: stats.buildings, Icon: Building2 },
   ], [stats]);
 
+  const openFilteredReport = () => {
+    const query = new URLSearchParams();
+    if (appliedSearch) query.set('search', appliedSearch);
+    if (recordType !== 'all') query.set('type', recordType);
+    if (committeeStatus !== 'all') query.set('status', committeeStatus);
+    if (cycleId) query.set('cycle', cycleId);
+    navigate(`/accounting-transformation/reports?${query.toString()}`);
+  };
   const remove = async (item: AccountingTransformationRecord, sectionKey: string, leafKey: string) => {
     if (!confirm(`هل تريد حذف السجل ${item.recordNumber}؟`)) return;
     try {
@@ -246,7 +256,7 @@ export const AccountingTransformationRecordsPage: React.FC = () => {
 
   return (
     <div className="mx-auto w-full max-w-[1700px] space-y-5 p-1 sm:p-3 md:p-5" dir="rtl">
-      <section className="flex flex-col gap-4 rounded-[28px] border bg-white/90 p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between"><div><Badge variant="outline" className="mb-2">لجنة متابعة متطلبات التحول المحاسبي</Badge><h1 className="text-2xl font-black md:text-3xl">سجل الأصول ومتطلبات التحول</h1><p className="mt-1 text-sm text-slate-500">العرض منظم هرميًا حسب نوع السجل ثم التصنيف الرئيسي ثم التصنيف الفرعي والمجموعة المحاسبية، مع إبقاء مصادر Legacy منفصلة.</p></div><div className="flex flex-wrap gap-2">{canAdd && <Button variant="outline" onClick={() => navigate('/accounting-transformation/import')}><FileSpreadsheet className="ml-2 h-4 w-4" />استيراد تحديث</Button>}{canAdd && <Button onClick={() => navigate('/accounting-transformation/new')}><PlusCircle className="ml-2 h-4 w-4" />إضافة سجل</Button>}</div></section>
+      <section className="flex flex-col gap-4 rounded-[28px] border bg-white/90 p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between"><div><Badge variant="outline" className="mb-2">لجنة متابعة متطلبات التحول المحاسبي</Badge><h1 className="text-2xl font-black md:text-3xl">سجل الأصول ومتطلبات التحول</h1><p className="mt-1 text-sm text-slate-500">العرض منظم هرميًا حسب نوع السجل ثم التصنيف الرئيسي ثم التصنيف الفرعي والمجموعة المحاسبية، مع إبقاء مصادر Legacy منفصلة.</p></div><div className="flex flex-wrap gap-2">{canPrint && <Button variant="outline" className="border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100" onClick={openFilteredReport}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button>}{canAdd && <Button variant="outline" onClick={() => navigate('/accounting-transformation/import')}><FileSpreadsheet className="ml-2 h-4 w-4" />استيراد تحديث</Button>}{canAdd && <Button onClick={() => navigate('/accounting-transformation/new')}><PlusCircle className="ml-2 h-4 w-4" />إضافة سجل</Button>}</div></section>
 
       {selectedCycle && <div className="rounded-2xl border border-sky-200 bg-sky-50/60 px-4 py-3 text-sm"><strong>الدورة:</strong> #{selectedCycle.cycleNumber} — {selectedCycle.name} · {selectedCycle.status === 'archived' ? 'مؤرشفة للعرض فقط' : selectedCycle.status}</div>}
 

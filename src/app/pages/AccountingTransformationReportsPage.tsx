@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import {
@@ -52,9 +52,10 @@ const printableFields = [
   ['accountingAssetCode', 'رمز الأصل المحاسبي'], ['region', 'المنطقة'], ['city', 'المدينة'],
   ['committeeStatus', 'حالة اللجنة'], ['censusProgress', 'اكتمال الحصر'],
   ['inventoryProgress', 'اكتمال الجرد'], ['valuationProgress', 'اكتمال التقييم'],
-  ['overallProgress', 'الاكتمال العام'], ['createdAt', 'تاريخ الإدخال'], ['updatedAt', 'آخر تحديث'],
+  ['overallProgress', 'الاكتمال العام'], ['createdBy', 'مدخل السجل'], ['updatedBy', 'آخر تعديل بواسطة'], ['createdAt', 'تاريخ الإدخال'], ['updatedAt', 'آخر تحديث'],
 ] as const;
 type FieldKey = (typeof printableFields)[number][0];
+const DEFAULT_PRINT_FIELDS: FieldKey[] = ['recordNumber', 'recordType', 'assetDescription', 'entityAssetNumber', 'accountingAssetCode', 'city', 'committeeStatus', 'overallProgress'];
 
 type ReportSettings = { universityName: string; departmentName: string; reportTitle: string; statementTitle: string };
 const STORAGE_KEY = 'iau-accounting-transformation-report-settings';
@@ -153,16 +154,37 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   const [cycles, setCycles] = useState<AccountingTransformationCycle[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState(searchParams.get('cycle') || '');
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [appliedSearch, setAppliedSearch] = useState('');
-  const [recordType, setRecordType] = useState('all');
-  const [committeeStatus, setCommitteeStatus] = useState('all');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [appliedSearch, setAppliedSearch] = useState(searchParams.get('search') || '');
+  const [recordType, setRecordType] = useState(
+    ['building', 'land', 'fixed_asset'].includes(searchParams.get('type') || '') ? String(searchParams.get('type')) : 'all',
+  );
+  const [committeeStatus, setCommitteeStatus] = useState(
+    Object.hasOwn(ACCOUNTING_COMMITTEE_STATUS_LABELS, searchParams.get('status') || '')
+      ? String(searchParams.get('status')) : 'all',
+  );
   const [group, setGroup] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [selectedFields] = useState<FieldKey[]>(printableFields.map(([key]) => key));
+  const [selectedFields, setSelectedFields] = useState<FieldKey[]>(DEFAULT_PRINT_FIELDS);
+  const [sortKey, setSortKey] = useState<FieldKey>('recordNumber');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [cityFilter, setCityFilter] = useState('all');
+  const [readinessFilter, setReadinessFilter] = useState('all');
+  const [ownershipFilter, setOwnershipFilter] = useState('all');
+  const [printScope, setPrintScope] = useState<'all' | 'selected'>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('landscape');
+  const [paperSize, setPaperSize] = useState<'A4' | 'A3'>('A4');
+  const [fontSize, setFontSize] = useState(9);
+  const [reportTitle, setReportTitle] = useState(
+    searchParams.get('type') === 'building' ? 'بيان المباني — لجنة متابعة متطلبات التحول المحاسبي' : DEFAULT_SETTINGS.reportTitle,
+  );
+  const [loadError, setLoadError] = useState('');
+  const [loadedCount, setLoadedCount] = useState(0);
+  const requestToken = useRef(0);
   const [officialTemplate, setOfficialTemplate] = useState<AccountingExcelTemplateMeta | null>(null);
   const [templateHistory, setTemplateHistory] = useState<AccountingExcelTemplateMeta[]>([]);
   const [templateLoading, setTemplateLoading] = useState(true);
@@ -199,23 +221,55 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   const selectedCycle = cycles.find((cycle) => cycle.id === selectedCycleId) || null;
 
   const load = async () => {
+    const token = ++requestToken.current;
     setLoading(true);
+    setLoadError('');
+    setSourceItems([]);
+    setLoadedCount(0);
     try {
-      const response = await getAccountingTransformationRecords({
+      const query = {
         search: appliedSearch,
         recordType,
         committeeStatus,
         cycleId: selectedCycleId || undefined,
-        all: true,
-      });
-      setSourceItems(response.items || []);
-      if (response.truncated) toast.warning(`تم تحميل أول ${response.items.length.toLocaleString('ar-SA')} سجل لحماية أداء الصفحة. استخدم تصفية أدق عند الحاجة.`);
+      };
+      // Read every matching record rather than only the visible 36 cards or the
+      // server's 5,000-row "all" shortcut. Never print a partial data set.
+      const first = await getAccountingTransformationRecords({ ...query, page: 1, limit: 200 });
+      const collected = [...(first.items || [])];
+      const pages = Math.max(1, first.totalPages || Math.ceil(first.total / 200));
+      if (token !== requestToken.current) return;
+      setLoadedCount(collected.length);
+      for (let pageNumber = 2; pageNumber <= pages; pageNumber += 1) {
+        if (token !== requestToken.current) return;
+        const next = await getAccountingTransformationRecords({ ...query, page: pageNumber, limit: 200 });
+        collected.push(...(next.items || []));
+        if (token !== requestToken.current) return;
+        setLoadedCount(collected.length);
+      }
+      if (collected.length !== first.total) {
+        throw new Error('عدد السجلات المحملة لا يطابق الإجمالي؛ لم يتم اعتماد نتائج جزئية.');
+      }
+      if (token === requestToken.current) setSourceItems(collected);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر تحميل التقرير');
-    } finally { setLoading(false); }
+      if (token === requestToken.current) {
+        const message = error instanceof Error ? error.message : 'تعذر تحميل التقرير';
+        setSourceItems([]);
+        setLoadError(message);
+        toast.error(message);
+      }
+    } finally {
+      if (token === requestToken.current) setLoading(false);
+    }
   };
-  useEffect(() => { void load(); }, [appliedSearch, recordType, committeeStatus, selectedCycleId]);
-  useEffect(() => { setPage(1); }, [group, dateFrom, dateTo, pageSize, selectedCycleId]);
+  useEffect(() => {
+    void load();
+    return () => { requestToken.current += 1; };
+  }, [appliedSearch, recordType, committeeStatus, selectedCycleId]);
+  useEffect(() => { setPage(1); }, [
+    group, dateFrom, dateTo, pageSize, selectedCycleId, cityFilter,
+    readinessFilter, ownershipFilter, sortKey, sortDirection,
+  ]);
 
   const datedItems = useMemo(() => sourceItems.filter((item) => {
     const time = new Date(item.createdAt).getTime();
@@ -241,9 +295,49 @@ export const AccountingTransformationReportsPage: React.FC = () => {
     return Array.from(map.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'ar'));
   }, [datedItems]);
 
-  const filteredItems = useMemo(() => group === 'all' ? datedItems : datedItems.filter((item) => groupKeyFor(item) === group), [datedItems, group]);
+  const cityOptions = useMemo(
+    () => Array.from(new Set(datedItems.map((item) => String(item.city || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar')),
+    [datedItems],
+  );
+  const filteredItems = useMemo(() => {
+    const items = datedItems.filter((item) =>
+      (group === 'all' || groupKeyFor(item) === group) &&
+      (cityFilter === 'all' || String(item.city || '').trim() === cityFilter) &&
+      (readinessFilter === 'all' || item.readinessStatus === readinessFilter) &&
+      (ownershipFilter === 'all' || item.ownershipMode === ownershipFilter)
+    );
+    const numericKeys: FieldKey[] = ['censusProgress', 'inventoryProgress', 'valuationProgress', 'overallProgress'];
+    return [...items].sort((a, b) => {
+      let comparison = 0;
+      if (numericKeys.includes(sortKey)) {
+        comparison = Number(a[sortKey] || 0) - Number(b[sortKey] || 0);
+      } else if (sortKey === 'createdAt' || sortKey === 'updatedAt') {
+        comparison = new Date(String(a[sortKey])).getTime() - new Date(String(b[sortKey])).getTime();
+      } else {
+        comparison = displayValue(a, sortKey).localeCompare(displayValue(b, sortKey), 'ar', { numeric: true, sensitivity: 'base' });
+      }
+      return (sortDirection === 'asc' ? comparison : -comparison) || a.id.localeCompare(b.id);
+    });
+  }, [datedItems, group, cityFilter, readinessFilter, ownershipFilter, sortKey, sortDirection]);
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const pageRows = filteredItems.slice((page - 1) * pageSize, page * pageSize);
+  const selectedVisibleCount = useMemo(
+    () => filteredItems.reduce((total, item) => total + (selectedIds.has(item.id) ? 1 : 0), 0),
+    [filteredItems, selectedIds],
+  );
+  const printItems = useMemo(
+    () => printScope === 'all' ? filteredItems : filteredItems.filter((item) => selectedIds.has(item.id)),
+    [filteredItems, selectedIds, printScope],
+  );
+  const toggleSelectedId = (id: string, checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    setPrintScope('selected');
+  };
   const summary = useMemo(() => {
     const total = filteredItems.length;
     const fixedAssets = filteredItems.filter((item) => item.recordType === 'fixed_asset').length;
@@ -332,20 +426,24 @@ export const AccountingTransformationReportsPage: React.FC = () => {
   };
 
   const printTabularReport = () => {
-    if (!canPrint || !filteredItems.length) return;
+    if (!canPrint || loading || loadError || !printItems.length || !selectedFields.length) return;
     const selected = printableFields.filter(([key]) => selectedFields.includes(key));
     const headers = selected.map(([, label]) => `<th>${escapeHtml(label)}</th>`).join('');
-    const body = filteredItems.map((item, index) => `<tr><td>${index + 1}</td>${selected.map(([key]) => `<td>${escapeHtml(displayValue(item, key))}</td>`).join('')}</tr>`).join('');
+    const body = printItems.map((item, index) => `<tr><td>${index + 1}</td>${selected.map(([key]) => `<td>${escapeHtml(displayValue(item, key))}</td>`).join('')}</tr>`).join('');
     const groupLabel = group === 'all' ? 'جميع المجموعات' : groups.find((x) => x.key === group)?.label || '-';
     const typeLabel = recordType === 'all' ? 'الكل' : getAccountingRecordTypeLabel(recordType as AccountingRecordType);
     const cycleLabel = selectedCycle ? `#${selectedCycle.cycleNumber} — ${selectedCycle.name}` : 'الدورة الحالية المعتمدة';
-    openPrintHtml(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>${escapeHtml(settings.reportTitle)}</title><style>@page{size:A4 landscape;margin:6mm 4mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{text-align:center;border-bottom:1px solid #1f4e79;padding:2mm;margin-bottom:2mm}.head h1{font-size:15px;margin:0}.head p{font-size:9px;margin:1mm 0}.meta{font-size:8px;border:1px solid #dbe3ec;padding:1.5mm 2mm;margin-bottom:2mm}.statement{text-align:center;font-size:12px;font-weight:800;margin:2mm 0}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}th{background:#0d3156;color:white;border:1px solid #dbe3ec;padding:2px}td{border:1px solid #dbe3ec;padding:1.5px;text-align:center;overflow-wrap:anywhere}tbody tr:nth-child(even){background:#f8fafc}thead{display:table-header-group}tr{break-inside:avoid}.foot{font-size:7px;color:#64748b;margin-top:2mm;display:flex;justify-content:space-between}</style></head><body><div class="head"><h1>${escapeHtml(settings.universityName)}</h1><p>${escapeHtml(settings.departmentName)}</p><h1>${escapeHtml(settings.reportTitle)}</h1></div><div class="meta">الدورة: ${escapeHtml(cycleLabel)} | النوع: ${escapeHtml(typeLabel)} | المجموعة: ${escapeHtml(groupLabel)} | إجمالي النتائج: ${filteredItems.length.toLocaleString('ar-SA')}</div><div class="statement">${escapeHtml(settings.statementTitle)}</div><table><thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table><div class="foot"><span>تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</span><span>لجنة متابعة متطلبات التحول المحاسبي</span></div><script>window.onload=()=>window.print()</script></body></html>`);
+    const printed = openPrintHtml(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><title>${escapeHtml(reportTitle || settings.reportTitle)}</title><style>@page{size:${paperSize} ${pageOrientation};margin:9mm 7mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:0}.head{text-align:center;border-bottom:1px solid #1f4e79;padding:2mm;margin-bottom:2mm}.head h1{font-size:15px;margin:0}.head p{font-size:9px;margin:1mm 0}.meta{font-size:8px;border:1px solid #dbe3ec;padding:1.5mm 2mm;margin-bottom:2mm}.statement{text-align:center;font-size:12px;font-weight:800;margin:2mm 0}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:${fontSize}px}th{background:#0d3156!important;color:white!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border:1px solid #dbe3ec;padding:4px 3px}td{border:1px solid #dbe3ec;padding:3px 2px;text-align:center;overflow-wrap:anywhere;vertical-align:top}tbody tr:nth-child(even){background:#f8fafc}thead{display:table-header-group}tr{break-inside:avoid}.foot{font-size:7px;color:#64748b;margin-top:2mm;display:flex;justify-content:space-between}</style></head><body><div class="head"><h1>${escapeHtml(settings.universityName)}</h1><p>${escapeHtml(settings.departmentName)}</p><h1>${escapeHtml(reportTitle || settings.reportTitle)}</h1></div><div class="meta">الدورة: ${escapeHtml(cycleLabel)} | النوع: ${escapeHtml(typeLabel)} | المجموعة: ${escapeHtml(groupLabel)} | إجمالي النتائج: ${printItems.length.toLocaleString('ar-SA')} | نطاق التقرير: ${printScope === 'all' ? 'كل النتائج المطابقة' : 'السجلات المحددة'} | الفرز: ${escapeHtml(printableFields.find(([key]) => key === sortKey)?.[1] || '')} (${sortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'})</div><div class="statement">${escapeHtml(settings.statementTitle)}</div><table><thead><tr><th>#</th>${headers}</tr></thead><tbody>${body}</tbody></table><div class="foot"><span>تاريخ التقرير: ${escapeHtml(new Date().toLocaleString('ar-SA'))}</span><span>لجنة متابعة متطلبات التحول المحاسبي</span></div><script>window.onload=()=>window.print()</script></body></html>`);
+    if (!printed) toast.error('المتصفح منع فتح نافذة الطباعة؛ اسمح بالنوافذ المنبثقة لهذه المنصة.');
   };
 
   const submitSearch = (event: React.FormEvent) => { event.preventDefault(); setAppliedSearch(search.trim()); setPage(1); };
   const resetFilters = () => {
     setSearch(''); setAppliedSearch(''); setRecordType('all'); setCommitteeStatus('all');
     setGroup('all'); setDateFrom(''); setDateTo(''); setPageSize(50); setPage(1);
+    setCityFilter('all'); setReadinessFilter('all'); setOwnershipFilter('all');
+    setSortKey('recordNumber'); setSortDirection('asc'); setSelectedFields(DEFAULT_PRINT_FIELDS);
+    setSelectedIds(new Set()); setPrintScope('all');
   };
 
   const cycleLabel = selectedCycle ? `#${selectedCycle.cycleNumber} — ${selectedCycle.name}` : 'الدورة الحالية المعتمدة';
@@ -405,9 +503,9 @@ export const AccountingTransformationReportsPage: React.FC = () => {
           <p className="text-xs leading-6 text-slate-500">كل مخرج يعتمد على الدورة والتصفية المحددتين أعلاه. لا يتم تغيير بيانات الدورة عند إنشاء التقرير.</p>
         </CardHeader>
         <CardContent className="grid gap-4 p-4 lg:grid-cols-3">
-          <OutputCard title="تقرير PDF / طباعة" description="تقرير رسمي جدولي من نتائج التصفية الحالية." icon={<Printer className="h-5 w-5" />} tone="sky" action={<Button className="w-full" disabled={!canPrint || !filteredItems.length} onClick={printTabularReport}><Printer className="ml-2 h-4 w-4" />إنشاء التقرير</Button>} />
-          <OutputCard title="Excel حسب التصفية" description="ملخص المتابعة مع أوراق منفصلة للأراضي والمباني ونموذج ب." icon={<Download className="h-5 w-5" />} tone="emerald" action={<Button className="w-full bg-emerald-700 hover:bg-emerald-800" disabled={!canPrint || !filteredItems.length} onClick={exportExcel}><Download className="ml-2 h-4 w-4" />تنزيل Excel</Button>} />
-          <OutputCard title="النموذج الرسمي المعبأ" description={cycleTemplate ? `يستخدم الإصدار ${cycleTemplate.versionNumber || 1} المثبت لهذه البيانات.` : 'يلزم رفع أو تثبيت نموذج رسمي أولًا.'} icon={<FileSpreadsheet className="h-5 w-5" />} tone="violet" action={<Button className="w-full bg-violet-700 hover:bg-violet-800" disabled={officialExporting || !filteredItems.length || !cycleTemplate} onClick={exportOfficialExcel}>{officialExporting ? 'جاري التجهيز...' : 'إنشاء النموذج الرسمي'}</Button>} />
+          <OutputCard title="تقرير PDF / طباعة" description={"تقرير رسمي يشمل " + printItems.length.toLocaleString("ar-SA") + " سجلًا، وفق النطاق والفرز والأعمدة المحددة."} icon={<Printer className="h-5 w-5" />} tone="sky" action={<Button className="w-full" disabled={!canPrint || loading || Boolean(loadError) || !printItems.length || !selectedFields.length} onClick={printTabularReport}><Printer className="ml-2 h-4 w-4" />إنشاء التقرير</Button>} />
+          <OutputCard title="Excel حسب التصفية" description="ملخص المتابعة مع أوراق منفصلة للأراضي والمباني ونموذج ب." icon={<Download className="h-5 w-5" />} tone="emerald" action={<Button className="w-full bg-emerald-700 hover:bg-emerald-800" disabled={!canPrint || loading || Boolean(loadError) || !filteredItems.length} onClick={exportExcel}><Download className="ml-2 h-4 w-4" />تنزيل Excel</Button>} />
+          <OutputCard title="النموذج الرسمي المعبأ" description={cycleTemplate ? `يستخدم الإصدار ${cycleTemplate.versionNumber || 1} المثبت لهذه البيانات.` : 'يلزم رفع أو تثبيت نموذج رسمي أولًا.'} icon={<FileSpreadsheet className="h-5 w-5" />} tone="violet" action={<Button className="w-full bg-violet-700 hover:bg-violet-800" disabled={officialExporting || loading || Boolean(loadError) || !filteredItems.length || !cycleTemplate} onClick={exportOfficialExcel}>{officialExporting ? 'جاري التجهيز...' : 'إنشاء النموذج الرسمي'}</Button>} />
         </CardContent>
       </Card>
 
@@ -429,6 +527,70 @@ export const AccountingTransformationReportsPage: React.FC = () => {
             <label className="text-xs font-bold">إلى تاريخ<Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="mt-1" /></label>
             <label className="text-xs font-bold">حجم الصفحة<NativeSelect value={String(pageSize)} onChange={(e) => setPageSize(Number(e.target.value))} className="mt-1"><option value="25">25</option><option value="50">50</option><option value="100">100</option></NativeSelect></label>
           </div>
+
+          <section aria-label="إعدادات الطباعة والفرز" className="mt-4 rounded-2xl border border-sky-200 bg-sky-50/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 text-sm font-black text-slate-900"><Printer className="h-4 w-4 text-sky-700" />تخصيص تقرير الطباعة / PDF</h3>
+              <span className="text-xs text-slate-600">التصدير يشمل النتائج المطابقة كافة، وليس الصفحة الظاهرة فقط.</span>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <label className="text-xs font-bold">المدينة
+                <NativeSelect value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="mt-1"><option value="all">جميع المدن</option>{cityOptions.map((cityName) => <option key={cityName} value={cityName}>{cityName}</option>)}</NativeSelect>
+              </label>
+              <label className="text-xs font-bold">جاهزية السجل
+                <NativeSelect value={readinessFilter} onChange={(e) => setReadinessFilter(e.target.value)} className="mt-1"><option value="all">كل مستويات الجاهزية</option><option value="needs_data">يحتاج بيانات</option><option value="in_progress">قيد الإنجاز</option><option value="near_ready">قارب الاكتمال</option><option value="ready">جاهز</option></NativeSelect>
+              </label>
+              <label className="text-xs font-bold">علاقة الأصل
+                <NativeSelect value={ownershipFilter} onChange={(e) => setOwnershipFilter(e.target.value)} className="mt-1"><option value="all">كل العلاقات</option><option value="owned">مملوك حسب بيانات السجل</option><option value="leased">مستأجر حسب بيانات السجل</option><option value="other">أخرى</option></NativeSelect>
+              </label>
+              <label className="text-xs font-bold">ترتيب حسب
+                <NativeSelect value={sortKey} onChange={(e) => setSortKey(e.target.value as FieldKey)} className="mt-1">{printableFields.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect>
+              </label>
+              <label className="text-xs font-bold">اتجاه الترتيب
+                <NativeSelect value={sortDirection} onChange={(e) => setSortDirection(e.target.value as 'asc' | 'desc')} className="mt-1"><option value="asc">تصاعدي</option><option value="desc">تنازلي</option></NativeSelect>
+              </label>
+              <label className="text-xs font-bold">مقاس الورق
+                <NativeSelect value={paperSize} onChange={(e) => setPaperSize(e.target.value as 'A4' | 'A3')} className="mt-1"><option value="A4">A4</option><option value="A3">A3</option></NativeSelect>
+              </label>
+              <label className="text-xs font-bold">اتجاه الصفحة
+                <NativeSelect value={pageOrientation} onChange={(e) => setPageOrientation(e.target.value as 'portrait' | 'landscape')} className="mt-1"><option value="landscape">أفقي</option><option value="portrait">عمودي</option></NativeSelect>
+              </label>
+              <label className="text-xs font-bold">حجم خط الجدول
+                <NativeSelect value={String(fontSize)} onChange={(e) => setFontSize(Number(e.target.value))} className="mt-1"><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></NativeSelect>
+              </label>
+            </div>
+            <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_220px]">
+              <label className="text-xs font-bold">عنوان التقرير
+                <Input value={reportTitle} maxLength={150} onChange={(e) => setReportTitle(e.target.value)} className="mt-1" placeholder="عنوان التقرير الرسمي" />
+              </label>
+              <label className="text-xs font-bold">نطاق الطباعة
+                <NativeSelect value={printScope} onChange={(e) => setPrintScope(e.target.value as 'all' | 'selected')} className="mt-1">
+                  <option value="all">كل النتائج المطابقة ({filteredItems.length})</option>
+                  <option value="selected">السجلات المحددة فقط ({selectedVisibleCount})</option>
+                </NativeSelect>
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => { setSelectedIds(new Set(filteredItems.map((item) => item.id))); setPrintScope('selected'); }}>تحديد جميع نتائج التصفية</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => { setSelectedIds(new Set()); setPrintScope('all'); }}>إلغاء التحديد</Button>
+              <span className="text-xs text-slate-600">المحدد: {selectedVisibleCount.toLocaleString('ar-SA')} · الجاهز للطباعة: {printItems.length.toLocaleString('ar-SA')}</span>
+            </div>
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <strong className="text-xs text-slate-800">أعمدة التقرير ({selectedFields.length})</strong>
+                <div className="flex gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setSelectedFields(printableFields.map(([key]) => key))}>كل الأعمدة</Button><Button type="button" size="sm" variant="outline" onClick={() => setSelectedFields([...DEFAULT_PRINT_FIELDS])}>الأعمدة الأساسية</Button></div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                {printableFields.map(([key, label]) => (
+                  <label key={key} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-100 px-2 py-2 text-xs text-slate-700">
+                    <input type="checkbox" className="h-4 w-4 accent-sky-700" checked={selectedFields.includes(key)} onChange={(e) => setSelectedFields((current) => e.target.checked ? [...current, key] : current.filter((field) => field !== key))} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              {!selectedFields.length && <p className="mt-2 text-xs font-bold text-red-700">اختر عمودًا واحدًا على الأقل لتفعيل الطباعة.</p>}
+            </div>
+          </section>
         </div>
       </details>
 
@@ -459,10 +621,10 @@ export const AccountingTransformationReportsPage: React.FC = () => {
       )}
 
       <Card className="rounded-[24px]">
-        <CardHeader className="border-b"><CardTitle className="text-base">البيانات التفصيلية</CardTitle><p className="text-xs text-slate-500">معاينة السجلات التي ستدخل في المخرجات أعلاه.</p></CardHeader>
+        <CardHeader className="border-b"><CardTitle className="text-base">البيانات التفصيلية</CardTitle><p className="text-xs text-slate-500">حدد السجلات التي تريدها من الجدول، أو اختر طباعة جميع نتائج التصفية. المعاينة بالصفحات؛ أما PDF فيشمل النطاق المحدد كاملًا.</p></CardHeader>
         <CardContent className="p-4">
-          {loading ? <div className="py-16 text-center text-sm text-slate-500">جاري تحميل التقرير...</div> : !pageRows.length ? <div className="py-16 text-center text-slate-500">لا توجد نتائج.</div> : <>
-            <div className="overflow-x-auto rounded-xl border"><table className="w-full min-w-[1100px] text-xs"><thead className="bg-slate-50"><tr>{printableFields.filter(([key]) => selectedFields.includes(key)).map(([key, label]) => <th key={key} className="p-3 text-right">{label}</th>)}</tr></thead><tbody>{pageRows.map((item) => <tr key={item.id} className="border-t">{printableFields.filter(([key]) => selectedFields.includes(key)).map(([key]) => <td key={key} className="p-3">{displayValue(item, key)}</td>)}</tr>)}</tbody></table></div>
+          {loading ? <div className="py-16 text-center text-sm text-slate-500">جاري تحميل التقرير... ({loadedCount.toLocaleString('ar-SA')} سجل)</div> : !pageRows.length ? <div className="py-16 text-center text-slate-500">{loadError || "لا توجد نتائج."}</div> : <>
+            <div className="overflow-x-auto rounded-xl border"><table className="w-full min-w-[1100px] text-xs"><thead className="bg-slate-50"><tr><th className="p-3 text-right">تحديد</th>{printableFields.filter(([key]) => selectedFields.includes(key)).map(([key, label]) => <th key={key} className="p-3 text-right">{label}</th>)}</tr></thead><tbody>{pageRows.map((item) => <tr key={item.id} className="border-t"><td className="p-3"><input type="checkbox" aria-label={"تحديد السجل " + item.recordNumber} className="h-4 w-4 accent-sky-700" checked={selectedIds.has(item.id)} onChange={(e) => toggleSelectedId(item.id, e.target.checked)} /></td>{printableFields.filter(([key]) => selectedFields.includes(key)).map(([key]) => <td key={key} className="p-3">{displayValue(item, key)}</td>)}</tr>)}</tbody></table></div>
             <div className="mt-4 flex items-center justify-between"><Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>السابق</Button><span className="text-xs">صفحة {page} من {totalPages}</span><Button variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>التالي</Button></div>
           </>}
         </CardContent>
