@@ -504,8 +504,8 @@ export const AccountingTransformationReportsPage: React.FC = () => {
         </CardHeader>
         <CardContent className="grid gap-4 p-4 lg:grid-cols-3">
           <OutputCard title="تقرير PDF / طباعة" description={"تقرير رسمي يشمل " + printItems.length.toLocaleString("ar-SA") + " سجلًا، وفق النطاق والفرز والأعمدة المحددة."} icon={<Printer className="h-5 w-5" />} tone="sky" action={<Button className="w-full" disabled={!canPrint || loading || Boolean(loadError) || !printItems.length || !selectedFields.length} onClick={printTabularReport}><Printer className="ml-2 h-4 w-4" />إنشاء التقرير</Button>} />
-          <OutputCard title="Excel حسب التصفية" description="ملخص المتابعة مع أوراق منفصلة للأراضي والمباني ونموذج ب." icon={<Download className="h-5 w-5" />} tone="emerald" action={<Button className="w-full bg-emerald-700 hover:bg-emerald-800" disabled={!canPrint || !filteredItems.length} onClick={exportExcel}><Download className="ml-2 h-4 w-4" />تنزيل Excel</Button>} />
-          <OutputCard title="النموذج الرسمي المعبأ" description={cycleTemplate ? `يستخدم الإصدار ${cycleTemplate.versionNumber || 1} المثبت لهذه البيانات.` : 'يلزم رفع أو تثبيت نموذج رسمي أولًا.'} icon={<FileSpreadsheet className="h-5 w-5" />} tone="violet" action={<Button className="w-full bg-violet-700 hover:bg-violet-800" disabled={officialExporting || !filteredItems.length || !cycleTemplate} onClick={exportOfficialExcel}>{officialExporting ? 'جاري التجهيز...' : 'إنشاء النموذج الرسمي'}</Button>} />
+          <OutputCard title="Excel حسب التصفية" description="ملخص المتابعة مع أوراق منفصلة للأراضي والمباني ونموذج ب." icon={<Download className="h-5 w-5" />} tone="emerald" action={<Button className="w-full bg-emerald-700 hover:bg-emerald-800" disabled={!canPrint || loading || Boolean(loadError) || !filteredItems.length} onClick={exportExcel}><Download className="ml-2 h-4 w-4" />تنزيل Excel</Button>} />
+          <OutputCard title="النموذج الرسمي المعبأ" description={cycleTemplate ? `يستخدم الإصدار ${cycleTemplate.versionNumber || 1} المثبت لهذه البيانات.` : 'يلزم رفع أو تثبيت نموذج رسمي أولًا.'} icon={<FileSpreadsheet className="h-5 w-5" />} tone="violet" action={<Button className="w-full bg-violet-700 hover:bg-violet-800" disabled={officialExporting || loading || Boolean(loadError) || !filteredItems.length || !cycleTemplate} onClick={exportOfficialExcel}>{officialExporting ? 'جاري التجهيز...' : 'إنشاء النموذج الرسمي'}</Button>} />
         </CardContent>
       </Card>
 
@@ -527,6 +527,70 @@ export const AccountingTransformationReportsPage: React.FC = () => {
             <label className="text-xs font-bold">إلى تاريخ<Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="mt-1" /></label>
             <label className="text-xs font-bold">حجم الصفحة<NativeSelect value={String(pageSize)} onChange={(e) => setPageSize(Number(e.target.value))} className="mt-1"><option value="25">25</option><option value="50">50</option><option value="100">100</option></NativeSelect></label>
           </div>
+
+          <section aria-label="إعدادات الطباعة والفرز" className="mt-4 rounded-2xl border border-sky-200 bg-sky-50/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 text-sm font-black text-slate-900"><Printer className="h-4 w-4 text-sky-700" />تخصيص تقرير الطباعة / PDF</h3>
+              <span className="text-xs text-slate-600">التصدير يشمل النتائج المطابقة كافة، وليس الصفحة الظاهرة فقط.</span>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <label className="text-xs font-bold">المدينة
+                <NativeSelect value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="mt-1"><option value="all">جميع المدن</option>{cityOptions.map((cityName) => <option key={cityName} value={cityName}>{cityName}</option>)}</NativeSelect>
+              </label>
+              <label className="text-xs font-bold">جاهزية السجل
+                <NativeSelect value={readinessFilter} onChange={(e) => setReadinessFilter(e.target.value)} className="mt-1"><option value="all">كل مستويات الجاهزية</option><option value="needs_data">يحتاج بيانات</option><option value="in_progress">قيد الإنجاز</option><option value="near_ready">قارب الاكتمال</option><option value="ready">جاهز</option></NativeSelect>
+              </label>
+              <label className="text-xs font-bold">علاقة الأصل
+                <NativeSelect value={ownershipFilter} onChange={(e) => setOwnershipFilter(e.target.value)} className="mt-1"><option value="all">كل العلاقات</option><option value="owned">مملوك حسب بيانات السجل</option><option value="leased">مستأجر حسب بيانات السجل</option><option value="other">أخرى</option></NativeSelect>
+              </label>
+              <label className="text-xs font-bold">ترتيب حسب
+                <NativeSelect value={sortKey} onChange={(e) => setSortKey(e.target.value as FieldKey)} className="mt-1">{printableFields.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect>
+              </label>
+              <label className="text-xs font-bold">اتجاه الترتيب
+                <NativeSelect value={sortDirection} onChange={(e) => setSortDirection(e.target.value as 'asc' | 'desc')} className="mt-1"><option value="asc">تصاعدي</option><option value="desc">تنازلي</option></NativeSelect>
+              </label>
+              <label className="text-xs font-bold">مقاس الورق
+                <NativeSelect value={paperSize} onChange={(e) => setPaperSize(e.target.value as 'A4' | 'A3')} className="mt-1"><option value="A4">A4</option><option value="A3">A3</option></NativeSelect>
+              </label>
+              <label className="text-xs font-bold">اتجاه الصفحة
+                <NativeSelect value={pageOrientation} onChange={(e) => setPageOrientation(e.target.value as 'portrait' | 'landscape')} className="mt-1"><option value="landscape">أفقي</option><option value="portrait">عمودي</option></NativeSelect>
+              </label>
+              <label className="text-xs font-bold">حجم خط الجدول
+                <NativeSelect value={String(fontSize)} onChange={(e) => setFontSize(Number(e.target.value))} className="mt-1"><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></NativeSelect>
+              </label>
+            </div>
+            <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_220px]">
+              <label className="text-xs font-bold">عنوان التقرير
+                <Input value={reportTitle} maxLength={150} onChange={(e) => setReportTitle(e.target.value)} className="mt-1" placeholder="عنوان التقرير الرسمي" />
+              </label>
+              <label className="text-xs font-bold">نطاق الطباعة
+                <NativeSelect value={printScope} onChange={(e) => setPrintScope(e.target.value as 'all' | 'selected')} className="mt-1">
+                  <option value="all">كل النتائج المطابقة ({filteredItems.length})</option>
+                  <option value="selected">السجلات المحددة فقط ({selectedVisibleCount})</option>
+                </NativeSelect>
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => { setSelectedIds(new Set(filteredItems.map((item) => item.id))); setPrintScope('selected'); }}>تحديد جميع نتائج التصفية</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => { setSelectedIds(new Set()); setPrintScope('all'); }}>إلغاء التحديد</Button>
+              <span className="text-xs text-slate-600">المحدد: {selectedVisibleCount.toLocaleString('ar-SA')} · الجاهز للطباعة: {printItems.length.toLocaleString('ar-SA')}</span>
+            </div>
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <strong className="text-xs text-slate-800">أعمدة التقرير ({selectedFields.length})</strong>
+                <div className="flex gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setSelectedFields(printableFields.map(([key]) => key))}>كل الأعمدة</Button><Button type="button" size="sm" variant="outline" onClick={() => setSelectedFields([...DEFAULT_PRINT_FIELDS])}>الأعمدة الأساسية</Button></div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                {printableFields.map(([key, label]) => (
+                  <label key={key} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-100 px-2 py-2 text-xs text-slate-700">
+                    <input type="checkbox" className="h-4 w-4 accent-sky-700" checked={selectedFields.includes(key)} onChange={(e) => setSelectedFields((current) => e.target.checked ? [...current, key] : current.filter((field) => field !== key))} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              {!selectedFields.length && <p className="mt-2 text-xs font-bold text-red-700">اختر عمودًا واحدًا على الأقل لتفعيل الطباعة.</p>}
+            </div>
+          </section>
         </div>
       </details>
 
@@ -557,10 +621,10 @@ export const AccountingTransformationReportsPage: React.FC = () => {
       )}
 
       <Card className="rounded-[24px]">
-        <CardHeader className="border-b"><CardTitle className="text-base">البيانات التفصيلية</CardTitle><p className="text-xs text-slate-500">معاينة السجلات التي ستدخل في المخرجات أعلاه.</p></CardHeader>
+        <CardHeader className="border-b"><CardTitle className="text-base">البيانات التفصيلية</CardTitle><p className="text-xs text-slate-500">حدد السجلات التي تريدها من الجدول، أو اختر طباعة جميع نتائج التصفية. المعاينة بالصفحات؛ أما PDF فيشمل النطاق المحدد كاملًا.</p></CardHeader>
         <CardContent className="p-4">
-          {loading ? <div className="py-16 text-center text-sm text-slate-500">جاري تحميل التقرير...</div> : !pageRows.length ? <div className="py-16 text-center text-slate-500">لا توجد نتائج.</div> : <>
-            <div className="overflow-x-auto rounded-xl border"><table className="w-full min-w-[1100px] text-xs"><thead className="bg-slate-50"><tr>{printableFields.filter(([key]) => selectedFields.includes(key)).map(([key, label]) => <th key={key} className="p-3 text-right">{label}</th>)}</tr></thead><tbody>{pageRows.map((item) => <tr key={item.id} className="border-t">{printableFields.filter(([key]) => selectedFields.includes(key)).map(([key]) => <td key={key} className="p-3">{displayValue(item, key)}</td>)}</tr>)}</tbody></table></div>
+          {loading ? <div className="py-16 text-center text-sm text-slate-500">جاري تحميل التقرير... ({loadedCount.toLocaleString('ar-SA')} سجل)</div> : !pageRows.length ? <div className="py-16 text-center text-slate-500">{loadError || "لا توجد نتائج."}</div> : <>
+            <div className="overflow-x-auto rounded-xl border"><table className="w-full min-w-[1100px] text-xs"><thead className="bg-slate-50"><tr><th className="p-3 text-right">تحديد</th>{printableFields.filter(([key]) => selectedFields.includes(key)).map(([key, label]) => <th key={key} className="p-3 text-right">{label}</th>)}</tr></thead><tbody>{pageRows.map((item) => <tr key={item.id} className="border-t"><td className="p-3"><input type="checkbox" aria-label={"تحديد السجل " + item.recordNumber} className="h-4 w-4 accent-sky-700" checked={selectedIds.has(item.id)} onChange={(e) => toggleSelectedId(item.id, e.target.checked)} /></td>{printableFields.filter(([key]) => selectedFields.includes(key)).map(([key]) => <td key={key} className="p-3">{displayValue(item, key)}</td>)}</tr>)}</tbody></table></div>
             <div className="mt-4 flex items-center justify-between"><Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>السابق</Button><span className="text-xs">صفحة {page} من {totalPages}</span><Button variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>التالي</Button></div>
           </>}
         </CardContent>
