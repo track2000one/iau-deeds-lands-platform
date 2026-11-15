@@ -43,6 +43,8 @@ assert.match(attachments, /loading="lazy"/);
 assert.match(attachments, /decoding="async"/);
 console.log('✓ Attachment previews remain lazy and closeable');
 
+assert.match(registry, /useState<'table' \| 'cards'>\('cards'\)/, 'Registry should open in cards view by default');
+assert.match(registry, /setBuildingView\('table'\)/, 'Manual table toggle must remain available');
 assert.match(registry, /data-deed-linked=\{Boolean\(/);
 assert.match(css, /article\.iau-interactive-card\.iau-card--building::before/);
 assert.match(css, /\[data-deed-linked="false"\]/);

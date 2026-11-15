@@ -264,7 +264,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   };
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [buildingView, setBuildingView] = useState<'table' | 'cards'>('table');
+  // Open the central buildings registry in cards mode; users can still switch to table.
+  const [buildingView, setBuildingView] = useState<'table' | 'cards'>('cards');
   const [buildingSort, setBuildingSort] = useState<'buildingNumber' | 'name' | 'deedNumber'>('buildingNumber');
   const [buildingSortDirection, setBuildingSortDirection] = useState<'asc' | 'desc'>('asc');
   // Keep the rendering limit tied to current filters without a transient full render.
