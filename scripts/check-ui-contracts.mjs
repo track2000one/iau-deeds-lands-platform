@@ -46,6 +46,10 @@ console.log('✓ Attachment previews remain lazy and closeable');
 assert.match(registry, /useState<'table' \| 'cards'>\('cards'\)/, 'Registry should open in cards view by default');
 assert.match(registry, /setBuildingView\('table'\)/, 'Manual table toggle must remain available');
 assert.match(registry, /data-deed-linked=\{Boolean\(/);
+assert.match(registry, /\(building\.deedId \|\| building\.deed\?\.id\) === form\.deedId/,
+  'The duplicate building-number check must be scoped by deed ID');
+assert.match(registry, /يمكن تكرار رقم المبنى أو اسمه عند اختلاف الصك/,
+  'The add/edit form must explain that building numbers may repeat across deeds');
 assert.match(css, /article\.iau-interactive-card\.iau-card--building::before/);
 assert.match(css, /\[data-deed-linked="false"\]/);
 console.log('✓ Building cards keep visible linked/unlinked accents');
