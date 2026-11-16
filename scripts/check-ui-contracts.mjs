@@ -46,8 +46,14 @@ console.log('✓ Attachment previews remain lazy and closeable');
 assert.match(registry, /useState<'table' \| 'cards'>\('cards'\)/, 'Registry should open in cards view by default');
 assert.match(registry, /setBuildingView\('table'\)/, 'Manual table toggle must remain available');
 assert.match(registry, /data-deed-linked=\{Boolean\(/);
-assert.match(registry, /\(building\.deedId \|\| building\.deed\?\.id\) === form\.deedId/,
-  'The duplicate building-number check must be scoped by deed ID');
+assert.match(registry, /mosqueApi\.buildingNumberUsage\(number\)/,
+  'Live number lookup must use the database, not the displayed cards');
+assert.match(registry, /mosqueApi\.buildingNumberUsage\(buildingNumber\)/,
+  'Save must verify current database records before changing a building');
+assert.match(registry, /item\.deedId === form\.deedId/,
+  'A registered number is conflicting only within the selected deed');
+assert.match(registry, /السجلات الموجودة بهذا الرقم في قاعدة البيانات/,
+  'The form must explain existing registrations and their deeds');
 assert.match(registry, /يمكن تكرار رقم المبنى أو اسمه عند اختلاف الصك/,
   'The add/edit form must explain that building numbers may repeat across deeds');
 assert.match(css, /article\.iau-interactive-card\.iau-card--building::before/);
