@@ -627,13 +627,16 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       return;
     }
 
+    // Building numbers are unique within a deed, not across the university.
+    // The backend enforces this authoritatively across all records and users.
     const duplicate = buildings.find(
       (building) =>
         building.id !== editingBuilding?.id &&
-        normalizeKey(building.buildingNumber) === normalizeKey(buildingNumber)
+        normalizeKey(building.buildingNumber) === normalizeKey(buildingNumber) &&
+        (building.deedId || building.deed?.id) === form.deedId
     );
     if (duplicate) {
-      toast.error(`رقم المبنى مستخدم مسبقًا للمبنى: ${duplicate.name || duplicate.buildingNumber}`);
+      toast.error(`رقم المبنى ${buildingNumber} مسجل مسبقًا ضمن الصك المحدد للمبنى: ${duplicate.name || duplicate.buildingNumber}. يمكن تكرار الرقم إذا كان الصك مختلفًا.`);
       return;
     }
 
@@ -1343,7 +1346,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               {editingBuilding ? 'تعديل المبنى المركزي' : 'تعريف مبنى جديد'}
             </DialogTitle>
             <DialogDescription>
-              كل مبنى يجب ربطه بصك مسجل في سجل الصكوك؛ ويمكن أن يرتبط الصك الواحد بأكثر من مبنى.
+              كل مبنى يجب ربطه بصك مسجل في سجل الصكوك؛ ويمكن تكرار رقم المبنى أو اسمه عند اختلاف الصك، ولا يُسمح بتكرار الرقم داخل الصك نفسه.
             </DialogDescription>
           </DialogHeader>
 
