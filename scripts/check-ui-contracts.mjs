@@ -56,6 +56,24 @@ assert.match(registry, /السجلات الموجودة بهذا الرقم في
   'The form must explain existing registrations and their deeds');
 assert.match(registry, /يمكن تكرار رقم المبنى أو اسمه عند اختلاف الصك/,
   'The add/edit form must explain that building numbers may repeat across deeds');
+assert.match(registry, /disabled=\{saving \|\| Boolean\(selectedDeedConflict\)\}/,
+  'Cannot submit a building number already registered under selected deed');
+assert.match(registry, /تنبيه مهم: المسافات وتغيير شكل الأحرف لا تجعل رقم المبنى مختلفًا/,
+  'Form must strongly warn about formatting-based duplicates');
+assert.match(registry, /role=\{selectedDeedConflict \? 'alert' : 'status'\}/,
+  'The duplicate warning must be announced accessibly');
+
+const numberUtility = await read('src/app/utils/normalizeBuildingNumber.ts');
+const numberCompiled = await transform(numberUtility, { loader: 'ts', format: 'esm' });
+const { normalizeBuildingNumber } = await import(
+  `data:text/javascript;base64,${Buffer.from(numberCompiled.code).toString('base64')}`
+);
+for (const example of ['A70', 'a70', 'A 70', 'a  70', 'A٧٠', 'Ａ７０', ' a\\t70 ']) {
+  assert.equal(normalizeBuildingNumber(example), 'A70',
+    `Alternate formatting must not generate a new identifier: ${example}`);
+}
+assert.equal(normalizeBuildingNumber('A-70'), 'A-70',
+  'Meaningful punctuation is not silently removed');
 assert.match(css, /article\.iau-interactive-card\.iau-card--building::before/);
 assert.match(css, /\[data-deed-linked="false"\]/);
 console.log('✓ Building cards keep visible linked/unlinked accents');
