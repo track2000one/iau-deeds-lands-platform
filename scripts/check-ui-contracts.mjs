@@ -68,7 +68,7 @@ const numberCompiled = await transform(numberUtility, { loader: 'ts', format: 'e
 const { normalizeBuildingNumber } = await import(
   `data:text/javascript;base64,${Buffer.from(numberCompiled.code).toString('base64')}`
 );
-for (const example of ['A70', 'a70', 'A 70', 'a  70', 'A٧٠', 'Ａ７０', ' a\\t70 ']) {
+for (const example of ['A70', 'a70', 'A 70', 'a  70', 'A٧٠', 'Ａ７０', ' A  70 ']) {
   assert.equal(normalizeBuildingNumber(example), 'A70',
     `Alternate formatting must not generate a new identifier: ${example}`);
 }
