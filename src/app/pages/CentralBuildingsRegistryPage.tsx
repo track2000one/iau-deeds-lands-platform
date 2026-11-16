@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '../../context/PermissionsContext';
-import { mosqueApi, type MosqueBuilding, type MosqueBuildingDeedReference } from '../api/mosques';
+import { mosqueApi, type MosqueBuilding, type MosqueBuildingDeedReference, type MosqueBuildingNumberUsage } from '../api/mosques';
 import { getAsset, getAssets, updateAsset } from '../api/assets';
 import { getAccountingTransformationRecords, updateAccountingTransformationRecord } from '../api/accountingTransformation';
 import {
@@ -248,6 +248,12 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const [editingBuilding, setEditingBuilding] =
     useState<MosqueBuilding | null>(null);
   const [form, setForm] = useState<BuildingForm>(EMPTY_FORM);
+  const [buildingNumberUsage, setBuildingNumberUsage] = useState<{
+    normalizedNumber: string;
+    result: MosqueBuildingNumberUsage;
+  } | null>(null);
+  const [checkingBuildingNumber, setCheckingBuildingNumber] = useState(false);
+  const [buildingNumberLookupError, setBuildingNumberLookupError] = useState('');
   const [pendingPhotoFiles, setPendingPhotoFiles] = useState<File[]>([]);
   const [pendingDocumentFiles, setPendingDocumentFiles] = useState<File[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<MosqueBuilding | null>(null);
@@ -547,6 +553,48 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     [buildingDeeds, form.deedId],
   );
 
+  // Read-only server lookup: unlike the locally displayed cards, it checks
+  // ALL registered building/deed pairs, including records outside the view.
+  useEffect(() => {
+    const number = form.buildingNumber.trim();
+    if (!formOpen || !number) {
+      setBuildingNumberUsage(null);
+      setCheckingBuildingNumber(false);
+      setBuildingNumberLookupError('');
+      return;
+    }
+    let cancelled = false;
+    setBuildingNumberUsage(null);
+    setBuildingNumberLookupError('');
+    setCheckingBuildingNumber(true);
+    const timer = window.setTimeout(() => {
+      void mosqueApi.buildingNumberUsage(number).then((result) => {
+        if (!cancelled) {
+          setBuildingNumberUsage({
+            normalizedNumber: number.toLocaleLowerCase(),
+            result,
+          });
+        }
+      }).catch((error) => {
+        if (!cancelled) setBuildingNumberLookupError(
+          error instanceof Error ? error.message : 'تعذر التحقق من سجلات المباني',
+        );
+      }).finally(() => {
+        if (!cancelled) setCheckingBuildingNumber(false);
+      });
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [formOpen, form.buildingNumber]);
+
+  const currentNumberUsage = buildingNumberUsage?.normalizedNumber === form.buildingNumber.trim().toLocaleLowerCase()
+    ? buildingNumberUsage.result : null;
+  const selectedDeedConflict = currentNumberUsage?.matches.find(
+    (item) => item.deedId === form.deedId && item.id !== editingBuilding?.id,
+  ) || null;
+
   const applyDeedLocation = (deedId: string) => {
     const deed = buildingDeeds.find((item) => item.id === deedId);
     setForm((previous) => ({
@@ -627,16 +675,23 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       return;
     }
 
-    // Building numbers are unique within a deed, not across the university.
-    // The backend enforces this authoritatively across all records and users.
-    const duplicate = buildings.find(
-      (building) =>
-        building.id !== editingBuilding?.id &&
-        normalizeKey(building.buildingNumber) === normalizeKey(buildingNumber) &&
-        (building.deedId || building.deed?.id) === form.deedId
-    );
-    if (duplicate) {
-      toast.error(`رقم المبنى ${buildingNumber} مسجل مسبقًا ضمن الصك المحدد للمبنى: ${duplicate.name || duplicate.buildingNumber}. يمكن تكرار الرقم إذا كان الصك مختلفًا.`);
+    // Always recheck the database on submit: local cards can be stale or omit
+    // records; the backend's (number, deed) constraint remains the final guard.
+    try {
+      const usage = await mosqueApi.buildingNumberUsage(buildingNumber);
+      const duplicate = usage.matches.find(
+        (item) => item.id !== editingBuilding?.id && item.deedId === form.deedId,
+      );
+      if (duplicate) {
+        const deedNumber = duplicate.deed?.deedNumber || selectedDeed?.deedNumber || 'المحدد';
+        toast.error(
+          `المبنى رقم ${buildingNumber} مسجل بالفعل تحت الصك ${deedNumber} باسم «${duplicate.name || buildingNumber}». لا يمكن إضافته مرتين داخل الصك نفسه، ويمكنك تعديل السجل الموجود.`,
+        );
+        return;
+      }
+    } catch (error) {
+      toast.error('تعذر التحقق من رقم المبنى في السجل المركزي: ' +
+        (error instanceof Error ? error.message : 'تحقق من الاتصال وحاول مجددًا'));
       return;
     }
 
@@ -1378,6 +1433,49 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                   {selectedDeed.plotNumber ? <> · القطعة: <b>{selectedDeed.plotNumber}</b></> : null}
                   {selectedDeed.planNumber ? <> · المخطط: <b>{selectedDeed.planNumber}</b></> : null}
                   {selectedDeed.area != null ? <> · مساحة الصك: <b>{selectedDeed.area.toLocaleString('ar-SA')} م²</b></> : null}
+                </div>
+              )}
+              {form.buildingNumber.trim() && (
+                <div className="mt-3 space-y-2" aria-live="polite">
+                  {checkingBuildingNumber ? (
+                    <p className="rounded-xl border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                      جارٍ فحص رقم المبنى في قاعدة البيانات...
+                    </p>
+                  ) : buildingNumberLookupError ? (
+                    <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                      تعذر فحص الأرقام المسجلة مسبقًا؛ تحقق من الاتصال. سيظل الحفظ خاضعًا للتحقق من الخادم.
+                    </p>
+                  ) : currentNumberUsage ? (
+                    <div className={`rounded-xl border px-3 py-3 text-xs leading-6 ${
+                      selectedDeedConflict
+                        ? 'border-rose-300 bg-rose-50 text-rose-950'
+                        : 'border-emerald-300 bg-emerald-50/70 text-emerald-950'
+                    }`}>
+                      <p className="font-black">
+                        {selectedDeedConflict
+                          ? `الرقم ${form.buildingNumber.trim()} مسجل بالفعل تحت هذا الصك؛ عدّل السجل الموجود بدل إنشاء سجل مكرر.`
+                          : form.deedId
+                            ? `لا يوجد تعارض للرقم ${form.buildingNumber.trim()} مع الصك المختار؛ يمكن تسجيله حتى لو استُخدم في صك مختلف.`
+                            : 'اختر صكًا لمعرفة هل رقم المبنى متاح تحته.'}
+                      </p>
+                      {currentNumberUsage.matches.length > 0 && (
+                        <div className="mt-2 space-y-1 border-t border-current/15 pt-2">
+                          <p className="font-bold">
+                            السجلات الموجودة بهذا الرقم في قاعدة البيانات ({currentNumberUsage.matches.length}):
+                          </p>
+                          {currentNumberUsage.matches.slice(0, 12).map((item) => (
+                            <p key={item.id} className="flex flex-wrap justify-between gap-x-3 rounded-lg bg-white/60 px-2 py-1">
+                              <span>{item.name || 'مبنى بدون اسم'} · صك {item.deed?.deedNumber || 'غير مرتبط'}</span>
+                              <span className="font-bold">{item.deedId === form.deedId ? 'الصك المختار — مسجل' : 'صك مختلف'}</span>
+                            </p>
+                          ))}
+                          {(currentNumberUsage.matches.length > 12 || currentNumberUsage.truncated) && (
+                            <p className="font-semibold">توجد نتائج إضافية؛ يُرجى مراجعة السجل المركزي.</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>
