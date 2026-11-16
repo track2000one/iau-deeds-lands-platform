@@ -2,6 +2,7 @@ import { updateInteractiveCardMotion, resetInteractiveCardMotion } from '../util
 import { printCentralBuildingReport } from '../utils/centralBuildingPrintReport';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useResultsMotion } from '../utils/useResultsMotion';
+import { normalizeBuildingNumber } from '../utils/normalizeBuildingNumber';
 import { useNavigate } from 'react-router';
 import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -553,10 +554,11 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     [buildingDeeds, form.deedId],
   );
 
-  // Read-only server lookup: unlike the locally displayed cards, it checks
-  // ALL registered building/deed pairs, including records outside the view.
+  const canonicalBuildingNumber = normalizeBuildingNumber(form.buildingNumber);
+  const numberNeedsNormalization = Boolean(form.buildingNumber && canonicalBuildingNumber !== form.buildingNumber);
+  // Read-only server lookup: includes legacy numbers with spaces or alternate numerals.
   useEffect(() => {
-    const number = form.buildingNumber.trim();
+    const number = canonicalBuildingNumber;
     if (!formOpen || !number) {
       setBuildingNumberUsage(null);
       setCheckingBuildingNumber(false);
@@ -571,7 +573,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       void mosqueApi.buildingNumberUsage(number).then((result) => {
         if (!cancelled) {
           setBuildingNumberUsage({
-            normalizedNumber: number.toLocaleLowerCase(),
+            normalizedNumber: number,
             result,
           });
         }
@@ -587,9 +589,9 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [formOpen, form.buildingNumber]);
+  }, [formOpen, canonicalBuildingNumber]);
 
-  const currentNumberUsage = buildingNumberUsage?.normalizedNumber === form.buildingNumber.trim().toLocaleLowerCase()
+  const currentNumberUsage = buildingNumberUsage?.normalizedNumber === canonicalBuildingNumber
     ? buildingNumberUsage.result : null;
   const selectedDeedConflict = currentNumberUsage?.matches.find(
     (item) => item.deedId === form.deedId && item.id !== editingBuilding?.id,
@@ -653,7 +655,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       toast.error('لا تملك صلاحية إضافة مبنى');
       return;
     }
-    const buildingNumber = form.buildingNumber.trim();
+    const buildingNumber = normalizeBuildingNumber(form.buildingNumber);
     const name = form.name.trim();
     if (!buildingNumber || !name) {
       toast.error('رقم المبنى واسم المبنى حقول مطلوبة');
@@ -1411,11 +1413,38 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
               <p className="mt-1 text-xs text-muted-foreground">البيانات المرجعية الأساسية للمبنى.</p>
             </div>
             <Field label="رقم المبنى *">
-              <Input value={form.buildingNumber} onChange={(event) => setForm((prev) => ({ ...prev, buildingNumber: event.target.value }))} />
+              <Input
+                value={form.buildingNumber}
+                aria-describedby="central-building-number-guidance"
+                onChange={(event) => setForm((prev) => ({ ...prev, buildingNumber: event.target.value }))}
+                onBlur={() => {
+                  if (canonicalBuildingNumber && numberNeedsNormalization) {
+                    setForm((prev) => ({
+                      ...prev,
+                      buildingNumber: normalizeBuildingNumber(prev.buildingNumber),
+                    }));
+                  }
+                }}
+              />
             </Field>
             <Field label="اسم المبنى *">
               <Input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
             </Field>
+            <div id="central-building-number-guidance" className="md:col-span-2 rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-950">
+              <p className="font-black">تنبيه مهم: المسافات وتغيير شكل الأحرف لا تجعل رقم المبنى مختلفًا.</p>
+              <p className="mt-1 font-semibold">
+                الرموز <span dir="ltr" className="font-mono">A70</span> و
+                <span dir="ltr" className="font-mono">a70</span> و
+                <span dir="ltr" className="font-mono">A 70</span> و
+                <span dir="ltr" className="font-mono">A٧٠</span> تُعامل جميعها كرقم واحد.
+                يُسمح بتسجيل الرقم نفسه تحت صك مختلف فقط.
+              </p>
+              {numberNeedsNormalization && canonicalBuildingNumber && (
+                <p className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-black" aria-live="polite">
+                  ستُوحَّد الصيغة تلقائيًا إلى: <span dir="ltr" className="font-mono">{canonicalBuildingNumber}</span>
+                </p>
+              )}
+            </div>
             <div className="md:col-span-2">
               <Field label="رقم الصك المرتبط بالمبنى *">
                 <NativeSelect value={form.deedId} onChange={(event) => applyDeedLocation(event.target.value)}>
@@ -1435,7 +1464,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                   {selectedDeed.area != null ? <> · مساحة الصك: <b>{selectedDeed.area.toLocaleString('ar-SA')} م²</b></> : null}
                 </div>
               )}
-              {form.buildingNumber.trim() && (
+              {canonicalBuildingNumber && (
                 <div className="mt-3 space-y-2" aria-live="polite">
                   {checkingBuildingNumber ? (
                     <p className="rounded-xl border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -1446,16 +1475,19 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                       تعذر فحص الأرقام المسجلة مسبقًا؛ تحقق من الاتصال. سيظل الحفظ خاضعًا للتحقق من الخادم.
                     </p>
                   ) : currentNumberUsage ? (
-                    <div className={`rounded-xl border px-3 py-3 text-xs leading-6 ${
-                      selectedDeedConflict
-                        ? 'border-rose-300 bg-rose-50 text-rose-950'
-                        : 'border-emerald-300 bg-emerald-50/70 text-emerald-950'
-                    }`}>
+                    <div
+                      role={selectedDeedConflict ? 'alert' : 'status'}
+                      className={`rounded-xl border-2 px-4 py-4 text-sm leading-7 ${
+                        selectedDeedConflict
+                          ? 'border-rose-500 bg-rose-100 text-rose-950 shadow-sm'
+                          : 'border-emerald-300 bg-emerald-50/70 text-emerald-950'
+                      }`}
+                    >
                       <p className="font-black">
                         {selectedDeedConflict
-                          ? `الرقم ${form.buildingNumber.trim()} مسجل بالفعل تحت هذا الصك؛ عدّل السجل الموجود بدل إنشاء سجل مكرر.`
+                          ? `⛔ لا يمكن الحفظ: رقم المبنى ${canonicalBuildingNumber} مسجل بالفعل تحت الصك ${selectedDeedConflict.deed?.deedNumber || selectedDeed?.deedNumber || 'المختار'} باسم «${selectedDeedConflict.name || canonicalBuildingNumber}». تغيير المسافات أو الأحرف لن يُنشئ مبنى جديدًا؛ افتح السجل الموجود وعدّله.`
                           : form.deedId
-                            ? `لا يوجد تعارض للرقم ${form.buildingNumber.trim()} مع الصك المختار؛ يمكن تسجيله حتى لو استُخدم في صك مختلف.`
+                            ? `✓ الرقم الموحّد ${canonicalBuildingNumber} متاح لهذا الصك؛ يمكن استخدامه في صك مختلف إذا لم يكن مسجلًا فيه.`
                             : 'اختر صكًا لمعرفة هل رقم المبنى متاح تحته.'}
                       </p>
                       {currentNumberUsage.matches.length > 0 && (
@@ -1470,7 +1502,9 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                             </p>
                           ))}
                           {(currentNumberUsage.matches.length > 12 || currentNumberUsage.truncated) && (
-                            <p className="font-semibold">توجد نتائج إضافية؛ يُرجى مراجعة السجل المركزي.</p>
+                            <p className="font-semibold">
+                              توجد نتائج إضافية؛ قد تكون هناك تسجيلات أخرى تحت الصك المختار. الحفظ يخضع لفحص الخادم النهائي.
+                            </p>
                           )}
                         </div>
                       )}
@@ -1694,8 +1728,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
             <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>
               إلغاء
             </Button>
-            <Button onClick={() => void saveBuilding()} disabled={saving}>
-              {saving ? 'جارٍ حفظ المبنى والمرفقات...' : 'حفظ المبنى والمرفقات'}
+            <Button onClick={() => void saveBuilding()} disabled={saving || Boolean(selectedDeedConflict)}>
+              {selectedDeedConflict
+                ? 'الحفظ ممنوع — الرقم مسجل في الصك'
+                : saving ? 'جارٍ حفظ المبنى والمرفقات...' : 'حفظ المبنى والمرفقات'}
             </Button>
           </DialogFooter>
         </DialogContent>
