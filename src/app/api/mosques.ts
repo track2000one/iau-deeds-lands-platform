@@ -35,6 +35,19 @@ export type MosqueBuildingDeedReference = {
   district?: string | null;
 };
 
+/** Minimal read-only record identity for deed-scoped duplicate detection. */
+export type MosqueBuildingNumberUsage = {
+  buildingNumber: string;
+  matches: Array<{
+    id: string;
+    buildingNumber: string;
+    name: string | null;
+    deedId: string | null;
+    deed: { id: string; deedNumber: string } | null;
+  }>;
+  truncated: boolean;
+};
+
 export type MosqueBuildingPendingPage = {
   items: MosqueBuilding[];
   total: number;
@@ -1039,6 +1052,9 @@ export const mosqueApi = {
     return apiJson<MosqueBuildingPendingPage>(`/api/mosques/buildings?${query.toString()}`);
   },
   buildingDeeds: () => apiJson<MosqueBuildingDeedReference[]>('/api/mosques/building-deeds'),
+  buildingNumberUsage: (number: string) => apiJson<MosqueBuildingNumberUsage>(
+    `/api/mosques/buildings/number-usage?number=${encodeURIComponent(number)}`,
+  ),
   createBuilding: (input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>('/api/mosques/buildings', { method: 'POST', body: JSON.stringify(input) }),
   updateBuilding: (id: string, input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>(`/api/mosques/buildings/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteBuilding: (id: string) => apiJson<void>(`/api/mosques/buildings/${id}`, { method: 'DELETE' }),
