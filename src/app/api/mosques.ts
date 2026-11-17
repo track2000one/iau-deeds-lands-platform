@@ -91,7 +91,7 @@ export type MosqueBuilding = {
   buildingType?: string | null;
   primaryUse?: string | null;
   ownershipType?: string | null;
-  operationalStatus?: 'active' | 'maintenance' | 'under_construction' | 'temporarily_closed' | 'out_of_service';
+  operationalStatus?: 'active' | 'maintenance' | 'under_construction' | 'temporarily_closed' | 'out_of_service' | 'not_existing' | 'other';
   constructionYear?: number | null;
   floorsCount?: number | null;
   basementFloorsCount?: number | null;
