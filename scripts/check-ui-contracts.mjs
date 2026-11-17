@@ -45,6 +45,10 @@ console.log('✓ Attachment previews remain lazy and closeable');
 
 assert.match(registry, /useState<'table' \| 'cards'>\('cards'\)/, 'Registry should open in cards view by default');
 assert.match(registry, /setBuildingView\('table'\)/, 'Manual table toggle must remain available');
+assert.match(registry, /<option value="not_existing">غير قائم<\\/option>/,
+  'Central buildings operational status must offer "غير قائم"');
+assert.match(registry, /<option value="not_existing">غير قائم<\\/option>\\s*<option value="other">أخرى<\\/option>/,
+  '"غير قائم" should appear immediately above "أخرى" in the operating status list');
 assert.match(registry, /data-deed-linked=\{Boolean\(/);
 assert.match(registry, /mosqueApi\.buildingNumberUsage\(number\)/,
   'Live number lookup must use the database, not the displayed cards');
