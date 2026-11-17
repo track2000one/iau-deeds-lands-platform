@@ -95,7 +95,7 @@ type BuildingForm = {
   buildingType: string;
   primaryUse: string;
   ownershipType: string;
-  operationalStatus: 'active' | 'maintenance' | 'under_construction' | 'temporarily_closed' | 'out_of_service';
+  operationalStatus: 'active' | 'maintenance' | 'under_construction' | 'temporarily_closed' | 'out_of_service' | 'not_existing' | 'other';
   constructionYear: string;
   floorsCount: string;
   basementFloorsCount: string;
@@ -1564,6 +1564,8 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                 <option value="under_construction">تحت الإنشاء</option>
                 <option value="temporarily_closed">مغلق مؤقتًا</option>
                 <option value="out_of_service">خارج الخدمة</option>
+                <option value="not_existing">غير قائم</option>
+                <option value="other">أخرى</option>
               </NativeSelect>
             </Field>
             <Field label="سنة الإنشاء">
