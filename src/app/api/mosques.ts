@@ -115,6 +115,7 @@ export type MosqueBuilding = {
   createdBy?: string | null;
   createdByName?: string | null;
   createdAt?: string;
+  registrationAt?: string | null; // Admin-correctable; fallback to createdAt on historical records.
   updatedAt?: string;
   sites?: Array<{
     id: string;

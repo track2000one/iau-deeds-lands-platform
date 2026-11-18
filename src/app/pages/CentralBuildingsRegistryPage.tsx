@@ -2,6 +2,7 @@ import { updateInteractiveCardMotion, resetInteractiveCardMotion } from '../util
 import { printCentralBuildingReport } from '../utils/centralBuildingPrintReport';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useResultsMotion } from '../utils/useResultsMotion';
+import { formatBuildingRegistrationTime, toRiyadhDateTimeInput, riyadhDateTimeInputToIso } from '../utils/buildingRegistrationTime';
 import { normalizeBuildingNumber } from '../utils/normalizeBuildingNumber';
 import { useNavigate } from 'react-router';
 import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
@@ -109,6 +110,7 @@ type BuildingForm = {
   latitude: string;
   longitude: string;
   notes: string;
+  registrationAt: string; // Only editable by admins on existing buildings.
 };
 
 const EMPTY_FORM: BuildingForm = {
@@ -136,6 +138,7 @@ const EMPTY_FORM: BuildingForm = {
   latitude: '',
   longitude: '',
   notes: '',
+  registrationAt: '',
 };
 
 const coverageLabels: Record<string, string> = {
@@ -201,7 +204,8 @@ const buildingDetails = (building: MosqueBuilding): Array<[string, string]> => [
   ['المساحة المبنية', building.builtUpArea == null ? '—' : `${building.builtUpArea.toLocaleString('ar-SA')} م²`],
   ['الإحداثيات', building.latitude == null || building.longitude == null ? '—' : `${building.latitude} ، ${building.longitude}`],
   ['أنشأ السجل', building.createdByName || (building.createdBy ? 'مستخدم سابق' : 'سجل قديم غير منسوب')],
-  ['تاريخ الإنشاء', building.createdAt ? new Date(building.createdAt).toLocaleString('ar-SA') : '—'],
+  ['تاريخ ووقت تسجيل المبنى (توقيت الرياض)', formatBuildingRegistrationTime(building.registrationAt || building.createdAt)],
+  ['تاريخ الإنشاء الأصلي (غير قابل للتعديل)', formatBuildingRegistrationTime(building.createdAt)],
 ];
 
 const parseOptionalNumber = (value: string): number | null => {
@@ -544,6 +548,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       latitude: building.latitude == null ? '' : String(building.latitude),
       longitude: building.longitude == null ? '' : String(building.longitude),
       notes: building.notes || '',
+      registrationAt: toRiyadhDateTimeInput(building.registrationAt || building.createdAt),
     });
     setMapPickerOpen(false);
     setFormOpen(true);
@@ -724,6 +729,19 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
       return;
     }
 
+    // Corrections to the official registration timestamp are admin-only.
+    // An unchanged timestamp must never be resent, so ordinary edits preserve
+    // its original seconds and server precision.
+    let adminRegistrationAt: string | undefined;
+    if (editingBuilding && isAdmin &&
+        form.registrationAt !== toRiyadhDateTimeInput(editingBuilding.registrationAt || editingBuilding.createdAt)) {
+      adminRegistrationAt = riyadhDateTimeInputToIso(form.registrationAt) || undefined;
+      if (!adminRegistrationAt) {
+        toast.error('تاريخ ووقت تسجيل المبنى غير صحيحين؛ أدخل التاريخ والوقت بتوقيت الرياض.');
+        return;
+      }
+    }
+
     const commonPayload = {
       buildingNumber,
       name,
@@ -754,7 +772,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     try {
       setSaving(true);
       const savedBuilding = editingBuilding
-        ? await mosqueApi.updateBuilding(editingBuilding.id, commonPayload)
+        ? await mosqueApi.updateBuilding(editingBuilding.id, {
+            ...commonPayload,
+            ...(adminRegistrationAt ? { registrationAt: adminRegistrationAt } : {}),
+          })
         : await mosqueApi.createBuilding({
             ...commonPayload,
             coverageStatus: 'unassessed',
@@ -1578,6 +1599,41 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                 <option value="no">غير مهيأ</option>
               </NativeSelect>
             </Field>
+
+            <div className="md:col-span-2 mt-2 border-b pb-2">
+              <p className="font-black text-foreground">التوثيق الزمني للمبنى</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                يُسجّل تاريخ ووقت إضافة المبنى تلقائيًا من الخادم. تصحيح تاريخ التسجيل متاح للمسؤول فقط، مع بقاء تاريخ الإنشاء الأصلي محفوظًا لأغراض التدقيق.
+              </p>
+            </div>
+            {!editingBuilding ? (
+              <div className="md:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm font-semibold text-emerald-950">
+                تاريخ ووقت التسجيل: يُحدَّدان تلقائيًا عند الحفظ وفق ساعة الخادم، ويُعرضان بتوقيت الرياض.
+              </div>
+            ) : (
+              <>
+                <Field label="تاريخ ووقت تسجيل المبنى — توقيت الرياض">
+                  <Input
+                    type="datetime-local"
+                    dir="ltr"
+                    value={form.registrationAt}
+                    readOnly={!isAdmin}
+                    aria-label="تاريخ ووقت تسجيل المبنى بتوقيت الرياض"
+                    onChange={(event) => {
+                      if (isAdmin) setForm((prev) => ({ ...prev, registrationAt: event.target.value }));
+                    }}
+                  />
+                </Field>
+                <div className="flex flex-col justify-center rounded-xl border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  <p className="font-bold">{isAdmin
+                    ? 'صلاحية المسؤول: يمكنك تصحيح تاريخ التسجيل، وسيُوثَّق التصحيح في سجل التدقيق.'
+                    : 'للعرض فقط: تعديل التاريخ والوقت متاح للمسؤول.'}</p>
+                  <p className="mt-1">
+                    تاريخ الإنشاء الأصلي: {formatBuildingRegistrationTime(editingBuilding.createdAt)}
+                  </p>
+                </div>
+              </>
+            )}
 
             <div className="md:col-span-2 mt-2 border-b pb-2">
               <p className="font-black text-foreground">المساحات والتكوين</p>

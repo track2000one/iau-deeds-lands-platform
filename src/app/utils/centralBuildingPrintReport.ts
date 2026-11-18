@@ -1,4 +1,5 @@
 import { mosqueApi, type MosqueBuilding, type CentralBuildingPhoto } from '../api/mosques';
+import { formatBuildingRegistrationTime } from './buildingRegistrationTime';
 import { reportPreparerName } from './reportAttribution';
 
 type PrintablePhoto = { photo: CentralBuildingPhoto; src: string | null };
@@ -102,7 +103,8 @@ export const createCentralBuildingReportHtml = (
 
   const administrationFields = [
     field('أنشأ السجل', building.createdByName || (building.createdBy ? 'مستخدم سابق' : 'سجل قديم غير منسوب')),
-    field('تاريخ إنشاء السجل', formatDate(building.createdAt)),
+    field('تاريخ ووقت تسجيل المبنى (توقيت الرياض)', formatBuildingRegistrationTime(building.registrationAt || building.createdAt)),
+    field('تاريخ إنشاء السجل الأصلي', formatDate(building.createdAt)),
     field('تاريخ آخر تحديث', formatDate(building.updatedAt)),
     field('أُعدّ بواسطة', preparer),
     field('تاريخ إعداد التقرير', generatedAt),

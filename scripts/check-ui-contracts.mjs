@@ -50,6 +50,28 @@ assert.ok(operatingStatusOptions.includes('<option value="not_existing">غير �
   'The operating status selector must contain "غير قائم"');
 assert.ok(operatingStatusOptions.includes('<option value="not_existing">غير قائم</option>\n                <option value="other">أخرى</option>'),
   '"غير قائم" must come immediately before "أخرى"');
+assert.match(registry, /adminRegistrationAt/,
+  'Only administrator should send edited registration date and time');
+assert.match(registry, /type="datetime-local"/,
+  'Admin editing form should display a registration date/time field');
+assert.match(registry, /readOnly=\{!isAdmin\}/,
+  'Standard user must see the timestamp as read-only');
+const printReportSource = await read('src/app/utils/centralBuildingPrintReport.ts');
+assert.match(printReportSource, /تاريخ ووقت تسجيل المبنى/,
+  'The building print/PDF card should display registration date/time');
+const centralReportsSource = await read('src/app/components/CentralBuildingsReports.tsx');
+assert.match(centralReportsSource, /registrationAt/,
+  'Central building Excel/PDF report table should offer registration date/time');
+
+const dateHelperSource = await read('src/app/utils/buildingRegistrationTime.ts');
+const dateHelperCompiled = await transform(dateHelperSource, { loader: 'ts', format: 'esm' });
+const dateHelper = await import(
+  `data:text/javascript;base64,${Buffer.from(dateHelperCompiled.code).toString('base64')}`
+);
+assert.equal(dateHelper.toRiyadhDateTimeInput('2026-11-18T09:15:00.000Z'), '2026-11-18T12:15');
+assert.equal(dateHelper.riyadhDateTimeInputToIso('2026-11-18T12:15'), '2026-11-18T09:15:00.000Z');
+assert.equal(dateHelper.riyadhDateTimeInputToIso('2026-02-31T12:15'), null);
+assert.equal(dateHelper.riyadhDateTimeInputToIso(''), null);
 assert.match(registry, /data-deed-linked=\{Boolean\(/);
 assert.match(registry, /mosqueApi\.buildingNumberUsage\(number\)/,
   'Live number lookup must use the database, not the displayed cards');
