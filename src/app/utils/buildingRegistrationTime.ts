@@ -36,3 +36,60 @@ export const riyadhDateTimeInputToIso = (value: string): string | null => {
   const iso = result.toISOString();
   return toRiyadhDateTimeInput(iso) === value ? iso : null;
 };
+
+
+/** Report filters compare UTC instants while all entered clock values are Riyadh-local.
+ * "To" includes the entire selected minute, not just its first second.
+ */
+export type BuildingRegistrationRecord = {
+  registrationAt?: string | null;
+  createdAt?: string | null;
+};
+
+export type BuildingRegistrationRange = {
+  fromMs: number | null;
+  toExclusiveMs: number | null;
+  valid: boolean;
+};
+
+export const buildingRegistrationMillis = (record: BuildingRegistrationRecord): number | null => {
+  const raw = record.registrationAt || record.createdAt;
+  if (!raw) return null;
+  const value = Date.parse(raw);
+  return Number.isFinite(value) ? value : null;
+};
+
+export const getBuildingRegistrationRange = (from: string, to: string): BuildingRegistrationRange => {
+  const startIso = from ? riyadhDateTimeInputToIso(from) : null;
+  const endIso = to ? riyadhDateTimeInputToIso(to) : null;
+  const fromMs = startIso ? Date.parse(startIso) : null;
+  const toExclusiveMs = endIso ? Date.parse(endIso) + 60_000 : null;
+  return {
+    fromMs,
+    toExclusiveMs,
+    valid: (!from || fromMs !== null) && (!to || toExclusiveMs !== null) &&
+      (fromMs === null || toExclusiveMs === null || fromMs < toExclusiveMs),
+  };
+};
+
+export const matchesBuildingRegistrationRange = (
+  record: BuildingRegistrationRecord, range: BuildingRegistrationRange,
+): boolean => {
+  if (!range.valid) return false;
+  if (range.fromMs === null && range.toExclusiveMs === null) return true;
+  const value = buildingRegistrationMillis(record);
+  return value !== null &&
+    (range.fromMs === null || value >= range.fromMs) &&
+    (range.toExclusiveMs === null || value < range.toExclusiveMs);
+};
+
+export const compareBuildingRegistrationTime = (
+  first: BuildingRegistrationRecord, second: BuildingRegistrationRecord, direction: 'asc' | 'desc',
+): number => {
+  const left = buildingRegistrationMillis(first);
+  const right = buildingRegistrationMillis(second);
+  // Records without timestamps remain at the end, regardless of direction.
+  if (left === null) return right === null ? 0 : 1;
+  if (right === null) return -1;
+  return direction === 'asc' ? left - right : right - left;
+};

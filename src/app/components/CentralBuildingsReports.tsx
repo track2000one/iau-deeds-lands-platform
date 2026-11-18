@@ -7,7 +7,7 @@ import {
   type BuildingReportPhotoMode,
 } from '../utils/centralBuildingsPhotoAppendix';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowDownUp, ArrowUp, BarChart3, ChevronLeft, ChevronRight, Download, Images, ListChecks, MapPin, Printer, Search, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowDown, ArrowDownUp, ArrowUp, BarChart3, CalendarClock, ChevronLeft, ChevronRight, Download, Images, ListChecks, MapPin, Printer, Search, SlidersHorizontal, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPendingBuildingImport } from './BuildingExcelImportManager';
 import type { MosqueBuilding, MosqueBuildingDeedReference } from '../api/mosques';
@@ -18,7 +18,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
 import { ReportViewToggle } from './ReportViewToggle';
-import { formatBuildingRegistrationTime } from '../utils/buildingRegistrationTime';
+import { compareBuildingRegistrationTime, formatBuildingRegistrationTime, getBuildingRegistrationRange, matchesBuildingRegistrationRange } from '../utils/buildingRegistrationTime';
 
 type UsageEntry = {
   mosqueSites: number;
@@ -136,6 +136,9 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
   const [city, setCity] = useState('all');
   const [district, setDistrict] = useState('all');
   const [creatorId, setCreatorId] = useState('all');
+  const [registrationFrom, setRegistrationFrom] = useState('');
+  const [registrationTo, setRegistrationTo] = useState('');
+  const registrationRange = useMemo(() => getBuildingRegistrationRange(registrationFrom, registrationTo), [registrationFrom, registrationTo]);
   const [buildingSelectionMode, setBuildingSelectionMode] = useState<'all' | 'custom'>('all');
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(new Set());
   const [buildingNameSearch, setBuildingNameSearch] = useState('');
@@ -159,7 +162,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
   }, [selectedColumns]);
   useEffect(() => {
     setPage(1);
-  }, [search, approval, campus, city, district, creatorId, linkType, coordinates, deedLink, sort, buildingSelectionMode, selectedBuildingIds]);
+  }, [search, approval, campus, city, district, creatorId, registrationFrom, registrationTo, linkType, coordinates, deedLink, sort, buildingSelectionMode, selectedBuildingIds]);
 
   // A new site, neighborhood or other filter must never carry over hidden
   // building IDs from an earlier selection.
@@ -167,7 +170,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     setBuildingSelectionMode('all');
     setSelectedBuildingIds(new Set());
     setBuildingNameSearch('');
-  }, [search, approval, campus, city, district, creatorId, linkType, coordinates, deedLink]);
+  }, [search, approval, campus, city, district, creatorId, registrationFrom, registrationTo, linkType, coordinates, deedLink]);
 
   const deedById = useMemo(() => new Map(deeds.map((deed) => [String(deed.id), deed])), [deeds]);
   const getDeedNumber = (building: MosqueBuilding): string => {
@@ -217,6 +220,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       if (city !== 'all' && data.city !== city) return false;
       if (district !== 'all' && data.district !== district) return false;
       if (creatorId !== 'all' && (building.createdBy || UNKNOWN_CREATOR) !== creatorId) return false;
+      if (!matchesBuildingRegistrationRange(building, registrationRange)) return false;
       if (deedLink === 'linked' && !isDeedLinked(building)) return false;
       if (deedLink === 'unlinked' && isDeedLinked(building)) return false;
       const located = hasCoordinates(data.latitude, data.longitude);
@@ -229,7 +233,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       if (needle && ![data.buildingNumber, data.name, data.campusLocation, data.city, data.district, getDeedNumber(building), creatorName(building)].some((value) => normalize(value).includes(needle))) return false;
       return true;
     });
-  }, [approval, buildings, campus, city, district, creatorId, coordinates, deedLink, deedById, linkType, search, usage]);
+  }, [approval, buildings, campus, city, district, creatorId, registrationRange, coordinates, deedLink, deedById, linkType, search, usage]);
 
   // Everything downstream (KPIs, table, photos, PDF and Excel) consumes this one
   // filtered collection; only the explicitly checked IDs survive custom selection.
@@ -303,6 +307,10 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
   };
 
   const sorted = useMemo(() => [...filtered].sort((first, second) => {
+    if (sort.key === 'registrationAt') {
+      const order = compareBuildingRegistrationTime(first, second, sort.direction);
+      return order || String(first.buildingNumber).localeCompare(String(second.buildingNumber), 'ar', { numeric: true });
+    }
     const left = cellValue(first, sort.key);
     const right = cellValue(second, sort.key);
     const comparison = typeof left === 'number' && typeof right === 'number'
@@ -324,6 +332,8 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     city !== 'all' ? 'المدينة: ' + city : '',
     district !== 'all' ? 'الحي: ' + district : '',
     creatorId !== 'all' ? 'اسم المستخدم: ' + (creatorOptions.find((item) => item.id === creatorId)?.name || 'غير معروف') : '',
+    registrationFrom ? 'تاريخ التسجيل من: ' + registrationFrom.replace('T', ' ') + ' (الرياض)' : '',
+    registrationTo ? 'تاريخ التسجيل إلى: ' + registrationTo.replace('T', ' ') + ' (الرياض؛ شامل الدقيقة)' : '',
     buildingSelectionMode === 'custom'
       ? 'المباني المختارة (' + selectedBuildingRows.length + '): ' +
         (selectedBuildingRows.length
@@ -553,6 +563,9 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
     setCity('all');
     setDistrict('all');
     setCreatorId('all');
+    setRegistrationFrom('');
+    setRegistrationTo('');
+    setSort({ key: 'buildingNumber', direction: 'asc' });
     setBuildingSelectionMode('all');
     setSelectedBuildingIds(new Set());
     setBuildingNameSearch('');
@@ -664,6 +677,59 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
                   </Button>
                 </div>
               </div>
+              <section className="rounded-xl border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-800 dark:bg-sky-950/20" aria-label="تصفية تاريخ ووقت تسجيل المبنى">
+                <div className="mb-3 space-y-1">
+                  <h3 className="flex items-center gap-2 text-sm font-black text-foreground">
+                    <CalendarClock className="h-4 w-4 text-primary" /> تصفية وفرز تاريخ ووقت تسجيل المبنى
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    حدّد تاريخًا ووقتًا من وإلى بتوقيت الرياض (الساعة والدقيقة). الحد النهائي يشمل الدقيقة المختارة بالكامل.
+                    في السجلات القديمة التي لا تحتوي تاريخ تسجيل مستقل، يُستخدم تاريخ الإنشاء الأصلي.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="central-buildings-registered-from" className="text-sm font-bold">مسجّل من (التاريخ والوقت)</Label>
+                    <Input id="central-buildings-registered-from" type="datetime-local" step={60} dir="ltr"
+                      aria-label="تاريخ ووقت التسجيل من بتوقيت الرياض" value={registrationFrom}
+                      onChange={(event) => setRegistrationFrom(event.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="central-buildings-registered-to" className="text-sm font-bold">مسجّل إلى (التاريخ والوقت)</Label>
+                    <Input id="central-buildings-registered-to" type="datetime-local" step={60} dir="ltr"
+                      aria-label="تاريخ ووقت التسجيل إلى بتوقيت الرياض" value={registrationTo}
+                      onChange={(event) => setRegistrationTo(event.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="central-buildings-registration-sort" className="text-sm font-bold">فرز حسب التاريخ والوقت</Label>
+                    <NativeSelect id="central-buildings-registration-sort"
+                      value={sort.key === 'registrationAt' ? sort.direction : ''}
+                      onChange={(event) => {
+                        if (event.target.value === 'asc' || event.target.value === 'desc') {
+                          setSort({ key: 'registrationAt', direction: event.target.value });
+                        }
+                      }}>
+                      <option value="">اختر ترتيب التاريخ</option>
+                      <option value="desc">الأحدث أولًا</option>
+                      <option value="asc">الأقدم أولًا</option>
+                    </NativeSelect>
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="button" variant="outline" className="w-full font-bold"
+                      disabled={!registrationFrom && !registrationTo && sort.key !== 'registrationAt'}
+                      onClick={() => {
+                        setRegistrationFrom('');
+                        setRegistrationTo('');
+                        if (sort.key === 'registrationAt') setSort({ key: 'buildingNumber', direction: 'asc' });
+                      }}>مسح تصفية التاريخ والوقت</Button>
+                  </div>
+                </div>
+                {!registrationRange.valid && (
+                  <p role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-2 text-sm font-bold text-red-800 dark:border-red-700 dark:bg-red-950/50 dark:text-red-200">
+                    نطاق التاريخ والوقت غير صحيح. تأكد من صحة التاريخ وأن وقت البداية لا يأتي بعد نهاية الدقيقة المحددة.
+                  </p>
+                )}
+              </section>
               <section className="space-y-3 rounded-xl border border-primary/20 bg-background p-3" aria-label="تحديد المباني بالاسم">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="space-y-1">

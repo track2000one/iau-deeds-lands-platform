@@ -72,6 +72,31 @@ assert.equal(dateHelper.toRiyadhDateTimeInput('2026-11-18T09:15:00.000Z'), '2026
 assert.equal(dateHelper.riyadhDateTimeInputToIso('2026-11-18T12:15'), '2026-11-18T09:15:00.000Z');
 assert.equal(dateHelper.riyadhDateTimeInputToIso('2026-02-31T12:15'), null);
 assert.equal(dateHelper.riyadhDateTimeInputToIso(''), null);
+const registrationRange = dateHelper.getBuildingRegistrationRange('2026-11-18T12:15', '2026-11-18T12:15');
+assert.equal(registrationRange.fromMs, Date.parse('2026-11-18T09:15:00.000Z'));
+assert.equal(registrationRange.toExclusiveMs, Date.parse('2026-11-18T09:16:00.000Z'));
+assert.equal(registrationRange.valid, true);
+assert.equal(dateHelper.matchesBuildingRegistrationRange({ registrationAt: '2026-11-18T09:15:59.999Z' }, registrationRange), true);
+assert.equal(dateHelper.matchesBuildingRegistrationRange({ registrationAt: '2026-11-18T09:16:00.000Z' }, registrationRange), false);
+assert.equal(dateHelper.matchesBuildingRegistrationRange({ registrationAt: '2026-11-18T09:14:59.999Z' }, registrationRange), false);
+assert.equal(dateHelper.matchesBuildingRegistrationRange({ createdAt: '2026-11-18T09:15:00Z', registrationAt: null }, registrationRange), true,
+  'Legacy rows should fall back to immutable creation time');
+assert.equal(dateHelper.matchesBuildingRegistrationRange({}, registrationRange), false);
+assert.equal(dateHelper.matchesBuildingRegistrationRange({}, dateHelper.getBuildingRegistrationRange('', '')), true,
+  'Without an active date filter, unknown timestamps must not hide historical rows');
+assert.equal(dateHelper.getBuildingRegistrationRange('2026-11-18T12:16', '2026-11-18T12:15').valid, false);
+assert.equal(dateHelper.getBuildingRegistrationRange('2026-02-31T12:00', '').valid, false);
+assert.equal(dateHelper.getBuildingRegistrationRange('', '2026-02-31T12:00').valid, false);
+const older = { registrationAt: '2026-11-18T09:15:20.000Z' };
+const newer = { registrationAt: '2026-11-18T09:15:40.000Z' };
+assert.ok(dateHelper.compareBuildingRegistrationTime(older, newer, 'asc') < 0);
+assert.ok(dateHelper.compareBuildingRegistrationTime(older, newer, 'desc') > 0);
+assert.ok(dateHelper.compareBuildingRegistrationTime({}, older, 'desc') > 0, 'Missing timestamp is always last');
+assert.match(centralReportsSource, /matchesBuildingRegistrationRange\(building, registrationRange\)/);
+assert.match(centralReportsSource, /compareBuildingRegistrationTime\(first, second, sort.direction\)/);
+assert.match(centralReportsSource, /type="datetime-local" step=\{60\}/);
+assert.match(centralReportsSource, /registrationFrom\.replace\('T', ' '\)/);
+console.log('✓ Riyadh registration date/time filters, inclusive minute, legacy fallback and chronological sort');
 assert.match(registry, /data-deed-linked=\{Boolean\(/);
 assert.match(registry, /mosqueApi\.buildingNumberUsage\(number\)/,
   'Live number lookup must use the database, not the displayed cards');
