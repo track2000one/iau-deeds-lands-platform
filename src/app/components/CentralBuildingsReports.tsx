@@ -18,6 +18,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { NativeSelect } from './ui/native-select';
 import { ReportViewToggle } from './ReportViewToggle';
+import { formatBuildingRegistrationTime } from '../utils/buildingRegistrationTime';
 
 type UsageEntry = {
   mosqueSites: number;
@@ -38,6 +39,7 @@ type ColumnKey =
   | 'buildingNumber'
   | 'name'
   | 'createdBy'
+  | 'registrationAt'
   | 'deedStatus'
   | 'deedNumber'
   | 'campusLocation'
@@ -52,6 +54,7 @@ const columns: Array<{ key: ColumnKey; label: string; width: number }> = [
   { key: 'buildingNumber', label: 'رقم المبنى', width: 18 },
   { key: 'name', label: 'اسم المبنى', width: 34 },
   { key: 'createdBy', label: 'اسم المستخدم', width: 26 },
+  { key: 'registrationAt', label: 'تاريخ ووقت تسجيل المبنى', width: 28 },
   { key: 'deedStatus', label: 'الارتباط بالصك', width: 20 },
   { key: 'deedNumber', label: 'رقم الصك', width: 24 },
   { key: 'approval', label: 'حالة الاعتماد', width: 18 },
@@ -78,10 +81,15 @@ const hasCoordinates = (latitude: unknown, longitude: unknown) =>
 
 const readSelectedColumns = (): Set<ColumnKey> => {
   try {
+    const latestSaved = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v5') || 'null');
+    if (Array.isArray(latestSaved)) {
+      const valid = latestSaved.filter((key): key is ColumnKey => columns.some((column) => column.key === key));
+      if (valid.length) return new Set(valid);
+    }
     const currentSaved = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v4') || 'null');
     if (Array.isArray(currentSaved)) {
       const valid = currentSaved.filter((key): key is ColumnKey => columns.some((column) => column.key === key));
-      if (valid.length) return new Set(valid);
+      if (valid.length) return new Set([...valid, 'registrationAt']);
     }
     const previousV3 = JSON.parse(window.localStorage.getItem('iau-central-buildings-report-columns-v3') || 'null');
     if (Array.isArray(previousV3)) {
@@ -144,7 +152,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('iau-central-buildings-report-columns-v4', JSON.stringify([...selectedColumns]));
+      window.localStorage.setItem('iau-central-buildings-report-columns-v5', JSON.stringify([...selectedColumns]));
     } catch {
       // Column preferences remain usable in the current session.
     }
@@ -280,6 +288,7 @@ export const CentralBuildingsReports: React.FC<Props> = ({ buildings, deeds, usa
       case 'buildingNumber': return data.buildingNumber || '—';
       case 'name': return data.name || '—';
       case 'createdBy': return creatorName(building);
+      case 'registrationAt': return formatBuildingRegistrationTime(building.registrationAt || building.createdAt);
       case 'deedStatus': return isDeedLinked(building) ? 'مرتبط بصك' : 'غير مرتبط بصك';
       case 'deedNumber': return getDeedNumber(building) || (isDeedLinked(building) ? 'رقم الصك غير متوفر' : '—');
       case 'campusLocation': return data.campusLocation || '—';
