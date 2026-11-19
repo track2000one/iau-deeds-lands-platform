@@ -13,11 +13,9 @@ import {
   Search,
   BarChart3,
   Building,
-  Shield,
   Users,
   UploadCloud,
   Bell,
-  Lock,
   Map,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -143,25 +141,6 @@ export const HomePage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="future-card overflow-hidden">
-            <CardHeader>
-              <CardTitle>{ui('معلومات النظام', 'System Information')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl border bg-background/40 p-3">
-                <span className="text-sm text-muted-foreground">{ui('إصدار المنصة', 'Platform Version')}</span>
-                <span className="font-mono">v2060.1.0</span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl border bg-background/40 p-3">
-                <span className="text-sm text-muted-foreground">{ui('وقت التشغيل', 'Uptime')}</span>
-                <span className="font-mono">{ui('١٠٫٠ يوم', '10.0 days')}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl border bg-background/40 p-3">
-                <span className="text-sm text-muted-foreground">{ui('حالة النظام', 'System Status')}</span>
-                <Badge variant="secondary">{ui('يعمل بكفاءة', 'Operational')}</Badge>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         <div className="min-w-0 space-y-5 2xl:order-1">
@@ -259,7 +238,7 @@ export const HomePage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+          <div className="min-w-0">
             <Card className="future-card min-w-0">
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
@@ -316,26 +295,6 @@ export const HomePage: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card className="future-card overflow-hidden">
-              <CardHeader>
-                <CardTitle>{ui('الأمان والموثوقية', 'Security and Reliability')}</CardTitle>
-                <CardDescription>{ui('مستوى أمان متقدم', 'Advanced security level')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="future-hero-art min-h-[210px]">
-                  <div className="future-shield">
-                    <Lock className="h-20 w-20" />
-                  </div>
-                </div>
-                <div className="mt-4 rounded-2xl border bg-background/35 p-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{ui('مستوى الأمان', 'Security Level')}</p>
-                    <p className="text-2xl font-bold">99.9%</p>
-                  </div>
-                  <Shield className="h-10 w-10 text-primary" />
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           <Card className="future-card overflow-hidden">
