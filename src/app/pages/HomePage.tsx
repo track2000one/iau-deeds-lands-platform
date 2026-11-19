@@ -9,8 +9,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import {
-  Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
-  Tooltip, XAxis, YAxis,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { useDeeds } from '../../context/DeedContext';
 import { useData } from '../../context/DataContext';
@@ -50,6 +50,13 @@ const numberValue = (value: unknown) => {
 
 const positiveArea = (value: unknown) => Math.max(0, numberValue(value));
 const hasText = (value: unknown) => String(value ?? '').trim().length > 0;
+const buildingCoordinatesValid = (building: MosqueBuilding) => {
+  if (building.latitude == null || building.longitude == null) return false;
+  const latitude = Number(building.latitude);
+  const longitude = Number(building.longitude);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) &&
+    latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+};
 const validDate = (value: unknown) => {
   const timestamp = new Date(value as string).getTime();
   return Number.isFinite(timestamp) ? timestamp : 0;
@@ -80,7 +87,7 @@ export const HomePage: React.FC = () => {
   const canLeasedIn = access('leased_lands_in');
   const canBuildingsOut = access('leased_buildings_out');
   const canBuildingsIn = access('leased_buildings_in');
-  const canRegistry = access('mosques');
+  const canRegistry = access('central_buildings');
   const canFollowUp = access('transaction_follow_up');
   const canArchive = access('archive');
   const canReports = access('reports');
@@ -93,6 +100,7 @@ export const HomePage: React.FC = () => {
   const [followUpError, setFollowUpError] = React.useState(false);
   const [filterDays, setFilterDays] = React.useState<Period>('all');
   const [monthRange, setMonthRange] = React.useState<MonthRange>(6);
+  const [buildingCampus, setBuildingCampus] = React.useState('');
   const [query, setQuery] = React.useState('');
   const [sort, setSort] = React.useState<'newest' | 'oldest'>('newest');
 
@@ -140,9 +148,69 @@ export const HomePage: React.FC = () => {
   const missingBuildingLinks = buildings?.filter((building) =>
     !building.deedId && !building.deed?.id).length ?? 0;
   const missingBuildingCoords = buildings?.filter((building) =>
-    building.latitude == null || building.longitude == null ||
-    !Number.isFinite(Number(building.latitude)) ||
-    !Number.isFinite(Number(building.longitude))).length ?? 0;
+    !buildingCoordinatesValid(building)).length ?? 0;
+
+  const buildingCampuses = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const building of buildings ?? []) {
+      const campus = building.campusLocation?.trim() || '';
+      counts.set(campus, (counts.get(campus) || 0) + 1);
+    }
+    return [...counts].map(([key, count]) => ({
+      key,
+      name: key || ui('غير محدد', 'Not specified'),
+      count,
+    })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, locale));
+  }, [buildings, locale]);
+
+  // A campus choice changes the detailed criteria; the headline KPI stays university-wide.
+  const selectedCampus = buildingCampuses.some((campus) => campus.key === buildingCampus)
+    ? buildingCampus : '';
+  const scopedBuildings = React.useMemo(() => {
+    if (!buildings) return [];
+    if (!selectedCampus) return buildings;
+    return buildings.filter((building) => (building.campusLocation?.trim() || '') === selectedCampus);
+  }, [buildings, selectedCampus]);
+  const buildingCount = scopedBuildings.length;
+  const buildingLinked = scopedBuildings.filter((building) =>
+    Boolean(building.deedId || building.deed?.id)).length;
+  const buildingGeocoded = scopedBuildings.filter(buildingCoordinatesValid).length;
+  const buildingActive = scopedBuildings.filter((building) =>
+    building.operationalStatus === 'active').length;
+  const buildingNotExisting = scopedBuildings.filter((building) =>
+    building.operationalStatus === 'not_existing').length;
+  const buildingAreaProvided = scopedBuildings.filter((building) =>
+    positiveArea(building.builtUpArea) > 0 || positiveArea(building.landArea) > 0).length;
+  const buildingPercentage = (count: number) =>
+    buildingCount ? Math.round(100 * count / buildingCount) : 0;
+  const buildingStatusDefinitions = [
+    { key: 'active', name: ui('قائم ونشط', 'Active'), color: '#10b981' },
+    { key: 'maintenance', name: ui('تحت الصيانة', 'Maintenance'), color: '#f59e0b' },
+    { key: 'under_construction', name: ui('تحت الإنشاء', 'Under construction'), color: '#3b82f6' },
+    { key: 'temporarily_closed', name: ui('مغلق مؤقتًا', 'Temporarily closed'), color: '#8b5cf6' },
+    { key: 'out_of_service', name: ui('خارج الخدمة', 'Out of service'), color: '#ef4444' },
+    { key: 'not_existing', name: ui('غير قائم', 'Not existing'), color: '#64748b' },
+    { key: 'other', name: ui('أخرى', 'Other'), color: '#06b6d4' },
+    { key: 'unspecified', name: ui('غير محدد', 'Unspecified'), color: '#a3a3a3' },
+  ];
+  const statuses = new Set(buildingStatusDefinitions.map((item) => item.key));
+  const buildingStatusDistribution = buildingStatusDefinitions.map((status) => ({
+    ...status,
+    count: scopedBuildings.filter((building) =>
+      (statuses.has(building.operationalStatus || '') ? building.operationalStatus : 'unspecified') === status.key).length,
+  })).filter((status) => status.count > 0);
+
+  const topCampusRows = buildingCampuses.slice(0, 8).map((row) => ({
+    ...row, selected: Boolean(selectedCampus && selectedCampus === row.key),
+  }));
+  if (buildingCampuses.length > 8) {
+    topCampusRows.push({
+      key: '__remaining__',
+      name: ui('بقية المواقع', 'Remaining campuses'),
+      count: buildingCampuses.slice(8).reduce((sum, row) => sum + row.count, 0),
+      selected: buildingCampuses.slice(8).some((row) => row.key === selectedCampus),
+    });
+  }
 
   const deedCompleteness = React.useMemo(() => {
     if (!deeds.length) return null;
@@ -160,6 +228,7 @@ export const HomePage: React.FC = () => {
     { name: ui('الأراضي المسلّمة', 'Delivered lands'), count: canDelivered ? deliveredLands.length : 0, color: '#8b5cf6', allowed: canDelivered },
     { name: ui('الأراضي المؤجرة والمستأجرة', 'Leased lands'), count: (canLeasedOut ? leasedLandsOut.length : 0) + (canLeasedIn ? leasedLandsIn.length : 0), color: '#f59e0b', allowed: canLeasedOut || canLeasedIn },
     { name: ui('المباني المؤجرة والمستأجرة', 'Leased buildings'), count: (canBuildingsOut ? leasedBuildingsOut.length : 0) + (canBuildingsIn ? leasedBuildingsIn.length : 0), color: '#ec4899', allowed: canBuildingsOut || canBuildingsIn },
+    { name: ui('السجل المركزي للمباني', 'Central buildings registry'), count: canRegistry && buildings ? buildings.length : 0, color: '#6366f1', allowed: canRegistry },
   ].filter((item) => item.allowed);
   const totalRecords = recordGroups.reduce((sum, item) => sum + item.count, 0);
 
@@ -169,7 +238,7 @@ export const HomePage: React.FC = () => {
       { title: ui('مساحة الصكوك', 'Deed area'), value: dataLoading ? '—' : fmt(totalDeedArea), subtitle: ui('متر مربع • مجموع المساحات المسجلة', 'Square metres • recorded sum'), icon: Ruler, route: '/deeds', tone: 'border-teal-200/60 dark:border-teal-800/50', iconTone: 'bg-teal-500/10 text-teal-600 dark:text-teal-300' },
     ] : []),
     ...(canRegistry ? [{
-      title: ui('مباني السجل المركزي', 'Central registry buildings'),
+      title: ui('عدد المباني المسجلة', 'Registered buildings count'),
       value: buildings === null ? '—' : fmt(buildings.length),
       subtitle: buildingsError ? ui('تعذر تحميل البيانات', 'Data unavailable') : ui('المباني المسجلة فعليًا', 'Registered buildings'),
       icon: Building2, route: '/buildings/registry',
@@ -275,6 +344,17 @@ export const HomePage: React.FC = () => {
       [ui('المؤشر', 'Indicator'), ui('القيمة', 'Value')],
       ...metrics.map((metric) => [metric.title, metric.value]),
       ...recordGroups.map((group) => [group.name, String(group.count)]),
+      ...(canRegistry && buildings ? [
+        [ui('إجمالي مباني السجل المركزي', 'Central buildings total'), String(buildings.length)],
+        [ui('المباني في النطاق المحدد', 'Buildings in selected campus'), String(buildingCount)],
+        [ui('المباني المرتبطة بصك', 'Buildings linked to deed'), String(buildingLinked)],
+        [ui('المباني بإحداثيات صحيحة', 'Buildings with valid coordinates'), String(buildingGeocoded)],
+        [ui('المباني القائمة النشطة', 'Active buildings'), String(buildingActive)],
+        [ui('المباني غير القائمة', 'Not existing buildings'), String(buildingNotExisting)],
+        [ui('المباني المدخلة مساحاتها', 'Buildings with recorded area'), String(buildingAreaProvided)],
+        ...buildingCampuses.map((campus) => [ui('مبانٍ حسب الحرم: ', 'Buildings by campus: ') + campus.name, String(campus.count)]),
+        ...buildingStatusDistribution.map((status) => [ui('مبانٍ حسب الحالة: ', 'Buildings by status: ') + status.name, String(status.count)]),
+      ] : []),
       ...(canDeeds ? [
         [ui('الصكوك دون إحداثيات', 'Deeds without coordinates'), String(missingCoords)],
         [ui('الصكوك دون مساحة', 'Deeds without area'), String(missingArea)],
@@ -380,6 +460,173 @@ export const HomePage: React.FC = () => {
           })}
         </div>
       </section>
+
+
+      {canRegistry && (
+        <section className="space-y-4" aria-label={ui('مؤشرات السجل المركزي للمباني', 'Central buildings analytics')}>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-extrabold text-foreground">
+                <Building2 className="h-5 w-5 text-indigo-600 dark:text-indigo-300" />
+                {ui('مؤشرات المباني الجامعية', 'University building indicators')}
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {ui('من السجل المركزي للمباني فقط، دون احتساب المباني المؤجرة أو المصليات كسجلات إضافية.',
+                  'Based on central registry records only; leased buildings and prayer sites are not added.')}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 rounded-xl border bg-card px-3 text-xs">
+                <span className="font-semibold text-muted-foreground">{ui('الحرم / الموقع', 'Campus')}</span>
+                <select value={selectedCampus} onChange={(event) => setBuildingCampus(event.target.value)}
+                  disabled={buildings === null}
+                  className="h-10 max-w-[175px] bg-transparent text-foreground outline-none"
+                  aria-label={ui('تصفية المباني حسب الحرم', 'Filter buildings by campus')}>
+                  <option value="">{ui('جميع المواقع', 'All campuses')}</option>
+                  {buildingCampuses.filter((campus) => campus.key).map((campus) => (
+                    <option key={campus.key} value={campus.key}>{campus.name} ({fmt(campus.count)})</option>
+                  ))}
+                </select>
+              </label>
+              <Button variant="outline" size="sm" onClick={() => navigate('/buildings/registry')} className="h-10 gap-2">
+                {ui('فتح السجل المركزي', 'Open central registry')}
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          {buildingsError ? (
+            <Card className="future-card"><CardContent className="flex flex-col items-center gap-2 py-9 text-center">
+              <AlertTriangle className="h-7 w-7 text-amber-600" />
+              <p className="text-sm font-semibold">{ui('تعذر تحميل مباني السجل المركزي؛ لا يمكن حساب المؤشرات حاليًا.', 'Building records are unavailable. Metrics cannot be calculated.')}</p>
+              <Button size="sm" variant="outline" onClick={() => window.location.reload()}>{ui('إعادة المحاولة', 'Retry')}</Button>
+            </CardContent></Card>
+          ) : buildings === null ? (
+            <Card className="future-card"><CardContent className="py-10 text-center text-sm text-muted-foreground">
+              {ui('جارٍ تحميل بيانات المباني من السجل المركزي…', 'Loading central registry building data…')}
+            </CardContent></Card>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
+                {[
+                  { label: ui('إجمالي المباني', 'Total buildings'), value: buildingCount, sub: ui('سجلات النطاق المحدد', 'Records in selection'), icon: Building2, accent: 'text-indigo-600 dark:text-indigo-300' },
+                  { label: ui('مرتبطة بصك', 'Linked to deeds'), value: buildingLinked, sub: fmt(buildingPercentage(buildingLinked)) + '% ' + ui('من مباني النطاق', 'of buildings'), icon: FileCheck2, accent: 'text-emerald-600 dark:text-emerald-300' },
+                  { label: ui('بإحداثيات صحيحة', 'Geolocated'), value: buildingGeocoded, sub: fmt(buildingPercentage(buildingGeocoded)) + '% ' + ui('من مباني النطاق', 'of buildings'), icon: MapPinned, accent: 'text-sky-600 dark:text-sky-300' },
+                  { label: ui('قائمة ونشطة', 'Active buildings'), value: buildingActive, sub: fmt(buildingPercentage(buildingActive)) + '% ' + ui('من مباني النطاق', 'of buildings'), icon: CheckCircle2, accent: 'text-teal-600 dark:text-teal-300' },
+                  { label: ui('بمساحة مسجلة', 'Area documented'), value: buildingAreaProvided, sub: fmt(buildingPercentage(buildingAreaProvided)) + '% ' + ui('من مباني النطاق', 'of buildings'), icon: Ruler, accent: 'text-violet-600 dark:text-violet-300' },
+                  { label: ui('غير قائمة', 'Not existing'), value: buildingNotExisting, sub: ui('بحسب الحالة المسجلة', 'As recorded'), icon: AlertTriangle, accent: 'text-slate-600 dark:text-slate-300' },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.label} className="rounded-2xl border bg-card p-4 shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold leading-5 text-muted-foreground">{item.label}</span>
+                        <Icon className={'h-5 w-5 shrink-0 ' + item.accent} />
+                      </div>
+                      <p className="mt-3 text-2xl font-black tabular-nums text-foreground">{fmt(item.value)}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">{item.sub}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+                <Card className="future-card min-w-0 overflow-hidden">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <BarChart3 className="h-5 w-5 text-primary" />
+                      {ui('توزيع المباني حسب الحرم الجامعي', 'Buildings by campus')}
+                    </CardTitle>
+                    <CardDescription>{ui('أعلى ثمانية مواقع، مع تجميع بقية المواقع دون استبعاد سجلات', 'Top eight locations; remaining locations are grouped without excluding records')}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {topCampusRows.length === 0 ? (
+                      <p className="grid h-[250px] place-items-center text-center text-sm text-muted-foreground">
+                        {ui('لا توجد مبانٍ مسجلة لعرض التوزيع', 'No building records to chart')}
+                      </p>
+                    ) : (
+                      <div className="w-full min-w-0" style={{ height: Math.max(260, topCampusRows.length * 47) }} dir="ltr">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={topCampusRows} layout="vertical" margin={{ top: 4, right: 19, left: 5, bottom: 4 }}>
+                            <CartesianGrid stroke={colors.border} strokeDasharray="4 4" horizontal={false} />
+                            <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false}
+                              tick={{ fill: colors.text, fontSize: 11 }} />
+                            <YAxis type="category" dataKey="name" width={130} tickLine={false} axisLine={false}
+                              tick={{ fill: colors.text, fontSize: 11 }}
+                              tickFormatter={(value: string) => value.length > 19 ? value.slice(0, 18) + '…' : value} />
+                            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
+                              formatter={(value: number) => [fmt(Number(value)), ui('مبنى', 'Buildings')]} />
+                            <Bar dataKey="count" maxBarSize={22} radius={[0, 5, 5, 0]}>
+                              {topCampusRows.map((row) => (
+                                <Cell key={row.key} fill={row.selected ? '#0d9488' : '#6366f1'} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                    <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                      {ui('يعرض الرسم جميع مواقع السجل، ويبرز الموقع المحدد باللون المختلف.', 'This chart shows all campus locations; the selected location is highlighted.')}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="future-card min-w-0 overflow-hidden">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <PieChartIcon className="h-5 w-5 text-primary" />
+                      {ui('الحالة التشغيلية للمباني', 'Building operational status')}
+                    </CardTitle>
+                    <CardDescription>
+                      {selectedCampus ? ui('وفق الحرم / الموقع المحدد', 'For the selected campus') : ui('جميع المواقع الجامعية', 'Across all campuses')}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {buildingStatusDistribution.length === 0 ? (
+                      <p className="grid h-[220px] place-items-center text-center text-sm text-muted-foreground">
+                        {ui('لا توجد حالات تشغيلية لعرض الرسم', 'No building status records available')}
+                      </p>
+                    ) : (
+                      <div className="relative h-[230px] w-full min-w-0" dir="ltr">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={buildingStatusDistribution} dataKey="count" nameKey="name" cx="50%" cy="50%"
+                              innerRadius={67} outerRadius={97} paddingAngle={2} stroke="none">
+                              {buildingStatusDistribution.map((status) => (
+                                <Cell key={status.key} fill={status.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip contentStyle={tooltipStyle}
+                              formatter={(value: number) => [fmt(Number(value)), ui('مبنى', 'Buildings')]} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-2xl font-extrabold tabular-nums">{fmt(buildingCount)}</span>
+                          <span className="text-[11px] text-muted-foreground">{ui('مبنى', 'buildings')}</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="mt-2 space-y-2">
+                      {buildingStatusDistribution.map((status) => (
+                        <div key={status.key} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: status.color }} />
+                            <span className="truncate">{status.name}</span>
+                          </span>
+                          <span className="shrink-0 font-bold tabular-nums text-foreground">
+                            {fmt(status.count)} ({fmt(buildingPercentage(status.count))}%)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              <p className="rounded-xl border border-dashed bg-muted/25 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
+                {ui('العدد يمثل السجلات الفعلية بالمباني بما فيها «غير قائم»، ولا يمثّل عدد المباني المشغولة أو عدد الصكوك الفريدة. وتُحدّث المؤشرات عند إعادة تحميل البيانات.',
+                  'Counts reflect actual building records, including not-existing buildings; they are not occupancy counts or unique deed counts. Refresh to reload data.')}
+              </p>
+            </>
+          )}
+        </section>
+      )}
 
       <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]" aria-label={ui('التحليل البياني', 'Analytics')}>
         <Card className="future-card min-w-0 overflow-hidden">
