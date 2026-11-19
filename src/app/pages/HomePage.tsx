@@ -1,327 +1,703 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
+import {
+  Activity, AlertTriangle, ArrowUpLeft, BarChart3, BellRing, Building2,
+  CalendarDays, CheckCircle2, ChevronLeft, ClipboardList, Download,
+  FileCheck2, FileText, Filter, Layers3, MapPinned, PieChart as PieChartIcon,
+  PlusCircle, RefreshCw, Ruler, Search, ShieldCheck, TrendingUp, WalletCards,
+  type LucideIcon,
+} from 'lucide-react';
+import {
+  Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
+  Tooltip, XAxis, YAxis,
+} from 'recharts';
 import { useDeeds } from '../../context/DeedContext';
 import { useData } from '../../context/DataContext';
-import { PLATFORM_LOGO_URL } from '../config/branding';
+import { usePermissions } from '../../context/PermissionsContext';
+import { mosqueApi, type MosqueBuilding } from '../api/mosques';
 import {
-  FileText,
-  MapPin,
-  MapPinOff,
-  Ruler,
-  PlusCircle,
-  Search,
-  BarChart3,
-  Building,
-  Users,
-  UploadCloud,
-  Bell,
-  Map,
-} from 'lucide-react';
+  transactionFollowUpApi,
+  type TransactionFollowUpDashboard,
+} from '../api/transactionFollowUp';
+import { PLATFORM_LOGO_URL } from '../config/branding';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { Separator } from '../components/ui/separator';
 
-const safeNumber = (value: unknown) => {
-  const number = Number(value || 0);
-
-  return Number.isNaN(number) ? 0 : number;
+type Period = '30' | '90' | '365' | 'all';
+type MonthRange = 6 | 12;
+type Metric = {
+  title: string;
+  value: string;
+  subtitle: string;
+  icon: LucideIcon;
+  route: string;
+  tone: string;
+  iconTone: string;
+};
+type NavigationItem = {
+  label: string;
+  subtitle: string;
+  path: string;
+  icon: LucideIcon;
 };
 
-const percent = (value: number, total: number) => {
-  if (!total) return '0.0';
+const numberValue = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
-  return ((value / total) * 100).toFixed(1);
+const positiveArea = (value: unknown) => Math.max(0, numberValue(value));
+const hasText = (value: unknown) => String(value ?? '').trim().length > 0;
+const validDate = (value: unknown) => {
+  const timestamp = new Date(value as string).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
 };
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
-  const locale = isArabic ? 'ar-SA' : 'en-US';
-  const ui = (ar: string, en: string) => (isArabic ? ar : en);
-  const formatNumber = (value: number) => new Intl.NumberFormat(locale).format(value);
-  const { deeds } = useDeeds();
-  const { getStatistics } = useData();
-  const dataStats = getStatistics();
+  const { i18n } = useTranslation();
+  const ar = i18n.language.startsWith('ar');
+  const locale = ar ? 'ar-SA' : 'en-US';
+  const ui = (arabic: string, english: string) => ar ? arabic : english;
+  const fmt = (value: number) => new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+  }).format(value);
+  const { deeds, loading: deedsLoading } = useDeeds();
+  const {
+    allocatedLands, deliveredLands, leasedLandsOut, leasedLandsIn,
+    leasedBuildingsOut, leasedBuildingsIn, loading: recordsLoading,
+  } = useData();
+  const { isAdmin, hasPermission, loading: permissionsLoading } = usePermissions();
 
-  const stats = React.useMemo(() => {
-    const plannedCount = deeds.filter((d) => d.isPlanned).length;
-    const unplannedCount = deeds.filter((d) => !d.isPlanned).length;
-    const totalArea = deeds.reduce((sum, d) => sum + safeNumber(d.area), 0);
+  const access = (module: Parameters<typeof hasPermission>[0]) =>
+    isAdmin || hasPermission(module, 'canView');
+  const canDeeds = access('deeds');
+  const canAllocated = access('allocated_lands');
+  const canDelivered = access('delivered_lands');
+  const canLeasedOut = access('leased_lands_out');
+  const canLeasedIn = access('leased_lands_in');
+  const canBuildingsOut = access('leased_buildings_out');
+  const canBuildingsIn = access('leased_buildings_in');
+  const canRegistry = access('mosques');
+  const canFollowUp = access('transaction_follow_up');
+  const canArchive = access('archive');
+  const canReports = access('reports');
+  const canVacant = access('vacant_lands');
+  const dataLoading = deedsLoading || recordsLoading || permissionsLoading;
 
-    return {
-      total: deeds.length,
-      planned: plannedCount,
-      unplanned: unplannedCount,
-      totalArea,
-      totalAreaText: new Intl.NumberFormat(i18n.language === 'ar' ? 'ar-SA' : 'en-US').format(totalArea),
-    };
-  }, [deeds, i18n.language]);
+  const [buildings, setBuildings] = React.useState<MosqueBuilding[] | null>(null);
+  const [buildingsError, setBuildingsError] = React.useState(false);
+  const [followUp, setFollowUp] = React.useState<TransactionFollowUpDashboard | null>(null);
+  const [followUpError, setFollowUpError] = React.useState(false);
+  const [filterDays, setFilterDays] = React.useState<Period>('all');
+  const [monthRange, setMonthRange] = React.useState<MonthRange>(6);
+  const [query, setQuery] = React.useState('');
+  const [sort, setSort] = React.useState<'newest' | 'oldest'>('newest');
 
-  const recentDeeds = React.useMemo(() => {
-    return [...deeds]
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .slice(0, 5);
+  React.useEffect(() => {
+    if (permissionsLoading) return;
+    let active = true;
+    if (canRegistry) {
+      mosqueApi.buildings().then((rows) => {
+        if (!active) return;
+        setBuildings(Array.isArray(rows) ? rows : []);
+        setBuildingsError(false);
+      }).catch(() => {
+        if (!active) return;
+        setBuildings(null);
+        setBuildingsError(true);
+      });
+    } else {
+      setBuildings(null);
+      setBuildingsError(false);
+    }
+    if (canFollowUp) {
+      transactionFollowUpApi.dashboard().then((result) => {
+        if (!active) return;
+        setFollowUp(result);
+        setFollowUpError(false);
+      }).catch(() => {
+        if (!active) return;
+        setFollowUp(null);
+        setFollowUpError(true);
+      });
+    } else {
+      setFollowUp(null);
+      setFollowUpError(false);
+    }
+    return () => { active = false; };
+  }, [canRegistry, canFollowUp, permissionsLoading]);
+
+  const missingCoords = React.useMemo(() =>
+    deeds.filter((deed) => !hasText(deed.coordinates)).length, [deeds]);
+  const missingArea = React.useMemo(() =>
+    deeds.filter((deed) => positiveArea(deed.area) <= 0).length, [deeds]);
+  const totalDeedArea = React.useMemo(() =>
+    deeds.reduce((total, deed) => total + positiveArea(deed.area), 0), [deeds]);
+  const plannedCount = React.useMemo(() => deeds.filter((deed) => deed.isPlanned).length, [deeds]);
+  const missingBuildingLinks = buildings?.filter((building) =>
+    !building.deedId && !building.deed?.id).length ?? 0;
+  const missingBuildingCoords = buildings?.filter((building) =>
+    building.latitude == null || building.longitude == null ||
+    !Number.isFinite(Number(building.latitude)) ||
+    !Number.isFinite(Number(building.longitude))).length ?? 0;
+
+  const deedCompleteness = React.useMemo(() => {
+    if (!deeds.length) return null;
+    const totalPresent = deeds.reduce((count, deed) =>
+      count + Number(hasText(deed.deedNumber))
+      + Number(positiveArea(deed.area) > 0)
+      + Number(hasText(deed.city))
+      + Number(hasText(deed.coordinates)), 0);
+    return Math.round(100 * totalPresent / (deeds.length * 4));
   }, [deeds]);
 
-  const topStats = [
-    {
-      label: t('home.totalDeeds'),
-      value: formatNumber(stats.total),
-      sub: t('deed.title'),
-      icon: FileText,
-      accent: 'text-primary',
-    },
-    {
-      label: t('home.plannedLands'),
-      value: formatNumber(stats.planned),
-      sub: `${percent(stats.planned, stats.total)}% ${t('deed.isPlanned')}`,
-      icon: MapPin,
-      accent: 'text-violet-500',
-    },
-    {
-      label: t('home.unplannedLands'),
-      value: formatNumber(stats.unplanned),
-      sub: `${percent(stats.unplanned, stats.total)}% ${ui('غير مخططة', 'Unplanned')}`, 
-      icon: MapPinOff,
-      accent: 'text-cyan-500',
-    },
-    {
-      label: ui('إجمالي مساحة الصكوك', 'Total Deed Area'),
-      value: stats.totalAreaText,
-      sub: t('deed.sqm'),
-      icon: Ruler,
-      accent: 'text-emerald-500',
-    },
+  const recordGroups = [
+    { name: ui('الصكوك', 'Deeds'), count: canDeeds ? deeds.length : 0, color: '#3b82f6', allowed: canDeeds },
+    { name: ui('الأراضي المخصصة', 'Allocated lands'), count: canAllocated ? allocatedLands.length : 0, color: '#0d9488', allowed: canAllocated },
+    { name: ui('الأراضي المسلّمة', 'Delivered lands'), count: canDelivered ? deliveredLands.length : 0, color: '#8b5cf6', allowed: canDelivered },
+    { name: ui('الأراضي المؤجرة والمستأجرة', 'Leased lands'), count: (canLeasedOut ? leasedLandsOut.length : 0) + (canLeasedIn ? leasedLandsIn.length : 0), color: '#f59e0b', allowed: canLeasedOut || canLeasedIn },
+    { name: ui('المباني المؤجرة والمستأجرة', 'Leased buildings'), count: (canBuildingsOut ? leasedBuildingsOut.length : 0) + (canBuildingsIn ? leasedBuildingsIn.length : 0), color: '#ec4899', allowed: canBuildingsOut || canBuildingsIn },
+  ].filter((item) => item.allowed);
+  const totalRecords = recordGroups.reduce((sum, item) => sum + item.count, 0);
+
+  const metrics: Metric[] = [
+    ...(canDeeds ? [
+      { title: ui('الصكوك المسجلة', 'Registered deeds'), value: dataLoading ? '—' : fmt(deeds.length), subtitle: ui('إجمالي الصكوك في السجل', 'Total deeds'), icon: FileCheck2, route: '/deeds', tone: 'border-blue-200/60 dark:border-blue-800/50', iconTone: 'bg-blue-500/10 text-blue-600 dark:text-blue-300' },
+      { title: ui('مساحة الصكوك', 'Deed area'), value: dataLoading ? '—' : fmt(totalDeedArea), subtitle: ui('متر مربع • مجموع المساحات المسجلة', 'Square metres • recorded sum'), icon: Ruler, route: '/deeds', tone: 'border-teal-200/60 dark:border-teal-800/50', iconTone: 'bg-teal-500/10 text-teal-600 dark:text-teal-300' },
+    ] : []),
+    ...(canRegistry ? [{
+      title: ui('مباني السجل المركزي', 'Central registry buildings'),
+      value: buildings === null ? '—' : fmt(buildings.length),
+      subtitle: buildingsError ? ui('تعذر تحميل البيانات', 'Data unavailable') : ui('المباني المسجلة فعليًا', 'Registered buildings'),
+      icon: Building2, route: '/buildings/registry',
+      tone: 'border-indigo-200/60 dark:border-indigo-800/50',
+      iconTone: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-300',
+    }] : []),
+    ...(canAllocated ? [{
+      title: ui('الأراضي المخصصة', 'Allocated lands'), value: recordsLoading ? '—' : fmt(allocatedLands.length),
+      subtitle: ui('عدد سجلات الأراضي', 'Land records'), icon: MapPinned, route: '/lands/allocated',
+      tone: 'border-emerald-200/60 dark:border-emerald-800/50',
+      iconTone: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
+    }] : []),
+    ...(canLeasedOut || canLeasedIn ? [{
+      title: ui('الأراضي المؤجرة / المستأجرة', 'Leased lands'),
+      value: recordsLoading ? '—' : fmt((canLeasedOut ? leasedLandsOut.length : 0) + (canLeasedIn ? leasedLandsIn.length : 0)),
+      subtitle: ui('مجموع سجلات عقود الأراضي', 'Land lease records'), icon: WalletCards,
+      route: canLeasedOut ? '/lands/leased-out' : '/lands/leased-in',
+      tone: 'border-amber-200/60 dark:border-amber-800/50',
+      iconTone: 'bg-amber-500/10 text-amber-600 dark:text-amber-300',
+    }] : []),
+    ...(canFollowUp ? [{
+      title: ui('المعاملات المفتوحة', 'Open transactions'), value: followUp ? fmt(followUp.open) : '—',
+      subtitle: followUpError ? ui('تعذر تحميل البيانات', 'Data unavailable') : ui('وفق نطاق صلاحية الحساب', 'Within your access scope'),
+      icon: ClipboardList, route: '/follow-up',
+      tone: 'border-rose-200/60 dark:border-rose-800/50',
+      iconTone: 'bg-rose-500/10 text-rose-600 dark:text-rose-300',
+    }] : []),
   ];
 
-  const quickActions = [
-    { id: 'add-deed', path: '/deeds/new', icon: PlusCircle, label: ui('إصدار صك جديد', 'Create New Deed'), sub: ui('إضافة صك إلكتروني', 'Add an electronic deed') },
-    { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: ui('تسجيل أرض', 'Register Land'), sub: ui('إضافة أرض جديدة', 'Add new land') },
-    { id: 'archive', path: '/archive', icon: UploadCloud, label: ui('رفع مستند', 'Upload Document'), sub: ui('حفظ الملفات والأرشفة', 'Save files and archive') },
-    { id: 'search', path: '/search', icon: Search, label: ui('بحث متقدم', 'Advanced Search'), sub: ui('البحث في السجلات', 'Search records') },
-    { id: 'reports', path: '/reports', icon: BarChart3, label: ui('التقارير', 'Reports'), sub: ui('إحصاءات وطباعة', 'Statistics and printing') },
+  const trend = React.useMemo(() => {
+    const now = new Date();
+    const rows = [];
+    for (let offset = monthRange - 1; offset >= 0; offset -= 1) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+      const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+      const from = monthStart.getTime();
+      const until = monthEnd.getTime();
+      rows.push({
+        label: new Intl.DateTimeFormat(locale, { month: 'short', year: '2-digit' }).format(monthStart),
+        count: deeds.filter((deed) => {
+          const time = validDate(deed.createdAt);
+          return time >= from && time < until;
+        }).length,
+      });
+    }
+    return rows;
+  }, [deeds, locale, monthRange]);
+
+  const recentDeeds = React.useMemo(() => {
+    const lowerQuery = query.trim().toLocaleLowerCase();
+    const cutoff = filterDays === 'all' ? 0 : Date.now() - Number(filterDays) * 24 * 60 * 60 * 1000;
+    return deeds.filter((deed) => {
+      const searchable = [deed.deedNumber, deed.propertyDescription, deed.city, deed.district]
+        .filter(Boolean).join(' ').toLocaleLowerCase();
+      return (!lowerQuery || searchable.includes(lowerQuery)) &&
+        (!cutoff || validDate(deed.createdAt) >= cutoff);
+    }).sort((a, b) => sort === 'newest'
+      ? validDate(b.createdAt) - validDate(a.createdAt)
+      : validDate(a.createdAt) - validDate(b.createdAt));
+  }, [deeds, query, filterDays, sort]);
+
+  const notifications: Array<{ label: string; count: number; route: string; color: string }> = [];
+  if (canFollowUp && followUp && followUp.overdue > 0) {
+    notifications.push({ label: ui('معاملات تجاوزت تاريخ الاستحقاق', 'Overdue transactions'), count: followUp.overdue, route: '/follow-up', color: 'text-rose-600 dark:text-rose-300' });
+  }
+  if (canFollowUp && followUp && followUp.unassigned > 0) {
+    notifications.push({ label: ui('معاملات غير مسندة', 'Unassigned transactions'), count: followUp.unassigned, route: '/follow-up', color: 'text-amber-600 dark:text-amber-300' });
+  }
+  if (canRegistry && buildings && missingBuildingLinks > 0) {
+    notifications.push({ label: ui('مبانٍ غير مرتبطة بصك', 'Buildings without deed links'), count: missingBuildingLinks, route: '/buildings/registry', color: 'text-indigo-600 dark:text-indigo-300' });
+  }
+  if (canRegistry && buildings && missingBuildingCoords > 0) {
+    notifications.push({ label: ui('مبانٍ دون إحداثيات', 'Buildings without coordinates'), count: missingBuildingCoords, route: '/buildings/registry', color: 'text-orange-600 dark:text-orange-300' });
+  }
+  if (canDeeds && !deedsLoading && missingCoords > 0) {
+    notifications.push({ label: ui('صكوك دون إحداثيات', 'Deeds without coordinates'), count: missingCoords, route: '/deeds', color: 'text-amber-600 dark:text-amber-300' });
+  }
+  if (canDeeds && !deedsLoading && missingArea > 0) {
+    notifications.push({ label: ui('صكوك دون مساحة مدخلة', 'Deeds missing area'), count: missingArea, route: '/deeds', color: 'text-rose-600 dark:text-rose-300' });
+  }
+
+  const actions: NavigationItem[] = [
+    ...(isAdmin ? [{ label: ui('إضافة صك جديد', 'Add deed'), subtitle: ui('تسجيل وتوثيق الصك', 'Register a deed'), path: '/deeds/new', icon: PlusCircle }] : []),
+    ...(canRegistry ? [{ label: ui('السجل المركزي للمباني', 'Buildings registry'), subtitle: ui('المباني والربط بالصكوك', 'Buildings and deed links'), path: '/buildings/registry', icon: Building2 }] : []),
+    ...(canFollowUp ? [{ label: ui('نظام المتابعة', 'Transaction follow-up'), subtitle: ui('المعاملات والإجراءات', 'Transactions and actions'), path: '/follow-up', icon: ClipboardList }] : []),
+    ...(canVacant ? [{ label: ui('الأراضي الشاغرة', 'Vacant lands'), subtitle: ui('المواقع والفرص المتاحة', 'Sites and opportunities'), path: '/lands/vacant', icon: MapPinned }] : []),
+    ...(canArchive ? [{ label: ui('الأرشيف', 'Archive'), subtitle: ui('المستندات والمرفقات', 'Documents and attachments'), path: '/archive', icon: Layers3 }] : []),
+    ...(canReports ? [{ label: ui('مركز التقارير', 'Reports centre'), subtitle: ui('التصفية والطباعة', 'Filter and print'), path: '/reports', icon: BarChart3 }] : []),
+    { label: ui('البحث والاستعلام', 'Search'), subtitle: ui('البحث في سجلات المنصة', 'Find platform records'), path: '/search', icon: Search },
   ];
+
+  const dateLabel = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+  const donutData = recordGroups.filter((group) => group.count > 0);
+  const colors = { border: 'hsl(var(--border))', text: 'hsl(var(--muted-foreground))' };
+  const tooltipStyle = {
+    backgroundColor: 'hsl(var(--card))',
+    border: '1px solid hsl(var(--border))',
+    borderRadius: 12,
+    color: 'hsl(var(--foreground))',
+  };
+  const exportCsv = () => {
+    const data = [
+      [ui('المؤشر', 'Indicator'), ui('القيمة', 'Value')],
+      ...metrics.map((metric) => [metric.title, metric.value]),
+      ...recordGroups.map((group) => [group.name, String(group.count)]),
+      ...(canDeeds ? [
+        [ui('الصكوك دون إحداثيات', 'Deeds without coordinates'), String(missingCoords)],
+        [ui('الصكوك دون مساحة', 'Deeds without area'), String(missingArea)],
+        [ui('نسبة اكتمال الحقول الأساسية', 'Basic deed field completeness'), deedCompleteness === null ? '—' : String(deedCompleteness) + '%'],
+      ] : []),
+      ...(canFollowUp && followUp ? [
+        [ui('المعاملات المتأخرة', 'Overdue transactions'), String(followUp.overdue)],
+        [ui('المعاملات غير المسندة', 'Unassigned transactions'), String(followUp.unassigned)],
+      ] : []),
+    ];
+    const csv = '\uFEFF' + data.map((row) =>
+      row.map((cell) => '"' + String(cell).replace(/"/g, '""') + '"').join(',')
+    ).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'iau-deeds-dashboard-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="w-full min-w-0 space-y-4 sm:space-y-5">
-      <div className="grid w-full grid-cols-1 items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
-        <div className="space-y-5 2xl:order-2">
-          <Card className="future-card overflow-hidden">
-            <CardContent className="p-4 sm:p-5">
-              <div className="future-hero-art min-h-[165px] sm:min-h-[210px]">
-                <div className="future-shield">
-                  <img
-                    src={PLATFORM_LOGO_URL}
-                    alt="Platform logo"
-                    className="h-24 w-24 sm:h-32 sm:w-32 object-contain drop-shadow-[0_0_30px_hsl(var(--primary)/0.35)]"
-                  />
+    <div className="mx-auto w-full max-w-[1760px] min-w-0 space-y-5 pb-8 sm:space-y-6">
+      <section className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/15 via-card to-card px-5 py-6 shadow-sm sm:px-7 sm:py-7">
+        <div className="pointer-events-none absolute -start-12 -top-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-primary/15 bg-background/75 shadow-sm sm:h-16 sm:w-16">
+              <img src={PLATFORM_LOGO_URL} alt={ui('شعار المنصة', 'Platform logo')} className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
+            </div>
+            <div className="min-w-0 space-y-2">
+              <Badge variant="secondary" className="gap-1.5 rounded-full border border-primary/15 bg-primary/10 text-primary">
+                <Activity className="h-3.5 w-3.5" />
+                {ui('لوحة المؤشرات التنفيذية', 'Executive dashboard')}
+              </Badge>
+              <h1 className="text-xl font-extrabold leading-snug tracking-tight text-foreground sm:text-2xl 2xl:text-3xl">
+                {ui('نظرة شاملة على أوقاف وأملاك الجامعة', 'University endowments and properties overview')}
+              </h1>
+              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                {ui('بيانات مباشرة من سجلات المنصة، مع مؤشرات للمتابعة وجودة البيانات وروابط للإجراءات.',
+                  'Live platform records, operational indicators, data quality and actionable shortcuts.')}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-xl border bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+              <CalendarDays className="h-4 w-4" />
+              {dateLabel}
+            </span>
+            <Button variant="outline" className="gap-2 rounded-xl bg-background/80" onClick={() => window.location.reload()}>
+              <RefreshCw className="h-4 w-4" />
+              {ui('تحديث البيانات', 'Refresh')}
+            </Button>
+            <Button variant="outline" className="gap-2 rounded-xl bg-background/80" onClick={exportCsv}>
+              <Download className="h-4 w-4" />
+              {ui('تصدير المؤشرات', 'Export metrics')}
+            </Button>
+          </div>
+        </div>
+        <div className="relative mt-5 flex flex-wrap items-center gap-2 border-t border-border/50 pt-4 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-background/60 px-2.5 py-1.5">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            {ui('العرض بحسب صلاحيات المستخدم', 'Role-scoped visibility')}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-background/60 px-2.5 py-1.5">
+            <Layers3 className="h-4 w-4 text-primary" />
+            {dataLoading ? ui('جارٍ تحميل السجلات', 'Loading records') : ui('إجمالي سجلات الوحدات المتاحة: ', 'Accessible category records: ') + fmt(totalRecords)}
+          </span>
+          <span>{ui('المؤشرات العددية إجمالية، ولا تعني عدد عقارات فريدة.', 'Counts are record totals, not unique properties.')}</span>
+        </div>
+      </section>
+
+      <section className="space-y-3" aria-label={ui('المؤشرات الرئيسية', 'Key performance indicators')}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              {ui('المؤشرات الرئيسية', 'Key indicators')}
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">{ui('اضغط على أي مؤشر للانتقال إلى سجلاته', 'Select any indicator to see its records')}</p>
+          </div>
+          <Badge variant="outline">{ui('بيانات فعلية', 'Live records')}</Badge>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          {metrics.map((metric) => {
+            const Icon = metric.icon;
+            return (
+              <button type="button" key={metric.title} onClick={() => navigate(metric.route)}
+                className={'group min-w-0 rounded-2xl border bg-card p-4 text-start shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ' + metric.tone}>
+                <div className="flex items-start justify-between gap-3">
+                  <span className={'grid h-11 w-11 place-items-center rounded-xl ' + metric.iconTone}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <ArrowUpLeft className="h-4 w-4 text-muted-foreground opacity-40 transition group-hover:opacity-100" />
+                </div>
+                <p className="mt-4 text-xs font-semibold text-muted-foreground">{metric.title}</p>
+                <p className="mt-1 break-words text-2xl font-extrabold tracking-tight text-foreground tabular-nums">{metric.value}</p>
+                <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{metric.subtitle}</p>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]" aria-label={ui('التحليل البياني', 'Analytics')}>
+        <Card className="future-card min-w-0 overflow-hidden">
+          <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                {ui('حركة تسجيل الصكوك', 'Deed registration activity')}
+              </CardTitle>
+              <CardDescription className="mt-1">
+                {ui('عدد الصكوك المضافة شهريًا وفق تاريخ إنشاء السجل', 'Monthly additions by record creation date')}
+              </CardDescription>
+            </div>
+            {canDeeds && (
+              <div className="flex gap-1 rounded-xl border bg-background/50 p-1">
+                {([6, 12] as const).map((months) => (
+                  <button key={months} type="button" onClick={() => setMonthRange(months)}
+                    aria-pressed={monthRange === months}
+                    className={'rounded-lg px-3 py-1.5 text-xs transition ' +
+                      (monthRange === months ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted')}>
+                    {months} {ui('شهرًا', 'months')}
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardHeader>
+          <CardContent className="min-w-0">
+            {!canDeeds ? (
+              <div className="grid h-[255px] place-items-center text-center text-sm text-muted-foreground">
+                {ui('لا تتوفر صلاحية عرض بيانات الصكوك', 'Deed access is unavailable')}
+              </div>
+            ) : deedsLoading ? (
+              <div className="grid h-[255px] place-items-center text-sm text-muted-foreground">{ui('جارٍ تحميل المؤشرات…', 'Loading metrics…')}</div>
+            ) : deeds.length === 0 ? (
+              <div className="grid h-[255px] place-items-center text-center text-sm text-muted-foreground">{ui('لا توجد سجلات صكوك لعرض الرسم البياني', 'No deed data to chart')}</div>
+            ) : (
+              <div className="h-[260px] w-full min-w-0" dir="ltr">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trend} margin={{ top: 12, right: 10, left: -25, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="deed-activity-fill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.32} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.01} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke={colors.border} strokeDasharray="4 4" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fill: colors.text, fontSize: 11 }} tickLine={false} axisLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fill: colors.text, fontSize: 11 }} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [fmt(Number(value)), ui('صك مضاف', 'Deeds added')]} />
+                    <Area type="monotone" dataKey="count" stroke="hsl(var(--primary))" strokeWidth={2.7}
+                      fill="url(#deed-activity-fill)" dot={{ r: 3, fill: 'hsl(var(--primary))' }}
+                      activeDot={{ r: 5 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="future-card min-w-0 overflow-hidden">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <PieChartIcon className="h-5 w-5 text-primary" />
+              {ui('توزيع سجلات الأصول', 'Asset record distribution')}
+            </CardTitle>
+            <CardDescription>{ui('حسب نوع السجل، دون دمج السجلات المتشابهة', 'By category, without record deduplication')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recordsLoading || deedsLoading ? (
+              <div className="grid h-[185px] place-items-center text-sm text-muted-foreground">{ui('جارٍ تحميل التصنيف…', 'Loading distribution…')}</div>
+            ) : donutData.length === 0 ? (
+              <div className="grid h-[185px] place-items-center text-sm text-muted-foreground">{ui('لا توجد سجلات متاحة للرسم البياني', 'No accessible records to chart')}</div>
+            ) : (
+              <div className="relative h-[180px] w-full min-w-0" dir="ltr">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={donutData} dataKey="count" nameKey="name" cx="50%" cy="50%"
+                      innerRadius={58} outerRadius={79} paddingAngle={3} stroke="none">
+                      {donutData.map((item) => <Cell key={item.name} fill={item.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [fmt(Number(value)), ui('سجل', 'Records')]} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-xl font-extrabold tabular-nums">{fmt(totalRecords)}</span>
+                  <span className="text-[10px] text-muted-foreground">{ui('سجل', 'records')}</span>
                 </div>
               </div>
+            )}
+            <div className="mt-2 space-y-2">
+              {recordGroups.map((group) => (
+                <div key={group.name} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: group.color }} />
+                    <span className="truncate">{group.name}</span>
+                  </span>
+                  <span className="shrink-0 font-bold tabular-nums text-foreground">{fmt(group.count)}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
 
-              <div className="mt-5">
-                <h2 className="text-xl font-bold">{ui('مرحباً بك في', 'Welcome to')}</h2>
-                <h2 className="text-xl font-bold">{ui('إدارة أوقاف وأملاك الجامعة', 'University Endowments and Properties Administration')}</h2>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="future-card overflow-hidden">
-            <CardHeader>
-              <CardTitle>{ui('إجراء سريع', 'Quick Action')}</CardTitle>
-              <CardDescription>{ui('الوصول السريع لأهم العمليات', 'Quick access to key operations')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full h-12 future-glow-button" onClick={() => navigate('/deeds/new')}>
-                <PlusCircle className="ml-2 h-5 w-5" />
-                {ui('إنشاء معاملة جديدة', 'Create New Transaction')}
-              </Button>
-            </CardContent>
-          </Card>
-
-        </div>
-
-        <div className="min-w-0 space-y-5 2xl:order-1">
-          <div className={isArabic ? 'text-right' : 'text-left'}>
-            <h1 className="text-2xl md:text-3xl 2xl:text-4xl font-bold">{t('home.welcome')}</h1>
-            <p className="text-muted-foreground mt-2">{t('app.subtitle')}</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-            {topStats.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <Card key={item.label} className="future-card min-h-[118px] overflow-hidden">
-                  <CardContent className="h-full p-3 sm:p-4 2xl:p-5">
-                    <div className="flex h-full flex-col items-start justify-between gap-2 sm:flex-row sm:items-center sm:gap-4">
-                      <div className="future-stat-icon h-12 w-12 bg-primary/10">
-                        <Icon className={`h-6 w-6 ${item.accent}`} />
+      <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
+        <Card className="future-card min-w-0 overflow-hidden">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              {ui('جودة بيانات الصكوك', 'Deed data completeness')}
+            </CardTitle>
+            <CardDescription>{ui('اكتمال أربعة حقول أساسية في سجلات الصكوك', 'Coverage of four core fields in deed records')}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!canDeeds ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">{ui('هذا المؤشر يتطلب صلاحية عرض الصكوك', 'Deed access is required')}</p>
+            ) : deedsLoading ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">{ui('جارٍ تحميل بيانات الصكوك…', 'Loading deeds…')}</p>
+            ) : deedCompleteness === null ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">{ui('لا توجد بيانات لحساب نسبة الاكتمال', 'No data for completeness')}</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-primary/5 p-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{ui('نسبة تعبئة الحقول الأساسية', 'Core fields filled')}</p>
+                    <p className="mt-1 text-3xl font-black tabular-nums text-foreground">{fmt(deedCompleteness)}%</p>
+                  </div>
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary">
+                    <FileCheck2 className="h-7 w-7" />
+                  </div>
+                </div>
+                {[
+                  { label: ui('رقم الصك', 'Deed number'), count: deeds.filter((d) => hasText(d.deedNumber)).length },
+                  { label: ui('مساحة الصك', 'Deed area'), count: deeds.length - missingArea },
+                  { label: ui('المدينة', 'City'), count: deeds.filter((d) => hasText(d.city)).length },
+                  { label: ui('الإحداثيات', 'Coordinates'), count: deeds.length - missingCoords },
+                ].map((item) => {
+                  const ratio = Math.round(item.count / deeds.length * 100);
+                  return (
+                    <div key={item.label} className="space-y-1.5">
+                      <div className="flex justify-between gap-3 text-xs">
+                        <span className="text-muted-foreground">{item.label}</span>
+                        <span className="font-bold tabular-nums">{fmt(item.count)} / {fmt(deeds.length)} ({fmt(ratio)}%)</span>
                       </div>
-                      <div className={isArabic ? 'text-right' : 'text-left'}>
-                        <p className="text-sm text-muted-foreground">{item.label}</p>
-                        <p className="mt-2 text-2xl 2xl:text-3xl font-bold tabular-nums">{item.value}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{item.sub}</p>
+                      <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={ratio} aria-valuemin={0} aria-valuemax={100} aria-label={item.label}>
+                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: String(ratio) + '%' }} />
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          <Card className="future-card overflow-hidden">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>{ui('نظرة عامة على المنصة', 'Platform Overview')}</span>
-                <BarChart3 className="h-5 w-5 text-primary" />
-              </CardTitle>
-              <CardDescription>{ui('ملخص شامل لأداء المنصة والعمليات الرئيسية', 'A comprehensive summary of platform performance and core operations')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-                <div className="text-center rounded-2xl border bg-background/40 p-4">
-                  <Users className="h-7 w-7 mx-auto mb-3 text-primary" />
-                  <p className="text-2xl font-bold">{formatNumber(dataStats.totalRecords)}</p>
-                  <p className="text-xs text-muted-foreground">{ui('إجمالي السجلات', 'Total Records')}</p>
-                </div>
-                <div className="text-center rounded-2xl border bg-background/40 p-4">
-                  <FileText className="h-7 w-7 mx-auto mb-3 text-primary" />
-                  <p className="text-2xl font-bold">{formatNumber(dataStats.totalDeeds)}</p>
-                  <p className="text-xs text-muted-foreground">{ui('الصكوك', 'Deeds')}</p>
-                </div>
-                <div className="text-center rounded-2xl border bg-background/40 p-4">
-                  <Map className="h-7 w-7 mx-auto mb-3 text-primary" />
-                  <p className="text-2xl font-bold">
-                    {formatNumber(dataStats.totalAllocatedLands + dataStats.totalDeliveredLands +
-                      dataStats.totalLeasedLandsOut + dataStats.totalLeasedLandsIn)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{ui('الأراضي', 'Lands')}</p>
-                </div>
-                <div className="text-center rounded-2xl border bg-background/40 p-4">
-                  <Building className="h-7 w-7 mx-auto mb-3 text-primary" />
-                  <p className="text-2xl font-bold">
-                    {formatNumber(dataStats.totalLeasedBuildingsOut + dataStats.totalLeasedBuildingsIn)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{ui('المباني', 'Buildings')}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="future-card overflow-hidden">
-            <CardHeader>
-              <CardTitle>{t('home.quickActions')}</CardTitle>
-              <CardDescription>{ui('العمليات الشائعة للوصول السريع', 'Common operations for quick access')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 xl:grid-cols-5">
-                {quickActions.map((action) => {
-                  const Icon = action.icon;
-
-                  return (
-                    <Button
-                      key={action.id}
-                      variant="outline"
-                      className="future-glow-button h-[88px] sm:h-[92px] min-w-0 flex-col gap-1.5 px-3 whitespace-normal"
-                      onClick={() => navigate(action.path)}
-                    >
-                      <Icon className="h-6 w-6 text-primary" />
-                      <span className="font-bold leading-tight">{action.label}</span>
-                      <span className="text-center text-xs leading-tight text-muted-foreground">{action.sub}</span>
-                    </Button>
                   );
                 })}
-              </div>
-            </CardContent>
-          </Card>
+                <p className="text-[11px] leading-5 text-muted-foreground">{ui('هذه النسبة تعكس تعبئة الحقول فقط، ولا تمثل اعتمادًا قانونيًا أو هندسيًا للمعلومات.', 'This measures field completion, not legal or engineering verification.')}</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-          <div className="min-w-0">
-            <Card className="future-card min-w-0">
-              <CardHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <CardTitle>{t('home.recentDeeds')}</CardTitle>
-                    <CardDescription>{ui('آخر الصكوك المضافة للنظام', 'Latest deeds added to the system')}</CardDescription>
-                  </div>
-                  <Button variant="outline" onClick={() => navigate('/deeds')}>
-                    {t('nav.allDeeds')}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {recentDeeds.length === 0 ? (
-                  <div className="text-center py-10 text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>{ui('لا توجد صكوك', 'No deeds found')}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {recentDeeds.map((deed, index) => (
-                      <div key={deed.id}>
-                        <div
-                          className="flex flex-col items-stretch justify-between gap-3 rounded-2xl border bg-background/35 p-3 transition-colors hover:bg-primary/5 sm:flex-row sm:items-center cursor-pointer"
-                          onClick={() => navigate(`/deeds/${deed.id}`)}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-11 w-11 rounded-2xl bg-primary/10 grid place-items-center">
-                              <FileText className="h-5 w-5 text-primary" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="font-bold truncate">{deed.deedNumber}</p>
-                                {deed.isPlanned && <Badge variant="secondary">{ui('مخططة', 'Planned')}</Badge>}
-                              </div>
-                              <p className="text-sm text-muted-foreground truncate">
-                                {deed.city || '-'} - {deed.district || '-'}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex shrink-0 items-center justify-between gap-3 text-right sm:block sm:text-left">
-                            <p className="font-bold">{formatNumber(safeNumber(deed.area))} {t('deed.sqm')}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {deed.createdAt ? new Date(deed.createdAt).toLocaleDateString(locale) : '-'}
-                            </p>
-                          </div>
-                        </div>
-                        {index < recentDeeds.length - 1 && <Separator className="mt-3" />}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-          </div>
-
-          <Card className="future-card overflow-hidden">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" />
-                {ui('التنبيهات والإشعارات', 'Alerts and Notifications')}
+        <Card className="future-card min-w-0 overflow-hidden">
+          <CardHeader className="sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BellRing className="h-5 w-5 text-primary" />
+                {ui('مؤشرات تستدعي المراجعة', 'Attention indicators')}
               </CardTitle>
-              <CardDescription>{ui('آخر التحديثات المهمة على المنصة', 'Latest important platform updates')}</CardDescription>
+              <CardDescription className="mt-1">{ui('تنبيهات مستخلصة من البيانات، وليست بلاغات آلية', 'Data-derived flags, not system incidents')}</CardDescription>
+            </div>
+            {notifications.length > 0 && <Badge variant="secondary">{fmt(notifications.length)} {ui('بنود', 'flags')}</Badge>}
+          </CardHeader>
+          <CardContent className="space-y-2.5">
+            {notifications.length > 0 ? notifications.map((item) => (
+              <button type="button" key={item.label} onClick={() => navigate(item.route)}
+                className="flex w-full items-center gap-3 rounded-xl border bg-background/35 p-3 text-start transition hover:border-primary/40 hover:bg-primary/5">
+                <AlertTriangle className={'h-4 w-4 shrink-0 ' + item.color} />
+                <span className="min-w-0 flex-1 text-sm text-foreground">{item.label}</span>
+                <span className="rounded-lg bg-muted px-2 py-1 text-xs font-bold tabular-nums">{fmt(item.count)}</span>
+                <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            )) : (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-7 text-center text-muted-foreground">
+                <CheckCircle2 className="h-9 w-9 text-emerald-600" />
+                <p className="text-sm">{ui('لا توجد مؤشرات ظاهرة تستدعي المراجعة ضمن البيانات المحمّلة', 'No flagged items in available data')}</p>
+              </div>
+            )}
+            {(buildingsError || followUpError) && (
+              <p className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5 text-amber-700 dark:text-amber-300">
+                {ui('تعذر تحميل بعض المؤشرات؛ لا تعني النتائج الحالية خلو السجلات من الملاحظات.', 'Some indicators were unavailable; shown flags may be incomplete.')}
+              </p>
+            )}
+            {canRegistry && buildings && (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-muted/40 p-3 text-xs">
+                <span className="text-muted-foreground">{ui('ارتباط المباني بالصكوك', 'Building-to-deed linkage')}</span>
+                <span className="font-bold tabular-nums">{fmt(buildings.length - missingBuildingLinks)} / {fmt(buildings.length)}</span>
+              </div>
+            )}
+            {canFollowUp && followUp && (
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 p-3 text-xs">
+                <span className="text-muted-foreground">{ui('المعاملات المنجزة أو المغلقة (غير المؤرشفة)', 'Completed/closed unarchived transactions')}</span>
+                <span className="font-bold tabular-nums">{fmt(followUp.completed)}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)]">
+        {canDeeds && (
+          <Card className="future-card min-w-0 overflow-hidden">
+            <CardHeader className="gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <FileText className="h-5 w-5 text-primary" />
+                    {ui('آخر سجلات الصكوك', 'Recent deeds')}
+                  </CardTitle>
+                  <CardDescription className="mt-1">{ui('بحث وفرز حسب تاريخ إضافة السجل', 'Search and sort by record creation date')}</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate('/deeds')} className="gap-1.5">
+                  {ui('عرض جميع الصكوك', 'All deeds')}
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <div className="relative min-w-[165px] flex-1">
+                  <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input type="search" value={query} onChange={(event) => setQuery(event.target.value)}
+                    placeholder={ui('ابحث برقم الصك أو الموقع…', 'Search by deed or location…')}
+                    aria-label={ui('البحث في الصكوك', 'Search deeds')}
+                    className="h-9 w-full rounded-xl border bg-background/75 ps-9 pe-3 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                </div>
+                <label className="flex items-center gap-1.5 rounded-xl border bg-background/75 px-2 text-xs text-muted-foreground">
+                  <Filter className="h-3.5 w-3.5" />
+                  <span className="sr-only">{ui('المدة', 'Period')}</span>
+                  <select value={filterDays} onChange={(event) => setFilterDays(event.target.value as Period)}
+                    className="h-9 max-w-[125px] bg-transparent text-foreground outline-none" aria-label={ui('المدة', 'Period')}>
+                    <option value="all">{ui('كل الفترات', 'All dates')}</option>
+                    <option value="30">{ui('آخر 30 يومًا', 'Last 30 days')}</option>
+                    <option value="90">{ui('آخر 90 يومًا', 'Last 90 days')}</option>
+                    <option value="365">{ui('آخر سنة', 'Last year')}</option>
+                  </select>
+                </label>
+                <select value={sort} onChange={(event) => setSort(event.target.value as 'newest' | 'oldest')}
+                  className="h-9 rounded-xl border bg-background/75 px-2 text-xs text-foreground outline-none focus:border-primary"
+                  aria-label={ui('ترتيب الصكوك', 'Sort deeds')}>
+                  <option value="newest">{ui('الأحدث أولًا', 'Newest first')}</option>
+                  <option value="oldest">{ui('الأقدم أولًا', 'Oldest first')}</option>
+                </select>
+              </div>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="rounded-2xl border bg-background/35 p-4">
-                <p className="font-bold">{ui('تحديث جديد', 'New Update')}</p>
-                <p className="text-sm text-muted-foreground mt-1">{ui('تم تحسين واجهة المنصة المستقبلية.', 'The platform interface has been improved.')}</p>
-              </div>
-              <div className="rounded-2xl border bg-background/35 p-4">
-                <p className="font-bold">{ui('معاملة بحاجة لمراجعة', 'Transaction Requires Review')}</p>
-                <p className="text-sm text-muted-foreground mt-1">{ui('راجع السجلات الأخيرة عند الحاجة.', 'Review the latest records when needed.')}</p>
-              </div>
-              <div className="rounded-2xl border bg-background/35 p-4">
-                <p className="font-bold">{ui('رفع مخطط', 'Upload Plan')}</p>
-                <p className="text-sm text-muted-foreground mt-1">{ui('يمكن رفع المخططات من صفحة الأرشفة.', 'Plans can be uploaded from the Archive page.')}</p>
-              </div>
+            <CardContent>
+              {deedsLoading ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">{ui('جارٍ جلب السجلات…', 'Loading records…')}</p>
+              ) : recentDeeds.length === 0 ? (
+                <p className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">{ui('لا توجد صكوك مطابقة لمعايير البحث', 'No deeds match the filters')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {recentDeeds.slice(0, 7).map((deed) => (
+                    <button type="button" key={deed.id} onClick={() => navigate('/deeds/' + deed.id)}
+                      className="group flex w-full min-w-0 items-center gap-3 rounded-xl border bg-background/35 p-3 text-start transition hover:border-primary/40 hover:bg-primary/5">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                        <FileText className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-bold text-foreground">{deed.deedNumber || '—'}</span>
+                          <Badge variant="secondary" className="text-[10px]">{deed.isPlanned ? ui('مخططة', 'Planned') : ui('غير مخططة', 'Unplanned')}</Badge>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{[deed.city, deed.district, deed.propertyDescription].filter(Boolean).join(' • ') || '—'}</p>
+                      </div>
+                      <div className="shrink-0 text-end text-xs">
+                        <p className="font-bold tabular-nums text-foreground">{fmt(positiveArea(deed.area))} {ui('م²', 'm²')}</p>
+                        <p className="mt-1 text-[10px] text-muted-foreground">{validDate(deed.createdAt) ? new Date(deed.createdAt).toLocaleDateString(locale) : '—'}</p>
+                      </div>
+                      <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground opacity-50 transition group-hover:opacity-100" />
+                    </button>
+                  ))}
+                  <p className="pt-1 text-[11px] text-muted-foreground">
+                    {ui('عدد النتائج المطابقة: ', 'Matching records: ')}{fmt(recentDeeds.length)} • {ui('يُعرض أول 7 سجلات', 'Showing the first 7')}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
+        )}
+
+        <Card className="future-card min-w-0 overflow-hidden">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Layers3 className="h-5 w-5 text-primary" />
+              {ui('مركز الوصول السريع', 'Quick access')}
+            </CardTitle>
+            <CardDescription>{ui('اختصارات تشغيلية مرتبطة بصلاحياتك', 'Operational shortcuts based on permissions')}</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            {actions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button key={action.path} type="button" onClick={() => navigate(action.path)}
+                  className="group flex items-center gap-3 rounded-xl border bg-background/35 p-3 text-start transition hover:border-primary/40 hover:bg-primary/5">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-foreground">{action.label}</span>
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">{action.subtitle}</span>
+                  </span>
+                  <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:text-primary" />
+                </button>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </section>
+
+      {canDeeds && !deedsLoading && deeds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-muted/25 px-4 py-3 text-xs text-muted-foreground">
+          <span>{ui('تصنيف الصكوك حسب التخطيط:', 'Deed planning classification:')} {fmt(plannedCount)} {ui('مخططة', 'planned')} • {fmt(deeds.length - plannedCount)} {ui('غير مخططة', 'unplanned')}</span>
+          <button type="button" onClick={() => navigate('/deeds')} className="font-semibold text-primary hover:underline">
+            {ui('مراجعة بيانات الصكوك', 'Review deed records')}
+          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 };
