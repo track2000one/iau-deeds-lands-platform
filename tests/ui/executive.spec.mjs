@@ -189,20 +189,9 @@ test('dashboard exports its live authorized indicators to browser PDF without ch
   await setup(page, { role: 'employee', permissions: allow(true) });
   await page.getByRole('button', { name: 'العودة للوحة المؤشرات' }).click();
   const dashboard = page.locator('#iau-dashboard-print-root');
-  console.log('DASHBOARD PDF RENDER DIAGNOSTICS', JSON.stringify(await page.evaluate(() => {
-    const node = document.querySelector('#iau-dashboard-print-root h1');
-    const ancestors = [];
-    let current = node;
-    for (let index = 0; current && index < 9; index++, current = current.parentElement) {
-      const style = getComputedStyle(current);
-      const rect = current.getBoundingClientRect();
-      ancestors.push({ tag: current.tagName, id: current.id, className: String(current.className).slice(0, 80),
-        display: style.display, visibility: style.visibility, opacity: style.opacity,
-        box: [rect.width, rect.height] });
-    }
-    return { path: location.hash, print: matchMedia('print').matches, ancestors };
-  }), null, 2));
-  await expect(dashboard.getByRole('heading', { name: 'نظرة شاملة على أوقاف وأملاك الجامعة' })).toBeVisible();
+  const mainHeading = dashboard.getByRole('heading', { name: 'نظرة شاملة على أوقاف وأملاك الجامعة' });
+  await expect(mainHeading).toBeVisible();
+  expect(await mainHeading.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(240);
   await expect(page.getByRole('button', { name: /تصدير المؤشرات CSV \/ Excel/ })).toBeVisible();
   const pdfExport = page.getByRole('button', { name: 'تصدير المؤشرات PDF' });
   await expect(pdfExport).toBeEnabled();
