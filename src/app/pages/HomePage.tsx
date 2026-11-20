@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import {
   Activity, AlertTriangle, ArrowUpLeft, BarChart3, BellRing, Building2,
-  CalendarDays, CheckCircle2, ChevronLeft, ClipboardList, Download,
+  CalendarDays, CheckCircle2, ChevronLeft, ClipboardList, Download, Printer,
   FileCheck2, FileText, Filter, Layers3, MapPinned, PieChart as PieChartIcon,
   PlusCircle, RefreshCw, Ruler, Search, ShieldCheck, TrendingUp, WalletCards,
   type LucideIcon,
@@ -381,6 +381,10 @@ export const HomePage: React.FC = () => {
     color: 'hsl(var(--foreground))',
     fontSize: 13,
   };
+  const exportPdf = () => {
+    // Native print produces selectable Arabic text and preserves chart visuals without uploading data.
+    if (!dataLoading) window.print();
+  };
   const exportCsv = () => {
     const data = [
       [ui('المؤشر', 'Indicator'), ui('القيمة', 'Value')],
@@ -421,8 +425,10 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1760px] min-w-0 space-y-5 pb-8 sm:space-y-6"
+    <div id="iau-dashboard-print-root" className="mx-auto w-full max-w-[1760px] min-w-0 space-y-5 pb-8 sm:space-y-6"
       style={{ zoom: dashboardFontSize / 100 }}>
+      <style>{'@media print { @page { size: A4 landscape; margin: 12mm; } html,body { background: #fff !important; } body * { visibility: hidden !important; } #iau-dashboard-print-root, #iau-dashboard-print-root * { visibility: visible !important; } #iau-dashboard-print-root { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; zoom: 1 !important; transform: none !important; overflow: visible !important; color: #152238 !important; background: white !important; } #iau-dashboard-print-root .dashboard-no-print { display: none !important; } #iau-dashboard-print-root .dashboard-print-meta { display: block !important; } #iau-dashboard-print-root .future-card, #iau-dashboard-print-root .recharts-wrapper, #iau-dashboard-print-root .rounded-xl, #iau-dashboard-print-root .rounded-2xl { break-inside: avoid; page-break-inside: avoid; } #iau-dashboard-print-root h1 { font-size: 20pt !important; } #iau-dashboard-print-root h2 { font-size: 14pt !important; } #iau-dashboard-print-root p, #iau-dashboard-print-root span, #iau-dashboard-print-root td, #iau-dashboard-print-root th { font-size: 10pt !important; } #iau-dashboard-print-root input, #iau-dashboard-print-root select, #iau-dashboard-print-root button { display: none !important; } #iau-dashboard-print-root .bg-card, #iau-dashboard-print-root .future-card { background: white !important; color: #152238 !important; box-shadow: none !important; } #iau-dashboard-print-root .text-muted-foreground { color: #475569 !important; } } @media screen { #iau-dashboard-print-root .dashboard-print-meta { display: none !important; } }'}</style>
+      <div className="dashboard-print-meta text-sm font-semibold" dir={ar ? 'rtl' : 'ltr'}>{ui('تقرير مؤشرات أوقاف وأملاك الجامعة', 'University endowments and properties dashboard report')} — {dateLabel}. {ui('تُعرض المؤشرات وفق الصلاحيات المسندة للمستخدم. بيانات المباني المفصلة بحسب الحرم: ', 'Role-scoped indicators. Detailed building campus filter: ')}{selectedCampus || ui('جميع المواقع', 'All campuses')}</div>
       <section className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/15 via-card to-card px-5 py-6 shadow-sm sm:px-7 sm:py-7">
         <div className="pointer-events-none absolute -start-12 -top-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
@@ -444,7 +450,7 @@ export const HomePage: React.FC = () => {
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className="dashboard-no-print flex shrink-0 flex-wrap items-center gap-2">
             <div className="flex items-center gap-1 rounded-xl border border-primary/25 bg-background/90 p-1.5 shadow-sm"
               role="group" aria-label={ui('التحكم بحجم الخط في لوحة المؤشرات', 'Dashboard font size controls')}>
               <span className="px-1.5 text-xs font-semibold text-muted-foreground">{ui('حجم الخط', 'Font size')}</span>
@@ -477,7 +483,13 @@ export const HomePage: React.FC = () => {
             </Button>
             <Button variant="outline" className="gap-2 rounded-xl bg-background/80" onClick={exportCsv}>
               <Download className="h-4 w-4" />
-              {ui('تصدير المؤشرات', 'Export metrics')}
+              {ui('تصدير المؤشرات CSV / Excel', 'Export metrics CSV / Excel')}
+            </Button>
+            <Button variant="outline" className="gap-2 rounded-xl bg-background/80" onClick={exportPdf}
+              disabled={dataLoading} aria-label={ui('تصدير المؤشرات PDF', 'Export metrics PDF')}
+              title={ui('اختر حفظ بصيغة PDF من نافذة الطباعة', 'Choose Save as PDF in the print dialog')}>
+              <Printer className="h-4 w-4" />
+              {ui('تصدير PDF', 'Export PDF')}
             </Button>
           </div>
         </div>
