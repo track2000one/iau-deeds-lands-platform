@@ -50,6 +50,18 @@ const numberValue = (value: unknown) => {
 
 const positiveArea = (value: unknown) => Math.max(0, numberValue(value));
 const hasText = (value: unknown) => String(value ?? '').trim().length > 0;
+const DASHBOARD_FONT_STORAGE_KEY = 'iau-deeds.dashboard-font-size.v1';
+const DASHBOARD_FONT_PRESETS = [100, 115, 130, 145] as const;
+const DEFAULT_DASHBOARD_FONT = 115;
+const initialDashboardFontSize = (): number => {
+  if (typeof window === 'undefined') return DEFAULT_DASHBOARD_FONT;
+  try {
+    const saved = Number(window.localStorage.getItem(DASHBOARD_FONT_STORAGE_KEY));
+    return DASHBOARD_FONT_PRESETS.find((value) => value === saved) ?? DEFAULT_DASHBOARD_FONT;
+  } catch {
+    return DEFAULT_DASHBOARD_FONT;
+  }
+};
 const buildingCoordinatesValid = (building: MosqueBuilding) => {
   if (building.latitude == null || building.longitude == null) return false;
   const latitude = Number(building.latitude);
@@ -103,6 +115,21 @@ export const HomePage: React.FC = () => {
   const [buildingCampus, setBuildingCampus] = React.useState('');
   const [query, setQuery] = React.useState('');
   const [sort, setSort] = React.useState<'newest' | 'oldest'>('newest');
+  const [dashboardFontSize, setDashboardFontSize] = React.useState<number>(initialDashboardFontSize);
+  const fontPresetIndex = DASHBOARD_FONT_PRESETS.findIndex((size) => size === dashboardFontSize);
+
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem(DASHBOARD_FONT_STORAGE_KEY, String(dashboardFontSize));
+    } catch {
+      // Browser storage may be disabled; the controls still work for this visit.
+    }
+  }, [dashboardFontSize]);
+
+  const adjustDashboardFontSize = (direction: -1 | 1) => {
+    const nextIndex = Math.min(DASHBOARD_FONT_PRESETS.length - 1, Math.max(0, fontPresetIndex + direction));
+    setDashboardFontSize(DASHBOARD_FONT_PRESETS[nextIndex]);
+  };
 
   React.useEffect(() => {
     if (permissionsLoading) return;
@@ -338,6 +365,7 @@ export const HomePage: React.FC = () => {
     border: '1px solid hsl(var(--border))',
     borderRadius: 12,
     color: 'hsl(var(--foreground))',
+    fontSize: 13,
   };
   const exportCsv = () => {
     const data = [
@@ -379,7 +407,8 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1760px] min-w-0 space-y-5 pb-8 sm:space-y-6">
+    <div className="mx-auto w-full max-w-[1760px] min-w-0 space-y-5 pb-8 sm:space-y-6"
+      style={{ zoom: dashboardFontSize / 100 }}>
       <section className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/15 via-card to-card px-5 py-6 shadow-sm sm:px-7 sm:py-7">
         <div className="pointer-events-none absolute -start-12 -top-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
@@ -402,6 +431,28 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-xl border border-primary/25 bg-background/90 p-1.5 shadow-sm"
+              role="group" aria-label={ui('التحكم بحجم الخط في لوحة المؤشرات', 'Dashboard font size controls')}>
+              <span className="px-1.5 text-xs font-semibold text-muted-foreground">{ui('حجم الخط', 'Font size')}</span>
+              <Button type="button" variant="outline" size="sm"
+                className="h-9 min-w-10 rounded-lg px-2 text-base font-bold"
+                onClick={() => adjustDashboardFontSize(-1)}
+                disabled={fontPresetIndex <= 0}
+                aria-label={ui('تصغير الخط', 'Decrease font size')}
+                title={ui('تصغير الخط', 'Decrease font size')}>A−</Button>
+              <button type="button" className="min-w-12 rounded-md px-1 text-center text-xs font-bold tabular-nums text-foreground hover:bg-muted"
+                onClick={() => setDashboardFontSize(DEFAULT_DASHBOARD_FONT)}
+                title={ui('استعادة حجم الخط الافتراضي', 'Reset default font size')}
+                aria-label={ui('استعادة حجم الخط الافتراضي', 'Reset default font size')}>
+                {dashboardFontSize}%
+              </button>
+              <Button type="button" variant="outline" size="sm"
+                className="h-9 min-w-10 rounded-lg px-2 text-base font-bold"
+                onClick={() => adjustDashboardFontSize(1)}
+                disabled={fontPresetIndex >= DASHBOARD_FONT_PRESETS.length - 1}
+                aria-label={ui('تكبير الخط', 'Increase font size')}
+                title={ui('تكبير الخط', 'Increase font size')}>A+</Button>
+            </div>
             <span className="inline-flex items-center gap-2 rounded-xl border bg-background/70 px-3 py-2 text-xs text-muted-foreground">
               <CalendarDays className="h-4 w-4" />
               {dateLabel}
@@ -454,7 +505,7 @@ export const HomePage: React.FC = () => {
                 </div>
                 <p className="mt-4 text-xs font-semibold text-muted-foreground">{metric.title}</p>
                 <p className="mt-1 break-words text-2xl font-extrabold tracking-tight text-foreground tabular-nums">{metric.value}</p>
-                <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{metric.subtitle}</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{metric.subtitle}</p>
               </button>
             );
           })}
@@ -523,7 +574,7 @@ export const HomePage: React.FC = () => {
                         <Icon className={'h-5 w-5 shrink-0 ' + item.accent} />
                       </div>
                       <p className="mt-3 text-2xl font-black tabular-nums text-foreground">{fmt(item.value)}</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">{item.sub}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{item.sub}</p>
                     </div>
                   );
                 })}
@@ -548,9 +599,9 @@ export const HomePage: React.FC = () => {
                           <BarChart data={topCampusRows} layout="vertical" margin={{ top: 4, right: 19, left: 5, bottom: 4 }}>
                             <CartesianGrid stroke={colors.border} strokeDasharray="4 4" horizontal={false} />
                             <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false}
-                              tick={{ fill: colors.text, fontSize: 11 }} />
+                              tick={{ fill: colors.text, fontSize: 12 }} />
                             <YAxis type="category" dataKey="name" width={130} tickLine={false} axisLine={false}
-                              tick={{ fill: colors.text, fontSize: 11 }}
+                              tick={{ fill: colors.text, fontSize: 12 }}
                               tickFormatter={(value: string) => value.length > 19 ? value.slice(0, 18) + '…' : value} />
                             <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
                               formatter={(value: number) => [fmt(Number(value)), ui('مبنى', 'Buildings')]} />
@@ -563,7 +614,7 @@ export const HomePage: React.FC = () => {
                         </ResponsiveContainer>
                       </div>
                     )}
-                    <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
                       {ui('يعرض الرسم جميع مواقع السجل، ويبرز الموقع المحدد باللون المختلف.', 'This chart shows all campus locations; the selected location is highlighted.')}
                     </p>
                   </CardContent>
@@ -599,7 +650,7 @@ export const HomePage: React.FC = () => {
                         </ResponsiveContainer>
                         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                           <span className="text-2xl font-extrabold tabular-nums">{fmt(buildingCount)}</span>
-                          <span className="text-[11px] text-muted-foreground">{ui('مبنى', 'buildings')}</span>
+                          <span className="text-xs text-muted-foreground">{ui('مبنى', 'buildings')}</span>
                         </div>
                       </div>
                     )}
@@ -619,7 +670,7 @@ export const HomePage: React.FC = () => {
                   </CardContent>
                 </Card>
               </div>
-              <p className="rounded-xl border border-dashed bg-muted/25 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
+              <p className="rounded-xl border border-dashed bg-muted/25 px-3 py-2 text-xs leading-5 text-muted-foreground">
                 {ui('العدد يمثل السجلات الفعلية بالمباني بما فيها «غير قائم»، ولا يمثّل عدد المباني المشغولة أو عدد الصكوك الفريدة. وتُحدّث المؤشرات عند إعادة تحميل البيانات.',
                   'Counts reflect actual building records, including not-existing buildings; they are not occupancy counts or unique deed counts. Refresh to reload data.')}
               </p>
@@ -673,8 +724,8 @@ export const HomePage: React.FC = () => {
                       </linearGradient>
                     </defs>
                     <CartesianGrid stroke={colors.border} strokeDasharray="4 4" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fill: colors.text, fontSize: 11 }} tickLine={false} axisLine={false} />
-                    <YAxis allowDecimals={false} tick={{ fill: colors.text, fontSize: 11 }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="label" tick={{ fill: colors.text, fontSize: 12 }} tickLine={false} axisLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fill: colors.text, fontSize: 12 }} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [fmt(Number(value)), ui('صك مضاف', 'Deeds added')]} />
                     <Area type="monotone" dataKey="count" stroke="hsl(var(--primary))" strokeWidth={2.7}
                       fill="url(#deed-activity-fill)" dot={{ r: 3, fill: 'hsl(var(--primary))' }}
@@ -712,7 +763,7 @@ export const HomePage: React.FC = () => {
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-xl font-extrabold tabular-nums">{fmt(totalRecords)}</span>
-                  <span className="text-[10px] text-muted-foreground">{ui('سجل', 'records')}</span>
+                  <span className="text-xs text-muted-foreground">{ui('سجل', 'records')}</span>
                 </div>
               </div>
             )}
@@ -777,7 +828,7 @@ export const HomePage: React.FC = () => {
                     </div>
                   );
                 })}
-                <p className="text-[11px] leading-5 text-muted-foreground">{ui('هذه النسبة تعكس تعبئة الحقول فقط، ولا تمثل اعتمادًا قانونيًا أو هندسيًا للمعلومات.', 'This measures field completion, not legal or engineering verification.')}</p>
+                <p className="text-xs leading-5 text-muted-foreground">{ui('هذه النسبة تعكس تعبئة الحقول فقط، ولا تمثل اعتمادًا قانونيًا أو هندسيًا للمعلومات.', 'This measures field completion, not legal or engineering verification.')}</p>
               </>
             )}
           </CardContent>
@@ -890,18 +941,18 @@ export const HomePage: React.FC = () => {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-bold text-foreground">{deed.deedNumber || '—'}</span>
-                          <Badge variant="secondary" className="text-[10px]">{deed.isPlanned ? ui('مخططة', 'Planned') : ui('غير مخططة', 'Unplanned')}</Badge>
+                          <Badge variant="secondary" className="text-xs">{deed.isPlanned ? ui('مخططة', 'Planned') : ui('غير مخططة', 'Unplanned')}</Badge>
                         </div>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">{[deed.city, deed.district, deed.propertyDescription].filter(Boolean).join(' • ') || '—'}</p>
                       </div>
                       <div className="shrink-0 text-end text-xs">
                         <p className="font-bold tabular-nums text-foreground">{fmt(positiveArea(deed.area))} {ui('م²', 'm²')}</p>
-                        <p className="mt-1 text-[10px] text-muted-foreground">{validDate(deed.createdAt) ? new Date(deed.createdAt).toLocaleDateString(locale) : '—'}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{validDate(deed.createdAt) ? new Date(deed.createdAt).toLocaleDateString(locale) : '—'}</p>
                       </div>
                       <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground opacity-50 transition group-hover:opacity-100" />
                     </button>
                   ))}
-                  <p className="pt-1 text-[11px] text-muted-foreground">
+                  <p className="pt-1 text-xs text-muted-foreground">
                     {ui('عدد النتائج المطابقة: ', 'Matching records: ')}{fmt(recentDeeds.length)} • {ui('يُعرض أول 7 سجلات', 'Showing the first 7')}
                   </p>
                 </div>
