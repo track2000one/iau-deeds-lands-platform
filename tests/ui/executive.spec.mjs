@@ -50,7 +50,7 @@ const allow = (canPrint = false) => ({
 async function setup(page, { role = 'admin', permissions = {}, failingPath = '' } = {}) {
   const requestLog = [];
   await page.addInitScript(() => {
-    localStorage.setItem('iau_access_token', 'synthetic-test-token-not-real');
+    localStorage.removeItem('iau_access_token');
     localStorage.removeItem('deeds_data');
   });
   await page.route('**/api/**', async (route) => {
@@ -60,6 +60,9 @@ async function setup(page, { role = 'admin', permissions = {}, failingPath = '' 
       status, contentType: 'application/json', body: JSON.stringify(body),
     });
     if (url.pathname === '/api/auth/me') return fulfill({ user: profile(role, permissions) });
+    if (url.pathname === '/api/auth/login') return fulfill({
+      token: 'synthetic-test-token-not-real', user: profile(role, permissions),
+    });
     if (url.pathname === '/api/users') return fulfill([]);
     if (url.pathname === failingPath) return fulfill({ message: 'Synthetic unavailable' }, 503);
     if (routes.has(url.pathname)) {
@@ -76,7 +79,13 @@ async function setup(page, { role = 'admin', permissions = {}, failingPath = '' 
     // DataContext and Layout may prefetch unrelated modules; never return privileged data.
     return fulfill({ message: 'Not included in synthetic role scope' }, 403);
   });
-  await page.goto('/#/reports/executive');
+  await page.goto('/#/login');
+  await page.locator('input[type="email"]').fill('fixture@example.invalid');
+  await page.locator('input[type="password"]').fill('only-a-synthetic-password');
+  await page.locator('button[type="submit"]').click();
+  await expect(page).toHaveURL(/#\/$/);
+  // In-app navigation avoids a full-page reload while AuthProvider restores the profile.
+  await page.evaluate(() => { window.location.hash = '#/reports/executive'; });
   return requestLog;
 }
 
