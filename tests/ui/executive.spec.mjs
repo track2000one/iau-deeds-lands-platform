@@ -88,7 +88,7 @@ async function setup(page, { role = 'admin', permissions = {}, failingPath = '' 
   // Follow the real dashboard action for users permitted to view reports.
   // A forbidden account navigates directly to verify the route guard itself.
   if (role === 'admin' || permissions.reports?.canView) {
-    await page.getByRole('button', { name: 'التقرير التنفيذي', exact: true }).click();
+    await page.getByRole('button', { name: /التقرير التنفيذي/ }).click();
   } else {
     await page.evaluate(() => { window.location.hash = '#/reports/executive'; });
   }
