@@ -150,7 +150,6 @@ test('a limited employee sees authorized building data without export or other m
 
 test('report route requires view permission and never reveals data to a forbidden user', async ({ page }) => {
   const requestLog = await setup(page, { role: 'employee', permissions: {
-    central_buildings: { canView: true },
     reports: { canView: false, canPrint: false },
   } });
   await expect(page.getByText('ليس لديك صلاحية')).toBeVisible();
