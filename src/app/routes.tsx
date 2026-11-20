@@ -11,6 +11,7 @@ const AllDeedsPage = lazy(() => import('./pages/AllDeedsPage').then((m) => ({ de
 const ViewDeedPage = lazy(() => import('./pages/ViewDeedPage').then((m) => ({ default: m.ViewDeedPage })));
 const MapsPage = lazy(() => import('./pages/MapsPage').then((m) => ({ default: m.MapsPage })));
 const ReportsPage = lazy(() => import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const ExecutiveSummaryReportPage = lazy(() => import('./pages/ExecutiveSummaryReportPage').then((m) => ({ default: m.ExecutiveSummaryReportPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })));
@@ -218,6 +219,7 @@ export const router = createHashRouter([
       { path: 'follow-up/risks/policy', element: <PermissionGuard module="transaction_risk_policy" action="canView">{page(<TransactionRiskPolicyPage />)}</PermissionGuard> },
       { path: 'contracts/follow-up', element: <PermissionGuard module="contracts_follow_up" action="canView">{page(<ContractsFollowUpPage />)}</PermissionGuard> },
       { path: 'reports', element: page(<ReportsPage />) },
+      { path: 'reports/executive', element: <PermissionGuard module="reports" action="canView">{page(<ExecutiveSummaryReportPage />)}</PermissionGuard> },
       { path: 'archive', element: <PermissionGuard module="archive" action="canView">{page(<ArchivePage />)}</PermissionGuard> },
       { path: 'settings', element: page(<SettingsPage />) },
       { path: 'appearance', element: page(<AppearanceSettingsPage />) },
