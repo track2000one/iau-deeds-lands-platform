@@ -74,34 +74,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const ui = (ar: string, en: string) => (isRTL ? ar : en);
   const locale = isRTL ? 'ar-SA' : 'en-US';
 
-  const coreHomeModules = [
-    'deeds',
-    'allocated_lands',
-    'delivered_lands',
-    'leased_lands_out',
-    'leased_lands_in',
-    'leased_buildings_out',
-    'leased_buildings_in',
-  ] as const;
-
-  const scopedLandingRoutes = [
-    ['investments', '/investments'],
-    ['vacant_lands', '/lands/vacant'],
-    ['assets', '/assets'],
-    ['accounting_transformation', '/accounting-transformation'],
-    ['mosques', '/mosques'],
-    ['transaction_follow_up', '/follow-up'],
-    ['contracts_follow_up', '/contracts/follow-up'],
-    ['site_inspections', '/site-inspections'],
-    ['reports', '/reports'],
-    ['archive', '/archive'],
-  ] as const;
-
-  const hasCoreHomeAccess =
-    isAdmin || coreHomeModules.some((module) => hasPermission(module, 'canView'));
-  const defaultLandingPath = hasCoreHomeAccess
-    ? '/'
-    : scopedLandingRoutes.find(([module]) => hasPermission(module, 'canView'))?.[1] || '/appearance';
+  // Everyone with a valid session lands on the shared dashboard.
+  const defaultLandingPath = '/';
 
   React.useEffect(() => {
     if (!sidebarOpen || window.innerWidth >= 1024) return;
@@ -152,7 +126,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const menuItems = [
-    { id: 'home', path: '/', icon: Home, label: t('nav.home'), alwaysVisible: hasCoreHomeAccess },
+    { id: 'home', path: '/', icon: Home, label: t('nav.home'), alwaysVisible: true },
     { id: 'add-deed', path: '/deeds/new', icon: PlusCircle, label: t('nav.addDeed'), module: 'deeds', action: 'canAdd' },
     { id: 'all-deeds', path: '/deeds', icon: FileText, label: t('nav.allDeeds'), module: 'deeds', action: 'canView' },
     { id: 'allocated-lands', path: '/lands/allocated', icon: MapPin, label: t('nav.allocatedLands'), module: 'allocated_lands', action: 'canView' },
