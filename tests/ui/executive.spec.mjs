@@ -100,7 +100,7 @@ test('admin sees real executive UI, filters and an analyzable Excel workbook', a
   const report = page.locator('#executive-report');
   await expect(report.locator('h1')).toContainText('التقرير التنفيذي');
   await expect(report.getByText('السجل المركزي للمباني', { exact: true })).toBeVisible();
-  await expect(report.getByText('الأراضي الشاغرة', { exact: true })).toBeVisible();
+  await expect(report.getByText('الأراضي الشاغرة', { exact: true }).last()).toBeVisible();
   await expect(report.getByText('نظام متابعة المعاملات', { exact: true })).toBeVisible();
   await expect(report.locator('html')).toHaveCount(0);
 
@@ -152,7 +152,7 @@ test('report route requires view permission and never reveals data to a forbidde
   const requestLog = await setup(page, { role: 'employee', permissions: {
     reports: { canView: false, canPrint: false },
   } });
-  await expect(page.getByText('ليس لديك صلاحية')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ليس لديك صلاحية' })).toBeVisible();
   await expect(page.locator('#executive-report')).toHaveCount(0);
   expect(requestLog.filter((path) => path === '/api/mosques/buildings')).toHaveLength(0);
 });
