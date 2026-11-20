@@ -84,10 +84,13 @@ async function setup(page, { role = 'admin', permissions = {}, failingPath = '' 
   await page.locator('input[type="password"]').fill('only-a-synthetic-password');
   await page.locator('button[type="submit"]').click();
   await expect(page).toHaveURL(/#\/$/);
-  // In-app navigation avoids a full-page reload while AuthProvider restores the profile.
-  await page.evaluate(() => { window.location.hash = '#/reports/executive'; });
-  await page.waitForTimeout(400);
-  console.log('[EXECUTIVE TEST ROUTE]', page.url(), (await page.locator('body').innerText()).slice(0, 900));
+  // Follow the real dashboard action for users permitted to view reports.
+  // A forbidden account navigates directly to verify the route guard itself.
+  if (role === 'admin' || permissions.reports?.canView) {
+    await page.getByRole('button', { name: 'التقرير التنفيذي', exact: true }).click();
+  } else {
+    await page.evaluate(() => { window.location.hash = '#/reports/executive'; });
+  }
   return requestLog;
 }
 
