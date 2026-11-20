@@ -366,7 +366,8 @@ export const HomePage: React.FC = () => {
     ...(canInspections ? [{ label: ui('المعاينات الميدانية', 'Site inspections'), subtitle: ui('المواقع والمعاينات', 'Field inspection records'), path: '/site-inspections', icon: MapPinned }] : []),
     ...(canContracts ? [{ label: ui('متابعة العقود', 'Contract follow-up'), subtitle: ui('سجل متابعة العقود', 'Contract follow-up registry'), path: '/contracts/follow-up', icon: ClipboardList }] : []),
     ...(canArchive ? [{ label: ui('الأرشيف', 'Archive'), subtitle: ui('المستندات والمرفقات', 'Documents and attachments'), path: '/archive', icon: Layers3 }] : []),
-    ...(canReports ? [{ label: ui('مركز التقارير', 'Reports centre'), subtitle: ui('التصفية والطباعة', 'Filter and print'), path: '/reports', icon: BarChart3 }] : []),
+    ...(canReports ? [{ label: ui('مركز التقارير', 'Reports centre'), subtitle: ui('التصفية والطباعة', 'Filter and print'), path: '/reports', icon: BarChart3 },
+      { label: ui('التقرير التنفيذي', 'Executive report'), subtitle: ui('مؤشرات الأعمال والتصدير إلى Excel وPDF', 'KPIs and Excel/PDF export'), path: '/reports/executive', icon: FileCheck2 }] : []),
     { label: ui('البحث والاستعلام', 'Search'), subtitle: ui('البحث في سجلات المنصة', 'Find platform records'), path: '/search', icon: Search },
   ];
 
