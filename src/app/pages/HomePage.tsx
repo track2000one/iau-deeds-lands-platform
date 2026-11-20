@@ -104,6 +104,12 @@ export const HomePage: React.FC = () => {
   const canArchive = access('archive');
   const canReports = access('reports');
   const canVacant = access('vacant_lands');
+  const canInvestments = access('investments');
+  const canAssets = access('assets');
+  const canAccounting = access('accounting_transformation');
+  const canMosques = access('mosques');
+  const canInspections = access('site_inspections');
+  const canContracts = access('contracts_follow_up');
   const dataLoading = deedsLoading || recordsLoading || permissionsLoading;
 
   const [buildings, setBuildings] = React.useState<MosqueBuilding[] | null>(null);
@@ -352,6 +358,12 @@ export const HomePage: React.FC = () => {
     ...(canRegistry ? [{ label: ui('السجل المركزي للمباني', 'Buildings registry'), subtitle: ui('المباني والربط بالصكوك', 'Buildings and deed links'), path: '/buildings/registry', icon: Building2 }] : []),
     ...(canFollowUp ? [{ label: ui('نظام المتابعة', 'Transaction follow-up'), subtitle: ui('المعاملات والإجراءات', 'Transactions and actions'), path: '/follow-up', icon: ClipboardList }] : []),
     ...(canVacant ? [{ label: ui('الأراضي الشاغرة', 'Vacant lands'), subtitle: ui('المواقع والفرص المتاحة', 'Sites and opportunities'), path: '/lands/vacant', icon: MapPinned }] : []),
+    ...(canInvestments ? [{ label: ui('المساحات والفرص الاستثمارية', 'Investments'), subtitle: ui('ملفات الاستثمار العقاري', 'Investment sites and opportunities'), path: '/investments', icon: WalletCards }] : []),
+    ...(canAssets ? [{ label: ui('وحدة الأصول', 'Assets'), subtitle: ui('سجلات الأصول وتقاريرها', 'Asset registry and reports'), path: '/assets', icon: Layers3 }] : []),
+    ...(canAccounting ? [{ label: ui('التحول المحاسبي', 'Accounting transformation'), subtitle: ui('الملفات المحاسبية والتقارير', 'Accounting files and reports'), path: '/accounting-transformation', icon: BarChart3 }] : []),
+    ...(canMosques ? [{ label: ui('المساجد والمصليات الجامعية', 'Mosques and prayer rooms'), subtitle: ui('متابعة أعمال الوحدة', 'Unit workspace'), path: '/mosques', icon: Building2 }] : []),
+    ...(canInspections ? [{ label: ui('المعاينات الميدانية', 'Site inspections'), subtitle: ui('المواقع والمعاينات', 'Field inspection records'), path: '/site-inspections', icon: MapPinned }] : []),
+    ...(canContracts ? [{ label: ui('متابعة العقود', 'Contract follow-up'), subtitle: ui('سجل متابعة العقود', 'Contract follow-up registry'), path: '/contracts/follow-up', icon: ClipboardList }] : []),
     ...(canArchive ? [{ label: ui('الأرشيف', 'Archive'), subtitle: ui('المستندات والمرفقات', 'Documents and attachments'), path: '/archive', icon: Layers3 }] : []),
     ...(canReports ? [{ label: ui('مركز التقارير', 'Reports centre'), subtitle: ui('التصفية والطباعة', 'Filter and print'), path: '/reports', icon: BarChart3 }] : []),
     { label: ui('البحث والاستعلام', 'Search'), subtitle: ui('البحث في سجلات المنصة', 'Find platform records'), path: '/search', icon: Search },
@@ -491,6 +503,18 @@ export const HomePage: React.FC = () => {
           </div>
           <Badge variant="outline">{ui('بيانات فعلية', 'Live records')}</Badge>
         </div>
+        {metrics.length === 0 ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-5">
+            <ShieldCheck className="mt-0.5 h-6 w-6 shrink-0 text-primary" />
+            <div className="space-y-1">
+              <p className="font-bold text-foreground">{ui('الصفحة الرئيسية متاحة لك', 'Your dashboard is available')}</p>
+              <p className="text-sm leading-6 text-muted-foreground">
+                {ui('لا توجد مؤشرات رقمية ضمن صلاحيات هذا الحساب حاليًا. يمكنك الانتقال إلى وحدات عملك من مركز الوصول السريع أدناه، وتُعرض إحصاءات الوحدات عند منح صلاحيات الاطلاع عليها.',
+                  'There are no numeric indicators within this account’s current permissions. Open your assigned workspaces below; additional metrics appear when access is granted.')}
+              </p>
+            </div>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           {metrics.map((metric) => {
             const Icon = metric.icon;
@@ -510,6 +534,7 @@ export const HomePage: React.FC = () => {
             );
           })}
         </div>
+        )}
       </section>
 
 
