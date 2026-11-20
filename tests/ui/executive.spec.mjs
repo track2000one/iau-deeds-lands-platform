@@ -86,6 +86,8 @@ async function setup(page, { role = 'admin', permissions = {}, failingPath = '' 
   await expect(page).toHaveURL(/#\/$/);
   // In-app navigation avoids a full-page reload while AuthProvider restores the profile.
   await page.evaluate(() => { window.location.hash = '#/reports/executive'; });
+  await page.waitForTimeout(400);
+  console.log('[EXECUTIVE TEST ROUTE]', page.url(), (await page.locator('body').innerText()).slice(0, 900));
   return requestLog;
 }
 
