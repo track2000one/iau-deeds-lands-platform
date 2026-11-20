@@ -51,7 +51,7 @@ jobs:
         with:
           name: ui-browser-failure-evidence
           path: |
-            test-results/
-            playwright-report/
+            tests/ui/test-results/
+            tests/ui/playwright-report/
           if-no-files-found: ignore
           retention-days: 7
