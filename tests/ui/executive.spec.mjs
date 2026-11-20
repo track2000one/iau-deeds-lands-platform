@@ -53,7 +53,8 @@ async function setup(page, { role = 'admin', permissions = {}, failingPath = '' 
     localStorage.removeItem('iau_access_token');
     localStorage.removeItem('deeds_data');
   });
-  await page.route('**/api/**', async (route) => {
+  // Match only the localhost REST root, never Vite source modules such as /src/app/api/*.ts.
+  await page.route(/^https?:\/\/127\.0\.0\.1:4173\/api\//, async (route) => {
     const url = new URL(route.request().url());
     requestLog.push(url.pathname);
     const fulfill = (body, status = 200) => route.fulfill({
