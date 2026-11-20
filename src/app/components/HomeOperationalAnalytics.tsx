@@ -110,7 +110,7 @@ export const HomeOperationalAnalytics: React.FC<Props> = ({
     return () => { active = false; };
   }, [canVacant, canInspections]);
 
-  const campuses = React.useMemo(() => [...new Set((lands ?? []).map((land) => land.campus?.trim()).filter(Boolean))]
+  const campuses = React.useMemo(() => [...new Set((lands ?? []).map((land) => land.campus?.trim()).filter((value): value is string => Boolean(value)))]
     .sort((a, b) => a.localeCompare(b, locale)), [lands, locale]);
   const selectedCampus = campuses.includes(campus) ? campus : '';
   const filteredLands = React.useMemo(() => (lands ?? []).filter((land) => !selectedCampus || land.campus === selectedCampus), [lands, selectedCampus]);
