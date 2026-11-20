@@ -431,7 +431,7 @@ export const HomePage: React.FC = () => {
       <div className="dashboard-print-meta text-sm font-semibold" dir={ar ? 'rtl' : 'ltr'}>{ui('تقرير مؤشرات أوقاف وأملاك الجامعة', 'University endowments and properties dashboard report')} — {dateLabel}. {ui('تُعرض المؤشرات وفق الصلاحيات المسندة للمستخدم. بيانات المباني المفصلة بحسب الحرم: ', 'Role-scoped indicators. Detailed building campus filter: ')}{selectedCampus || ui('جميع المواقع', 'All campuses')}</div>
       <section className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/15 via-card to-card px-5 py-6 shadow-sm sm:px-7 sm:py-7">
         <div className="pointer-events-none absolute -start-12 -top-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <div className="relative flex flex-col gap-5">
           <div className="flex min-w-0 items-start gap-4">
             <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-primary/15 bg-background/75 shadow-sm sm:h-16 sm:w-16">
               <img src={PLATFORM_LOGO_URL} alt={ui('شعار المنصة', 'Platform logo')} className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
@@ -450,7 +450,7 @@ export const HomePage: React.FC = () => {
               </p>
             </div>
           </div>
-          <div className="dashboard-no-print flex shrink-0 flex-wrap items-center gap-2">
+          <div className="dashboard-no-print flex w-full min-w-0 flex-wrap items-center justify-start gap-2">
             <div className="flex items-center gap-1 rounded-xl border border-primary/25 bg-background/90 p-1.5 shadow-sm"
               role="group" aria-label={ui('التحكم بحجم الخط في لوحة المؤشرات', 'Dashboard font size controls')}>
               <span className="px-1.5 text-xs font-semibold text-muted-foreground">{ui('حجم الخط', 'Font size')}</span>
