@@ -184,3 +184,30 @@ test('printing uses report-only CSS and produces a valid PDF document', async ({
   expect(document.getPageCount()).toBeGreaterThanOrEqual(1);
   expect(buffer.length).toBeGreaterThan(2500);
 });
+
+test('dashboard exports its live authorized indicators to browser PDF without changing the CSV action', async ({ page }) => {
+  await setup(page, { role: 'employee', permissions: allow(true) });
+  await page.getByRole('button', { name: 'العودة للوحة المؤشرات' }).click();
+  const dashboard = page.locator('#iau-dashboard-print-root');
+  await expect(dashboard.getByRole('heading', { name: 'نظرة شاملة على أوقاف وأملاك الجامعة' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /تصدير المؤشرات CSV \/ Excel/ })).toBeVisible();
+  const pdfExport = page.getByRole('button', { name: 'تصدير المؤشرات PDF' });
+  await expect(pdfExport).toBeEnabled();
+
+  await page.evaluate(() => {
+    window.__dashboardPrintCount = 0;
+    window.print = () => { window.__dashboardPrintCount += 1; };
+  });
+  await pdfExport.click();
+  expect(await page.evaluate(() => window.__dashboardPrintCount)).toBe(1);
+
+  await page.emulateMedia({ media: 'print' });
+  await expect(dashboard.getByText('تقرير مؤشرات أوقاف وأملاك الجامعة')).toBeVisible();
+  await expect(dashboard.locator('.dashboard-no-print')).toBeHidden();
+  await expect(dashboard).toBeVisible();
+
+  const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true });
+  const parsed = await PDFDocument.load(pdf);
+  expect(parsed.getPageCount()).toBeGreaterThan(0);
+  expect(pdf.length).toBeGreaterThan(3000);
+});
