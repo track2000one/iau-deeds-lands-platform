@@ -124,6 +124,8 @@ const applyLightShellForGlassTheme = (themeId?: string | null) => {
 };
 
 const propertyDataPath = (pathname: string) => {
+  // Executive report fetches only permitted source modules; avoid preloading all other property collections.
+  if (pathname === '/reports/executive') return false;
   if (pathname === '/') return true;
   return [
     '/admin',
