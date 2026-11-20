@@ -170,12 +170,12 @@ export const HomeOperationalAnalytics: React.FC<Props> = ({
       );
     }
     const safeCell = (value: string) => {
-          // Prevent spreadsheet formula injection from user-entered campus/location names.
-          const text = String(value);
-          const sanitized = /^[=+@\-\t\r]/.test(text.trimStart()) ? "'" + text : text;
-          return '"' + sanitized.replace(/"/g, '""') + '"';
-        };
-        const csv = '\uFEFF' + rows.map((row) => row.map(safeCell).join(',')).join('\r\n');
+      // Prevent spreadsheet formula injection from user-entered campus/location names.
+      const text = String(value);
+      const sanitized = /^[=+@\-\t\r]/.test(text.trimStart()) ? "'" + text : text;
+      return '"' + sanitized.replace(/"/g, '""') + '"';
+    };
+    const csv = '\uFEFF' + rows.map((row) => row.map(safeCell).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
