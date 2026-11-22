@@ -1220,7 +1220,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                               size="sm"
                                               variant="outline"
                                               className="border-red-300 text-red-700 hover:bg-red-50"
-                                              disabled={!isAdmin && (references > 0 || Boolean(building.photos?.length) || Boolean(building.documents?.length)}
+                                              disabled={!isAdmin && (references > 0 || Boolean(building.photos?.length) || Boolean(building.documents?.length))}
                                               title={isAdmin ? 'حذف إداري للبطاقة والمرفقات مع الإبقاء على السجلات المرتبطة مستقلة' : references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length || building.documents?.length ? 'احذف صور ومرفقات المبنى أولًا' : 'حذف المبنى'}
                                               onClick={() => { setDeleteReason(''); setDeleteTarget(building); }}
                                             >
@@ -1344,7 +1344,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                     </Button>
                                   )}
                                   {canDeleteBuilding(building) && (
-                                    <Button size="sm" variant="outline" disabled={!isAdmin && (references > 0 || Boolean(building.photos?.length) || Boolean(building.documents?.length)}
+                                    <Button size="sm" variant="outline" disabled={!isAdmin && (references > 0 || Boolean(building.photos?.length) || Boolean(building.documents?.length))}
                                       className="gap-1.5 border-red-300 text-red-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-red-50 hover:shadow-md"
                                       onClick={() => { setDeleteReason(''); setDeleteTarget(building); }}
                                       title={isAdmin ? 'حذف إداري للبطاقة والمرفقات مع الإبقاء على السجلات المرتبطة مستقلة' : references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length || building.documents?.length ? 'احذف صور ومرفقات المبنى أولًا' : 'حذف المبنى'}>
