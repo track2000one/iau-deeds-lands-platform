@@ -227,7 +227,9 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     userProfile?.uid && building.createdBy && userProfile.uid === building.createdBy
   );
   const canEditBuilding = (building: MosqueBuilding) => canEdit && ownsBuilding(building);
-  const canDeleteBuilding = (building: MosqueBuilding) => canDelete && ownsBuilding(building);
+  // Destructive deletion of an entire central-building record is admin-only.
+  // Staff may edit/remove media on records they created, but cannot delete the card itself.
+  const canDeleteBuilding = (_building: MosqueBuilding) => isAdmin && canDelete;
   const canViewAssets = isAdmin || hasPermission('assets', 'canView');
   const canEditAssets = isAdmin || hasPermission('assets', 'canEdit');
   const canViewAccounting =
