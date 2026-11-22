@@ -262,6 +262,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
   const [pendingPhotoFiles, setPendingPhotoFiles] = useState<File[]>([]);
   const [pendingDocumentFiles, setPendingDocumentFiles] = useState<File[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<MosqueBuilding | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
   const [viewTarget, setViewTarget] = useState<MosqueBuilding | null>(null);
   const updateBuildingPhotos = (buildingId: string, photos: CentralBuildingPhoto[]) => {
     setBuildings((records) => records.map((item) => item.id === buildingId ? { ...item, photos } : item));
@@ -909,7 +910,7 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
     const references =
       (item?.mosqueSites || 0) + (item?.assets || 0) + (item?.accounting || 0) + (item?.inspections || 0);
 
-    if (references > 0) {
+    if (!isAdmin && references > 0) {
       toast.error('لا يمكن حذف مبنى مرتبط بسجلات تشغيلية. أزل الارتباطات أولًا.');
       setDeleteTarget(null);
       return;
@@ -917,8 +918,12 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
 
     try {
       setSaving(true);
-      await mosqueApi.deleteBuilding(deleteTarget.id);
-      toast.success('تم حذف المبنى من السجل المركزي');
+      const result = await mosqueApi.deleteBuilding(deleteTarget.id, deleteReason);
+      toast.success(isAdmin ? 'تم حذف بطاقة المبنى بواسطة المسؤول' : 'تم حذف المبنى من السجل المركزي');
+      if (result.mediaCleanupFailures > 0) {
+        toast.warning('حُذفت البطاقة، لكن تعذر حذف بعض الملفات من التخزين. راجع سجل التدقيق.');
+      }
+      setDeleteReason('');
       setDeleteTarget(null);
       await loadData();
     } catch (error) {
@@ -1215,9 +1220,9 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                               size="sm"
                                               variant="outline"
                                               className="border-red-300 text-red-700 hover:bg-red-50"
-                                              disabled={references > 0 || Boolean(building.photos?.length) || Boolean(building.documents?.length)}
-                                              title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length || building.documents?.length ? 'احذف صور ومرفقات المبنى أولًا' : 'حذف المبنى'}
-                                              onClick={() => setDeleteTarget(building)}
+                                              disabled={!isAdmin && (references > 0 || Boolean(building.photos?.length) || Boolean(building.documents?.length)}
+                                              title={isAdmin ? 'حذف إداري للبطاقة والمرفقات مع الإبقاء على السجلات المرتبطة مستقلة' : references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length || building.documents?.length ? 'احذف صور ومرفقات المبنى أولًا' : 'حذف المبنى'}
+                                              onClick={() => { setDeleteReason(''); setDeleteTarget(building); }}
                                             >
                                               <Trash2 className="h-4 w-4" /> حذف
                                             </Button>
@@ -1339,10 +1344,10 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
                                     </Button>
                                   )}
                                   {canDeleteBuilding(building) && (
-                                    <Button size="sm" variant="outline" disabled={references > 0 || Boolean(building.photos?.length) || Boolean(building.documents?.length)}
+                                    <Button size="sm" variant="outline" disabled={!isAdmin && (references > 0 || Boolean(building.photos?.length) || Boolean(building.documents?.length)}
                                       className="gap-1.5 border-red-300 text-red-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-red-50 hover:shadow-md"
-                                      onClick={() => setDeleteTarget(building)}
-                                      title={references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length || building.documents?.length ? 'احذف صور ومرفقات المبنى أولًا' : 'حذف المبنى'}>
+                                      onClick={() => { setDeleteReason(''); setDeleteTarget(building); }}
+                                      title={isAdmin ? 'حذف إداري للبطاقة والمرفقات مع الإبقاء على السجلات المرتبطة مستقلة' : references > 0 ? 'المبنى مرتبط بسجلات ولا يمكن حذفه' : building.photos?.length || building.documents?.length ? 'احذف صور ومرفقات المبنى أولًا' : 'حذف المبنى'}>
                                       <Trash2 className="h-4 w-4" /> حذف
                                     </Button>
                                   )}
@@ -1800,9 +1805,25 @@ export const CentralBuildingsRegistryPage: React.FC = () => {
           <AlertDialogHeader className="text-right sm:text-right">
             <AlertDialogTitle>حذف المبنى من السجل المركزي؟</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم حذف تعريف المبنى فقط إذا لم يكن مرتبطًا بأي سجل تشغيلي.
+              {isAdmin
+                ? 'سيُحذف سجل هذا المبنى نهائيًا، بما فيه الصور والمرفقات. ستبقى الأصول والمعاينات والسجلات التشغيلية محفوظة، ويُفصل ارتباطها بالبطاقة المحذوفة. سيُوثّق الحذف باسم المسؤول.'
+                : 'سيتم حذف تعريف المبنى فقط إذا لم يكن مرتبطًا بأي سجل تشغيلي.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {isAdmin && (
+            <div className="space-y-2 text-right">
+              <Label htmlFor="central-building-delete-reason">سبب الحذف (اختياري)</Label>
+              <Textarea
+                id="central-building-delete-reason"
+                value={deleteReason}
+                onChange={(event) => setDeleteReason(event.target.value)}
+                maxLength={500}
+                rows={2}
+                placeholder="مثال: أخطاء في بيانات الموقع، وسيُعاد إدخال البطاقة بشكل صحيح"
+                className="resize-none"
+              />
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction onClick={() => void confirmDelete()} disabled={saving}>
