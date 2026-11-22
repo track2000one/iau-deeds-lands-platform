@@ -1058,7 +1058,17 @@ export const mosqueApi = {
   ),
   createBuilding: (input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>('/api/mosques/buildings', { method: 'POST', body: JSON.stringify(input) }),
   updateBuilding: (id: string, input: Partial<MosqueBuilding>) => apiJson<MosqueBuilding>(`/api/mosques/buildings/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
-  deleteBuilding: (id: string) => apiJson<void>(`/api/mosques/buildings/${id}`, { method: 'DELETE' }),
+  deleteBuilding: (id: string, reason?: string) => apiJson<{
+    deleted: boolean;
+    unlinkedMosqueSites: number;
+    unlinkedInspections: number;
+    unlinkedAssets: number;
+    unlinkedAccounting: number;
+    mediaCleanupFailures: number;
+  }>(`/api/mosques/buildings/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ reason: reason?.trim() || undefined }),
+  }),
   uploadBuildingPhotos: async (id: string, files: File[]) => {
     const data = new FormData();
     files.forEach((file) => data.append('photos', file));
