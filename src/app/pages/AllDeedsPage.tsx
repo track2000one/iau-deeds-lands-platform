@@ -92,7 +92,8 @@ export const AllDeedsPage: React.FC = () => {
   const [pdfIncludeIndex, setPdfIncludeIndex] = useState(true);
   const [pdfFileName, setPdfFileName] = useState('');
   const [pdfCompression, setPdfCompression] = useState<DeedPdfCompression>('email');
-  const [pdfMaxFileSizeMb, setPdfMaxFileSizeMb] = useState(15);
+  // By default generate one complete PDF; size caps are opt-in for email delivery.
+  const [pdfMaxFileSizeMb, setPdfMaxFileSizeMb] = useState(0);
   const [pdfOversizedAction, setPdfOversizedAction] = useState<'split' | 'block'>('split');
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<DeedBatchPdfProgress | null>(null);
@@ -312,12 +313,12 @@ export const AllDeedsPage: React.FC = () => {
 
       if (result.splitCount > 1) {
         toast.success(
-          `تم تجهيز التقرير في ${result.splitCount} ملفات PDF مستقلة ضمن الحد المحدد، وتنزيلها داخل ملف ZIP واحد. فك ضغط ZIP وأرسل كل جزء على حدة.`,
-          { duration: 12000 },
+          `تم تجميع ${result.deedCount.toLocaleString('ar-SA')} صك في ${result.splitCount.toLocaleString('ar-SA')} أجزاء PDF داخل ملف ZIP؛ العدد على غلاف كل جزء يخص ذلك الجزء فقط.`,
+          { duration: 14000 },
         );
         toast.info(
-          `أحجام الأجزاء: ${result.parts?.map((part, index) => `جزء ${index + 1}: ${part.fileSizeMb.toFixed(1)} MB`).join(' — ') || ''}. لا ترسل ZIP كاملًا إن كان أكبر من حد البريد.`,
-          { duration: 14000 },
+          `توزيع الصكوك: ${result.parts?.map((part, index) => `الجزء ${index + 1}: ${part.deedCount.toLocaleString('ar-SA')} صك (${part.fileSizeMb.toFixed(1)} MB)`).join(' — ') || ''}. فك ضغط ZIP لعرض جميع الأجزاء.`,
+          { duration: 16000 },
         );
       } else {
         toast.success(
@@ -836,6 +837,9 @@ export const AllDeedsPage: React.FC = () => {
               <h3 className="flex items-center gap-2 font-black text-indigo-950">
                 <FileDown className="h-5 w-5" /> التحكم بحجم ملف PDF قبل التنزيل
               </h3>
+              <p className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold leading-6 text-emerald-950">
+                الإعداد الافتراضي: إنشاء ملف PDF واحد للصكوك المختارة دون حد للحجم. إذا اخترت حدًا للحجم وتقسيمًا تلقائيًا، قد يُحمّل التقرير كملف ZIP يحتوي عدة أجزاء؛ لا يعني عدد الصكوك المكتوب على غلاف أحد الأجزاء أنه إجمالي التقرير.
+              </p>
               <p className="text-xs leading-6 text-indigo-900">
                 يتم ضغط الصور وصفحات الغلاف والفهرس وفق الجودة المختارة. تبقى صفحات ملفات PDF الأصلية دون تعديل لحماية وضوح الصكوك.
                 حجم الملف النهائي يعتمد أيضًا على المستندات الأصلية التي جرى دمجها.
@@ -866,7 +870,7 @@ export const AllDeedsPage: React.FC = () => {
                     <option value="15">15 ميجابايت — للبريد الإلكتروني</option>
                     <option value="20">20 ميجابايت</option>
                     <option value="25">25 ميجابايت</option>
-                    <option value="0">بدون حد — تحميل مهما كان الحجم</option>
+                    <option value="0">بدون حد — ملف PDF واحد لجميع الصكوك المتاحة (الافتراضي)</option>
                   </NativeSelect>
                 </div>
               </div>
