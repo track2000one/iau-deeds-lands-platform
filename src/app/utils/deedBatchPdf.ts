@@ -941,22 +941,27 @@ const createDeedsIndexPage = (
   ctx.fillRect(100, 275, 1200, 78);
   ctx.fillStyle = '#143c5b';
   ctx.font = 'bold 29px Tahoma, Arial, sans-serif';
-  ctx.fillText('رقم الصك', 1220, 325);
-  ctx.fillText('المدينة / الحي', 870, 325);
-  ctx.fillText('الصفحة', 255, 325);
+  // Four right-to-left columns: deed number, plan number, city/district, page.
+  // Fixed column widths and canvas maxWidth prevent long values from overlapping.
+  ctx.fillText('رقم الصك', 1240, 325);
+  ctx.fillText('المخطط', 945, 325);
+  ctx.fillText('المدينة / الحي', 665, 325);
+  ctx.textAlign = 'center';
+  ctx.fillText('الصفحة', 220, 325);
   entries.forEach(({ deed, page }, i) => {
     const y = 397 + i * 88;
     ctx.fillStyle = i % 2 ? '#ffffff' : '#eef5f9';
     ctx.fillRect(100, y - 45, 1200, 76);
     ctx.fillStyle = '#1c3d5a';
+    ctx.textAlign = 'right';
     ctx.font = 'bold 28px Tahoma, Arial, sans-serif';
-    ctx.fillText(deed.deedNumber || '—', 1220, y, 320);
+    ctx.fillText(deed.deedNumber || '—', 1240, y, 265);
     ctx.font = '25px Tahoma, Arial, sans-serif';
-    ctx.fillText([deed.city, deed.district].filter(Boolean).join(' — ') || 'غير محدد', 870, y, 490);
+    ctx.fillText(String(deed.planNumber || '').trim() || '—', 945, y, 240);
+    ctx.fillText([deed.city, deed.district].filter(Boolean).join(' — ') || 'غير محدد', 665, y, 345);
     ctx.textAlign = 'center';
     ctx.font = 'bold 31px Tahoma, Arial, sans-serif';
-    ctx.fillText(String(page), 255, y);
-    ctx.textAlign = 'right';
+    ctx.fillText(String(page), 220, y);
   });
   ctx.fillStyle = '#687b8c';
   ctx.textAlign = 'center';
