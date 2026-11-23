@@ -477,6 +477,7 @@ const createCover = (
   documentCount: number,
   scopeLabel: string,
   imageQuality = 0.9,
+  partSummary?: { totalDeeds: number },
 ) => {
   const canvas = document.createElement('canvas');
   canvas.width = 1400;
@@ -517,7 +518,12 @@ const createCover = (
   context.font = '600 34px Tahoma, Arial, sans-serif';
   context.fillText(scopeLabel || 'جميع الصكوك', 1260, 590);
 
-  const cards = [
+  const cards = partSummary ? [
+    ['عدد الصكوك في هذا الجزء', deedCount.toLocaleString('ar-SA')],
+    ['إجمالي الصكوك في جميع الأجزاء', partSummary.totalDeeds.toLocaleString('ar-SA')],
+    ['مرفقات هذا الجزء', documentCount.toLocaleString('ar-SA')],
+    ['تاريخ إنشاء الملف', new Date().toLocaleDateString('ar-SA-u-ca-gregory')],
+  ] : [
     ['عدد الصكوك', deedCount.toLocaleString('ar-SA')],
     ['إجمالي المرفقات المختارة', documentCount.toLocaleString('ar-SA')],
     ['تاريخ إنشاء الملف', new Date().toLocaleDateString('ar-SA-u-ca-gregory')],
@@ -1063,6 +1069,7 @@ const renderDeedPdfPart = async (
   partNumber: number,
   options: DeedBatchPdfOptions,
   quality: number,
+  totalDeeds: number,
 ): Promise<Uint8Array> => {
   const signal = options.signal;
   if (signal?.aborted) throw new DOMException('تم إلغاء إنشاء ملف PDF', 'AbortError');
@@ -1080,6 +1087,7 @@ const renderDeedPdfPart = async (
         spans.reduce((total, item) => total + item.attachmentCount, 0),
         `الجزء ${partNumber} — ${options.scopeLabel || 'مستندات الصكوك'}`,
         quality,
+        { totalDeeds },
       ),
     );
   }
@@ -1147,7 +1155,7 @@ const saveSplitDeedPdfParts = async (
       label: `تقسيم الصكوك إلى أجزاء لا تتجاوز ${targetSizeMb} ميجابايت`,
     });
     const proposed = [...current, span];
-    const proposedBytes = await renderDeedPdfPart(pdf, proposed, completed.length + 1, options, quality);
+    const proposedBytes = await renderDeedPdfPart(pdf, proposed, completed.length + 1, options, quality, spans.length);
     if (proposedBytes.byteLength <= maxBytes) {
       current = proposed;
       currentBytes = proposedBytes;
@@ -1157,7 +1165,7 @@ const saveSplitDeedPdfParts = async (
     if (current.length && currentBytes) {
       completed.push({ spans: current, bytes: currentBytes });
       current = [span];
-      currentBytes = await renderDeedPdfPart(pdf, current, completed.length + 1, options, quality);
+      currentBytes = await renderDeedPdfPart(pdf, current, completed.length + 1, options, quality, spans.length);
     } else {
       current = proposed;
       currentBytes = proposedBytes;
