@@ -195,6 +195,24 @@ test('printing uses report-only CSS and produces a valid PDF document', async ({
   expect(buffer.length).toBeGreaterThan(2500);
 });
 
+test('mosque analytics show an authorized, interactive campus inventory', async ({ page }) => {
+  await setup(page, { role: 'employee', permissions: { reports: { canView: true }, mosques: { canView: true } } });
+  await page.getByRole('button', { name: 'العودة للوحة المؤشرات' }).click();
+  const section = page.getByRole('region', { name: 'مؤشرات المساجد والمصليات الجامعية' });
+  await expect(section).toBeVisible();
+  await expect(section.getByText('حصر المساجد والجوامع والمصليات')).toBeVisible();
+  await expect(section.getByText('مساجد', { exact: true })).toBeVisible();
+  await section.getByLabel('تصفية المساجد والمصليات حسب الحرم').selectOption('الحرم الشرقي');
+  await expect(section.getByText('طلبات جديدة', { exact: true })).toBeVisible();
+});
+test('mosque analytics stay hidden without mosque viewing permission', async ({ page }) => {
+  const requests = await setup(page, { role: 'employee', permissions: { reports: { canView: true }, central_buildings: { canView: true } } });
+  await page.getByRole('button', { name: 'العودة للوحة المؤشرات' }).click();
+  await expect(page.getByRole('region', { name: 'مؤشرات المساجد والمصليات الجامعية' })).toHaveCount(0);
+  expect(requests.filter((path) => path === '/api/mosques/sites')).toHaveLength(0);
+  expect(requests.filter((path) => path === '/api/mosques/dashboard')).toHaveLength(0);
+});
+
 test('dashboard exports its live authorized indicators to browser PDF without changing the CSV action', async ({ page }) => {
   await setup(page, { role: 'employee', permissions: allow(true) });
   await page.getByRole('button', { name: 'العودة للوحة المؤشرات' }).click();
