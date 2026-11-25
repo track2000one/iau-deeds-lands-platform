@@ -22,6 +22,7 @@ import {
 } from '../api/transactionFollowUp';
 import { PLATFORM_LOGO_URL } from '../config/branding';
 import { HomeOperationalAnalytics } from '../components/HomeOperationalAnalytics';
+import { HomeMosqueAnalytics } from '../components/HomeMosqueAnalytics';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -723,6 +724,8 @@ export const HomePage: React.FC = () => {
         followUp={followUp} followUpError={followUpError}
         locale={locale} ui={ui} fmt={fmt}
       />
+
+      {canMosques && <HomeMosqueAnalytics locale={locale} ui={ui} fmt={fmt} />}
 
       <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]" aria-label={ui('التحليل البياني', 'Analytics')}>
         <Card className="future-card min-w-0 overflow-hidden">
