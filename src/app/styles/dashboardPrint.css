@@ -20,7 +20,7 @@
     background: #fff !important; color: #172033 !important;
     font-family: Tahoma, Arial, sans-serif !important;
   }
-  #iau-dashboard-pdf-snapshot #iau-dashboard-print-root {
+  #iau-dashboard-pdf-snapshot #iau-dashboard-print-copy {
     width: 100% !important; max-width: none !important; height: auto !important;
     min-height: 0 !important; max-height: none !important;
     position: static !important; overflow: visible !important;
