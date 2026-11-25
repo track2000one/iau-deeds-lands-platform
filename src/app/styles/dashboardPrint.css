@@ -11,7 +11,7 @@
   }
   /* The live application is fixed at 100vh and scrolls inside <main>.
      Exclude it entirely; print the independent, naturally paginated snapshot. */
-  body > :not(#iau-dashboard-pdf-snapshot) { display: none !important; }
+  body:has(> #iau-dashboard-pdf-snapshot) > :not(#iau-dashboard-pdf-snapshot) { display: none !important; }
   body > #iau-dashboard-pdf-snapshot {
     display: block !important; position: static !important;
     width: 100% !important; height: auto !important; max-height: none !important;
