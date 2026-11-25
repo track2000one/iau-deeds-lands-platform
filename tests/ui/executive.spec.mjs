@@ -26,12 +26,20 @@ const sampleInspections = [
   { id: 'i2', visitDate: '2025-01-01T09:00:00Z', workflowStatus: 'closed', priority: 'normal' },
 ];
 const followUp = { total: 6, open: 3, overdue: 1, waiting: 1, completed: 3, unassigned: 1, needsAction: 2 };
+const mosqueSites = [
+  { id: 'm1', name: 'مسجد تجريبي', siteType: 'mosque', status: 'active', campusLocation: 'الحرم الشرقي', latitude: 26.1, longitude: 50.1 },
+  { id: 'm2', name: 'جامع تجريبي', siteType: 'jami', status: 'maintenance', campusLocation: 'الحرم الغربي' },
+  { id: 'm3', name: 'مصلى تجريبي', siteType: 'prayer_room', status: 'active', campusLocation: 'الحرم الشرقي' },
+];
+const mosqueDashboard = { role: 'head', stats: { sites: 3, newRequests: 2, lateRequests: 1, openTickets: 4, completionTasksActive: 3 } };
 const routes = new Map([
   ['/api/deeds', sampleDeeds],
   ['/api/mosques/buildings', sampleBuildings],
   ['/api/vacant-lands', sampleVacant],
   ['/api/site-inspections', sampleInspections],
   ['/api/transaction-follow-up/dashboard', followUp],
+  ['/api/mosques/sites', mosqueSites],
+  ['/api/mosques/dashboard', mosqueDashboard],
 ]);
 const profile = (role, permissions = {}) => ({
   uid: 'synthetic-test-account', email: 'fixture@example.invalid', username: 'موظف تجريبي',
@@ -73,6 +81,8 @@ async function setup(page, { role = 'admin', permissions = {}, failingPath = '' 
         '/api/vacant-lands': 'vacant_lands',
         '/api/site-inspections': 'site_inspections',
         '/api/transaction-follow-up/dashboard': 'transaction_follow_up',
+        '/api/mosques/sites': 'mosques',
+        '/api/mosques/dashboard': 'mosques',
       }[url.pathname];
       const permitted = role === 'admin' || permissions[moduleForPath]?.canView;
       return permitted ? fulfill(routes.get(url.pathname)) : fulfill({ message: 'Forbidden' }, 403);
@@ -183,6 +193,24 @@ test('printing uses report-only CSS and produces a valid PDF document', async ({
   const document = await PDFDocument.load(buffer);
   expect(document.getPageCount()).toBeGreaterThanOrEqual(1);
   expect(buffer.length).toBeGreaterThan(2500);
+});
+
+test('mosque analytics show an authorized, interactive campus inventory', async ({ page }) => {
+  await setup(page, { role: 'employee', permissions: { reports: { canView: true }, mosques: { canView: true } } });
+  await page.getByRole('button', { name: 'العودة للوحة المؤشرات' }).click();
+  const section = page.getByRole('region', { name: 'مؤشرات المساجد والمصليات الجامعية' });
+  await expect(section).toBeVisible();
+  await expect(section.getByText('حصر المساجد والجوامع والمصليات')).toBeVisible();
+  await expect(section.getByText('مساجد', { exact: true }).first()).toBeVisible();
+  await section.getByLabel('تصفية المساجد والمصليات حسب الحرم').selectOption('الحرم الشرقي');
+  await expect(section.getByText('طلبات جديدة', { exact: true })).toBeVisible();
+});
+test('mosque analytics stay hidden without mosque viewing permission', async ({ page }) => {
+  const requests = await setup(page, { role: 'employee', permissions: { reports: { canView: true }, central_buildings: { canView: true } } });
+  await page.getByRole('button', { name: 'العودة للوحة المؤشرات' }).click();
+  await expect(page.getByRole('region', { name: 'مؤشرات المساجد والمصليات الجامعية' })).toHaveCount(0);
+  expect(requests.filter((path) => path === '/api/mosques/sites')).toHaveLength(0);
+  expect(requests.filter((path) => path === '/api/mosques/dashboard')).toHaveLength(0);
 });
 
 test('dashboard exports its live authorized indicators to browser PDF without changing the CSV action', async ({ page }) => {
