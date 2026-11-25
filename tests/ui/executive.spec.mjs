@@ -230,14 +230,38 @@ test('dashboard exports its live authorized indicators to browser PDF without ch
   });
   await pdfExport.click();
   expect(await page.evaluate(() => window.__dashboardPrintCount)).toBe(1);
+  const printable = page.locator('#iau-dashboard-pdf-snapshot');
+  await expect(printable).toHaveCount(1);
+  await expect(printable.getByText('تقرير مؤشرات أوقاف وأملاك الجامعة')).toBeAttached();
+  await expect(printable.getByText('مؤشرات المساجد والمصليات الجامعية')).toHaveCount(0);
+  await expect(printable.locator('.dashboard-no-print')).toHaveCount(0);
+  await expect(printable.locator('.dashboard-print-exclude')).toHaveCount(0);
+  // Source remains visible on the regular screen; only the separate snapshot prints.
+  await expect(dashboard).toBeVisible();
 
   await page.emulateMedia({ media: 'print' });
-  await expect(dashboard.getByText('تقرير مؤشرات أوقاف وأملاك الجامعة')).toBeVisible();
-  await expect(dashboard.locator('.dashboard-no-print')).toBeHidden();
-  await expect(dashboard).toBeVisible();
+  await expect(printable).toBeVisible();
+  await expect(dashboard).toBeHidden();
 
   const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true });
   const parsed = await PDFDocument.load(pdf);
-  expect(parsed.getPageCount()).toBeGreaterThan(0);
+  // Regression: user-uploaded output was a single clipped page. The report
+  // must span as many sheets as necessary to include the lower dashboard sections.
+  expect(parsed.getPageCount()).toBeGreaterThan(1);
   expect(pdf.length).toBeGreaterThan(3000);
+});
+
+test('PDF print snapshot includes permitted mosque and prayer room indicators', async ({ page }) => {
+  await setup(page, { role: 'admin' });
+  await page.getByRole('button', { name: 'العودة للوحة المؤشرات' }).click();
+  await expect(page.getByRole('region', { name: 'مؤشرات المساجد والمصليات الجامعية' })).toBeVisible();
+  await page.evaluate(() => { window.print = () => {}; });
+  await page.getByRole('button', { name: 'تصدير المؤشرات PDF' }).click();
+  const printable = page.locator('#iau-dashboard-pdf-snapshot');
+  await expect(printable).toHaveCount(1);
+  await expect(printable.locator('h2').filter({ hasText: 'مؤشرات المساجد والمصليات الجامعية' })).toHaveCount(1);
+  await expect(printable.getByText('حصر المساجد والجوامع والمصليات')).toBeAttached();
+  await page.emulateMedia({ media: 'print' });
+  const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true });
+  expect((await PDFDocument.load(pdf)).getPageCount()).toBeGreaterThan(1);
 });

@@ -23,6 +23,8 @@ import {
 import { PLATFORM_LOGO_URL } from '../config/branding';
 import { HomeOperationalAnalytics } from '../components/HomeOperationalAnalytics';
 import { HomeMosqueAnalytics } from '../components/HomeMosqueAnalytics';
+import { printDashboardReport } from '../utils/printDashboardReport';
+import '../styles/dashboardPrint.css';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -383,8 +385,8 @@ export const HomePage: React.FC = () => {
     fontSize: 13,
   };
   const exportPdf = () => {
-    // Native print produces selectable Arabic text and preserves chart visuals without uploading data.
-    if (!dataLoading) window.print();
+    const root = document.getElementById('iau-dashboard-print-root');
+    if (!dataLoading && root) printDashboardReport(root);
   };
   const exportCsv = () => {
     const data = [
@@ -428,7 +430,6 @@ export const HomePage: React.FC = () => {
   return (
     <div id="iau-dashboard-print-root" className="mx-auto w-full max-w-[1760px] min-w-0 space-y-5 pb-8 sm:space-y-6"
       style={{ zoom: dashboardFontSize / 100 }}>
-      <style>{'@media print { @page { size: A4 landscape; margin: 12mm; } html,body { background: #fff !important; overflow: visible !important; } .neo-platform-shell, .app-content-row, .app-main, .iau-route-reveal { height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important; } body * { visibility: hidden !important; } #iau-dashboard-print-root, #iau-dashboard-print-root * { visibility: visible !important; } #iau-dashboard-print-root { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; zoom: 1 !important; transform: none !important; overflow: visible !important; color: #152238 !important; background: white !important; } #iau-dashboard-print-root .dashboard-no-print { display: none !important; } #iau-dashboard-print-root .dashboard-print-meta { display: block !important; } #iau-dashboard-print-root .future-card, #iau-dashboard-print-root .recharts-wrapper, #iau-dashboard-print-root .rounded-xl, #iau-dashboard-print-root .rounded-2xl { break-inside: avoid; page-break-inside: avoid; } #iau-dashboard-print-root h1 { font-size: 20pt !important; } #iau-dashboard-print-root h2 { font-size: 14pt !important; } #iau-dashboard-print-root p, #iau-dashboard-print-root span, #iau-dashboard-print-root td, #iau-dashboard-print-root th { font-size: 10pt !important; } #iau-dashboard-print-root input, #iau-dashboard-print-root select, #iau-dashboard-print-root button { display: none !important; } #iau-dashboard-print-root .bg-card, #iau-dashboard-print-root .future-card { background: white !important; color: #152238 !important; box-shadow: none !important; } #iau-dashboard-print-root .text-muted-foreground { color: #475569 !important; } } @media screen { #iau-dashboard-print-root .dashboard-print-meta { display: none !important; } }'}</style>
       <div className="dashboard-print-meta text-sm font-semibold" dir={ar ? 'rtl' : 'ltr'}>{ui('تقرير مؤشرات أوقاف وأملاك الجامعة', 'University endowments and properties dashboard report')} — {dateLabel}. {ui('تُعرض المؤشرات وفق الصلاحيات المسندة للمستخدم. بيانات المباني المفصلة بحسب الحرم: ', 'Role-scoped indicators. Detailed building campus filter: ')}{selectedCampus || ui('جميع المواقع', 'All campuses')}</div>
       <section className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/15 via-card to-card px-5 py-6 shadow-sm sm:px-7 sm:py-7">
         <div className="pointer-events-none absolute -start-12 -top-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
@@ -1009,7 +1010,7 @@ export const HomePage: React.FC = () => {
           </Card>
         )}
 
-        <Card className="future-card min-w-0 overflow-hidden">
+        <Card className="dashboard-print-exclude future-card min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Layers3 className="h-5 w-5 text-primary" />

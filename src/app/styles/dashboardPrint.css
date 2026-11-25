@@ -1,0 +1,72 @@
+@media screen {
+  #iau-dashboard-pdf-snapshot { display: none !important; }
+  #iau-dashboard-print-root .dashboard-print-meta { display: none !important; }
+}
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  html, body {
+    display: block !important; width: auto !important; height: auto !important;
+    min-height: 0 !important; max-height: none !important; overflow: visible !important;
+    margin: 0 !important; background: #fff !important; color: #172033 !important;
+  }
+  /* The live application is fixed at 100vh and scrolls inside <main>.
+     Exclude it entirely; print the independent, naturally paginated snapshot. */
+  body:has(> #iau-dashboard-pdf-snapshot) > :not(#iau-dashboard-pdf-snapshot) { display: none !important; }
+  body > #iau-dashboard-pdf-snapshot {
+    display: block !important; position: static !important;
+    width: 100% !important; height: auto !important; max-height: none !important;
+    min-height: 0 !important; overflow: visible !important;
+    padding: 0 !important; margin: 0 !important;
+    background: #fff !important; color: #172033 !important;
+    font-family: Tahoma, Arial, sans-serif !important;
+  }
+  #iau-dashboard-pdf-snapshot #iau-dashboard-print-copy {
+    width: 100% !important; max-width: none !important; height: auto !important;
+    min-height: 0 !important; max-height: none !important;
+    position: static !important; overflow: visible !important;
+    zoom: 1 !important; transform: none !important;
+    background: #fff !important; color: #172033 !important;
+    margin: 0 !important; padding: 0 !important;
+  }
+  #iau-dashboard-pdf-snapshot .dashboard-no-print,
+  #iau-dashboard-pdf-snapshot .dashboard-print-exclude,
+  #iau-dashboard-pdf-snapshot input,
+  #iau-dashboard-pdf-snapshot select,
+  #iau-dashboard-pdf-snapshot textarea { display: none !important; }
+  #iau-dashboard-pdf-snapshot .dashboard-print-meta { display: block !important; }
+  #iau-dashboard-pdf-snapshot .overflow-hidden,
+  #iau-dashboard-pdf-snapshot .overflow-y-auto,
+  #iau-dashboard-pdf-snapshot .overflow-x-hidden,
+  #iau-dashboard-pdf-snapshot .max-h-36 {
+    max-height: none !important; overflow: visible !important;
+  }
+  #iau-dashboard-pdf-snapshot .future-card,
+  #iau-dashboard-pdf-snapshot .recharts-wrapper,
+  #iau-dashboard-pdf-snapshot .rounded-xl,
+  #iau-dashboard-pdf-snapshot .rounded-2xl,
+  #iau-dashboard-pdf-snapshot .rounded-3xl {
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  #iau-dashboard-pdf-snapshot section,
+  #iau-dashboard-pdf-snapshot .grid {
+    break-inside: auto; page-break-inside: auto;
+  }
+  #iau-dashboard-pdf-snapshot h1 { font-size: 20pt !important; }
+  #iau-dashboard-pdf-snapshot h2 { font-size: 14pt !important; }
+  #iau-dashboard-pdf-snapshot p,
+  #iau-dashboard-pdf-snapshot span,
+  #iau-dashboard-pdf-snapshot td,
+  #iau-dashboard-pdf-snapshot th { font-size: 10pt !important; }
+  #iau-dashboard-pdf-snapshot .bg-card,
+  #iau-dashboard-pdf-snapshot .future-card {
+    background: #fff !important; color: #172033 !important;
+    box-shadow: none !important;
+  }
+  #iau-dashboard-pdf-snapshot .text-muted-foreground { color: #475569 !important; }
+  #iau-dashboard-pdf-snapshot svg { max-width: 100%; }
+  /* Avoid grid/flex fragmentation clipping from fixed-height widgets. */
+  #iau-dashboard-pdf-snapshot .dashboard-print-meta {
+    font-size: 12pt !important; font-weight: 700 !important;
+    margin: 0 0 14px !important; line-height: 1.5 !important;
+  }
+}
