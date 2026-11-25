@@ -15,6 +15,7 @@ export function printDashboardReport(source: HTMLElement): void {
   clone.style.width = '100%';
   clone.querySelectorAll('.dashboard-no-print, .dashboard-print-exclude').forEach((node) => node.remove());
   clone.querySelectorAll('input, select, textarea').forEach((node) => node.remove());
+  clone.id = 'iau-dashboard-print-copy';
   snapshot.appendChild(clone);
   document.body.appendChild(snapshot);
   const cleanup = () => {
