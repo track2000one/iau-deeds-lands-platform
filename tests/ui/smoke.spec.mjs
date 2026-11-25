@@ -98,6 +98,17 @@ test('release verifier distinguishes up-to-date, newer version and offline error
 });
 
 test('real PDF merger preserves source pages and includes deed, plan and site documents', async ({ page }) => {
+  // The ui-test mode enables a localhost API. Keep this fixture fully synthetic by
+  // returning an empty manifest; the three inline data-URL PDFs remain the source.
+  await page.route('**/api/attachments/deed/**', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', body: '[]',
+  }));
+  await page.route('**/api/attachments/file/**', (route) => route.fulfill({
+    status: 404, contentType: 'application/json', body: '{}',
+  }));
+  await page.route('**/api/attachments/deed-batch-manifest', (route) => route.fulfill({
+    status: 404, contentType: 'application/json', body: '{}',
+  }));
   await page.goto('/tests/ui/harness.html');
   const fixture = page.getByTestId('real-pdf-merge');
   const event = page.waitForEvent('download');
