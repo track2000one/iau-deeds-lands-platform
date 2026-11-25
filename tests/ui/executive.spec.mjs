@@ -259,7 +259,7 @@ test('PDF print snapshot includes permitted mosque and prayer room indicators', 
   await page.getByRole('button', { name: 'تصدير المؤشرات PDF' }).click();
   const printable = page.locator('#iau-dashboard-pdf-snapshot');
   await expect(printable).toHaveCount(1);
-  await expect(printable.getByRole('heading', { name: 'مؤشرات المساجد والمصليات الجامعية' })).toBeAttached();
+  await expect(printable.locator('h2').filter({ hasText: 'مؤشرات المساجد والمصليات الجامعية' })).toHaveCount(1);
   await expect(printable.getByText('حصر المساجد والجوامع والمصليات')).toBeAttached();
   await page.emulateMedia({ media: 'print' });
   const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true });
