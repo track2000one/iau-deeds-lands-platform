@@ -201,7 +201,7 @@ test('mosque analytics show an authorized, interactive campus inventory', async 
   const section = page.getByRole('region', { name: 'مؤشرات المساجد والمصليات الجامعية' });
   await expect(section).toBeVisible();
   await expect(section.getByText('حصر المساجد والجوامع والمصليات')).toBeVisible();
-  await expect(section.getByText('مساجد', { exact: true })).toBeVisible();
+  await expect(section.getByText('مساجد', { exact: true }).first()).toBeVisible();
   await section.getByLabel('تصفية المساجد والمصليات حسب الحرم').selectOption('الحرم الشرقي');
   await expect(section.getByText('طلبات جديدة', { exact: true })).toBeVisible();
 });
