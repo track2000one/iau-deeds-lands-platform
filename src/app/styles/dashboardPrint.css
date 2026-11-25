@@ -1,5 +1,6 @@
 @media screen {
   #iau-dashboard-pdf-snapshot { display: none !important; }
+  #iau-dashboard-print-root .dashboard-print-meta { display: none !important; }
 }
 @media print {
   @page { size: A4 landscape; margin: 12mm; }
