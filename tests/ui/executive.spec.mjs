@@ -250,3 +250,18 @@ test('dashboard exports its live authorized indicators to browser PDF without ch
   expect(parsed.getPageCount()).toBeGreaterThan(1);
   expect(pdf.length).toBeGreaterThan(3000);
 });
+
+test('PDF print snapshot includes permitted mosque and prayer room indicators', async ({ page }) => {
+  await setup(page, { role: 'admin' });
+  await page.getByRole('button', { name: 'العودة للوحة المؤشرات' }).click();
+  await expect(page.getByRole('region', { name: 'مؤشرات المساجد والمصليات الجامعية' })).toBeVisible();
+  await page.evaluate(() => { window.print = () => {}; });
+  await page.getByRole('button', { name: 'تصدير المؤشرات PDF' }).click();
+  const printable = page.locator('#iau-dashboard-pdf-snapshot');
+  await expect(printable).toHaveCount(1);
+  await expect(printable.getByRole('heading', { name: 'مؤشرات المساجد والمصليات الجامعية' })).toBeAttached();
+  await expect(printable.getByText('حصر المساجد والجوامع والمصليات')).toBeAttached();
+  await page.emulateMedia({ media: 'print' });
+  const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true });
+  expect((await PDFDocument.load(pdf)).getPageCount()).toBeGreaterThan(1);
+});
