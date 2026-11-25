@@ -26,12 +26,20 @@ const sampleInspections = [
   { id: 'i2', visitDate: '2025-01-01T09:00:00Z', workflowStatus: 'closed', priority: 'normal' },
 ];
 const followUp = { total: 6, open: 3, overdue: 1, waiting: 1, completed: 3, unassigned: 1, needsAction: 2 };
+const mosqueSites = [
+  { id: 'm1', name: 'مسجد تجريبي', siteType: 'mosque', status: 'active', campusLocation: 'الحرم الشرقي', latitude: 26.1, longitude: 50.1 },
+  { id: 'm2', name: 'جامع تجريبي', siteType: 'jami', status: 'maintenance', campusLocation: 'الحرم الغربي' },
+  { id: 'm3', name: 'مصلى تجريبي', siteType: 'prayer_room', status: 'active', campusLocation: 'الحرم الشرقي' },
+];
+const mosqueDashboard = { role: 'head', stats: { sites: 3, newRequests: 2, lateRequests: 1, openTickets: 4, completionTasksActive: 3 } };
 const routes = new Map([
   ['/api/deeds', sampleDeeds],
   ['/api/mosques/buildings', sampleBuildings],
   ['/api/vacant-lands', sampleVacant],
   ['/api/site-inspections', sampleInspections],
   ['/api/transaction-follow-up/dashboard', followUp],
+  ['/api/mosques/sites', mosqueSites],
+  ['/api/mosques/dashboard', mosqueDashboard],
 ]);
 const profile = (role, permissions = {}) => ({
   uid: 'synthetic-test-account', email: 'fixture@example.invalid', username: 'موظف تجريبي',
@@ -73,6 +81,8 @@ async function setup(page, { role = 'admin', permissions = {}, failingPath = '' 
         '/api/vacant-lands': 'vacant_lands',
         '/api/site-inspections': 'site_inspections',
         '/api/transaction-follow-up/dashboard': 'transaction_follow_up',
+        '/api/mosques/sites': 'mosques',
+        '/api/mosques/dashboard': 'mosques',
       }[url.pathname];
       const permitted = role === 'admin' || permissions[moduleForPath]?.canView;
       return permitted ? fulfill(routes.get(url.pathname)) : fulfill({ message: 'Forbidden' }, 403);
