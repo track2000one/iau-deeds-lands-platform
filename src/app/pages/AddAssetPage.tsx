@@ -25,6 +25,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { AppDateField } from '../components/AppDateField';
+import { AssetFinancialFields } from '../components/AssetFinancialFields';
 import { AssetOfficialTemplateFields } from '../components/AssetOfficialTemplateFields';
 import { createAsset, extractAssetData, uploadAssetFile } from '../api/assets';
 import type { AssetSmartExtraction, AssetSmartExtractionFields } from '../api/assets';
@@ -1055,6 +1056,7 @@ export const AddAssetPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      <AssetFinancialFields value={form} onChange={setForm} />
       <AssetOfficialTemplateFields value={form} onChange={setForm} />
 
       <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-[0_16px_48px_rgba(15,23,42,0.07)] backdrop-blur-xl">
