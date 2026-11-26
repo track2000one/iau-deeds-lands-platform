@@ -105,6 +105,13 @@ const text = (row: Record<string, unknown>, ...names: string[]) => cleanText(pic
 const num = (row: Record<string, unknown>, ...names: string[]) => toNumber(pick(row, ...names));
 const date = (row: Record<string, unknown>, ...names: string[]) => toIsoDate(pick(row, ...names));
 
+const isAssetIdentifierHeading = (value: unknown) => {
+  const key = normalize(value);
+  return /^(رقم الاصل الفريد بالجهه(?:\s*\(.*\))?|رقم الاصل الفريد في نظام وزاره الماليه(?:\s*\(.*\))?|رقم الصنف|رقم الاصل|unique asset number in the entity|unique asset number in mof system|item number|asset number)$/.test(key)
+    || key === normalize('رقم الأصل الفريد بالجهة (الرقم المستخدم حاليا للأصل او الرقم تسلسلي)')
+    || key === normalize('رقم الأصل الفريد في نظام وزارة المالية (الرقم التعريفي)');
+};
+
 const makeFallbackItemNumber = (prefix: string, fileName: string, sourceRow: number) => {
   const safeFile = fileName.replace(/\.xlsx?$/i, '').replace(/[^A-Za-z0-9\u0600-\u06FF]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
   return `XLS-${prefix.toUpperCase()}-${safeFile || 'FILE'}-${sourceRow}`;
@@ -288,6 +295,7 @@ const parseLegacySheet = (workbook: XLSX.WorkBook, sheetName: string, kind: Excl
   const rows: ParsedAssetExcelRow[] = [];
   for (let index = headerRowIndex + 1; index < matrix.length; index += 1) {
     const values = matrix[index]; if (!Array.isArray(values)) continue;
+    if (legacyHeaderScore(values) >= 3) continue;
     const row: Record<string, unknown> = {}; headers.forEach((header,col) => { row[header] = values[col]; });
     if (!Object.entries(row).some(([key,value]) => !key.startsWith('__EMPTY') && cleanText(value) !== '')) continue;
     const input = legacyRowToAsset(row, kind, fileName, fileHash, sheetName, index + 1); if (!input) continue;
@@ -302,12 +310,17 @@ export const parseOfficialAssetExcel = async (file: File): Promise<ParsedAssetEx
   const workbook = XLSX.read(data, { type: 'array', cellDates: true, cellStyles: true });
   const warnings: string[] = [];
   const rows: ParsedAssetExcelRow[] = [];
+  const invalidHeadingRows: string[] = [];
   const modelBInspections = inspectModelBWorkbook(workbook);
   const modelBSheets = new Set(modelBInspections.map((item) => item.sheetName));
 
   for (const item of parseModelBWorkbook(workbook, modelBInspections)) {
     const input = modelBToAsset(item.payload, file.name, fileHash, item.sourceSheet, item.sourceRow);
     if (!input) continue;
+    if (isAssetIdentifierHeading(input.itemNumber)) {
+      invalidHeadingRows.push(`${item.sourceSheet}: ${item.sourceRow}`);
+      continue;
+    }
     rows.push({ sourceFile: file.name, sourceFileHash: fileHash, sourceSheet: item.sourceSheet, sourceRow: item.sourceRow, kind: 'fixed_asset', input });
   }
 
@@ -317,9 +330,16 @@ export const parseOfficialAssetExcel = async (file: File): Promise<ParsedAssetEx
     const kind = classifySheet(sheetName, file.name);
     if (!kind || /mapping|lookup|vlook|list|تعريف|تصنيف وترميز|الاعمار الانتاجيه|حدود الرسمله/i.test(normalize(sheetName))) continue;
     const legacyRows = parseLegacySheet(workbook, sheetName, kind, file.name, fileHash);
-    if (legacyRows.length) { rows.push(...legacyRows); legacyMapped += 1; }
+    if (legacyRows.length) {
+      for (const row of legacyRows) {
+        if (isAssetIdentifierHeading(row.input.itemNumber)) invalidHeadingRows.push(`${row.sourceSheet}: ${row.sourceRow}`);
+        else rows.push(row);
+      }
+      legacyMapped += 1;
+    }
   }
 
+  if (invalidHeadingRows.length) warnings.push(`تم استبعاد ${invalidHeadingRows.length} صف من الاستيراد لأن رقم الأصل يحتوي عنوان عمود Excel وليس معرفًا صالحًا. راجع المصدر: ${invalidHeadingRows.slice(0, 20).join('، ')}`);
   const mappedSheets = modelBInspections.length + legacyMapped;
   const additionalSheets = Math.max(0, workbook.SheetNames.length - mappedSheets);
   if (!rows.length) warnings.push('تمت قراءة جميع أوراق المصنف، لكن لم يتم العثور على سجلات يمكن ربطها تلقائيًا بالسجل المركزي للأصول.');
