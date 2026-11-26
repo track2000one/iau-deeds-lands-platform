@@ -151,7 +151,7 @@ export const reopenAssetCycle = (cycleId: string) =>
   apiJson<AssetUpdateCycle>(`/api/assets/cycles/${cycleId}/reopen`, { method: 'POST' });
 
 export const approveAssetCycle = (cycleId: string) =>
-  apiJson<{ cycle: AssetUpdateCycle; comparison: AssetCycleComparison }>(`/api/assets/cycles/${cycleId}/approve`, { method: 'POST' });
+  apiJson<{ cycle: AssetUpdateCycle; comparison: AssetCycleComparison }>(`/api/assets/cycles/${cycleId}/approve`, { method: 'POST' }, 180_000);
 
 export const confirmAssetCycleRecord = (cycleId: string, recordId: string) =>
   apiJson<AssetCycleRecord>(`/api/assets/cycles/${cycleId}/records/${recordId}/confirm`, { method: 'PATCH' });
