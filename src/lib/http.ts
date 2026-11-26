@@ -66,9 +66,10 @@ export const authenticatedFetch = async (
 
 export const apiJson = async <T,>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
 ): Promise<T> => {
-  const response = await authenticatedFetch(path, options);
+  const response = await authenticatedFetch(path, options, timeoutMs);
 
   if (response.status === 204) {
     return undefined as T;
