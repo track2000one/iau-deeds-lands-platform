@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import type { AssetInput } from '../types/asset';
 import { MODEL_B_VERSION } from '../app/config/fixedAssetModelB';
 import { inspectModelBWorkbook, parseModelBWorkbook } from './fixedAssetModelBWorkbook';
+import { normalizeAssetFieldLabel } from './assetOfficialFields';
 
 export type AssetExcelImportKind =
   | 'fixed_asset'
@@ -98,6 +99,14 @@ const pick = (row: Record<string, unknown>, ...names: string[]) => {
   for (const name of names) {
     const value = row[name];
     if (value !== undefined && value !== null && cleanText(value) !== '') return value;
+  }
+  // The 2024 template appends examples to several Arabic header names.
+  // Match normalized header labels without changing the retained original cells.
+  for (const name of names) {
+    const key = normalizeAssetFieldLabel(name);
+    const match = Object.entries(row).find(([header, value]) =>
+      normalizeAssetFieldLabel(header) === key && cleanText(value) !== '');
+    if (match) return match[1];
   }
   return null;
 };
@@ -290,12 +299,31 @@ const parseLegacySheet = (workbook: XLSX.WorkBook, sheetName: string, kind: Excl
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false });
   let headerRowIndex = -1; let bestScore = 0;
   matrix.slice(0, 20).forEach((row,index) => { const score = legacyHeaderScore(row || []); if (score > bestScore) { bestScore = score; headerRowIndex = index; } });
+  // Official legacy templates: English row 2; Arabic row 3, except the
+  // 2024 infrastructure sheet where the Arabic header is on row 4.
+  // Prefer the Arabic header when both languages are present.
+  const englishIndex = matrix.slice(0, 20).findIndex((row) =>
+    row.some((cell) => normalize(cell) === 'entity code') &&
+    row.some((cell) => normalize(cell) === 'asset description'));
+  if (englishIndex >= 0) {
+    const arabicOffset = matrix.slice(englishIndex + 1, englishIndex + 4).findIndex((row) =>
+      row.some((cell) => normalize(cell).startsWith('اسم الجهه')) &&
+      row.some((cell) => normalize(cell).startsWith('وصف الاصل')));
+    if (arabicOffset >= 0) { headerRowIndex = englishIndex + 1 + arabicOffset; bestScore = 2; }
+  }
   if (headerRowIndex < 0 || bestScore < 2) return [];
-  const headers = (matrix[headerRowIndex] || []).map((value,index) => cleanText(value) || `__EMPTY_${index}`);
+  const seenHeaders = new Set<string>();
+  const headers = (matrix[headerRowIndex] || []).map((value,index) => {
+    const header = cleanText(value) || `__EMPTY_${index}`;
+    if (seenHeaders.has(header)) return `${header} [${XLSX.utils.encode_col(index)}]`;
+    seenHeaders.add(header);
+    return header;
+  });
   const rows: ParsedAssetExcelRow[] = [];
   for (let index = headerRowIndex + 1; index < matrix.length; index += 1) {
     const values = matrix[index]; if (!Array.isArray(values)) continue;
     if (legacyHeaderScore(values) >= 3) continue;
+    if (values.some((value) => /^(الحقول الاجباريه للحصر|الحقول الاجباريه للجرد)$/.test(normalize(value)))) continue;
     const row: Record<string, unknown> = {}; headers.forEach((header,col) => { row[header] = values[col]; });
     if (!Object.entries(row).some(([key,value]) => !key.startsWith('__EMPTY') && cleanText(value) !== '')) continue;
     const input = legacyRowToAsset(row, kind, fileName, fileHash, sheetName, index + 1); if (!input) continue;
