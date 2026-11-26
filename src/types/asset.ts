@@ -114,6 +114,11 @@ export interface AssetRecord {
   serviceDate?: string | null;
   serviceDateType?: 'gregorian' | 'hijri';
   acquisitionCost?: number | null;
+  location?: string | null;
+  depreciationAmount?: string | number | null;
+  accumulatedDepreciation?: string | number | null;
+  residualValue?: string | number | null;
+  netBookValue?: string | number | null;
   supportingCostDocument?: string | null;
   archiveDocumentNumber?: string | null;
   manufacturer?: string | null;
@@ -176,6 +181,11 @@ export type AssetInput = {
   serviceDate?: string | null;
   serviceDateType?: 'gregorian' | 'hijri';
   acquisitionCost?: number | null;
+  location?: string | null;
+  depreciationAmount?: string | number | null;
+  accumulatedDepreciation?: string | number | null;
+  residualValue?: string | number | null;
+  netBookValue?: string | number | null;
   supportingCostDocument?: string | null;
   archiveDocumentNumber?: string | null;
   manufacturer?: string | null;

@@ -113,6 +113,15 @@ const pick = (row: Record<string, unknown>, ...names: string[]) => {
 const text = (row: Record<string, unknown>, ...names: string[]) => cleanText(pick(row, ...names));
 const num = (row: Record<string, unknown>, ...names: string[]) => toNumber(pick(row, ...names));
 const date = (row: Record<string, unknown>, ...names: string[]) => toIsoDate(pick(row, ...names));
+const readFinancialDecimal = (row: Record<string, unknown>, ...names: string[]): string | null => {
+  const raw = pick(row, ...names);
+  if (raw == null || cleanText(raw) === '') return null;
+  const value = digitsToLatin(raw).replace(/٬/g, ',').replace(/٫/g, '.');
+  // Recognize only unambiguous decimal or correctly grouped thousands.
+  const normalized = /^-?\d{1,3}(,\d{3})+(\.\d{1,4})?$/.test(value) ? value.replace(/,/g, '') : value;
+  return /^-?\d{1,16}(\.\d{1,4})?$/.test(normalized) ? normalized : null;
+};
+
 
 const isAssetIdentifierHeading = (value: unknown) => {
   const key = normalize(value);
@@ -251,6 +260,11 @@ const legacyRowToAsset = (row: Record<string, unknown>, kind: Exclude<AssetExcel
   const classification3 = text(row, 'وصف تصنيف الأصول المستوى الثالث - عربي', 'Level 3 FA Module - Arabic Description');
   return {
     itemNumber, name: name || `${KIND_LABELS[kind]} - ${sourceRow}`, category: kind, barcode: null,
+    location: text(row, 'Location', 'الموقع') || null,
+    depreciationAmount: readFinancialDecimal(row, 'قسط الاهلاك', 'قسط الإهلاك', 'Depreciation amount'),
+    accumulatedDepreciation: readFinancialDecimal(row, 'الاستهلاك المتراكم', 'الإهلاك المتراكم', 'Accumulated Depreciation'),
+    residualValue: readFinancialDecimal(row, 'القيمة المتبقية في نهاية العمر', 'Residual Value'),
+    netBookValue: readFinancialDecimal(row, 'القيمة الدفترية', 'Net Book Value'),
     status: statusFromText(text(row, 'حالة استغلال الأصل(يعمل بشكل دائم، احتياطي).', 'Asset Utilization')),
     technicalCondition: text(row, 'حالة الأصل', 'Asset Condition') || null,
     department: responsibleDepartment || null, building: text(row, 'رقم المبنى', 'Building Number') || null,

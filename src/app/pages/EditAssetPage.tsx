@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { AppDateField } from '../components/AppDateField';
+import { AssetFinancialFields } from '../components/AssetFinancialFields';
 import { AssetOfficialTemplateFields } from '../components/AssetOfficialTemplateFields';
 import { normalizeFlexibleDateForInput } from '../../utils/dateUtils';
 import { getAsset, updateAsset, uploadAssetFile } from '../api/assets';
@@ -73,6 +74,8 @@ export const EditAssetPage: React.FC = () => {
           accountingGroup: asset.accountingGroup || '', accountingGroupCode: asset.accountingGroupCode || '', assetCode: asset.assetCode || '', remainingLife: asset.remainingLife ?? null, usefulLife: asset.usefulLife ?? null,
           purchaseDate: normalizeFlexibleDateForInput(asset.purchaseDate, asset.purchaseDateType || 'gregorian'), purchaseDateType: asset.purchaseDateType || 'gregorian', purchaseValue: asset.purchaseValue ?? null,
           serviceDate: normalizeFlexibleDateForInput(asset.serviceDate, asset.serviceDateType || 'gregorian'), serviceDateType: asset.serviceDateType || 'gregorian', acquisitionCost: asset.acquisitionCost ?? asset.purchaseValue ?? null,
+          location: asset.location ?? null, depreciationAmount: asset.depreciationAmount ?? null,
+          accumulatedDepreciation: asset.accumulatedDepreciation ?? null, residualValue: asset.residualValue ?? null, netBookValue: asset.netBookValue ?? null,
           supportingCostDocument: asset.supportingCostDocument || '', archiveDocumentNumber: asset.archiveDocumentNumber || '', manufacturer: asset.manufacturer || '',
           lastInventoryDate: normalizeFlexibleDateForInput(asset.lastInventoryDate, asset.lastInventoryDateType || 'gregorian'), lastInventoryDateType: asset.lastInventoryDateType || 'gregorian',
           unitOfMeasure: asset.unitOfMeasure || '', quantity: asset.quantity ?? 1, excelPayload: asset.excelPayload || { templateType: 'ppe' },
@@ -216,6 +219,7 @@ export const EditAssetPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      <AssetFinancialFields value={form} onChange={setForm} />
       <AssetOfficialTemplateFields value={form} onChange={setForm} />
 
       <Card className="rounded-[28px] border-white/55 bg-white/70 shadow-md">
