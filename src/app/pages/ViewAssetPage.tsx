@@ -19,12 +19,14 @@ import { usePermissions } from '../../context/PermissionsContext';
 import { deleteAsset, getAsset } from '../api/assets';
 import type { AssetRecord } from '../../types/asset';
 import { ASSET_STATUS_LABELS } from '../../types/asset';
+import { ASSET_OFFICIAL_CATEGORY_LABELS, getOfficialAssetFieldRows, isAssetFieldFilled } from '../../utils/assetOfficialFields';
 
 const CATEGORY_LABELS: Record<string, string> = {
   it: 'تقنية معلومات',
   furniture: 'أثاث',
   equipment: 'أجهزة ومعدات',
   vehicle: 'مركبات',
+  intangible: 'أصول غير ملموسة', infrastructure: 'بنية تحتية', land: 'أراضي',
   other: 'أخرى',
 };
 
@@ -58,6 +60,8 @@ export const ViewAssetPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [fieldFilter, setFieldFilter] = useState<'all' | 'filled' | 'missing'>('all');
+  const [fieldSearch, setFieldSearch] = useState('');
 
   const canEdit = isAdmin || hasPermission('assets', 'canEdit');
   const canDelete = isAdmin || hasPermission('assets', 'canDelete');
@@ -480,6 +484,15 @@ export const ViewAssetPage: React.FC = () => {
   }
 
   const attachments = asset.attachments || [];
+  const fieldRows = getOfficialAssetFieldRows(asset.category, asset.excelPayload);
+  const officialRows = fieldRows.filter((field) => field.official);
+  const filledCount = officialRows.filter((field) => isAssetFieldFilled(field.value)).length;
+  const visibleFields = fieldRows.filter((field) => {
+    const filled = isAssetFieldFilled(field.value);
+    const search = fieldSearch.trim().toLowerCase();
+    return (fieldFilter === 'all' || (fieldFilter === 'filled' ? filled : !filled))
+      && (!search || field.label.toLowerCase().includes(search) || field.key.toLowerCase().includes(search));
+  });
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-5 sm:space-y-6">
@@ -608,6 +621,37 @@ export const ViewAssetPage: React.FC = () => {
             <p className="text-xs text-muted-foreground">الملاحظات</p>
             <p className="mt-1 whitespace-pre-wrap leading-7">{displayValue(asset.notes)}</p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[28px] border-border bg-card text-card-foreground shadow-sm">
+        <CardHeader className="border-b">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <FileText className="h-5 w-5 text-primary" /> حقول سجل الترميز الرسمية
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {ASSET_OFFICIAL_CATEGORY_LABELS[asset.category] || CATEGORY_LABELS[asset.category] || asset.category}
+            {' — مرجع 2025 / 2026. عرض بيانات Excel المحفوظة، بما فيها الحقول غير المعبأة، دون تغيير السجل المعتمد.'}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4 p-5">
+          {officialRows.length > 0 && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[['الحقول المرجعية', officialRows.length], ['معبأة في بيانات المصدر', filledCount], ['غير معبأة في بيانات المصدر', officialRows.length - filledCount]].map(([label,value]) =>
+              <div key={label} className="rounded-xl border p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="text-xl font-black">{Number(value).toLocaleString('ar-SA')}</div></div>)}
+          </div>}
+          <p className="text-xs text-muted-foreground">هذه المؤشرات تقيس توفر القيم في بيانات Excel المحفوظة فقط؛ وقد تتوفر بعض القيم في الحقول التشغيلية أعلاه. الحقول غير المعبأة ليست بالضرورة إلزامية.</p>
+          <div className="flex flex-wrap gap-2">
+            <input aria-label="البحث في حقول الترميز" value={fieldSearch} onChange={(event) => setFieldSearch(event.target.value)} placeholder="بحث باسم الحقل..." className="h-10 min-w-0 flex-1 rounded-lg border bg-background px-3 text-sm" />
+            {([['all','الكل'],['filled','المعبأة'],['missing','غير المعبأة']] as const).map(([filter,label]) =>
+              <Button key={filter} size="sm" variant={fieldFilter === filter ? 'default' : 'outline'} onClick={() => setFieldFilter(filter)}>{label}</Button>)}
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {visibleFields.map((field) => <div key={`${field.official ? 'official' : 'extra'}-${field.key}`} className="min-w-0 rounded-xl border bg-background p-3">
+              <div className="flex flex-wrap items-start justify-between gap-1"><p className="text-xs font-semibold text-muted-foreground">{field.label}</p>{!field.official && <Badge variant="outline">حقل إضافي</Badge>}</div>
+              <p className="mt-2 break-words whitespace-pre-wrap text-sm font-medium">{isAssetFieldFilled(field.value) ? (typeof field.value === 'object' ? JSON.stringify(field.value) : String(field.value)) : 'غير معبأ في المصدر'}</p>
+            </div>)}
+          </div>
+          {visibleFields.length === 0 && <p className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">لا توجد حقول مطابقة للبحث أو التصفية.</p>}
         </CardContent>
       </Card>
 
