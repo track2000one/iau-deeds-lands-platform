@@ -625,6 +625,13 @@ export const ViewAssetPage: React.FC = () => {
       </Card>
 
       <Card className="rounded-[28px] border-border bg-card text-card-foreground shadow-sm">
+        <CardHeader className="border-b"><CardTitle className="flex items-center gap-2 text-lg"><FileText className="h-5 w-5 text-primary" /> الموقع والقيم المالية المسجلة</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
+          {([['الموقع', asset.location], ['قسط الإهلاك', asset.depreciationAmount], ['الإهلاك المتراكم', asset.accumulatedDepreciation], ['القيمة المتبقية في نهاية العمر', asset.residualValue], ['القيمة الدفترية', asset.netBookValue]] as const).map(([label,value]) => <div key={label} className="rounded-xl border bg-background p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 break-words font-bold">{value === null || value === undefined || value === '' ? 'غير معبأ' : String(value)}</p></div>)}
+          <p className="text-xs text-muted-foreground sm:col-span-2 xl:col-span-3">القيم المالية بالريال السعودي وفق بيانات الأصل المدخلة، دون حساب تلقائي. بيانات Excel الأصلية معروضة بشكل مستقل أدناه.</p>
+        </CardContent>
+      </Card>
+      <Card className="rounded-[28px] border-border bg-card text-card-foreground shadow-sm">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2 text-lg">
             <FileText className="h-5 w-5 text-primary" /> حقول سجل الترميز الرسمية
